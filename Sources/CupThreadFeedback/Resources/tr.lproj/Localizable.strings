@@ -1,0 +1,70 @@
+/* Turkish Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "Geri Bildirim Gönder";
+"cupthread.feedback.short_summary" = "Kısa özet";
+"cupthread.feedback.title_label" = "Başlık";
+"cupthread.feedback.description_label" = "Açıklama";
+"cupthread.feedback.section_feedback" = "Geri Bildirim";
+"cupthread.feedback.section_feedback_footer" = "Neyin iyi çalıştığını, neyin çalışmadığını ve neleri görmek istediğinizi bize bildirin.";
+"cupthread.feedback.section_contact" = "İletişim";
+"cupthread.feedback.section_contact_footer" = "İsteğe bağlı — yalnızca geri bildiriminiz hakkında sizinle iletişim kurmak için kullanılır.";
+"cupthread.feedback.name_label" = "Ad";
+"cupthread.feedback.email_label" = "E-posta";
+"cupthread.feedback.send_button" = "Geri Bildirim Gönder";
+"cupthread.feedback.sending_button" = "Gönderiliyor…";
+"cupthread.feedback.thanks_title" = "Teşekkürler!";
+"cupthread.feedback.thanks_subtitle" = "Geri bildiriminiz ekibe iletildi.";
+"cupthread.feedback.send_more" = "Daha Fazla Geri Bildirim Gönder";
+"cupthread.feedback.accessibility_sent" = "Geri bildirim başarıyla gönderildi.";
+
+"cupthread.features.title" = "Özellik Talepleri";
+"cupthread.features.search_prompt" = "Özellik taleplerinde ara";
+"cupthread.features.all_versions" = "Tüm Sürümler";
+"cupthread.features.version_picker" = "Sürüm";
+"cupthread.features.filter_by_version" = "Sürüme göre filtrele";
+"cupthread.features.request_a_feature" = "Özellik Öner";
+"cupthread.features.request_a_feature_hint" = "Özellik talebi oluşturma ekranını açar";
+"cupthread.features.empty_title" = "Özellik Talebi Yok";
+"cupthread.features.empty_description" = "Kullanıcılardan gelen öneriler burada görünecektir.";
+"cupthread.features.empty_with_query" = "“%@” için sonuç bulunamadı.";
+"cupthread.features.empty_no_requests" = "Henüz özellik talebi yok.";
+"cupthread.features.submitted_banner" = "Talep gönderildi — ekip onayladıktan sonra görünecektir.";
+"cupthread.features.pending_review" = "İnceleme bekliyor";
+"cupthread.features.anonymous" = "Anonim";
+"cupthread.features.released_in" = "%@ sürümünde yayınlandı";
+"cupthread.features.vote_remove_accessibility" = "Bu talepten oyu kaldır. Şu anda %lld oy.";
+"cupthread.features.vote_add_accessibility" = "Bu talebe oy ver. Şu anda %lld oy.";
+"cupthread.features.vote_own_hint" = "Kendi talebinize oy veremezsiniz.";
+"cupthread.features.vote_toggle_hint" = "Oy durumunu değiştirmek için çift dokunun.";
+"cupthread.features.vote_count_accessibility" = "%lld oy%@";
+"cupthread.features.vote_including_yours" = ", sizin oyunuz dahil";
+"cupthread.features.compose_title" = "Özellik Öner";
+"cupthread.features.compose_submit" = "Gönder";
+"cupthread.features.compose_sending" = "Gönderiliyor…";
+"cupthread.features.compose_name_prompt" = "Adınız (isteğe bağlı)";
+"cupthread.features.compose_desc_prompt" = "Ne geliştirmeliyiz ve neden?";
+
+"cupthread.roadmap.title" = "Yol Haritası";
+"cupthread.roadmap.search_prompt" = "Yol haritasında ara";
+"cupthread.roadmap.column_other" = "Diğer";
+"cupthread.roadmap.empty_column_title" = "%@ içinde öge yok";
+"cupthread.roadmap.empty_column_desc" = "Bu sütuna taşınan talepler burada görünecektir.";
+
+"cupthread.whatsnew.title" = "Yenilikler";
+"cupthread.whatsnew.no_updates_title" = "Henüz Güncelleme Yok";
+"cupthread.whatsnew.no_updates_desc" = "Yeni sürümler çıktıkça sürüm notları burada görünecektir.";
+"cupthread.whatsnew.no_updates_tv" = "Henüz güncelleme yok.";
+"cupthread.whatsnew.shipped_features" = "Yayınlanan Özellikler";
+"cupthread.whatsnew.subscribe_title" = "Ürün güncellemelerini alın";
+"cupthread.whatsnew.subscribe_desc" = "Yeni sürüm notlarını ve ürün duyurularını e-posta ile alın.";
+"cupthread.whatsnew.subscribe_button" = "Güncellemelere Abone Ol";
+"cupthread.whatsnew.subscribe_email_placeholder" = "ad@ornek.com";
+"cupthread.whatsnew.subscribe_modal_title" = "Ürün Güncellemeleri";
+"cupthread.whatsnew.subscribe_modal_sub" = "Yayınlanan sürüm notlarını anında almak için e-postanızı girin.";
+"cupthread.whatsnew.subscribed_success" = "Ürün güncellemelerine abone oldunuz!";
+"cupthread.whatsnew.close_button" = "Kapat";
+"cupthread.whatsnew.done_button" = "Tamam";
+
+"cupthread.error.could_not_load" = "Yüklenemedi";
+"cupthread.error.try_again" = "Yeniden Dene";
+"cupthread.error.accessibility_failed" = "Yükleme başarısız oldu. %@";

@@ -1,0 +1,70 @@
+/* Simplified Chinese Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "发送反馈";
+"cupthread.feedback.short_summary" = "简要概述";
+"cupthread.feedback.title_label" = "标题";
+"cupthread.feedback.description_label" = "详细描述";
+"cupthread.feedback.section_feedback" = "反馈内容";
+"cupthread.feedback.section_feedback_footer" = "告诉我们哪些体验良好、遇到了什么问题，以及期待的改进。";
+"cupthread.feedback.section_contact" = "联系方式";
+"cupthread.feedback.section_contact_footer" = "选填 — 仅用于后续跟进反馈处理进展。";
+"cupthread.feedback.name_label" = "姓名";
+"cupthread.feedback.email_label" = "邮箱";
+"cupthread.feedback.send_button" = "发送反馈";
+"cupthread.feedback.sending_button" = "发送中…";
+"cupthread.feedback.thanks_title" = "感谢反馈！";
+"cupthread.feedback.thanks_subtitle" = "您的反馈已成功送达团队。";
+"cupthread.feedback.send_more" = "发送更多反馈";
+"cupthread.feedback.accessibility_sent" = "反馈已成功发送。";
+
+"cupthread.features.title" = "需求建议";
+"cupthread.features.search_prompt" = "搜索需求建议";
+"cupthread.features.all_versions" = "所有版本";
+"cupthread.features.version_picker" = "版本";
+"cupthread.features.filter_by_version" = "按版本筛选";
+"cupthread.features.request_a_feature" = "提出新需求";
+"cupthread.features.request_a_feature_hint" = "打开需求建议提交面板";
+"cupthread.features.empty_title" = "暂无需求建议";
+"cupthread.features.empty_description" = "其他用户的建议与想法将显示在此处。";
+"cupthread.features.empty_with_query" = "未找到与“%@”相关的结果。";
+"cupthread.features.empty_no_requests" = "暂无需求建议。";
+"cupthread.features.submitted_banner" = "建议已提交 — 团队审核通过后将公开显示。";
+"cupthread.features.pending_review" = "等待审核";
+"cupthread.features.anonymous" = "匿名用户";
+"cupthread.features.released_in" = "已在 %@ 中发布";
+"cupthread.features.vote_remove_accessibility" = "取消对该需求的投票。当前共有 %lld 票。";
+"cupthread.features.vote_add_accessibility" = "为该需求投票。当前共有 %lld 票。";
+"cupthread.features.vote_own_hint" = "您无法为自己提出的需求投票。";
+"cupthread.features.vote_toggle_hint" = "轻点两下切换投票状态。";
+"cupthread.features.vote_count_accessibility" = "%lld 票%@";
+"cupthread.features.vote_including_yours" = "（含您的一票）";
+"cupthread.features.compose_title" = "提出新需求";
+"cupthread.features.compose_submit" = "提交";
+"cupthread.features.compose_sending" = "提交中…";
+"cupthread.features.compose_name_prompt" = "您的姓名（选填）";
+"cupthread.features.compose_desc_prompt" = "希望我们开发什么功能？解决什么场景？";
+
+"cupthread.roadmap.title" = "路线图";
+"cupthread.roadmap.search_prompt" = "搜索路线图";
+"cupthread.roadmap.column_other" = "其他";
+"cupthread.roadmap.empty_column_title" = "%@ 列暂无内容";
+"cupthread.roadmap.empty_column_desc" = "移入该列的需求将显示在此处。";
+
+"cupthread.whatsnew.title" = "最新动态";
+"cupthread.whatsnew.no_updates_title" = "暂无更新";
+"cupthread.whatsnew.no_updates_desc" = "新版本发布后，更新日志将在此呈现。";
+"cupthread.whatsnew.no_updates_tv" = "暂无更新。";
+"cupthread.whatsnew.shipped_features" = "已发布功能";
+"cupthread.whatsnew.subscribe_title" = "获取更新通知";
+"cupthread.whatsnew.subscribe_desc" = "通过邮件接收最新的发布日志与产品通告。";
+"cupthread.whatsnew.subscribe_button" = "订阅更新";
+"cupthread.whatsnew.subscribe_email_placeholder" = "name@example.com";
+"cupthread.whatsnew.subscribe_modal_title" = "产品更新";
+"cupthread.whatsnew.subscribe_modal_sub" = "输入您的邮箱，在新版本发布时第一时间获得通知。";
+"cupthread.whatsnew.subscribed_success" = "您已成功订阅产品更新！";
+"cupthread.whatsnew.close_button" = "关闭";
+"cupthread.whatsnew.done_button" = "完成";
+
+"cupthread.error.could_not_load" = "加载失败";
+"cupthread.error.try_again" = "重试";
+"cupthread.error.accessibility_failed" = "加载失败：%@";

@@ -1,0 +1,70 @@
+/* English Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "Send Feedback";
+"cupthread.feedback.short_summary" = "Short summary";
+"cupthread.feedback.title_label" = "Title";
+"cupthread.feedback.description_label" = "Description";
+"cupthread.feedback.section_feedback" = "Feedback";
+"cupthread.feedback.section_feedback_footer" = "Tell us what worked, what didn't, and what you'd like to see next.";
+"cupthread.feedback.section_contact" = "Contact";
+"cupthread.feedback.section_contact_footer" = "Optional — we'll only use it to follow up on your feedback.";
+"cupthread.feedback.name_label" = "Name";
+"cupthread.feedback.email_label" = "Email";
+"cupthread.feedback.send_button" = "Send Feedback";
+"cupthread.feedback.sending_button" = "Sending…";
+"cupthread.feedback.thanks_title" = "Thanks!";
+"cupthread.feedback.thanks_subtitle" = "Your feedback was sent to the team.";
+"cupthread.feedback.send_more" = "Send More Feedback";
+"cupthread.feedback.accessibility_sent" = "Feedback sent successfully.";
+
+"cupthread.features.title" = "Feature Requests";
+"cupthread.features.search_prompt" = "Search feature requests";
+"cupthread.features.all_versions" = "All Versions";
+"cupthread.features.version_picker" = "Version";
+"cupthread.features.filter_by_version" = "Filter by version";
+"cupthread.features.request_a_feature" = "Request a Feature";
+"cupthread.features.request_a_feature_hint" = "Opens the feature request composer";
+"cupthread.features.empty_title" = "No Feature Requests";
+"cupthread.features.empty_description" = "Ideas from users like you will appear here.";
+"cupthread.features.empty_with_query" = "No results for “%@”.";
+"cupthread.features.empty_no_requests" = "No feature requests yet.";
+"cupthread.features.submitted_banner" = "Request submitted — it'll show once the team approves it.";
+"cupthread.features.pending_review" = "Pending review";
+"cupthread.features.anonymous" = "Anonymous";
+"cupthread.features.released_in" = "Released in %@";
+"cupthread.features.vote_remove_accessibility" = "Remove vote from this request. Currently %lld votes.";
+"cupthread.features.vote_add_accessibility" = "Vote for this request. Currently %lld votes.";
+"cupthread.features.vote_own_hint" = "You can't vote on your own request.";
+"cupthread.features.vote_toggle_hint" = "Double tap to toggle your vote.";
+"cupthread.features.vote_count_accessibility" = "%lld votes%@";
+"cupthread.features.vote_including_yours" = ", including yours";
+"cupthread.features.compose_title" = "Request a Feature";
+"cupthread.features.compose_submit" = "Submit";
+"cupthread.features.compose_sending" = "Sending…";
+"cupthread.features.compose_name_prompt" = "Your name (optional)";
+"cupthread.features.compose_desc_prompt" = "What should we build and why?";
+
+"cupthread.roadmap.title" = "Roadmap";
+"cupthread.roadmap.search_prompt" = "Search the roadmap";
+"cupthread.roadmap.column_other" = "Other";
+"cupthread.roadmap.empty_column_title" = "No items in %@";
+"cupthread.roadmap.empty_column_desc" = "Requests moved to this column will appear here.";
+
+"cupthread.whatsnew.title" = "What's New";
+"cupthread.whatsnew.no_updates_title" = "No Updates Yet";
+"cupthread.whatsnew.no_updates_desc" = "Release notes will appear here as new versions ship.";
+"cupthread.whatsnew.no_updates_tv" = "No updates yet.";
+"cupthread.whatsnew.shipped_features" = "Shipped Features";
+"cupthread.whatsnew.subscribe_title" = "Get product updates";
+"cupthread.whatsnew.subscribe_desc" = "Receive new release notes and product announcements via email.";
+"cupthread.whatsnew.subscribe_button" = "Subscribe to Updates";
+"cupthread.whatsnew.subscribe_email_placeholder" = "name@example.com";
+"cupthread.whatsnew.subscribe_modal_title" = "Product Updates";
+"cupthread.whatsnew.subscribe_modal_sub" = "Enter your email to receive product release notes as soon as they ship.";
+"cupthread.whatsnew.subscribed_success" = "You're subscribed to product updates!";
+"cupthread.whatsnew.close_button" = "Close";
+"cupthread.whatsnew.done_button" = "Done";
+
+"cupthread.error.could_not_load" = "Couldn't Load";
+"cupthread.error.try_again" = "Try Again";
+"cupthread.error.accessibility_failed" = "Failed to load. %@";

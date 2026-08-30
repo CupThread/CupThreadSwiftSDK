@@ -1,0 +1,70 @@
+/* German Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "Feedback senden";
+"cupthread.feedback.short_summary" = "Kurze Zusammenfassung";
+"cupthread.feedback.title_label" = "Titel";
+"cupthread.feedback.description_label" = "Beschreibung";
+"cupthread.feedback.section_feedback" = "Feedback";
+"cupthread.feedback.section_feedback_footer" = "Teilen Sie uns mit, was funktioniert hat, was nicht und was Sie sich wünschen.";
+"cupthread.feedback.section_contact" = "Kontakt";
+"cupthread.feedback.section_contact_footer" = "Optional — wird nur für Rückfragen zu Ihrem Feedback verwendet.";
+"cupthread.feedback.name_label" = "Name";
+"cupthread.feedback.email_label" = "E-Mail";
+"cupthread.feedback.send_button" = "Feedback senden";
+"cupthread.feedback.sending_button" = "Wird gesendet…";
+"cupthread.feedback.thanks_title" = "Vielen Dank!";
+"cupthread.feedback.thanks_subtitle" = "Ihr Feedback wurde an das Team übermittelt.";
+"cupthread.feedback.send_more" = "Weiteres Feedback senden";
+"cupthread.feedback.accessibility_sent" = "Feedback erfolgreich gesendet.";
+
+"cupthread.features.title" = "Funktionsanfragen";
+"cupthread.features.search_prompt" = "Funktionsanfragen suchen";
+"cupthread.features.all_versions" = "Alle Versionen";
+"cupthread.features.version_picker" = "Version";
+"cupthread.features.filter_by_version" = "Nach Version filtern";
+"cupthread.features.request_a_feature" = "Funktion vorschlagen";
+"cupthread.features.request_a_feature_hint" = "Öffnet das Formular für Funktionsanfragen";
+"cupthread.features.empty_title" = "Keine Funktionsanfragen";
+"cupthread.features.empty_description" = "Vorschläge von Nutzern wie Ihnen erscheinen hier.";
+"cupthread.features.empty_with_query" = "Keine Ergebnisse für „%@“.";
+"cupthread.features.empty_no_requests" = "Noch keine Funktionsanfragen vorhanden.";
+"cupthread.features.submitted_banner" = "Anfrage übermittelt — sie wird nach Genehmigung durch das Team angezeigt.";
+"cupthread.features.pending_review" = "Überprüfung ausstehend";
+"cupthread.features.anonymous" = "Anonym";
+"cupthread.features.released_in" = "Veröffentlicht in %@";
+"cupthread.features.vote_remove_accessibility" = "Stimme für diese Anfrage zurückziehen. Aktuell %lld Stimmen.";
+"cupthread.features.vote_add_accessibility" = "Für diese Anfrage abstimmen. Aktuell %lld Stimmen.";
+"cupthread.features.vote_own_hint" = "Sie können nicht für Ihre eigene Anfrage abstimmen.";
+"cupthread.features.vote_toggle_hint" = "Doppeltippen, um Ihre Stimme abzugeben oder zurückzuziehen.";
+"cupthread.features.vote_count_accessibility" = "%lld Stimmen%@";
+"cupthread.features.vote_including_yours" = ", einschließlich Ihrer";
+"cupthread.features.compose_title" = "Funktion vorschlagen";
+"cupthread.features.compose_submit" = "Absenden";
+"cupthread.features.compose_sending" = "Wird gesendet…";
+"cupthread.features.compose_name_prompt" = "Ihr Name (optional)";
+"cupthread.features.compose_desc_prompt" = "Was sollen wir bauen und warum?";
+
+"cupthread.roadmap.title" = "Roadmap";
+"cupthread.roadmap.search_prompt" = "Roadmap durchsuchen";
+"cupthread.roadmap.column_other" = "Sonstige";
+"cupthread.roadmap.empty_column_title" = "Keine Einträge in %@";
+"cupthread.roadmap.empty_column_desc" = "Hierhin verschobene Anfragen werden an dieser Stelle angezeigt.";
+
+"cupthread.whatsnew.title" = "Neuigkeiten";
+"cupthread.whatsnew.no_updates_title" = "Noch keine Updates";
+"cupthread.whatsnew.no_updates_desc" = "Release Notes erscheinen hier, sobald neue Versionen veröffentlicht werden.";
+"cupthread.whatsnew.no_updates_tv" = "Noch keine Updates vorhanden.";
+"cupthread.whatsnew.shipped_features" = "Veröffentlichte Funktionen";
+"cupthread.whatsnew.subscribe_title" = "Produktupdates erhalten";
+"cupthread.whatsnew.subscribe_desc" = "Erhalten Sie neue Release Notes und Produktankündigungen per E-Mail.";
+"cupthread.whatsnew.subscribe_button" = "Updates abonnieren";
+"cupthread.whatsnew.subscribe_email_placeholder" = "name@beispiel.de";
+"cupthread.whatsnew.subscribe_modal_title" = "Produktupdates";
+"cupthread.whatsnew.subscribe_modal_sub" = "Geben Sie Ihre E-Mail-Adresse ein, um über neue Versionen informiert zu werden.";
+"cupthread.whatsnew.subscribed_success" = "Sie haben Produktupdates erfolgreich abonniert!";
+"cupthread.whatsnew.close_button" = "Schließen";
+"cupthread.whatsnew.done_button" = "Fertig";
+
+"cupthread.error.could_not_load" = "Laden fehlgeschlagen";
+"cupthread.error.try_again" = "Erneut versuchen";
+"cupthread.error.accessibility_failed" = "Laden fehlgeschlagen. %@";

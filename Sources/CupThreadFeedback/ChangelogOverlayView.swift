@@ -1,0 +1,298 @@
+import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
+
+// MARK: - Overlay view
+
+/// Sheet that shows the latest published changelog entries using console-configured copy.
+///
+/// Host apps typically present this after launch via `FeedbackClient.presentLatestChangelog()`
+/// or the SwiftUI `.changelogOverlay(client:isPresented:)` modifier.
+public struct ChangelogOverlayView: View {
+    public let client: FeedbackClient
+    public var onPrimary: () -> Void
+    public var onClose: () -> Void
+
+    private let preparedEntries: [ChangelogEntry]?
+    private let preparedAppearance: SdkAppearance?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var entries: [ChangelogEntry] = []
+    @State private var appearance: SdkAppearance = .defaults
+    @State private var isLoading = true
+    @State private var loadError: String?
+
+    public init(
+        client: FeedbackClient,
+        entries: [ChangelogEntry]? = nil,
+        appearance: SdkAppearance? = nil,
+        onPrimary: @escaping () -> Void = {},
+        onClose: @escaping () -> Void = {}
+    ) {
+        self.client = client
+        self.preparedEntries = entries
+        self.preparedAppearance = appearance
+        self.onPrimary = onPrimary
+        self.onClose = onClose
+    }
+
+    private var overlay: ChangelogOverlayConfig { appearance.changelogOverlay }
+
+    public var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let loadError {
+                    LoadErrorView(message: loadError) {
+                        await load()
+                    }
+                } else {
+                    content
+                }
+            }
+            .navigationTitle(overlay.title)
+            #if os(iOS) || os(visionOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(overlay.closeButton) { close() }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !isLoading && loadError == nil {
+                    Button(overlay.primaryButton) { primary() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                }
+            }
+        }
+        .tint(appearance.theme.accentColor)
+        .preferredColorScheme(appearance.theme.preferredColorScheme)
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 480)
+        #endif
+        .task { await load() }
+    }
+
+    private var content: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if !overlay.subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(overlay.subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                if entries.isEmpty {
+                    ContentUnavailableView {
+                        Label(CupThreadStrings.tr("cupthread.whatsnew.no_updates_title"), systemImage: "sparkles")
+                    } description: {
+                        Text(CupThreadStrings.tr("cupthread.whatsnew.no_updates_desc"))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 24)
+                } else {
+                    ForEach(entries) { entry in
+                        ChangelogEntryCard(entry: entry)
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    @MainActor
+    private func load() async {
+        if let preparedAppearance {
+            appearance = preparedAppearance
+        }
+        if let preparedEntries {
+            entries = preparedEntries
+            isLoading = false
+            return
+        }
+
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false }
+        do {
+            let config = try await client.fetchAppConfig()
+            appearance = config.sdk
+            let all = try await client.fetchChangelog()
+            entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    private func close() {
+        onClose()
+        dismiss()
+    }
+
+    private func primary() {
+        onPrimary()
+        dismiss()
+    }
+}
+
+// MARK: - SwiftUI modifier
+
+private struct ChangelogOverlayModifier: ViewModifier {
+    let client: FeedbackClient
+    @Binding var isPresented: Bool
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: $isPresented) {
+            ChangelogOverlayView(
+                client: client,
+                onPrimary: { isPresented = false },
+                onClose: { isPresented = false }
+            )
+        }
+    }
+}
+
+extension View {
+    /// Presents the console-configured latest-changelog overlay as a sheet.
+    public func changelogOverlay(client: FeedbackClient, isPresented: Binding<Bool>) -> some View {
+        modifier(ChangelogOverlayModifier(client: client, isPresented: isPresented))
+    }
+}
+
+// MARK: - Programmatic presentation
+
+extension FeedbackClient {
+    /// Presents the latest changelog overlay using copy and limits from the console.
+    ///
+    /// Returns `false` when changelog is hidden, there is no host window to present
+    /// from, or there are no published entries. Throws if the network request fails.
+    @MainActor
+    @discardableResult
+    public func presentLatestChangelog() async throws -> Bool {
+        guard let prepared = try await prepareChangelogOverlay() else { return false }
+        return await presentPreparedChangelogOverlay(
+            client: self,
+            entries: prepared.entries,
+            appearance: prepared.appearance
+        )
+    }
+
+    /// Fetches overlay configuration and the newest published entries.
+    /// Returns `nil` when the console hid changelog or nothing has been published.
+    public func prepareChangelogOverlay() async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
+        let config = try await fetchAppConfig()
+        guard config.sdk.features.changelog else { return nil }
+        let all = try await fetchChangelog()
+        let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
+        guard !entries.isEmpty else { return nil }
+        return (entries, config.sdk)
+    }
+}
+
+@MainActor
+private func presentPreparedChangelogOverlay(
+    client: FeedbackClient,
+    entries: [ChangelogEntry],
+    appearance: SdkAppearance
+) async -> Bool {
+    await withCheckedContinuation { continuation in
+        final class ResumeBox: @unchecked Sendable {
+            var resumed = false
+            let continuation: CheckedContinuation<Bool, Never>
+            init(_ continuation: CheckedContinuation<Bool, Never>) {
+                self.continuation = continuation
+            }
+            func finish(_ value: Bool) {
+                guard !resumed else { return }
+                resumed = true
+                continuation.resume(returning: value)
+            }
+        }
+        let box = ResumeBox(continuation)
+
+        #if canImport(UIKit) && !os(watchOS)
+        guard let presenter = topViewController() else {
+            box.finish(false)
+            return
+        }
+        let host = UIHostingController(
+            rootView: ChangelogOverlayView(
+                client: client,
+                entries: entries,
+                appearance: appearance,
+                onPrimary: {
+                    presenter.dismiss(animated: true) { box.finish(true) }
+                },
+                onClose: {
+                    presenter.dismiss(animated: true) { box.finish(true) }
+                }
+            )
+            .onDisappear { box.finish(true) }
+        )
+        #if os(tvOS)
+        // .pageSheet is unavailable on tvOS; full-screen default fits the
+        // focus-driven layout better anyway.
+        presenter.present(host, animated: true)
+        #else
+        host.modalPresentationStyle = .pageSheet
+        presenter.present(host, animated: true)
+        #endif
+        #elseif os(macOS)
+        guard let controller = NSApp.keyWindow?.contentViewController ?? NSApp.windows.first?.contentViewController else {
+            box.finish(false)
+            return
+        }
+        let host = NSHostingController(
+            rootView: ChangelogOverlayView(
+                client: client,
+                entries: entries,
+                appearance: appearance,
+                onPrimary: {
+                    controller.dismiss(nil)
+                    box.finish(true)
+                },
+                onClose: {
+                    controller.dismiss(nil)
+                    box.finish(true)
+                }
+            )
+            .onDisappear { box.finish(true) }
+        )
+        controller.presentAsSheet(host)
+        #else
+        box.finish(false)
+        #endif
+    }
+}
+
+#if canImport(UIKit) && !os(watchOS)
+@MainActor
+private func topViewController(base: UIViewController? = nil) -> UIViewController? {
+    let root = base ?? UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .flatMap(\.windows)
+        .first { $0.isKeyWindow }?
+        .rootViewController
+    if let nav = root as? UINavigationController {
+        return topViewController(base: nav.visibleViewController)
+    }
+    if let tab = root as? UITabBarController {
+        return topViewController(base: tab.selectedViewController)
+    }
+    if let presented = root?.presentedViewController {
+        return topViewController(base: presented)
+    }
+    return root
+}
+#endif

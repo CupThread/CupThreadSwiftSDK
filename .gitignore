@@ -1,0 +1,13 @@
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+*.xcworkspace
+!Demo/CupThreadDemo.xcodeproj/project.xcworkspace
+DerivedData/
+.swiftpm/
+build/
+*.zip
+*.framework
+*.xcframework
+node_modules/

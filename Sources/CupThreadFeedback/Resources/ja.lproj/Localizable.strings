@@ -1,0 +1,70 @@
+/* Japanese Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "フィードバックを送信";
+"cupthread.feedback.short_summary" = "要約";
+"cupthread.feedback.title_label" = "タイトル";
+"cupthread.feedback.description_label" = "詳細説明";
+"cupthread.feedback.section_feedback" = "フィードバック内容";
+"cupthread.feedback.section_feedback_footer" = "良かった点、問題点、改善のアイデアなどをお聞かせください。";
+"cupthread.feedback.section_contact" = "ご連絡先";
+"cupthread.feedback.section_contact_footer" = "任意 — フィードバックの確認・返信にのみ使用されます。";
+"cupthread.feedback.name_label" = "お名前";
+"cupthread.feedback.email_label" = "メールアドレス";
+"cupthread.feedback.send_button" = "フィードバックを送信";
+"cupthread.feedback.sending_button" = "送信中…";
+"cupthread.feedback.thanks_title" = "ありがとうございます！";
+"cupthread.feedback.thanks_subtitle" = "フィードバックがチームに送信されました。";
+"cupthread.feedback.send_more" = "さらにフィードバックを送信";
+"cupthread.feedback.accessibility_sent" = "フィードバックが正常に送信されました。";
+
+"cupthread.features.title" = "機能リクエスト";
+"cupthread.features.search_prompt" = "機能リクエストを検索";
+"cupthread.features.all_versions" = "すべてのバージョン";
+"cupthread.features.version_picker" = "バージョン";
+"cupthread.features.filter_by_version" = "バージョンでフィルター";
+"cupthread.features.request_a_feature" = "機能をリクエスト";
+"cupthread.features.request_a_feature_hint" = "機能リクエストの作成画面を開きます。";
+"cupthread.features.empty_title" = "機能リクエストがありません";
+"cupthread.features.empty_description" = "ユーザーからのアイデアや提案がここに表示されます。";
+"cupthread.features.empty_with_query" = "「%@」に一致する結果は見つかりませんでした。";
+"cupthread.features.empty_no_requests" = "機能リクエストはまだありません。";
+"cupthread.features.submitted_banner" = "リクエストを送信しました — チームの承認後に公開されます。";
+"cupthread.features.pending_review" = "レビュー待ち";
+"cupthread.features.anonymous" = "匿名ユーザー";
+"cupthread.features.released_in" = "%@ でリリース済み";
+"cupthread.features.vote_remove_accessibility" = "このリクエストへの投票を取り消す。現在 %lld 票。";
+"cupthread.features.vote_add_accessibility" = "このリクエストに投票する。現在 %lld 票。";
+"cupthread.features.vote_own_hint" = "自分が投稿したリクエストには投票できません。";
+"cupthread.features.vote_toggle_hint" = "ダブルタップで投票を切り替えます。";
+"cupthread.features.vote_count_accessibility" = "%lld 票%@";
+"cupthread.features.vote_including_yours" = "（あなたの1票を含む）";
+"cupthread.features.compose_title" = "機能をリクエスト";
+"cupthread.features.compose_submit" = "送信";
+"cupthread.features.compose_sending" = "送信中…";
+"cupthread.features.compose_name_prompt" = "お名前（任意）";
+"cupthread.features.compose_desc_prompt" = "どのような機能が必要ですか？ 理由や用途を教えてください。";
+
+"cupthread.roadmap.title" = "ロードマップ";
+"cupthread.roadmap.search_prompt" = "ロードマップを検索";
+"cupthread.roadmap.column_other" = "その他";
+"cupthread.roadmap.empty_column_title" = "%@ に項目はありません";
+"cupthread.roadmap.empty_column_desc" = "このカラムに移動されたリクエストがここに表示されます。";
+
+"cupthread.whatsnew.title" = "最新情報";
+"cupthread.whatsnew.no_updates_title" = "更新情報はまだありません";
+"cupthread.whatsnew.no_updates_desc" = "新しいバージョンがリリースされると、ここに更新履歴が表示されます。";
+"cupthread.whatsnew.no_updates_tv" = "更新情報はまだありません。";
+"cupthread.whatsnew.shipped_features" = "リリースされた機能";
+"cupthread.whatsnew.subscribe_title" = "最新情報を受け取る";
+"cupthread.whatsnew.subscribe_desc" = "新しいリリースノートやお知らせをメールで受け取ります。";
+"cupthread.whatsnew.subscribe_button" = "更新通知を購読";
+"cupthread.whatsnew.subscribe_email_placeholder" = "name@example.com";
+"cupthread.whatsnew.subscribe_modal_title" = "製品アップデート";
+"cupthread.whatsnew.subscribe_modal_sub" = "メールアドレスを入力して、新バージョンリリース時に通知を受け取りましょう。";
+"cupthread.whatsnew.subscribed_success" = "アップデート通知を購読しました！";
+"cupthread.whatsnew.close_button" = "閉じる";
+"cupthread.whatsnew.done_button" = "完了";
+
+"cupthread.error.could_not_load" = "読み込めませんでした";
+"cupthread.error.try_again" = "再試行";
+"cupthread.error.accessibility_failed" = "読み込みに失敗しました: %@";

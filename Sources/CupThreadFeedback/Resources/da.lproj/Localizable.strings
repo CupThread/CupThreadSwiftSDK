@@ -1,0 +1,70 @@
+/* Danish Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "Send feedback";
+"cupthread.feedback.short_summary" = "Kort resumé";
+"cupthread.feedback.title_label" = "Titel";
+"cupthread.feedback.description_label" = "Beskrivelse";
+"cupthread.feedback.section_feedback" = "Feedback";
+"cupthread.feedback.section_feedback_footer" = "Fortæl os, hvad der fungerede, hvad der ikke gjorde, og hvad du gerne vil se næste gang.";
+"cupthread.feedback.section_contact" = "Kontakt";
+"cupthread.feedback.section_contact_footer" = "Valgfrit — vi bruger det kun til at følge op på din feedback.";
+"cupthread.feedback.name_label" = "Navn";
+"cupthread.feedback.email_label" = "E-mail";
+"cupthread.feedback.send_button" = "Send feedback";
+"cupthread.feedback.sending_button" = "Sender…";
+"cupthread.feedback.thanks_title" = "Mange tak!";
+"cupthread.feedback.thanks_subtitle" = "Din feedback er sendt til teamet.";
+"cupthread.feedback.send_more" = "Send mere feedback";
+"cupthread.feedback.accessibility_sent" = "Feedback blev sendt.";
+
+"cupthread.features.title" = "Funktionsønsker";
+"cupthread.features.search_prompt" = "Søg i funktionsønsker";
+"cupthread.features.all_versions" = "Alle versioner";
+"cupthread.features.version_picker" = "Version";
+"cupthread.features.filter_by_version" = "Filtrer efter version";
+"cupthread.features.request_a_feature" = "Foreslå funktion";
+"cupthread.features.request_a_feature_hint" = "Åbner formularen til funktionsforslag";
+"cupthread.features.empty_title" = "Ingen funktionsønsker";
+"cupthread.features.empty_description" = "Forslag fra brugere som dig vises her.";
+"cupthread.features.empty_with_query" = "Ingen resultater for "%@".";
+"cupthread.features.empty_no_requests" = "Ingen funktionsønsker endnu.";
+"cupthread.features.submitted_banner" = "Ønske indsendt — det vises, så snart teamet har godkendt det.";
+"cupthread.features.pending_review" = "Afventer vurdering";
+"cupthread.features.anonymous" = "Anonym";
+"cupthread.features.released_in" = "Udgivet i %@";
+"cupthread.features.vote_remove_accessibility" = "Fjern stemme fra dette ønske. Har i øjeblikket %lld stemmer.";
+"cupthread.features.vote_add_accessibility" = "Stem på dette ønske. Har i øjeblikket %lld stemmer.";
+"cupthread.features.vote_own_hint" = "Du kan ikke stemme på dit eget ønske.";
+"cupthread.features.vote_toggle_hint" = "Dobbelttryk for at ændre din stemme.";
+"cupthread.features.vote_count_accessibility" = "%lld stemmer%@";
+"cupthread.features.vote_including_yours" = ", inklusive din";
+"cupthread.features.compose_title" = "Foreslå funktion";
+"cupthread.features.compose_submit" = "Indsend";
+"cupthread.features.compose_sending" = "Sender…";
+"cupthread.features.compose_name_prompt" = "Dit navn (valgfrit)";
+"cupthread.features.compose_desc_prompt" = "Hvad skal vi bygge og hvorfor?";
+
+"cupthread.roadmap.title" = "Køreplan";
+"cupthread.roadmap.search_prompt" = "Søg i køreplan";
+"cupthread.roadmap.column_other" = "Andet";
+"cupthread.roadmap.empty_column_title" = "Ingen elementer i %@";
+"cupthread.roadmap.empty_column_desc" = "Ønsker, der flyttes til denne kolonne, vises her.";
+
+"cupthread.whatsnew.title" = "Nyheder";
+"cupthread.whatsnew.no_updates_title" = "Ingen opdateringer endnu";
+"cupthread.whatsnew.no_updates_desc" = "Udgivelsesnoter vises her, når nye versioner udgives.";
+"cupthread.whatsnew.no_updates_tv" = "Ingen opdateringer endnu.";
+"cupthread.whatsnew.shipped_features" = "Udgivne funktioner";
+"cupthread.whatsnew.subscribe_title" = "Modtag produktopdateringer";
+"cupthread.whatsnew.subscribe_desc" = "Modtag nye udgivelsesnoter og produktnyheder via e-mail.";
+"cupthread.whatsnew.subscribe_button" = "Abonner på opdateringer";
+"cupthread.whatsnew.subscribe_email_placeholder" = "navn@eksempel.dk";
+"cupthread.whatsnew.subscribe_modal_title" = "Produktopdateringer";
+"cupthread.whatsnew.subscribe_modal_sub" = "Indtast din e-mail for at modtage udgivelsesnoter, så snart de udgives.";
+"cupthread.whatsnew.subscribed_success" = "Du er nu tilmeldt produktopdateringer!";
+"cupthread.whatsnew.close_button" = "Luk";
+"cupthread.whatsnew.done_button" = "Færdig";
+
+"cupthread.error.could_not_load" = "Kunne ikke indlæse";
+"cupthread.error.try_again" = "Prøv igen";
+"cupthread.error.accessibility_failed" = "Indlæsning mislykkedes. %@";

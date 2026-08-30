@@ -1,0 +1,70 @@
+/* Spanish Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "Enviar feedback";
+"cupthread.feedback.short_summary" = "Resumen breve";
+"cupthread.feedback.title_label" = "Título";
+"cupthread.feedback.description_label" = "Descripción";
+"cupthread.feedback.section_feedback" = "Feedback";
+"cupthread.feedback.section_feedback_footer" = "Cuéntanos qué funcionó, qué no y qué te gustaría ver en el futuro.";
+"cupthread.feedback.section_contact" = "Contacto";
+"cupthread.feedback.section_contact_footer" = "Opcional — solo se utilizará para el seguimiento de tu feedback.";
+"cupthread.feedback.name_label" = "Nombre";
+"cupthread.feedback.email_label" = "Correo electrónico";
+"cupthread.feedback.send_button" = "Enviar feedback";
+"cupthread.feedback.sending_button" = "Enviando…";
+"cupthread.feedback.thanks_title" = "¡Gracias!";
+"cupthread.feedback.thanks_subtitle" = "Tu feedback ha sido enviado al equipo.";
+"cupthread.feedback.send_more" = "Enviar más feedback";
+"cupthread.feedback.accessibility_sent" = "Feedback enviado correctamente.";
+
+"cupthread.features.title" = "Solicitudes de funciones";
+"cupthread.features.search_prompt" = "Buscar solicitudes de funciones";
+"cupthread.features.all_versions" = "Todas las versiones";
+"cupthread.features.version_picker" = "Versión";
+"cupthread.features.filter_by_version" = "Filtrar por versión";
+"cupthread.features.request_a_feature" = "Sugerir una función";
+"cupthread.features.request_a_feature_hint" = "Abre el formulario de sugerencia de funciones";
+"cupthread.features.empty_title" = "No hay solicitudes";
+"cupthread.features.empty_description" = "Las ideas de usuarios como tú aparecerán aquí.";
+"cupthread.features.empty_with_query" = "No hay resultados para «%@».";
+"cupthread.features.empty_no_requests" = "No hay solicitudes de funciones todavía.";
+"cupthread.features.submitted_banner" = "Solicitud enviada — aparecerá una vez que el equipo la apruebe.";
+"cupthread.features.pending_review" = "Pendiente de revisión";
+"cupthread.features.anonymous" = "Anónimo";
+"cupthread.features.released_in" = "Publicada en %@";
+"cupthread.features.vote_remove_accessibility" = "Quitar tu voto de esta solicitud. Actualmente %lld votos.";
+"cupthread.features.vote_add_accessibility" = "Votar por esta solicitud. Actualmente %lld votos.";
+"cupthread.features.vote_own_hint" = "No puedes votar por tu propia solicitud.";
+"cupthread.features.vote_toggle_hint" = "Toca dos veces para emitir o quitar tu voto.";
+"cupthread.features.vote_count_accessibility" = "%lld votos%@";
+"cupthread.features.vote_including_yours" = ", incluido el tuyo";
+"cupthread.features.compose_title" = "Sugerir una función";
+"cupthread.features.compose_submit" = "Enviar";
+"cupthread.features.compose_sending" = "Enviando…";
+"cupthread.features.compose_name_prompt" = "Tu nombre (opcional)";
+"cupthread.features.compose_desc_prompt" = "¿Qué deberíamos construir y por qué?";
+
+"cupthread.roadmap.title" = "Hoja de ruta";
+"cupthread.roadmap.search_prompt" = "Buscar en la hoja de ruta";
+"cupthread.roadmap.column_other" = "Otro";
+"cupthread.roadmap.empty_column_title" = "No hay elementos en %@";
+"cupthread.roadmap.empty_column_desc" = "Las solicitudes movidas a esta columna aparecerán aquí.";
+
+"cupthread.whatsnew.title" = "Novedades";
+"cupthread.whatsnew.no_updates_title" = "No hay actualizaciones";
+"cupthread.whatsnew.no_updates_desc" = "Las notas de la versión aparecerán aquí a medida que se lancen nuevas versiones.";
+"cupthread.whatsnew.no_updates_tv" = "No hay actualizaciones todavía.";
+"cupthread.whatsnew.shipped_features" = "Funciones publicadas";
+"cupthread.whatsnew.subscribe_title" = "Recibir actualizaciones";
+"cupthread.whatsnew.subscribe_desc" = "Recibe nuevas notas de versión y anuncios de producto por correo electrónico.";
+"cupthread.whatsnew.subscribe_button" = "Suscribirse a las novedades";
+"cupthread.whatsnew.subscribe_email_placeholder" = "nombre@ejemplo.es";
+"cupthread.whatsnew.subscribe_modal_title" = "Actualizaciones del producto";
+"cupthread.whatsnew.subscribe_modal_sub" = "Introduce tu correo para recibir las novedades en cuanto se publiquen.";
+"cupthread.whatsnew.subscribed_success" = "¡Te has suscrito a las actualizaciones del producto!";
+"cupthread.whatsnew.close_button" = "Cerrar";
+"cupthread.whatsnew.done_button" = "Hecho";
+
+"cupthread.error.could_not_load" = "No se pudo cargar";
+"cupthread.error.try_again" = "Reintentar";
+"cupthread.error.accessibility_failed" = "Error al cargar. %@";
