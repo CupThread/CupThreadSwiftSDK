@@ -10,15 +10,20 @@ jobs:
   lint:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install SwiftLint
-        run: brew install swiftlint
+        run: |
+          brew untap aws/tap 2>/dev/null || true
+          brew install swiftlint
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
       - name: Run SwiftLint
         run: swiftlint lint --strict
   test:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Run Swift Tests
