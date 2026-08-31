@@ -73,4 +73,13 @@ sed -i '' "s#<script>var baseUrl = \"[^\"]*\"</script>#&<script>if(location.path
 # Optional DocC theme-settings file; a stub avoids a benign 404 in the console.
 printf '{}\n' > "$OUTPUT_DIR/theme-settings.json"
 
+# Sync static resources (such as .webp images) to all DocC SPA image locations
+RESOURCES_DIR="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources"
+if [ -d "$RESOURCES_DIR" ]; then
+    mkdir -p "$OUTPUT_DIR/images" "$OUTPUT_DIR/images/cupthreadswiftsdk.CupThreadFeedback" "$OUTPUT_DIR/images/cupthreadfeedback"
+    cp -R "$RESOURCES_DIR"/* "$OUTPUT_DIR/images/" 2>/dev/null || true
+    cp -R "$RESOURCES_DIR"/* "$OUTPUT_DIR/images/cupthreadswiftsdk.CupThreadFeedback/" 2>/dev/null || true
+    cp -R "$RESOURCES_DIR"/* "$OUTPUT_DIR/images/cupthreadfeedback/" 2>/dev/null || true
+fi
+
 echo "==> Documentation site written to $OUTPUT_DIR/"
