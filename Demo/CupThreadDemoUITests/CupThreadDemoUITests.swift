@@ -20,7 +20,7 @@ final class CupThreadDemoUITests: XCTestCase {
         // Allow UI animations and render loop to settle
         Thread.sleep(forTimeInterval: 1.0)
 
-        saveScreenshot(app.screenshot(), name: "roadmap")
+        saveScreenshot(XCUIScreen.main.screenshot(), name: "roadmap")
     }
 
     @MainActor
@@ -34,7 +34,7 @@ final class CupThreadDemoUITests: XCTestCase {
 
         Thread.sleep(forTimeInterval: 1.0)
 
-        saveScreenshot(app.screenshot(), name: "feature_requests")
+        saveScreenshot(XCUIScreen.main.screenshot(), name: "feature_requests")
     }
 
     @MainActor
@@ -48,7 +48,7 @@ final class CupThreadDemoUITests: XCTestCase {
 
         Thread.sleep(forTimeInterval: 1.0)
 
-        saveScreenshot(app.screenshot(), name: "submit_request")
+        saveScreenshot(XCUIScreen.main.screenshot(), name: "submit_request")
     }
 
     @MainActor
@@ -62,7 +62,7 @@ final class CupThreadDemoUITests: XCTestCase {
 
         Thread.sleep(forTimeInterval: 1.0)
 
-        saveScreenshot(app.screenshot(), name: "whats_new")
+        saveScreenshot(XCUIScreen.main.screenshot(), name: "whats_new")
     }
 
     @MainActor
@@ -78,7 +78,7 @@ final class CupThreadDemoUITests: XCTestCase {
 
         Thread.sleep(forTimeInterval: 1.0)
 
-        saveScreenshot(app.screenshot(), name: "changelog_overlay")
+        saveScreenshot(XCUIScreen.main.screenshot(), name: "changelog_overlay")
     }
 
     @MainActor
@@ -92,7 +92,7 @@ final class CupThreadDemoUITests: XCTestCase {
 
         Thread.sleep(forTimeInterval: 1.0)
 
-        saveScreenshot(app.screenshot(), name: "feedback_composer")
+        saveScreenshot(XCUIScreen.main.screenshot(), name: "feedback_composer")
     }
 
     // MARK: - Interactive Navigation Test
