@@ -15,3 +15,6 @@ node_modules/
 # DocC build artifacts (.docc catalogs under Sources are committed)
 .docbuild/
 docs-site/
+
+# ZCode agent session files
+.zcode/
