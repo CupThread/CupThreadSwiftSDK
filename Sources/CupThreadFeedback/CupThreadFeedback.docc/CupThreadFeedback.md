@@ -67,3 +67,7 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 - ``BoardColumn``: A roadmap board column.
 - ``AppVersion``: A released or planned app version.
 - ``FeedbackClientError``: Errors thrown by ``FeedbackClient``.
+
+## Agentic coding
+
+This SDK is engineered to be **Agentic Coding friendly** for LLMs and AI pair programmers with zero third-party dependencies, clean architecture, and comprehensive DocC documentation. Companion skills, CLI tools, and agent workflows are available at [CupThreadAgenticCoding](https://github.com/CupThread/CupThreadAgenticCoding).

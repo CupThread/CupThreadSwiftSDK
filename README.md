@@ -10,6 +10,14 @@ Part of the [CupThread.com](https://cupthread.com) platform.
 - 🤖 [CupThread/CupThreadAndroidSDK](https://github.com/CupThread/CupThreadAndroidSDK) — Android SDK (Jetpack Compose / Maven).
 - 🧠 [CupThread/CupThreadAgenticCoding](https://github.com/CupThread/CupThreadAgenticCoding) — AI-friendly CLI & Skills for pair programming.
 
+## 🤖 Agentic Coding Friendly
+
+This repository is designed from the ground up to be **Agentic Coding friendly** for LLMs, coding agents, and pair programmers:
+- **Zero third-party dependencies**: Lightweight, deterministic builds without external dependency conflicts.
+- **Strict type consistency**: Full alignment with CupThread Public API schemas.
+- **100% DocC documentation**: Complete symbol docs, parameter annotations, and visual screenshot guides.
+- **AI skills & pair programming tooling**: Companion skills, CLI tools, and agent workflows are maintained in [CupThread/CupThreadAgenticCoding](https://github.com/CupThread/CupThreadAgenticCoding).
+
 ---
 
 ## Visual Showcase
