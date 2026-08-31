@@ -7,7 +7,7 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 ## Getting started
 
 - <doc:GettingStarted>
-- <doc:Presenting-the-Changelog-Overlay>
+- <doc:PresentingTheChangelogOverlay>
 
 ## Core types
 

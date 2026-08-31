@@ -25,6 +25,7 @@ for name in roadmap feature_requests submit_request whats_new changelog_overlay 
     if [ -f "$src_png" ]; then
         echo "Converting $name.png -> $name.webp..."
         cwebp -q 90 -m 6 "$src_png" -o "$DOCC_RES_DIR/$name.webp" >/dev/null 2>&1
+        cp "$DOCC_RES_DIR/$name.webp" "$DOCS_DIR/screenshots/$name.webp"
         rm -f "$src_png"
     fi
 done

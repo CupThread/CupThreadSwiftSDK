@@ -71,13 +71,13 @@ Each view adapts to its platform: iPhone gets a compact paged layout, iPad/macOS
 
 ### Visual Preview
 
-![CupThread Roadmap Surface](roadmap.webp)
+![CupThread Roadmap Surface](roadmap.png)
 
-![CupThread Feature Requests Surface](feature_requests.webp)
+![CupThread Feature Requests Surface](feature_requests.png)
 
-![CupThread What's New Surface](whats_new.webp)
+![CupThread What's New Surface](whats_new.png)
 
-![CupThread Feedback Composer](feedback_composer.webp)
+![CupThread Feedback Composer](feedback_composer.png)
 
 ## Gate surfaces from the console
 
