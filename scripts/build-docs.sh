@@ -13,6 +13,13 @@
 # can be deployed to GitHub Pages directly — see .github/workflows/docs.yml —
 # or previewed locally with:
 #   python3 -m http.server 8080 --directory docs-site
+#
+# Base-path note: the path MUST be injected while BUILDING the archive
+# (docc convert, via OTHER_DOCC_FLAGS). Newer docc versions ignore
+# --hosting-base-path on `process-archive transform-for-static-hosting`, so
+# passing it only at transform time yields index.html with root-relative
+# asset URLs (blank page when hosted under a subpath). We still pass it to
+# the transform too, for docc versions that only honor it there.
 set -eu
 
 SCHEME="CupThreadFeedback"
@@ -27,11 +34,23 @@ else
     [ -n "$BASE_PATH" ] || BASE_PATH="$SCHEME"
 fi
 
+# Normalize: docc wants a leading slash and no trailing slash ("/CupThreadSwiftSDK").
+BASE_PATH="${BASE_PATH%/}"
+BASE_PATH="/${BASE_PATH#/}"
+
 echo "==> Building $SCHEME.doccarchive (base path: $BASE_PATH)"
-xcodebuild docbuild \
-    -scheme "$SCHEME" \
-    -destination 'generic/platform=iOS Simulator' \
-    -derivedDataPath "$DERIVED_DATA"
+if [ "$BASE_PATH" = "/" ]; then
+    xcodebuild docbuild \
+        -scheme "$SCHEME" \
+        -destination 'generic/platform=iOS Simulator' \
+        -derivedDataPath "$DERIVED_DATA"
+else
+    xcodebuild docbuild \
+        -scheme "$SCHEME" \
+        -destination 'generic/platform=iOS Simulator' \
+        -derivedDataPath "$DERIVED_DATA" \
+        "OTHER_DOCC_FLAGS=--hosting-base-path $BASE_PATH"
+fi
 
 echo "==> Transforming archive for static hosting"
 rm -rf "$OUTPUT_DIR"
