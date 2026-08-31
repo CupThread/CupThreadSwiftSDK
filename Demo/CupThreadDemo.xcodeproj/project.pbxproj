@@ -6,6 +6,7 @@
   objects = {
     A10000000000000000000001 = {isa = PBXBuildFile; fileRef = A10000000000000000000002; };
     A10000000000000000000003 = {isa = PBXBuildFile; fileRef = A10000000000000000000004; };
+    A10000000000000000000013 = {isa = PBXBuildFile; fileRef = A10000000000000000000012; };
     A20000000000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = ../; };
     A20000000000000000000002 = {isa = XCSwiftPackageProductDependency; productName = CupThreadFeedback; package = A20000000000000000000001; };
     A20000000000000000000004 = {isa = PBXBuildFile; productRef = A20000000000000000000002; };
@@ -17,21 +18,68 @@
     };
     A10000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CupThreadDemoApp.swift; sourceTree = "<group>"; };
     A10000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+    A10000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoMockURLProtocol.swift; sourceTree = "<group>"; };
     A10000000000000000000005 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CupThreadDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+    
+    B10000000000000000000001 = {
+      isa = PBXContainerItemProxy;
+      containerPortal = A1000000000000000000000C;
+      proxyType = 1;
+      remoteGlobalIDString = A10000000000000000000009;
+      remoteInfo = CupThreadDemo;
+    };
+    B10000000000000000000002 = {
+      isa = PBXTargetDependency;
+      target = A10000000000000000000009;
+      targetProxy = B10000000000000000000001;
+    };
+    B10000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CupThreadDemoUITests.swift; sourceTree = "<group>"; };
+    B10000000000000000000004 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CupThreadDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+    B10000000000000000000005 = {isa = PBXBuildFile; fileRef = B10000000000000000000003; };
+    B10000000000000000000006 = {
+      isa = PBXSourcesBuildPhase;
+      buildActionMask = 2147483647;
+      files = (B10000000000000000000005);
+      runOnlyForDeploymentPostprocessing = 0;
+    };
+    B10000000000000000000007 = {
+      isa = PBXFrameworksBuildPhase;
+      buildActionMask = 2147483647;
+      files = ();
+      runOnlyForDeploymentPostprocessing = 0;
+    };
+    B10000000000000000000008 = {
+      isa = PBXGroup;
+      children = (B10000000000000000000003);
+      path = CupThreadDemoUITests;
+      sourceTree = "<group>";
+    };
+    B10000000000000000000009 = {
+      isa = PBXNativeTarget;
+      buildConfigurationList = B1000000000000000000000A;
+      buildPhases = (B10000000000000000000006, B10000000000000000000007);
+      buildRules = ();
+      dependencies = (B10000000000000000000002);
+      name = CupThreadDemoUITests;
+      productName = CupThreadDemoUITests;
+      productReference = B10000000000000000000004;
+      productType = "com.apple.product-type.bundle.ui-testing";
+    };
+
     A10000000000000000000006 = {
       isa = PBXGroup;
-      children = (A10000000000000000000007, A10000000000000000000008);
+      children = (A10000000000000000000007, B10000000000000000000008, A10000000000000000000008);
       sourceTree = "<group>";
     };
     A10000000000000000000007 = {
       isa = PBXGroup;
-      children = (A10000000000000000000002, A10000000000000000000004);
+      children = (A10000000000000000000002, A10000000000000000000004, A10000000000000000000012);
       path = CupThreadDemo;
       sourceTree = "<group>";
     };
     A10000000000000000000008 = {
       isa = PBXGroup;
-      children = (A10000000000000000000005);
+      children = (A10000000000000000000005, B10000000000000000000004);
       name = Products;
       sourceTree = "<group>";
     };
@@ -50,12 +98,20 @@
     A1000000000000000000000B = {
       isa = PBXSourcesBuildPhase;
       buildActionMask = 2147483647;
-      files = (A10000000000000000000001, A10000000000000000000003);
+      files = (A10000000000000000000001, A10000000000000000000003, A10000000000000000000013);
       runOnlyForDeploymentPostprocessing = 0;
     };
     A1000000000000000000000C = {
       isa = PBXProject;
-      attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1500; LastUpgradeCheck = 1500; TargetAttributes = {A10000000000000000000009 = {CreatedOnToolsVersion = 15.0;};};};
+      attributes = {
+        BuildIndependentTargetsInParallel = 1;
+        LastSwiftUpdateCheck = 1500;
+        LastUpgradeCheck = 1500;
+        TargetAttributes = {
+          A10000000000000000000009 = {CreatedOnToolsVersion = 15.0;};
+          B10000000000000000000009 = {CreatedOnToolsVersion = 15.0; TestTargetID = A10000000000000000000009;};
+        };
+      };
       buildConfigurationList = A1000000000000000000000D;
       compatibilityVersion = "Xcode 14.0";
       developmentRegion = en;
@@ -66,14 +122,19 @@
       productRefGroup = A10000000000000000000008;
       projectDirPath = "";
       projectRoot = "";
-      targets = (A10000000000000000000009);
+      targets = (A10000000000000000000009, B10000000000000000000009);
     };
     A1000000000000000000000E = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES; CLANG_WARN_BOOL_CONVERSION = YES; CLANG_WARN_COMMA = YES; CLANG_WARN_CONSTANT_CONVERSION = YES; CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES; CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR; CLANG_WARN_DOCUMENTATION_COMMENTS = YES; CLANG_WARN_EMPTY_BODY = YES; CLANG_WARN_ENUM_CONVERSION = YES; CLANG_WARN_INFINITE_RECURSION = YES; CLANG_WARN_INT_CONVERSION = YES; CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES; CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES; CLANG_WARN_OBJC_LITERAL_CONVERSION = YES; CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR; CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES; CLANG_WARN_RANGE_LOOP_ANALYSIS = YES; CLANG_WARN_STRICT_PROTOTYPES = YES; CLANG_WARN_SUSPICIOUS_MOVE = YES; CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE; CLANG_WARN_UNREACHABLE_CODE = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_STRICT_OBJC_MSGSEND = YES; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu17; GCC_DYNAMIC_NO_PIC = NO; GCC_NO_COMMON_BLOCKS = YES; GCC_OPTIMIZATION_LEVEL = 0; GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)"); GCC_WARN_64_TO_32_BIT_CONVERSION = YES; GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR; GCC_WARN_UNDECLARED_SELECTOR = YES; GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE; GCC_WARN_UNUSED_FUNCTION = YES; GCC_WARN_UNUSED_VARIABLE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE; MTL_FAST_MATH = YES; ONLY_ACTIVE_ARCH = YES; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone";}; name = Debug; };
     A1000000000000000000000F = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; ENABLE_NS_ASSERTIONS = NO; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MTL_ENABLE_DEBUG_INFO = NO; MTL_FAST_MATH = YES; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; VALIDATE_PRODUCT = YES;}; name = Release; };
     A10000000000000000000010 = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_ASSET_PATHS = ""; DEVELOPMENT_TEAM = ""; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = CupThreadDemo/Info.plist; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"; INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.lex.cupthread.demo; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug; };
     A10000000000000000000011 = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_ASSET_PATHS = ""; DEVELOPMENT_TEAM = ""; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = CupThreadDemo/Info.plist; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"; INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.lex.cupthread.demo; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Release; };
+    
+    B1000000000000000000000B = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = YES; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.lex.cupthread.demo.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = CupThreadDemo; USES_XCTRUNNER = YES;}; name = Debug; };
+    B1000000000000000000000C = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = YES; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.lex.cupthread.demo.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = CupThreadDemo; USES_XCTRUNNER = YES;}; name = Release; };
+
     A1000000000000000000000D = {isa = XCConfigurationList; buildConfigurations = (A1000000000000000000000E, A1000000000000000000000F); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
     A1000000000000000000000A = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000010, A10000000000000000000011); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+    B1000000000000000000000A = {isa = XCConfigurationList; buildConfigurations = (B1000000000000000000000B, B1000000000000000000000C); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
   };
   rootObject = A1000000000000000000000C;
 }

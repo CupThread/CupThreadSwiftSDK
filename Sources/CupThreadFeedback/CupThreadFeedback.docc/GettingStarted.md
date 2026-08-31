@@ -62,12 +62,22 @@ Available surfaces:
 
 | View | Purpose |
 | ---- | ------- |
-| ``FeedbackComposerView`` | Structured feedback form with attachment uploads |
-| ``FeatureRequestsView`` | Browse, search, vote, and submit feature requests |
 | ``RoadmapBoardView`` | Kanban roadmap grouped by the app's public columns |
+| ``FeatureRequestsView`` | Browse, search, vote, and submit feature requests |
 | ``WhatsNewView`` | "What's New" changelog with email subscription |
+| ``FeedbackComposerView`` | Structured feedback form with attachment uploads |
 
 Each view adapts to its platform: iPhone gets a compact paged layout, iPad/macOS/visionOS get the wide board, and tvOS gets focus-friendly lists.
+
+### Visual Preview
+
+![CupThread Roadmap Surface](roadmap.webp)
+
+![CupThread Feature Requests Surface](feature_requests.webp)
+
+![CupThread What's New Surface](whats_new.webp)
+
+![CupThread Feedback Composer](feedback_composer.webp)
 
 ## Gate surfaces from the console
 
@@ -90,5 +100,5 @@ Drafts can carry attachments you upload with ``FeedbackClient/uploadAttachment(d
 
 ## Next steps
 
-- Present the latest changelog after launch: <doc:Presenting-the-Changelog-Overlay>
+- Present the latest changelog after launch: <doc:PresentingTheChangelogOverlay>
 - Browse the full API in the topics on the home page.

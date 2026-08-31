@@ -2,6 +2,8 @@
 
 Show your app's latest updates right after launch — with copy you edit in the CupThread console, not in code.
 
+![Changelog Overlay Modal](changelog_overlay.webp)
+
 ## SwiftUI
 
 The simplest integration is the ``changelogOverlay(client:isPresented:)`` modifier. Present it from your root scene after launch:

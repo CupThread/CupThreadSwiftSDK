@@ -12,6 +12,20 @@ Part of the [CupThread.com](https://cupthread.com) platform.
 
 ---
 
+## Visual Showcase
+
+| **Roadmap Board** | **Feature Requests** | **Submit Request** |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/roadmap.webp" width="260" alt="Roadmap Board" /> | <img src="docs/screenshots/feature_requests.webp" width="260" alt="Feature Requests" /> | <img src="docs/screenshots/submit_request.webp" width="260" alt="Submit Request Sheet" /> |
+| Kanban columns, stage chips & vote counts | Optimistic voting, search & version filter | User request compose sheet |
+
+| **What's New / Changelog** | **Changelog Modal Overlay** | **Feedback Composer** |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/whats_new.webp" width="260" alt="What's New Changelog" /> | <img src="docs/screenshots/changelog_overlay.webp" width="260" alt="Changelog Overlay" /> | <img src="docs/screenshots/feedback_composer.webp" width="260" alt="Feedback Composer" /> |
+| Markdown release notes & email subscribe | In-app announcement sheet with custom copy | Structured feedback with auto metadata |
+
+---
+
 ## Installation
 
 ### Swift Package Manager (Recommended)
@@ -68,11 +82,11 @@ let userToken = UserTokenStore.shared.token  // stable anonymous UUID
 
 All views adapt per platform (tvOS uses focus-friendly layouts; visionOS and macOS layouts match iOS).
 
-- `FeedbackComposerView(client:userToken:onSubmit:)` — Structured feedback form with attachment uploads.
-- `FeatureRequestsView(client:userToken:)` — Browse, vote (optimistic), and submit feature requests.
 - `RoadmapBoardView(client:userToken:)` — Kanban roadmap grouped by the app's public columns (`GET /api/v1/public/columns`), with vote counts and version badges.
+- `FeatureRequestsView(client:userToken:)` — Browse, vote (optimistic), and submit feature requests.
 - `WhatsNewView(client:userToken:)` — "What's New" changelog list with version badges, friendly dates, chips for shipped feature requests, and email subscription.
 - `ChangelogOverlayView` / `.changelogOverlay(client:isPresented:)` — Modal sheet of latest changelog entries with developer console configured copy.
+- `FeedbackComposerView(client:userToken:onSubmit:)` — Structured feedback form with attachment uploads.
 
 ```swift
 CupThreadTheme(client: client) {
@@ -124,11 +138,20 @@ python3 -m http.server 8080 --directory docs-site   # preview at http://localhos
 
 The site rebuilds and deploys automatically on every push to `main` (see `.github/workflows/docs.yml`).
 
-## Development
+## Development & Testing
 
 ```sh
-# Run tests
+# Run Swift package unit tests
 swift test
+
+# Run UI tests in Demo app & generate core screenshots
+xcodebuild test \
+    -project Demo/CupThreadDemo.xcodeproj \
+    -scheme CupThreadDemo \
+    -destination 'platform=iOS Simulator,name=iPhone 16'
+
+# Build DocC documentation site
+scripts/build-docs.sh docs-site
 
 # Release a new version (archives 7 slices, creates XCFramework zip, tags & creates release)
 node scripts/release.mjs --version 0.1.1

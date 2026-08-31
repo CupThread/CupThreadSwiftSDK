@@ -37,7 +37,7 @@ struct ContentView: View {
 
     @State private var tab: Tab = Tab.fromLaunchArguments()
     @State private var appearance: SdkAppearance = .defaults
-    @State private var showChangelogOverlay = false
+    @State private var showChangelogOverlay = ProcessInfo.processInfo.arguments.contains("-openChangelogOverlay")
 
     /// Reads an optional `-searchText <text>` launch argument for demos/deep links.
     private static func launchSearchText() -> String {
@@ -105,10 +105,22 @@ struct ContentView: View {
 struct FeedbackDemoView: View {
     let client: FeedbackClient
 
+    private static var demoInitialDraft: FeedbackDraft? {
+        guard ProcessInfo.processInfo.arguments.contains("-prefillFeedback") else { return nil }
+        var draft = FeedbackDraft.autofilled()
+        draft.title = "Export reports to CSV and PDF"
+        draft.description = "It would be super helpful to export weekly feedback analytics "
+            + "as CSV or PDF reports so we can share them with stakeholders."
+        draft.reporterName = "Alex Developer"
+        draft.reporterEmail = "alex@example.com"
+        return draft
+    }
+
     var body: some View {
         NavigationStack {
             FeedbackComposerView(
                 client: client,
+                initialDraft: Self.demoInitialDraft,
                 userToken: UserTokenStore.shared.token
             )
         }
