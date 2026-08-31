@@ -27,6 +27,15 @@ public struct FeatureRequestsView: View {
     // Tracks which item IDs have an in-flight vote request (prevents double-taps).
     @State private var votingIds: Set<String> = []
 
+    /// Creates the feature requests list.
+    /// - Parameters:
+    ///   - client: The shared ``FeedbackClient``.
+    ///   - userToken: Anonymous token identifying this user; drives
+    ///     `hasVoted` state, own-request detection, and voting.
+    ///   - autoPresentCompose: Shows the submission sheet immediately on first
+    ///     appearance — e.g. when the view is opened from a "Request a feature"
+    ///     deep link.
+    ///   - initialSearchText: Search text pre-filled before first load.
     public init(
         client: FeedbackClient,
         userToken: String,

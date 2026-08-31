@@ -16,6 +16,23 @@ public struct FeedbackComposerView: View {
     @State private var errorMessage: String?
     @State private var result: FeedbackSubmissionResult?
 
+    /// Creates the feedback form.
+    ///
+    /// The view enforces a minimum length (title ≥ 3, description ≥ 5
+    /// characters) before enabling the send button, shows an inline error
+    /// banner on failure, and swaps to a success screen on completion.
+    ///
+    /// Wrap your hierarchy in ``CupThreadTheme`` or present the view through
+    /// one of the SDK containers so console feature flags and theming apply.
+    /// - Parameters:
+    ///   - client: The shared ``FeedbackClient``.
+    ///   - initialDraft: Draft the form starts from. Defaults to
+    ///     ``FeedbackDraft/autofilled(platform:)`` using the client's
+    ///     ``FeedbackClientConfiguration/defaultPlatform``.
+    ///   - userToken: Optional anonymous token; when given it is sent as
+    ///     `X-User-Token` so submissions link to the end-user identity.
+    ///   - onSubmit: Called with the server's receipt after a successful
+    ///     submission — use it to log, show a toast, or deep-link elsewhere.
     public init(
         client: FeedbackClient,
         initialDraft: FeedbackDraft? = nil,

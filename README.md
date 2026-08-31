@@ -111,6 +111,19 @@ try await client.presentLatestChangelog()
 
 ---
 
+## Documentation
+
+The full API documentation (DocC) is published to **[cupthread.github.io/CupThreadSwiftSDK](https://cupthread.github.io/CupThreadSwiftSDK/)**.
+
+Build it locally:
+
+```sh
+scripts/build-docs.sh docs-site
+python3 -m http.server 8080 --directory docs-site   # preview at http://localhost:8080
+```
+
+The site rebuilds and deploys automatically on every push to `main` (see `.github/workflows/docs.yml`).
+
 ## Development
 
 ```sh

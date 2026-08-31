@@ -20,6 +20,11 @@ public struct WhatsNewView: View {
     @State private var loadError: String?
     @State private var isSubscribePresented = false
 
+    /// Creates the "What's New" view.
+    /// - Parameters:
+    ///   - client: The shared ``FeedbackClient``.
+    ///   - userToken: Anonymous token identifying this user; links email
+    ///     subscriptions made from this view to the end-user identity.
     public init(client: FeedbackClient, userToken: String) {
         self.client = client
         self.userToken = userToken

@@ -54,6 +54,12 @@ public struct RoadmapBoardView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
+    /// Creates the roadmap board.
+    /// - Parameters:
+    ///   - client: The shared ``FeedbackClient``.
+    ///   - userToken: Anonymous token identifying this user; drives
+    ///     `hasVoted`/`isOwnRequest` badges on the cards.
+    ///   - initialSearchText: Search text pre-filled before first load.
     public init(client: FeedbackClient, userToken: String, initialSearchText: String = "") {
         self.client = client
         self.userToken = userToken

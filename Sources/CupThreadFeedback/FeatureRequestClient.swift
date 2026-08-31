@@ -20,6 +20,10 @@ private struct VotePayload: Encodable, Sendable {
 extension FeedbackClient {
 
     /// Fetches the feature requests list for the configured app.
+    ///
+    /// Results include each request's vote count and whether the current user
+    /// already voted (`hasVoted`), which is why the call requires a
+    /// `userToken`.
     /// - Parameters:
     ///   - userToken: A stable UUID string identifying this user (for own pending requests and vote state).
     ///   - limit: Maximum number of results to return.
@@ -27,6 +31,9 @@ extension FeedbackClient {
     ///   - versionId: Optional version filter (see `fetchVersions()`).
     ///   - query: Optional server-side search over title and description
     ///     (rate-limited per IP and briefly cached by the backend).
+    /// - Returns: The matching requests plus the unpaginated `total`.
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
+    ///   ``FeedbackClientError/invalidResponse``.
     public func fetchFeatureRequests(
         userToken: String,
         limit: Int = 50,
@@ -67,6 +74,17 @@ extension FeedbackClient {
     }
 
     /// Submits a new feature request. It will be pending until approved by an admin.
+    ///
+    /// Titles and descriptions are trimmed; an empty `requesterName` is sent
+    /// as anonymous. The submitting user is recorded via `userToken`, which
+    /// is also how the console recognizes "own" requests (those can't be
+    /// self-voted).
+    /// - Parameters:
+    ///   - draft: Title, description, and optional requester name.
+    ///   - userToken: A stable UUID string identifying this user.
+    /// - Returns: The created request's id and whether it is pending review.
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
+    ///   ``FeedbackClientError/invalidResponse``.
     public func submitFeatureRequest(
         _ draft: FeatureRequestDraft,
         userToken: String
@@ -96,6 +114,16 @@ extension FeedbackClient {
     }
 
     /// Toggles the current user's vote on a feature request.
+    ///
+    /// Calling this on a request the user already voted on removes the vote.
+    /// ``FeatureRequestsView`` applies the flip optimistically and reconciles
+    /// with the returned server state.
+    /// - Parameters:
+    ///   - featureRequestId: Id of the request to vote on.
+    ///   - userToken: A stable UUID string identifying this user.
+    /// - Returns: The new vote state and the request's authoritative vote count.
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
+    ///   ``FeedbackClientError/invalidResponse``.
     public func toggleVote(
         featureRequestId: String,
         userToken: String

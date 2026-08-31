@@ -11,3 +11,7 @@ build/
 *.framework
 *.xcframework
 node_modules/
+
+# DocC build artifacts (.docc catalogs under Sources are committed)
+.docbuild/
+docs-site/

@@ -26,6 +26,21 @@ public struct ChangelogOverlayView: View {
     @State private var isLoading = true
     @State private var loadError: String?
 
+    /// Creates the overlay sheet.
+    ///
+    /// Pass `entries` and `appearance` only when you already fetched them via
+    /// ``FeedbackClient/prepareChangelogOverlay()``; otherwise the view loads
+    /// both on first appearance.
+    /// - Parameters:
+    ///   - client: The shared ``FeedbackClient``.
+    ///   - entries: Pre-fetched changelog entries; `nil` makes the view fetch
+    ///     them itself.
+    ///   - appearance: Pre-fetched console appearance; `nil` makes the view
+    ///     fetch it itself.
+    ///   - onPrimary: Called when the user taps the console-configured primary
+    ///     button; the sheet dismisses afterwards.
+    ///   - onClose: Called when the user taps the close button; the sheet
+    ///     dismisses afterwards.
     public init(
         client: FeedbackClient,
         entries: [ChangelogEntry]? = nil,
@@ -165,6 +180,21 @@ private struct ChangelogOverlayModifier: ViewModifier {
 
 extension View {
     /// Presents the console-configured latest-changelog overlay as a sheet.
+    ///
+    /// The sheet fetches the app configuration and newest entries when shown,
+    /// so the copy (title, buttons, entry count) always matches the console.
+    ///
+    /// ```swift
+    /// ContentView()
+    ///     .task { showWhatsNew = true }
+    ///     .changelogOverlay(client: client, isPresented: $showWhatsNew)
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - client: The shared ``FeedbackClient``.
+    ///   - isPresented: Binding controlling the sheet; set it to `true` to
+    ///     show the overlay. Dismissal from inside the sheet writes `false`.
+    /// - Returns: A view that presents ``ChangelogOverlayView`` when triggered.
     public func changelogOverlay(client: FeedbackClient, isPresented: Binding<Bool>) -> some View {
         modifier(ChangelogOverlayModifier(client: client, isPresented: isPresented))
     }
@@ -177,6 +207,12 @@ extension FeedbackClient {
     ///
     /// Returns `false` when changelog is hidden, there is no host window to present
     /// from, or there are no published entries. Throws if the network request fails.
+    ///
+    /// Use ``prepareChangelogOverlay()`` plus ``ChangelogOverlayView`` instead
+    /// when you need control over where and how the sheet appears.
+    /// - Returns: Whether the overlay was actually presented.
+    /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
+    ///   when either network call fails.
     @MainActor
     @discardableResult
     public func presentLatestChangelog() async throws -> Bool {
@@ -190,6 +226,20 @@ extension FeedbackClient {
 
     /// Fetches overlay configuration and the newest published entries.
     /// Returns `nil` when the console hid changelog or nothing has been published.
+    ///
+    /// Pair the result with ``ChangelogOverlayView`` for custom presentation:
+    ///
+    /// ```swift
+    /// if let prepared = try await client.prepareChangelogOverlay() {
+    ///     overlayEntries = prepared.entries
+    ///     showSheet = true
+    /// }
+    /// ```
+    ///
+    /// - Returns: Newest entries (capped by the console's entry count) plus
+    ///   the appearance, or `nil` when the overlay should stay hidden.
+    /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
+    ///   when either network call fails.
     public func prepareChangelogOverlay() async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
         let config = try await fetchAppConfig()
         guard config.sdk.features.changelog else { return nil }
