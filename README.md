@@ -16,12 +16,12 @@ Part of the [CupThread.com](https://cupthread.com) platform.
 
 | **Roadmap Board** | **Feature Requests** | **Submit Request** |
 | :---: | :---: | :---: |
-| <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/roadmap.webp" width="260" alt="Roadmap Board" /> | <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/feature_requests.webp" width="260" alt="Feature Requests" /> | <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/submit_request.webp" width="260" alt="Submit Request Sheet" /> |
+| <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/roadmap.jpg" width="260" alt="Roadmap Board" /> | <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/feature_requests.jpg" width="260" alt="Feature Requests" /> | <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/submit_request.jpg" width="260" alt="Submit Request Sheet" /> |
 | Kanban columns, stage chips & vote counts | Optimistic voting, search & version filter | User request compose sheet |
 
 | **What's New / Changelog** | **Changelog Modal Overlay** | **Feedback Composer** |
 | :---: | :---: | :---: |
-| <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/whats_new.webp" width="260" alt="What's New Changelog" /> | <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/changelog_overlay.webp" width="260" alt="Changelog Overlay" /> | <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/feedback_composer.webp" width="260" alt="Feedback Composer" /> |
+| <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/whats_new.jpg" width="260" alt="What's New Changelog" /> | <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/changelog_overlay.jpg" width="260" alt="Changelog Overlay" /> | <img src="Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources/feedback_composer.jpg" width="260" alt="Feedback Composer" /> |
 | Markdown release notes & email subscribe | In-app announcement sheet with custom copy | Structured feedback with auto metadata |
 
 ---

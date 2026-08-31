@@ -2,13 +2,13 @@
 
 Give your users a voice with real-time search, optimistic voting, milestone filtering, and submission sheets.
 
-![Browse Feature Requests](feature_requests.webp)
+![Browse Feature Requests](feature_requests.jpg)
 
 ## Overview
 
 ``FeatureRequestsView`` is a full-featured surface where users can discover what others have suggested, vote on their favorite ideas, and submit new feature requests.
 
-![Submit Feature Request](submit_request.webp)
+![Submit Feature Request](submit_request.jpg)
 
 Key features:
 - **Optimistic voting**: Immediate UI response with background server synchronization and duplicate click throttling.

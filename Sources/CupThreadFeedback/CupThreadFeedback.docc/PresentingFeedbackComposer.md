@@ -2,7 +2,7 @@
 
 Collect structured bug reports, feedback, and user ideas with automatic environment diagnostics and attachment uploads.
 
-![CupThread Feedback Composer](feedback_composer.webp)
+![CupThread Feedback Composer](feedback_composer.jpg)
 
 ## Overview
 

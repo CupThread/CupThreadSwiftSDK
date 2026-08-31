@@ -2,7 +2,7 @@
 
 Show your public Kanban roadmap grouped by status columns configured in the CupThread console.
 
-![CupThread Roadmap Board](roadmap.webp)
+![CupThread Roadmap Board](roadmap.jpg)
 
 ## Overview
 

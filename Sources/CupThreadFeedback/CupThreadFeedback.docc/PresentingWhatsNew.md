@@ -2,7 +2,7 @@
 
 Display published release notes and changelogs with version badges, shipped feature chips, and email subscription support.
 
-![What's New Changelog](whats_new.webp)
+![What's New Changelog](whats_new.jpg)
 
 ## Overview
 

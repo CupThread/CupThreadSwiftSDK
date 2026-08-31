@@ -11,7 +11,7 @@ xcodebuild test \
     -scheme CupThreadDemo \
     -destination "$DESTINATION"
 
-echo "==> Converting screenshots to WebP..."
+echo "==> Converting screenshots to JPEG for DocC..."
 "$REPO_ROOT/scripts/convert-screenshots.sh"
 
-echo "==> Done! Screenshots updated in WebP format."
+echo "==> Done! Screenshots updated in JPEG format."
