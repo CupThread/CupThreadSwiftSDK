@@ -250,6 +250,19 @@ extension FeedbackClient {
     }
 }
 
+private final class ResumeBox: @unchecked Sendable {
+    var resumed = false
+    let continuation: CheckedContinuation<Bool, Never>
+    init(_ continuation: CheckedContinuation<Bool, Never>) {
+        self.continuation = continuation
+    }
+    func finish(_ value: Bool) {
+        guard !resumed else { return }
+        resumed = true
+        continuation.resume(returning: value)
+    }
+}
+
 @MainActor
 private func presentPreparedChangelogOverlay(
     client: FeedbackClient,
@@ -257,18 +270,6 @@ private func presentPreparedChangelogOverlay(
     appearance: SdkAppearance
 ) async -> Bool {
     await withCheckedContinuation { continuation in
-        final class ResumeBox: @unchecked Sendable {
-            var resumed = false
-            let continuation: CheckedContinuation<Bool, Never>
-            init(_ continuation: CheckedContinuation<Bool, Never>) {
-                self.continuation = continuation
-            }
-            func finish(_ value: Bool) {
-                guard !resumed else { return }
-                resumed = true
-                continuation.resume(returning: value)
-            }
-        }
         let box = ResumeBox(continuation)
 
         #if canImport(UIKit) && !os(watchOS)

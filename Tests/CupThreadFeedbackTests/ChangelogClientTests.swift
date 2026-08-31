@@ -245,7 +245,7 @@ struct ChangelogClientTests {
     // MARK: - ChangelogEntry decoding (server shape)
 
     @Test func changelogEntryDecodesServerRecord() throws {
-        let json = """
+        let json = Data("""
         {
             "id": "cl-1",
             "title": "Widgets & Dark Mode",
@@ -257,7 +257,7 @@ struct ChangelogClientTests {
                 { "id": "fr-2", "title": "Home screen widgets" }
             ]
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let entry = try JSONDecoder().decode(ChangelogEntry.self, from: json)
 
@@ -271,7 +271,7 @@ struct ChangelogClientTests {
     }
 
     @Test func changelogEntryParsesFractionalSecondDates() throws {
-        let json = """
+        let json = Data("""
         {
             "id": "cl-2",
             "title": "Performance",
@@ -280,7 +280,7 @@ struct ChangelogClientTests {
             "publishedAt": "2026-03-01T08:30:00.123Z",
             "linkedRequests": []
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let entry = try JSONDecoder().decode(ChangelogEntry.self, from: json)
 

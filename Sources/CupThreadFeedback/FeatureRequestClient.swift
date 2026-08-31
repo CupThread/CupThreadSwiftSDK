@@ -49,7 +49,7 @@ extension FeedbackClient {
             URLQueryItem(name: "appKey", value: configuration.appKey),
             URLQueryItem(name: "userToken", value: userToken),
             URLQueryItem(name: "limit", value: String(limit)),
-            URLQueryItem(name: "offset", value: String(offset)),
+            URLQueryItem(name: "offset", value: String(offset))
         ]
         if let versionId {
             queryItems.append(URLQueryItem(name: "versionId", value: versionId))

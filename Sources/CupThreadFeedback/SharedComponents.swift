@@ -142,12 +142,19 @@ struct VoteCountBadge: View {
     let hasVoted: Bool
 
     var body: some View {
-        CapsuleBadge(
+        let includingYours = hasVoted
+            ? CupThreadStrings.tr("cupthread.features.vote_including_yours")
+            : ""
+        return CapsuleBadge(
             icon: hasVoted ? "arrowtriangle.up.fill" : "arrowtriangle.up",
             text: "\(count)",
             tint: hasVoted ? .accentColor : .secondary
         )
-        .accessibilityLabel(CupThreadStrings.tr("cupthread.features.vote_count_accessibility", Int64(count), hasVoted ? CupThreadStrings.tr("cupthread.features.vote_including_yours") : ""))
+        .accessibilityLabel(
+            CupThreadStrings.tr(
+                "cupthread.features.vote_count_accessibility", Int64(count), includingYours
+            )
+        )
     }
 }
 

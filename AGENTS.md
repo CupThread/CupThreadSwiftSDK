@@ -26,6 +26,7 @@
 
 ## Development & Testing
 - Run test suite: `swift test`
+- Run linter: `swiftlint lint --strict` (config in `.swiftlint.yml`; installed via `brew install swiftlint`, never as an SPM plugin — same zero-dependency rule as the doc pipeline)
 - Release SDK: `node scripts/release.mjs --version <semver>`
 - Build docs site: `scripts/build-docs.sh docs-site` (DocC source of truth lives in `Sources/CupThreadFeedback/CupThreadFeedback.docc/`)
 - Simulator testing: Use the `Demo/` project (`Demo/CupThreadDemo.xcodeproj`). Use the `axe` CLI for simulator automation.

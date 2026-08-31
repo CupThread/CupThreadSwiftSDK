@@ -1,3 +1,6 @@
+// swiftlint:disable file_length
+// This suite is organized by type and intentionally exceeds the default
+// file-length budget (see .swiftlint.yml).
 import Foundation
 import Testing
 @testable import CupThreadFeedback
@@ -109,7 +112,10 @@ struct FeedbackAttachmentTests {
     }
 
     @Test func codableRoundTrip() throws {
-        let original = FeedbackAttachment(kind: .image, key: "img-key", url: sampleURL, filename: "photo.png", mimeType: "image/png", size: 1024)
+        let original = FeedbackAttachment(
+            kind: .image, key: "img-key", url: sampleURL,
+            filename: "photo.png", mimeType: "image/png", size: 1024
+        )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(FeedbackAttachment.self, from: data)
         #expect(decoded == original)
@@ -122,13 +128,13 @@ struct FeedbackAttachmentTests {
 struct FeedbackDraftTests {
     @Test func defaultValuesForIosPlatform() {
         let draft = FeedbackDraft(platform: .ios)
-        #expect(draft.title == "")
-        #expect(draft.description == "")
-        #expect(draft.reporterName == "")
-        #expect(draft.reporterEmail == "")
+        #expect(draft.title.isEmpty)
+        #expect(draft.description.isEmpty)
+        #expect(draft.reporterName.isEmpty)
+        #expect(draft.reporterEmail.isEmpty)
         #expect(draft.platform == .ios)
-        #expect(draft.appVersion == "")
-        #expect(draft.buildNumber == "")
+        #expect(draft.appVersion.isEmpty)
+        #expect(draft.buildNumber.isEmpty)
         #expect(draft.metadata.isEmpty)
         #expect(draft.attachments.isEmpty)
     }
@@ -177,7 +183,7 @@ struct FeedbackDraftTests {
 @Suite("FeedbackSubmissionResult")
 struct FeedbackSubmissionResultTests {
     @Test func decodesWithAllFields() throws {
-        let json = """
+        let json = Data("""
         {
             "submissionId": "sub-123",
             "forwardedToGithub": true,
@@ -185,7 +191,7 @@ struct FeedbackSubmissionResultTests {
             "githubDiscussionUrl": "https://github.com/owner/repo/discussions/42",
             "warning": null
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let result = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
         #expect(result.submissionId == "sub-123")
@@ -196,12 +202,12 @@ struct FeedbackSubmissionResultTests {
     }
 
     @Test func decodesWithRequiredFieldsOnly() throws {
-        let json = """
+        let json = Data("""
         {
             "submissionId": "sub-456",
             "forwardedToGithub": false
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let result = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
         #expect(result.submissionId == "sub-456")
@@ -212,22 +218,22 @@ struct FeedbackSubmissionResultTests {
     }
 
     @Test func decodesWarningField() throws {
-        let json = """
+        let json = Data("""
         {
             "submissionId": "sub-789",
             "forwardedToGithub": false,
             "warning": "Submission stored but forwarding failed."
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let result = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
         #expect(result.warning == "Submission stored but forwarding failed.")
     }
 
     @Test func equatableWhenSameValues() throws {
-        let json = """
+        let json = Data("""
         {"submissionId":"s","forwardedToGithub":true}
-        """.data(using: .utf8)!
+        """.utf8)
         let a = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
         let b = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
         #expect(a == b)

@@ -225,7 +225,7 @@ struct PublicAPITests {
 
         _ = try await Self.makeAPIClient().submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
 
-        #expect(capture.value == "")
+        #expect((capture.value ?? "").isEmpty)
     }
 
     // MARK: - Feature request list query
@@ -251,7 +251,7 @@ struct PublicAPITests {
     // MARK: - FeatureRequestItem decoding (server shape)
 
     @Test func featureRequestItemDecodesServerRecord() throws {
-        let json = """
+        let json = Data("""
         {
             "id": "fr-1",
             "appId": "app-1",
@@ -272,7 +272,7 @@ struct PublicAPITests {
             "createdAt": "2026-01-01T00:00:00.000Z",
             "updatedAt": "2026-02-01T00:00:00.000Z"
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let item = try JSONDecoder().decode(FeatureRequestItem.self, from: json)
 
@@ -287,7 +287,7 @@ struct PublicAPITests {
 
     @Test func featureRequestItemDecodesCustomStatusWithoutColumn() throws {
         // Free-form status (custom column name) must not break decoding.
-        let json = """
+        let json = Data("""
         {
             "id": "fr-2",
             "appId": "app-1",
@@ -308,7 +308,7 @@ struct PublicAPITests {
             "createdAt": "2026-01-01T00:00:00.000Z",
             "updatedAt": "2026-01-01T00:00:00.000Z"
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let item = try JSONDecoder().decode(FeatureRequestItem.self, from: json)
 

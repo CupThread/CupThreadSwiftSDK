@@ -1,0 +1,63 @@
+# SwiftLint configuration for CupThreadFeedback SDK.
+# Run locally with `brew install swiftlint && swiftlint lint`.
+# Deliberately NOT wired into Package.swift as a build plugin: package
+# dependencies are resolved by every SDK consumer, and the zero-dependency
+# rule (AGENTS.md) forbids adding tooling to the manifest. Lint runs from
+# the CLI and CI instead.
+
+included:
+  - Sources
+  - Tests
+  - Demo
+
+excluded:
+  - Demo/CupThreadDemo.xcodeproj
+  - .build
+  - docs-site
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - first_where
+  - last_where
+  - sorted_first_last
+  - contains_over_filter_count
+  - contains_over_first_not_nil
+  - missing_docs
+
+line_length:
+  warning: 140
+  error: 200
+  ignores_urls: true
+  ignores_comments: true
+  ignores_interpolated_strings: true
+
+identifier_name:
+  min_length: 2
+  excluded:
+    - id
+    - q
+    - a  # ordering/comparison test pairs
+    - b
+
+type_body_length:
+  warning: 350
+  error: 500
+
+# Tests are organized by type rather than split to fit the library file-size
+# budget; the one oversized suite silences file_length locally.
+file_length:
+  warning: 500
+  error: 800
+
+function_body_length:
+  warning: 60
+  error: 120
+
+nesting:
+  type_level:
+    warning: 3
+
+# SwiftUI-heavy codebase; these fight the framework rather than real issues.
+disabled_rules:
+  - multiple_closures_with_trailing_closure
