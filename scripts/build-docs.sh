@@ -61,4 +61,16 @@ xcrun docc process-archive transform-for-static-hosting "$ARCHIVE" \
 # GitHub Pages would otherwise run Jekyll and drop files starting with "_".
 touch "$OUTPUT_DIR/.nojekyll"
 
+# The DocC SPA has no route for the site root ("/" renders its 404 view);
+# the real landing page is the module page. Patch only the ROOT index.html
+# so visitors of .../CupThreadSwiftSDK/ land on the module page. Deeper
+# index.html copies are untouched (pathname != baseUrl there). "&" in the
+# replacement keeps docc's original baseUrl script (trailing slash included).
+MODULE_PATH="documentation/$(echo "$SCHEME" | tr '[:upper:]' '[:lower:]')"
+sed -i '' "s#<script>var baseUrl = \"[^\"]*\"</script>#&<script>if(location.pathname===baseUrl)location.replace(baseUrl+\"${MODULE_PATH}/\");</script>#" \
+    "$OUTPUT_DIR/index.html"
+
+# Optional DocC theme-settings file; a stub avoids a benign 404 in the console.
+printf '{}\n' > "$OUTPUT_DIR/theme-settings.json"
+
 echo "==> Documentation site written to $OUTPUT_DIR/"
