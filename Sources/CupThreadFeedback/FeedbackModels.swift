@@ -130,7 +130,16 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
     public var attachments: [FeedbackAttachment]
 
     /// Creates a draft. All fields except `platform` default to empty.
-    /// - Parameter platform: Platform reported with the submission.
+    /// - Parameters:
+    ///   - title: Short summary of the feedback.
+    ///   - description: Detailed explanation or steps to reproduce.
+    ///   - reporterName: Optional name of the user.
+    ///   - reporterEmail: Optional contact email of the user.
+    ///   - platform: Platform reported with the submission.
+    ///   - appVersion: The host app's marketing version.
+    ///   - buildNumber: The host app's build number.
+    ///   - metadata: Free-form key/value pairs merged into the submission for triage.
+    ///   - attachments: Uploaded attachment references.
     public init(
         title: String = "",
         description: String = "",

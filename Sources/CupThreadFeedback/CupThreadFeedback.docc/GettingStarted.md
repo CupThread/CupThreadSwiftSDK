@@ -60,12 +60,13 @@ struct FeedbackTab: View {
 
 Available surfaces:
 
-| View | Purpose |
-| ---- | ------- |
-| ``RoadmapBoardView`` | Kanban roadmap grouped by the app's public columns |
-| ``FeatureRequestsView`` | Browse, search, vote, and submit feature requests |
-| ``WhatsNewView`` | "What's New" changelog with email subscription |
-| ``FeedbackComposerView`` | Structured feedback form with attachment uploads |
+| View | Purpose | Guide |
+| ---- | ------- | ----- |
+| ``RoadmapBoardView`` | Kanban roadmap grouped by the app's public columns | <doc:PresentingTheRoadmap> |
+| ``FeatureRequestsView`` | Browse, search, vote, and submit feature requests | <doc:PresentingFeatureRequests> |
+| ``WhatsNewView`` | "What's New" changelog with email subscription | <doc:PresentingWhatsNew> |
+| ``FeedbackComposerView`` | Structured feedback form with attachment uploads | <doc:PresentingFeedbackComposer> |
+| ``ChangelogOverlayView`` | Modal "What's New" sheet presented after app launch | <doc:PresentingTheChangelogOverlay> |
 
 Each view adapts to its platform: iPhone gets a compact paged layout, iPad/macOS/visionOS get the wide board, and tvOS gets focus-friendly lists.
 
@@ -81,7 +82,7 @@ Each view adapts to its platform: iPhone gets a compact paged layout, iPad/macOS
 
 ## Gate surfaces from the console
 
-The CupThread console controls which surfaces are visible, the theme, and the changelog overlay copy. The SDK applies this automatically through the ``SdkSurfaceModifier``-style wrappers — when you disable a surface (for example *Roadmap*) in the console, the view shows an "unavailable" placeholder instead of crashing or disappearing.
+The CupThread console controls which surfaces are visible, the theme, and the changelog overlay copy. The SDK applies this automatically through the `.sdkSurface(client:feature:)` modifier wrappers — when you disable a surface (for example *Roadmap*) in the console, the view shows an "unavailable" placeholder instead of crashing or disappearing. See <doc:CustomizingAppearance> for details.
 
 ## Submit feedback programmatically
 
@@ -98,7 +99,11 @@ print(result.submissionId)
 
 Drafts can carry attachments you upload with ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:)`` and arbitrary metadata for your own triage tooling.
 
-## Next steps
+## Explore guides & articles
 
-- Present the latest changelog after launch: <doc:PresentingTheChangelogOverlay>
-- Browse the full API in the topics on the home page.
+- <doc:PresentingFeedbackComposer>
+- <doc:PresentingFeatureRequests>
+- <doc:PresentingTheRoadmap>
+- <doc:PresentingWhatsNew>
+- <doc:PresentingTheChangelogOverlay>
+- <doc:CustomizingAppearance>
