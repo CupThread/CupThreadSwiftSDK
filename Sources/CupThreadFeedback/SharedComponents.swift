@@ -71,6 +71,38 @@ struct CapsuleBadge: View {
     }
 }
 
+// MARK: - Avatar
+
+/// Circular avatar image, falling back to a person.circle.fill SF Symbol.
+struct AvatarView: View {
+    let url: String?
+    var size: CGFloat = 20
+
+    var body: some View {
+        Group {
+            if let url, let imageURL = URL(string: url) {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable()
+                    default:
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Image(systemName: "person.circle.fill")
+                    .resizable()
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Vote controls
 
 /// Light haptics when the vote state flips. `SensoryFeedback.impact(weight:)`

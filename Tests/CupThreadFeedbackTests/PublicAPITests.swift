@@ -265,6 +265,16 @@ struct PublicAPITests {
             "versionLabel": "2.1",
             "releasedVersion": "2.1",
             "requesterName": "Lex",
+            "requesterAvatarUrl": "https://example.com/avatar.png",
+            "requesterClerkId": "user_123",
+            "recentCommenters": [
+                {
+                    "authorName": "Bob",
+                    "clerkUserId": "user_456",
+                    "avatarUrl": "https://example.com/bob.png"
+                }
+            ],
+            "hasMoreCommenters": true,
             "approved": true,
             "voteCount": 7,
             "hasVoted": true,
@@ -283,6 +293,42 @@ struct PublicAPITests {
         #expect(item.versionLabel == "2.1")
         #expect(item.voteCount == 7)
         #expect(item.hasVoted == true)
+        #expect(item.requesterAvatarUrl == "https://example.com/avatar.png")
+        #expect(item.requesterClerkId == "user_123")
+        #expect(item.recentCommenters.count == 1)
+        #expect(item.recentCommenters[0].authorName == "Bob")
+        #expect(item.hasMoreCommenters == true)
+    }
+
+    @Test func featureRequestItemDecodesBackwardCompat() throws {
+        let json = Data("""
+        {
+            "id": "fr-1",
+            "appId": "app-1",
+            "title": "Dark mode",
+            "description": "Please add dark mode",
+            "status": "in-progress",
+            "columnId": "c2",
+            "columnSlug": "in-progress",
+            "columnName": "In Progress",
+            "versionId": "v1",
+            "versionLabel": "2.1",
+            "releasedVersion": "2.1",
+            "requesterName": "Lex",
+            "approved": true,
+            "voteCount": 7,
+            "hasVoted": true,
+            "isOwnRequest": false,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-02-01T00:00:00.000Z"
+        }
+        """.utf8)
+
+        let item = try JSONDecoder().decode(FeatureRequestItem.self, from: json)
+        #expect(item.requesterAvatarUrl == nil)
+        #expect(item.requesterClerkId == nil)
+        #expect(item.recentCommenters.isEmpty)
+        #expect(item.hasMoreCommenters == false)
     }
 
     @Test func featureRequestItemDecodesCustomStatusWithoutColumn() throws {
@@ -325,6 +371,10 @@ struct PublicAPITests {
             description: "D",
             status: "backlog",
             columnName: "Backlog",
+            requesterAvatarUrl: "https://example.com/a.png",
+            requesterClerkId: "user_x",
+            recentCommenters: [RecentCommenter(authorName: "A", clerkUserId: "u_a", avatarUrl: nil)],
+            hasMoreCommenters: true,
             approved: true,
             voteCount: 3,
             hasVoted: false,
@@ -339,6 +389,10 @@ struct PublicAPITests {
         #expect(updated.hasVoted == true)
         #expect(updated.title == base.title)
         #expect(updated.columnName == base.columnName)
+        #expect(updated.requesterAvatarUrl == base.requesterAvatarUrl)
+        #expect(updated.requesterClerkId == base.requesterClerkId)
+        #expect(updated.recentCommenters == base.recentCommenters)
+        #expect(updated.hasMoreCommenters == base.hasMoreCommenters)
     }
 }
 

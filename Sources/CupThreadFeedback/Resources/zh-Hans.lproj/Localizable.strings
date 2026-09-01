@@ -68,3 +68,15 @@
 "cupthread.error.could_not_load" = "加载失败";
 "cupthread.error.try_again" = "重试";
 "cupthread.error.accessibility_failed" = "加载失败：%@";
+
+"cupthread.comments.title" = "评论";
+"cupthread.comments.empty_title" = "暂无评论";
+"cupthread.comments.empty_description" = "快来发表第一条评论吧。";
+"cupthread.comments.reply" = "回复";
+"cupthread.comments.replying_to" = "回复 @%@";
+"cupthread.comments.compose_prompt" = "写下您的想法…";
+
+"cupthread.profile.title" = "用户资料";
+"cupthread.profile.apps" = "应用列表";
+"cupthread.profile.recent_comments" = "近期评论";
+"cupthread.profile.no_comments" = "暂无近期评论。";

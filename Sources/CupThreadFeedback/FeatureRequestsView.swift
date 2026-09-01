@@ -19,6 +19,8 @@ public struct FeatureRequestsView: View {
     @State private var loadError: String?
     @State private var isComposePresented = false
     @State private var showSubmittedBanner = false
+    @State private var selectedItemForComments: FeatureRequestItem?
+    @State private var selectedUserIdForProfile: String?
 
     @State private var searchText = ""
     @State private var versions: [AppVersion] = []
@@ -80,6 +82,26 @@ public struct FeatureRequestsView: View {
                 Task { await loadFeatureRequests() }
             }
         }
+        .sheet(item: $selectedItemForComments) { item in
+            NavigationStack {
+                CommentsView(
+                    client: client,
+                    userToken: userToken,
+                    featureRequestId: item.id,
+                    featureRequestTitle: item.title
+                )
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { selectedUserIdForProfile != nil },
+            set: { if !$0 { selectedUserIdForProfile = nil } }
+        )) {
+            if let userId = selectedUserIdForProfile {
+                NavigationStack {
+                    UserProfileView(client: client, userId: userId)
+                }
+            }
+        }
         .refreshable { await loadFeatureRequests() }
         .task { await loadVersions() }
         .task(id: filterKey) {
@@ -124,7 +146,9 @@ public struct FeatureRequestsView: View {
                         FeatureRequestCard(
                             item: item,
                             highlightQuery: searchText,
-                            isVoteInFlight: votingIds.contains(item.id)
+                            isVoteInFlight: votingIds.contains(item.id),
+                            onSelectCard: { selectedItemForComments = item },
+                            onSelectUser: { selectedUserIdForProfile = $0 }
                         ) {
                             Task { await toggleVoteOptimistic(for: item) }
                         }
@@ -154,7 +178,9 @@ public struct FeatureRequestsView: View {
                     FeatureRequestCard(
                         item: item,
                         highlightQuery: searchText,
-                        isVoteInFlight: votingIds.contains(item.id)
+                        isVoteInFlight: votingIds.contains(item.id),
+                        onSelectCard: { selectedItemForComments = item },
+                        onSelectUser: { selectedUserIdForProfile = $0 }
                     ) {
                         Task { await toggleVoteOptimistic(for: item) }
                     }
@@ -288,6 +314,8 @@ private struct FeatureRequestCard: View {
     let item: FeatureRequestItem
     var highlightQuery: String = ""
     let isVoteInFlight: Bool
+    var onSelectCard: (() -> Void)?
+    var onSelectUser: ((String) -> Void)?
     let vote: () -> Void
 
     var body: some View {
@@ -329,6 +357,10 @@ private struct FeatureRequestCard: View {
                 metaRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onSelectCard?()
+            }
 
             VotePill(
                 voteCount: item.voteCount,
@@ -348,10 +380,12 @@ private struct FeatureRequestCard: View {
             CapsuleBadge(icon: "checkmark.seal.fill", text: CupThreadStrings.tr("cupthread.features.released_in", released), tint: .green)
         } else {
             HStack(spacing: 10) {
-                Label(
-                    item.requesterName.flatMap { $0.isEmpty ? nil : $0 } ?? CupThreadStrings.tr("cupthread.features.anonymous"),
-                    systemImage: "person"
-                )
+                requesterLabel
+
+                if !item.recentCommenters.isEmpty {
+                    commentersStack
+                }
+
                 if let date = item.createdAtDate {
                     Label {
                         Text(date, format: .relative(presentation: .named))
@@ -363,6 +397,55 @@ private struct FeatureRequestCard: View {
             .font(.caption2)
             .foregroundStyle(.tertiary)
         }
+    }
+
+    @ViewBuilder
+    private var requesterLabel: some View {
+        if let clerkId = item.requesterClerkId {
+            Button {
+                onSelectUser?(clerkId)
+            } label: {
+                HStack(spacing: 6) {
+                    AvatarView(url: item.requesterAvatarUrl, size: 20)
+                    Text(item.requesterName.flatMap { $0.isEmpty ? nil : $0 } ?? CupThreadStrings.tr("cupthread.features.anonymous"))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+        } else {
+            HStack(spacing: 6) {
+                AvatarView(url: item.requesterAvatarUrl, size: 20)
+                Text(item.requesterName.flatMap { $0.isEmpty ? nil : $0 } ?? CupThreadStrings.tr("cupthread.features.anonymous"))
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var commentersStack: some View {
+        HStack(spacing: -6) {
+            ForEach(Array(item.recentCommenters.prefix(3).enumerated()), id: \.offset) { index, commenter in
+                if let clerkId = commenter.clerkUserId {
+                    Button {
+                        onSelectUser?(clerkId)
+                    } label: {
+                        AvatarView(url: commenter.avatarUrl, size: 18)
+                    }
+                    .buttonStyle(.plain)
+                    .zIndex(Double(3 - index))
+                } else {
+                    AvatarView(url: commenter.avatarUrl, size: 18)
+                        .zIndex(Double(3 - index))
+                }
+            }
+            if item.hasMoreCommenters {
+                Text("···")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .accessibilityLabel("Recent commenters")
     }
 }
 
@@ -380,87 +463,5 @@ private struct SubmittedBanner: View {
         .padding(12)
         .background(Color.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - Compose sheet
-
-private struct FeatureRequestComposeView: View {
-    let client: FeedbackClient
-    let userToken: String
-    let onSubmitted: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var draft = FeatureRequestDraft()
-    @State private var isSubmitting = false
-    @State private var submitError: String?
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField(CupThreadStrings.tr("cupthread.feedback.title_label"), text: $draft.title, prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary")))
-                    TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
-                        .lineLimit(5...10)
-                        .padding(.top, 2)
-                } header: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
-                } footer: {
-                    Text(CupThreadStrings.tr("cupthread.features.compose_desc_prompt"))
-                }
-
-                Section {
-                    TextField(CupThreadStrings.tr("cupthread.features.compose_name_prompt"), text: $draft.requesterName)
-                } header: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
-                } footer: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_contact_footer"))
-                }
-
-                if let submitError {
-                    Section {
-                        ErrorBanner(message: submitError)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .listRowBackground(Color.clear)
-                    }
-                }
-            }
-            .navigationTitle(CupThreadStrings.tr("cupthread.features.compose_title"))
-            #if os(iOS) || os(visionOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            #if os(macOS)
-            .frame(minWidth: 460, minHeight: 420)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(CupThreadStrings.tr("cupthread.whatsnew.close_button")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isSubmitting ? CupThreadStrings.tr("cupthread.features.compose_sending") : CupThreadStrings.tr("cupthread.features.compose_submit")) {
-                        Task { await submit() }
-                    }
-                    .disabled(isSubmitting || !canSubmit)
-                }
-            }
-        }
-    }
-
-    private var canSubmit: Bool {
-        draft.title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
-        draft.description.trimmingCharacters(in: .whitespacesAndNewlines).count >= 5
-    }
-
-    @MainActor
-    private func submit() async {
-        isSubmitting = true
-        submitError = nil
-        defer { isSubmitting = false }
-        do {
-            _ = try await client.submitFeatureRequest(draft, userToken: userToken)
-            onSubmitted()
-        } catch {
-            submitError = error.localizedDescription
-        }
     }
 }

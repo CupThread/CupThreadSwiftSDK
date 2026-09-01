@@ -1,5 +1,20 @@
 import Foundation
 
+// MARK: - Commenters
+
+/// A commenter who recently commented on a feature request.
+///
+/// Returned as part of ``FeatureRequestItem/recentCommenters``;
+/// the card UI renders an avatar stack from these.
+public struct RecentCommenter: Codable, Equatable, Sendable {
+    /// Display name of the commenter, when given.
+    public let authorName: String?
+    /// Clerk user id, enabling navigation to the commenter's profile.
+    public let clerkUserId: String?
+    /// URL of the commenter's avatar image, when given.
+    public let avatarUrl: String?
+}
+
 // MARK: - Feature request record (mirrors the server FeatureRequestRecord)
 
 /// A public feature request as returned by `GET /api/v1/feature-requests`.
@@ -32,6 +47,14 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     public let releasedVersion: String?
     /// Display name of the requester, when given.
     public let requesterName: String?
+    /// Avatar URL of the requester, when given.
+    public let requesterAvatarUrl: String?
+    /// Clerk user id of the requester, when given.
+    public let requesterClerkId: String?
+    /// Array of recent commenters.
+    public let recentCommenters: [RecentCommenter]
+    /// Whether there are more commenters than shown.
+    public let hasMoreCommenters: Bool
     /// Whether an admin approved the request; unapproved requests show a
     /// "pending review" badge to their submitter.
     public let approved: Bool
@@ -82,6 +105,10 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         versionLabel: String? = nil,
         releasedVersion: String? = nil,
         requesterName: String? = nil,
+        requesterAvatarUrl: String? = nil,
+        requesterClerkId: String? = nil,
+        recentCommenters: [RecentCommenter] = [],
+        hasMoreCommenters: Bool = false,
         approved: Bool,
         voteCount: Int,
         hasVoted: Bool,
@@ -101,6 +128,10 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.versionLabel = versionLabel
         self.releasedVersion = releasedVersion
         self.requesterName = requesterName
+        self.requesterAvatarUrl = requesterAvatarUrl
+        self.requesterClerkId = requesterClerkId
+        self.recentCommenters = recentCommenters
+        self.hasMoreCommenters = hasMoreCommenters
         self.approved = approved
         self.voteCount = voteCount
         self.hasVoted = hasVoted
@@ -123,6 +154,10 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
             versionLabel: versionLabel,
             releasedVersion: releasedVersion,
             requesterName: requesterName,
+            requesterAvatarUrl: requesterAvatarUrl,
+            requesterClerkId: requesterClerkId,
+            recentCommenters: recentCommenters,
+            hasMoreCommenters: hasMoreCommenters,
             approved: approved,
             voteCount: count,
             hasVoted: voted,
@@ -130,6 +165,39 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
             createdAt: createdAt,
             updatedAt: updatedAt
         )
+    }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.appId = try container.decode(String.self, forKey: .appId)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.description = try container.decode(String.self, forKey: .description)
+        self.status = try container.decode(String.self, forKey: .status)
+        self.columnId = try container.decodeIfPresent(String.self, forKey: .columnId)
+        self.columnSlug = try container.decodeIfPresent(String.self, forKey: .columnSlug)
+        self.columnName = try container.decodeIfPresent(String.self, forKey: .columnName)
+        self.versionId = try container.decodeIfPresent(String.self, forKey: .versionId)
+        self.versionLabel = try container.decodeIfPresent(String.self, forKey: .versionLabel)
+        self.releasedVersion = try container.decodeIfPresent(String.self, forKey: .releasedVersion)
+        self.requesterName = try container.decodeIfPresent(String.self, forKey: .requesterName)
+        self.requesterAvatarUrl = try container.decodeIfPresent(String.self, forKey: .requesterAvatarUrl)
+        self.requesterClerkId = try container.decodeIfPresent(String.self, forKey: .requesterClerkId)
+        self.recentCommenters = try container.decodeIfPresent([RecentCommenter].self, forKey: .recentCommenters) ?? []
+        self.hasMoreCommenters = try container.decodeIfPresent(Bool.self, forKey: .hasMoreCommenters) ?? false
+        self.approved = try container.decode(Bool.self, forKey: .approved)
+        self.voteCount = try container.decode(Int.self, forKey: .voteCount)
+        self.hasVoted = try container.decode(Bool.self, forKey: .hasVoted)
+        self.isOwnRequest = try container.decode(Bool.self, forKey: .isOwnRequest)
+        self.createdAt = try container.decode(String.self, forKey: .createdAt)
+        self.updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, appId, title, description, status
+        case columnId, columnSlug, columnName, versionId, versionLabel
+        case releasedVersion, requesterName, requesterAvatarUrl, requesterClerkId
+        case recentCommenters, hasMoreCommenters, approved, voteCount
+        case hasVoted, isOwnRequest, createdAt, updatedAt
     }
 }
 

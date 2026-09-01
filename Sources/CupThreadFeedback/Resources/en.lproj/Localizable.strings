@@ -68,3 +68,15 @@
 "cupthread.error.could_not_load" = "Couldn't Load";
 "cupthread.error.try_again" = "Try Again";
 "cupthread.error.accessibility_failed" = "Failed to load. %@";
+
+"cupthread.comments.title" = "Comments";
+"cupthread.comments.empty_title" = "No Comments Yet";
+"cupthread.comments.empty_description" = "Be the first to join the discussion.";
+"cupthread.comments.reply" = "Reply";
+"cupthread.comments.replying_to" = "Replying to @%@";
+"cupthread.comments.compose_prompt" = "Write a comment…";
+
+"cupthread.profile.title" = "User Profile";
+"cupthread.profile.apps" = "Apps";
+"cupthread.profile.recent_comments" = "Recent Comments";
+"cupthread.profile.no_comments" = "No recent comments.";

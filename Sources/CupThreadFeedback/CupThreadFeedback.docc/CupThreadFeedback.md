@@ -33,12 +33,29 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 ## Feature requests & roadmap
 
 - ``FeatureRequestItem``: A public feature request.
+- ``RecentCommenter``: A commenter on a feature request.
 - ``FeatureRequestDraft``: A new feature request before submission.
 - ``ListFeatureRequestsResult``: Paginated list response.
 - ``FeatureRequestSubmissionResult``: Response to a new request.
 - ``VoteResult``: Response to a vote toggle.
 - ``FeatureRequestsView``: Browse, search, and vote on requests.
 - ``RoadmapBoardView``: Kanban board grouped by public columns.
+
+## Comments & @replies
+
+- ``FeatureRequestComment``: A public comment on a feature request.
+- ``CommentDraft``: A new comment before submission.
+- ``CommentsView``: Flat comment thread with @author replies.
+- ``FeedbackClient/fetchComments(featureRequestId:)``, ``FeedbackClient/postComment(featureRequestId:draft:userToken:)``
+
+## User profiles
+
+- ``UserProfile``: A public developer or user profile.
+- ``PublicUserProfileResponse``: User profile with public apps and comments.
+- ``PublicAppSummary``: Summary of a public app.
+- ``UserProfileComment``: Recent public comment on a profile.
+- ``UserProfileView``: Public user profile page.
+- ``FeedbackClient/fetchUserProfile(userId:)``
 
 ## Changelog & "What's New"
 

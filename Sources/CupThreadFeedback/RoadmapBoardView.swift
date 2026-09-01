@@ -397,6 +397,22 @@ private struct RoadmapCard: View {
                 if let version = item.versionLabel {
                     CapsuleBadge(icon: "tag", text: version, tint: .secondary)
                 }
+
+                if !item.recentCommenters.isEmpty {
+                    HStack(spacing: -6) {
+                        ForEach(Array(item.recentCommenters.prefix(3).enumerated()), id: \.offset) { index, commenter in
+                            AvatarView(url: commenter.avatarUrl, size: 16)
+                                .zIndex(Double(3 - index))
+                        }
+                        if item.hasMoreCommenters {
+                            Text("···")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .accessibilityLabel("Recent commenters")
+                }
+
                 Spacer(minLength: 8)
                 VoteCountBadge(count: item.voteCount, hasVoted: item.hasVoted)
             }
