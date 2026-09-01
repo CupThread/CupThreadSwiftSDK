@@ -15,7 +15,7 @@ npx skills add CupThread/CupThreadAgenticCoding --skill cupthread-swift-sdk
 Once installed, simply copy and paste this prompt to your AI coding agent:
 
 ```text
-Integrate the CupThread SwiftUI roadmap board and changelog overlay into this app using appKey app_xxx.
+Integrate the CupThread SwiftUI SDK (roadmap board, changelog overlay, and feedback composer) into this app. Scaffold a dedicated configuration helper with a placeholder for the App Key, and at the end, remind me with step-by-step instructions on how to set my App Key safely (e.g. via xcconfig or local config).
 ```
 
 ---
