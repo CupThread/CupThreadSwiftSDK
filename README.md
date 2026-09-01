@@ -4,19 +4,26 @@ SwiftUI-based SDK for Apple platforms: **iOS 17+, macOS 14+, visionOS 1.0+, tvOS
 
 Part of the [CupThread.com](https://cupthread.com) platform.
 
+## 🤖 Recommended: Install via AI Agent (Agentic Coding)
+
+Instead of manually editing `Package.swift` and wiring views by hand, install the official **CupThread Swift AI Skill** into your workspace with [`npx skills`](https://github.com/skills-directory/skills) and let your AI assistant (Claude Code, Cursor, Copilot, Xcode, Windsurf, Codex, Antigravity) integrate and customize it for you:
+
+```sh
+npx skills add CupThread/CupThreadAgenticCoding --skill cupthread-swift-sdk
+```
+
+Once installed, simply prompt your coding agent:
+> *"Integrate the CupThread SwiftUI roadmap board and changelog overlay with appKey `app_xxx`"*
+
+---
+
 ## CupThread Ecosystem
 - 🌐 [CupThread.com](https://cupthread.com) — Feedback SaaS platform, developer console, and API.
 - 🍏 [CupThread/CupThreadSwiftSDK](https://github.com/CupThread/CupThreadSwiftSDK) — Apple platform SDK (SwiftUI / SPM / XCFramework).
 - 🤖 [CupThread/CupThreadAndroidSDK](https://github.com/CupThread/CupThreadAndroidSDK) — Android SDK (Jetpack Compose / Maven).
+- ⚛️ [CupThread/CupThreadReactNativeSDK](https://github.com/CupThread/CupThreadReactNativeSDK) — React Native & Expo SDK (TypeScript).
+- 💙 [CupThread/CupThreadFlutterSDK](https://github.com/CupThread/CupThreadFlutterSDK) — Flutter SDK (Dart).
 - 🧠 [CupThread/CupThreadAgenticCoding](https://github.com/CupThread/CupThreadAgenticCoding) — AI-friendly CLI & Skills for pair programming.
-
-## 🤖 Agentic Coding Friendly
-
-This repository is designed from the ground up to be **Agentic Coding friendly** for LLMs, coding agents, and pair programmers:
-- **Zero third-party dependencies**: Lightweight, deterministic builds without external dependency conflicts.
-- **Strict type consistency**: Full alignment with CupThread Public API schemas.
-- **100% DocC documentation**: Complete symbol docs, parameter annotations, and visual screenshot guides.
-- **AI skills & pair programming tooling**: Companion skills, CLI tools, and agent workflows are maintained in [CupThread/CupThreadAgenticCoding](https://github.com/CupThread/CupThreadAgenticCoding).
 
 ---
 
@@ -34,7 +41,7 @@ This repository is designed from the ground up to be **Agentic Coding friendly**
 
 ---
 
-## Installation
+## Manual Installation
 
 ### Swift Package Manager (Recommended)
 
