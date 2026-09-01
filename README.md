@@ -12,8 +12,11 @@ Instead of manually editing `Package.swift` and wiring views by hand, install th
 npx skills add CupThread/CupThreadAgenticCoding --skill cupthread-swift-sdk
 ```
 
-Once installed, simply prompt your coding agent:
-> *"Integrate the CupThread SwiftUI roadmap board and changelog overlay with appKey `app_xxx`"*
+Once installed, simply copy and paste this prompt to your AI coding agent:
+
+```text
+Integrate the CupThread SwiftUI roadmap board and changelog overlay into this app using appKey app_xxx.
+```
 
 ---
 
