@@ -1,0 +1,87 @@
+/* Vietnamese Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "Gửi phản hồi";
+"cupthread.feedback.short_summary" = "Tóm tắt ngắn gọn";
+"cupthread.feedback.title_label" = "Tiêu đề";
+"cupthread.feedback.description_label" = "Mô tả";
+"cupthread.feedback.section_feedback" = "Phản hồi";
+"cupthread.feedback.section_feedback_footer" = "Hãy cho chúng tôi biết điều gì hiệu quả, điều gì chưa và bạn mong muốn điều gì tiếp theo.";
+"cupthread.feedback.section_contact" = "Liên hệ";
+"cupthread.feedback.section_contact_footer" = "Tùy chọn — chúng tôi chỉ dùng thông tin này để theo dõi phản hồi của bạn.";
+"cupthread.feedback.name_label" = "Họ và tên";
+"cupthread.feedback.email_label" = "Email";
+"cupthread.feedback.section_attachments" = "Tệp đính kèm";
+"cupthread.feedback.section_attachments_footer" = "Đính kèm ảnh chụp màn hình hoặc nhật ký để giúp chúng tôi chẩn đoán sự cố.";
+"cupthread.feedback.add_attachment" = "Thêm hình ảnh / Ảnh chụp màn hình";
+"cupthread.feedback.uploading_attachment" = "Đang tải lên tệp đính kèm…";
+"cupthread.feedback.remove_attachment" = "Xóa tệp đính kèm";
+"cupthread.feedback.send_button" = "Gửi phản hồi";
+"cupthread.feedback.sending_button" = "Đang gửi…";
+"cupthread.feedback.thanks_title" = "Cảm ơn bạn!";
+"cupthread.feedback.thanks_subtitle" = "Phản hồi của bạn đã được gửi đến đội ngũ phát triển.";
+"cupthread.feedback.send_more" = "Gửi thêm phản hồi";
+"cupthread.feedback.accessibility_sent" = "Phản hồi đã được gửi thành công.";
+
+"cupthread.features.title" = "Yêu cầu tính năng";
+"cupthread.features.search_prompt" = "Tìm kiếm yêu cầu tính năng";
+"cupthread.features.all_versions" = "Tất cả các phiên bản";
+"cupthread.features.version_picker" = "Phiên bản";
+"cupthread.features.filter_by_version" = "Lọc theo phiên bản";
+"cupthread.features.request_a_feature" = "Đề xuất tính năng";
+"cupthread.features.request_a_feature_hint" = "Mở khung soạn yêu cầu tính năng";
+"cupthread.features.empty_title" = "Chưa có yêu cầu tính năng nào";
+"cupthread.features.empty_description" = "Ý tưởng từ người dùng như bạn sẽ xuất hiện tại đây.";
+"cupthread.features.empty_with_query" = "Không tìm thấy kết quả nào cho “%@”.";
+"cupthread.features.empty_no_requests" = "Chưa có yêu cầu tính năng nào.";
+"cupthread.features.submitted_banner" = "Đã gửi yêu cầu — yêu cầu sẽ hiển thị sau khi đội ngũ phê duyệt.";
+"cupthread.features.pending_review" = "Chờ xét duyệt";
+"cupthread.features.anonymous" = "Ẩn danh";
+"cupthread.features.released_in" = "Đã phát hành trong %@";
+"cupthread.features.vote_remove_accessibility" = "Hủy bỏ phiếu cho yêu cầu này. Hiện có %lld lượt bình chọn.";
+"cupthread.features.vote_add_accessibility" = "Bình chọn cho yêu cầu này. Hiện có %lld lượt bình chọn.";
+"cupthread.features.vote_own_hint" = "Bạn không thể bình chọn cho yêu cầu của chính mình.";
+"cupthread.features.vote_toggle_hint" = "Chạm hai lần để chuyển đổi bình chọn của bạn.";
+"cupthread.features.vote_count_accessibility" = "%lld lượt bình chọn%@";
+"cupthread.features.vote_including_yours" = ", bao gồm cả bạn";
+"cupthread.features.compose_title" = "Đề xuất tính năng";
+"cupthread.features.compose_submit" = "Gửi";
+"cupthread.features.compose_sending" = "Đang gửi…";
+"cupthread.features.compose_name_prompt" = "Tên của bạn (tùy chọn)";
+"cupthread.features.compose_desc_prompt" = "Chúng tôi nên xây dựng tính năng gì và tại sao?";
+
+"cupthread.roadmap.title" = "Lộ trình phát triển";
+"cupthread.roadmap.search_prompt" = "Tìm kiếm lộ trình";
+"cupthread.roadmap.column_other" = "Khác";
+"cupthread.roadmap.empty_column_title" = "Không có mục nào trong %@";
+"cupthread.roadmap.empty_column_desc" = "Các yêu cầu được chuyển sang cột này sẽ xuất hiện tại đây.";
+
+"cupthread.whatsnew.title" = "Có gì mới";
+"cupthread.whatsnew.no_updates_title" = "Chưa có cập nhật nào";
+"cupthread.whatsnew.no_updates_desc" = "Ghi chú phát hành sẽ xuất hiện tại đây khi phiên bản mới ra mắt.";
+"cupthread.whatsnew.no_updates_tv" = "Chưa có cập nhật nào.";
+"cupthread.whatsnew.shipped_features" = "Tính năng đã phát hành";
+"cupthread.whatsnew.subscribe_title" = "Nhận cập nhật sản phẩm";
+"cupthread.whatsnew.subscribe_desc" = "Nhận thông báo phát hành mới và tin tức sản phẩm qua email.";
+"cupthread.whatsnew.subscribe_button" = "Đăng ký nhận cập nhật";
+"cupthread.whatsnew.subscribe_email_placeholder" = "name@example.com";
+"cupthread.whatsnew.subscribe_modal_title" = "Cập nhật sản phẩm";
+"cupthread.whatsnew.subscribe_modal_sub" = "Nhập email của bạn để nhận ghi chú phát hành ngay khi có phiên bản mới.";
+"cupthread.whatsnew.subscribed_success" = "Bạn đã đăng ký nhận cập nhật sản phẩm thành công!";
+"cupthread.whatsnew.close_button" = "Đóng";
+"cupthread.whatsnew.done_button" = "Xong";
+
+"cupthread.error.could_not_load" = "Không thể tải";
+"cupthread.error.try_again" = "Thử lại";
+"cupthread.error.accessibility_failed" = "Tải thất bại: %@";
+
+"cupthread.comments.title" = "Bình luận";
+"cupthread.comments.empty_title" = "Chưa có bình luận nào";
+"cupthread.comments.empty_description" = "Hãy là người đầu tiên tham gia thảo luận.";
+"cupthread.comments.reply" = "Trả lời";
+"cupthread.comments.replying_to" = "Đang trả lời @%@";
+"cupthread.comments.compose_prompt" = "Viết bình luận…";
+
+"cupthread.profile.title" = "Hồ sơ người dùng";
+"cupthread.profile.apps" = "Ứng dụng";
+"cupthread.profile.recent_comments" = "Bình luận gần đây";
+"cupthread.profile.no_comments" = "Không có bình luận gần đây.";

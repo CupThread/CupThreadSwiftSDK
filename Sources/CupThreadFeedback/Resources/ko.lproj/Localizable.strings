@@ -1,0 +1,87 @@
+/* Korean Localization for CupThreadFeedback SDK */
+
+"cupthread.feedback.title" = "피드백 보내기";
+"cupthread.feedback.short_summary" = "요약";
+"cupthread.feedback.title_label" = "제목";
+"cupthread.feedback.description_label" = "설명";
+"cupthread.feedback.section_feedback" = "피드백";
+"cupthread.feedback.section_feedback_footer" = "좋았던 점, 아쉬웠던 점, 앞으로 바라는 점을 알려주세요.";
+"cupthread.feedback.section_contact" = "연락처";
+"cupthread.feedback.section_contact_footer" = "선택 사항 — 피드백 관련 후속 안내에만 사용됩니다.";
+"cupthread.feedback.name_label" = "이름";
+"cupthread.feedback.email_label" = "이메일";
+"cupthread.feedback.section_attachments" = "첨부 파일";
+"cupthread.feedback.section_attachments_footer" = "문제 진단에 도움이 되는 스크린샷이나 로그를 첨부해 주세요.";
+"cupthread.feedback.add_attachment" = "이미지 / 스크린샷 추가";
+"cupthread.feedback.uploading_attachment" = "첨부 파일 업로드 중…";
+"cupthread.feedback.remove_attachment" = "첨부 파일 삭제";
+"cupthread.feedback.send_button" = "피드백 보내기";
+"cupthread.feedback.sending_button" = "보내는 중…";
+"cupthread.feedback.thanks_title" = "감사합니다!";
+"cupthread.feedback.thanks_subtitle" = "피드백이 팀에 성공적으로 전달되었습니다.";
+"cupthread.feedback.send_more" = "피드백 더 보내기";
+"cupthread.feedback.accessibility_sent" = "피드백이 성공적으로 전송되었습니다.";
+
+"cupthread.features.title" = "기능 제안";
+"cupthread.features.search_prompt" = "기능 제안 검색";
+"cupthread.features.all_versions" = "모든 버전";
+"cupthread.features.version_picker" = "버전";
+"cupthread.features.filter_by_version" = "버전별 필터";
+"cupthread.features.request_a_feature" = "기능 제안하기";
+"cupthread.features.request_a_feature_hint" = "기능 제안 작성 창을 엽니다";
+"cupthread.features.empty_title" = "기능 제안 없음";
+"cupthread.features.empty_description" = "사용자들의 아이디어가 여기에 표시됩니다.";
+"cupthread.features.empty_with_query" = "“%@”에 대한 검색 결과가 없습니다.";
+"cupthread.features.empty_no_requests" = "아직 등록된 기능 제안이 없습니다.";
+"cupthread.features.submitted_banner" = "제안이 제출되었습니다 — 팀 검토 후 공개됩니다.";
+"cupthread.features.pending_review" = "검토 대기 중";
+"cupthread.features.anonymous" = "익명 사용자";
+"cupthread.features.released_in" = "%@에서 출시됨";
+"cupthread.features.vote_remove_accessibility" = "이 제안에 대한 투표를 취소합니다. 현재 %lld표.";
+"cupthread.features.vote_add_accessibility" = "이 제안에 투표합니다. 현재 %lld표.";
+"cupthread.features.vote_own_hint" = "자신이 작성한 제안에는 투표할 수 없습니다.";
+"cupthread.features.vote_toggle_hint" = "이중 탭하여 투표 상태를 전환합니다.";
+"cupthread.features.vote_count_accessibility" = "%lld표%@";
+"cupthread.features.vote_including_yours" = "(내 투표 포함)";
+"cupthread.features.compose_title" = "기능 제안하기";
+"cupthread.features.compose_submit" = "제출";
+"cupthread.features.compose_sending" = "제출 중…";
+"cupthread.features.compose_name_prompt" = "이름 (선택 사항)";
+"cupthread.features.compose_desc_prompt" = "어떤 기능이 필요하며 그 이유는 무엇인가요?";
+
+"cupthread.roadmap.title" = "로드맵";
+"cupthread.roadmap.search_prompt" = "로드맵 검색";
+"cupthread.roadmap.column_other" = "기타";
+"cupthread.roadmap.empty_column_title" = "%@에 항목이 없습니다";
+"cupthread.roadmap.empty_column_desc" = "이 항목으로 이동된 제안이 여기에 표시됩니다.";
+
+"cupthread.whatsnew.title" = "새로운 기능";
+"cupthread.whatsnew.no_updates_title" = "새로운 업데이트 없음";
+"cupthread.whatsnew.no_updates_desc" = "새 버전이 출시되면 릴리즈 노트가 여기에 표시됩니다.";
+"cupthread.whatsnew.no_updates_tv" = "새로운 업데이트가 없습니다.";
+"cupthread.whatsnew.shipped_features" = "출시된 기능";
+"cupthread.whatsnew.subscribe_title" = "제품 업데이트 소식 받기";
+"cupthread.whatsnew.subscribe_desc" = "새로운 릴리즈 노트와 제품 공지를 이메일로 받아보세요.";
+"cupthread.whatsnew.subscribe_button" = "업데이트 구독하기";
+"cupthread.whatsnew.subscribe_email_placeholder" = "name@example.com";
+"cupthread.whatsnew.subscribe_modal_title" = "제품 업데이트";
+"cupthread.whatsnew.subscribe_modal_sub" = "이메일을 입력하시면 새 버전이 출시되는 즉시 알려드립니다.";
+"cupthread.whatsnew.subscribed_success" = "제품 업데이트 구독이 완료되었습니다!";
+"cupthread.whatsnew.close_button" = "닫기";
+"cupthread.whatsnew.done_button" = "완료";
+
+"cupthread.error.could_not_load" = "불러올 수 없음";
+"cupthread.error.try_again" = "다시 시도";
+"cupthread.error.accessibility_failed" = "불러오기에 실패했습니다: %@";
+
+"cupthread.comments.title" = "댓글";
+"cupthread.comments.empty_title" = "아직 댓글이 없습니다";
+"cupthread.comments.empty_description" = "첫 번째 댓글을 남겨보세요.";
+"cupthread.comments.reply" = "답글";
+"cupthread.comments.replying_to" = "@%@ 님에게 답글 작성 중";
+"cupthread.comments.compose_prompt" = "댓글을 입력하세요…";
+
+"cupthread.profile.title" = "사용자 프로필";
+"cupthread.profile.apps" = "앱";
+"cupthread.profile.recent_comments" = "최근 댓글";
+"cupthread.profile.no_comments" = "최근 댓글이 없습니다.";

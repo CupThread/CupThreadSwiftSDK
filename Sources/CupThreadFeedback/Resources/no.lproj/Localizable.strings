@@ -10,6 +10,11 @@
 "cupthread.feedback.section_contact_footer" = "Valgfritt — vi bruker det kun til å følge opp tilbakemeldingen din.";
 "cupthread.feedback.name_label" = "Navn";
 "cupthread.feedback.email_label" = "E-post";
+"cupthread.feedback.section_attachments" = "Vedlegg";
+"cupthread.feedback.section_attachments_footer" = "Legg ved skjermbilder eller logger for å hjelpe oss med å feilsøke problemer.";
+"cupthread.feedback.add_attachment" = "Legg til bilde / skjermbilde";
+"cupthread.feedback.uploading_attachment" = "Laster opp vedlegg…";
+"cupthread.feedback.remove_attachment" = "Fjern vedlegg";
 "cupthread.feedback.send_button" = "Send tilbakemelding";
 "cupthread.feedback.sending_button" = "Sender…";
 "cupthread.feedback.thanks_title" = "Tusen takk!";
@@ -23,17 +28,17 @@
 "cupthread.features.version_picker" = "Versjon";
 "cupthread.features.filter_by_version" = "Filtrer etter versjon";
 "cupthread.features.request_a_feature" = "Foreslå funksjon";
-"cupthread.features.request_a_feature_hint" = "Åpner skjema for å foreslå en funksjon";
+"cupthread.features.request_a_feature_hint" = "Åpner skjema for å foreslå funksjon";
 "cupthread.features.empty_title" = "Ingen funksjonsønsker";
 "cupthread.features.empty_description" = "Forslag fra brukere som deg vil vises her.";
 "cupthread.features.empty_with_query" = "Ingen resultater for «%@».";
 "cupthread.features.empty_no_requests" = "Ingen funksjonsønsker ennå.";
-"cupthread.features.submitted_banner" = "Ønsket er sendt inn — det vises så snart teamet har godkjent det.";
-"cupthread.features.pending_review" = "Venter på vurdering";
+"cupthread.features.submitted_banner" = "Forslaget er sendt — det vises når teamet har godkjent det.";
+"cupthread.features.pending_review" = "Venter på godkjenning";
 "cupthread.features.anonymous" = "Anonym";
 "cupthread.features.released_in" = "Lansert i %@";
-"cupthread.features.vote_remove_accessibility" = "Fjern stemme fra dette ønsket. Har for øyeblikket %lld stemmer.";
-"cupthread.features.vote_add_accessibility" = "Stem på dette ønsket. Har for øyeblikket %lld stemmer.";
+"cupthread.features.vote_remove_accessibility" = "Fjern stemme fra dette ønsket. Nåværende stemmer: %lld.";
+"cupthread.features.vote_add_accessibility" = "Stem på dette ønsket. Nåværende stemmer: %lld.";
 "cupthread.features.vote_own_hint" = "Du kan ikke stemme på ditt eget ønske.";
 "cupthread.features.vote_toggle_hint" = "Dobbelttrykk for å endre stemmen din.";
 "cupthread.features.vote_count_accessibility" = "%lld stemmer%@";
@@ -48,23 +53,35 @@
 "cupthread.roadmap.search_prompt" = "Søk i veikartet";
 "cupthread.roadmap.column_other" = "Annet";
 "cupthread.roadmap.empty_column_title" = "Ingen elementer i %@";
-"cupthread.roadmap.empty_column_desc" = "Ønsker som flyttes til denne kolonnen vil vises her.";
+"cupthread.roadmap.empty_column_desc" = "Ønsker flyttet til denne kolonnen vil vises her.";
 
-"cupthread.whatsnew.title" = "Nyheter";
+"cupthread.whatsnew.title" = "Hva er nytt";
 "cupthread.whatsnew.no_updates_title" = "Ingen oppdateringer ennå";
-"cupthread.whatsnew.no_updates_desc" = "Versjonsnotater vil vises her når nye versjoner lanseres.";
+"cupthread.whatsnew.no_updates_desc" = "Versjonsnotater vil vises her etter hvert som nye versjoner lanseres.";
 "cupthread.whatsnew.no_updates_tv" = "Ingen oppdateringer ennå.";
 "cupthread.whatsnew.shipped_features" = "Lanserte funksjoner";
 "cupthread.whatsnew.subscribe_title" = "Få produktoppdateringer";
-"cupthread.whatsnew.subscribe_desc" = "Motta nye versjonsnotater og produktnyheter via e-post.";
+"cupthread.whatsnew.subscribe_desc" = "Motta nye versjonsnotater og produktnyheter på e-post.";
 "cupthread.whatsnew.subscribe_button" = "Abonner på oppdateringer";
 "cupthread.whatsnew.subscribe_email_placeholder" = "navn@eksempel.no";
 "cupthread.whatsnew.subscribe_modal_title" = "Produktoppdateringer";
-"cupthread.whatsnew.subscribe_modal_sub" = "Skriv inn e-posten din for å motta versjonsnotater så snart de lanseres.";
+"cupthread.whatsnew.subscribe_modal_sub" = "Oppgi e-postadressen din for å motta versjonsnotater så snart de er klare.";
 "cupthread.whatsnew.subscribed_success" = "Du abonnerer nå på produktoppdateringer!";
 "cupthread.whatsnew.close_button" = "Lukk";
 "cupthread.whatsnew.done_button" = "Ferdig";
 
 "cupthread.error.could_not_load" = "Kunne ikke laste inn";
 "cupthread.error.try_again" = "Prøv igjen";
-"cupthread.error.accessibility_failed" = "Kunne ikke laste inn. %@";
+"cupthread.error.accessibility_failed" = "Innlasting mislyktes: %@";
+
+"cupthread.comments.title" = "Kommentarer";
+"cupthread.comments.empty_title" = "Ingen kommentarer ennå";
+"cupthread.comments.empty_description" = "Vær den første til å bli med i samtalen.";
+"cupthread.comments.reply" = "Svar";
+"cupthread.comments.replying_to" = "Svarer til @%@";
+"cupthread.comments.compose_prompt" = "Skriv en kommentar…";
+
+"cupthread.profile.title" = "Brukerprofil";
+"cupthread.profile.apps" = "Apper";
+"cupthread.profile.recent_comments" = "Nylige kommentarer";
+"cupthread.profile.no_comments" = "Ingen nylige kommentarer.";

@@ -10,6 +10,11 @@
 "cupthread.feedback.section_contact_footer" = "選填 — 僅用於後續追蹤回饋處理進度。";
 "cupthread.feedback.name_label" = "姓名";
 "cupthread.feedback.email_label" = "電子郵件";
+"cupthread.feedback.section_attachments" = "附件";
+"cupthread.feedback.section_attachments_footer" = "新增螢幕截圖或記錄檔以協助我們診斷問題。";
+"cupthread.feedback.add_attachment" = "新增圖片 / 截圖";
+"cupthread.feedback.uploading_attachment" = "正在上傳附件…";
+"cupthread.feedback.remove_attachment" = "移除附件";
 "cupthread.feedback.send_button" = "傳送回饋";
 "cupthread.feedback.sending_button" = "傳送中…";
 "cupthread.feedback.thanks_title" = "感謝您的回饋！";
@@ -68,3 +73,15 @@
 "cupthread.error.could_not_load" = "載入失敗";
 "cupthread.error.try_again" = "重試";
 "cupthread.error.accessibility_failed" = "載入失敗：%@";
+
+"cupthread.comments.title" = "留言";
+"cupthread.comments.empty_title" = "尚無留言";
+"cupthread.comments.empty_description" = "快來發表第一則留言吧。";
+"cupthread.comments.reply" = "回覆";
+"cupthread.comments.replying_to" = "回覆 @%@";
+"cupthread.comments.compose_prompt" = "寫下您的想法…";
+
+"cupthread.profile.title" = "使用者資料";
+"cupthread.profile.apps" = "應用程式列表";
+"cupthread.profile.recent_comments" = "近期留言";
+"cupthread.profile.no_comments" = "尚無近期留言。";

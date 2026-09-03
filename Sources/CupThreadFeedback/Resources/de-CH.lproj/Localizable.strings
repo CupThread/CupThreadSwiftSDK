@@ -1,51 +1,56 @@
-/* Swiss German Localization for CupThreadFeedback SDK */
+/* German (Switzerland) Localization for CupThreadFeedback SDK */
 
 "cupthread.feedback.title" = "Feedback senden";
 "cupthread.feedback.short_summary" = "Kurze Zusammenfassung";
 "cupthread.feedback.title_label" = "Titel";
 "cupthread.feedback.description_label" = "Beschreibung";
 "cupthread.feedback.section_feedback" = "Feedback";
-"cupthread.feedback.section_feedback_footer" = "Sagen Sie uns, was funktioniert hat, was nicht, und was Sie sich als Nächstes wünschen.";
+"cupthread.feedback.section_feedback_footer" = "Teilen Sie uns mit, was funktioniert hat, was nicht und was Sie sich wünschen.";
 "cupthread.feedback.section_contact" = "Kontakt";
-"cupthread.feedback.section_contact_footer" = "Optional — wir verwenden dies nur für Rückfragen zu Ihrem Feedback.";
+"cupthread.feedback.section_contact_footer" = "Optional — wird nur für Rückfragen zu Ihrem Feedback verwendet.";
 "cupthread.feedback.name_label" = "Name";
 "cupthread.feedback.email_label" = "E-Mail";
+"cupthread.feedback.section_attachments" = "Anhänge";
+"cupthread.feedback.section_attachments_footer" = "Fügen Sie Screenshots oder Protokolle an, um die Fehlerdiagnose zu unterstützen.";
+"cupthread.feedback.add_attachment" = "Bild / Screenshot hinzufügen";
+"cupthread.feedback.uploading_attachment" = "Anhang wird hochgeladen…";
+"cupthread.feedback.remove_attachment" = "Anhang entfernen";
 "cupthread.feedback.send_button" = "Feedback senden";
 "cupthread.feedback.sending_button" = "Wird gesendet…";
 "cupthread.feedback.thanks_title" = "Vielen Dank!";
-"cupthread.feedback.thanks_subtitle" = "Ihr Feedback wurde an das Team gesendet.";
+"cupthread.feedback.thanks_subtitle" = "Ihr Feedback wurde an das Team übermittelt.";
 "cupthread.feedback.send_more" = "Weiteres Feedback senden";
 "cupthread.feedback.accessibility_sent" = "Feedback erfolgreich gesendet.";
 
-"cupthread.features.title" = "Funktionswünsche";
-"cupthread.features.search_prompt" = "Funktionswünsche durchsuchen";
+"cupthread.features.title" = "Funktionsanfragen";
+"cupthread.features.search_prompt" = "Funktionsanfragen suchen";
 "cupthread.features.all_versions" = "Alle Versionen";
 "cupthread.features.version_picker" = "Version";
 "cupthread.features.filter_by_version" = "Nach Version filtern";
 "cupthread.features.request_a_feature" = "Funktion vorschlagen";
-"cupthread.features.request_a_feature_hint" = "Öffnet das Formular für Funktionsvorschläge";
-"cupthread.features.empty_title" = "Keine Funktionswünsche";
-"cupthread.features.empty_description" = "Ideen von Benutzern wie Ihnen werden hier angezeigt.";
+"cupthread.features.request_a_feature_hint" = "Öffnet das Formular für Funktionsanfragen";
+"cupthread.features.empty_title" = "Keine Funktionsanfragen";
+"cupthread.features.empty_description" = "Ideen von Nutzern wie Ihnen werden hier angezeigt.";
 "cupthread.features.empty_with_query" = "Keine Ergebnisse für „%@“.";
-"cupthread.features.empty_no_requests" = "Noch keine Funktionswünsche vorhanden.";
-"cupthread.features.submitted_banner" = "Vorschlag eingereicht — wird angezeigt, sobald das Team ihn genehmigt.";
-"cupthread.features.pending_review" = "Wartet auf Genehmigung";
+"cupthread.features.empty_no_requests" = "Noch keine Funktionsanfragen vorhanden.";
+"cupthread.features.submitted_banner" = "Anfrage gesendet — sie wird angezeigt, sobald das Team sie freigibt.";
+"cupthread.features.pending_review" = "Wartet auf Überprüfung";
 "cupthread.features.anonymous" = "Anonym";
 "cupthread.features.released_in" = "Veröffentlicht in %@";
-"cupthread.features.vote_remove_accessibility" = "Stimme für diese Anfrage entfernen. Aktuell %lld Stimmen.";
-"cupthread.features.vote_add_accessibility" = "Für diese Anfrage abstimmen. Aktuell %lld Stimmen.";
-"cupthread.features.vote_own_hint" = "Sie können nicht für Ihren eigenen Vorschlag abstimmen.";
-"cupthread.features.vote_toggle_hint" = "Doppeltippen, um die Stimme zu ändern.";
+"cupthread.features.vote_remove_accessibility" = "Stimme für diese Anfrage zurückziehen. Derzeit %lld Stimmen.";
+"cupthread.features.vote_add_accessibility" = "Für diese Anfrage stimmen. Derzeit %lld Stimmen.";
+"cupthread.features.vote_own_hint" = "Sie können nicht für Ihre eigene Anfrage stimmen.";
+"cupthread.features.vote_toggle_hint" = "Doppeltippen, um Stimme abzugeben oder zurückzuziehen.";
 "cupthread.features.vote_count_accessibility" = "%lld Stimmen%@";
 "cupthread.features.vote_including_yours" = ", einschliesslich Ihrer";
 "cupthread.features.compose_title" = "Funktion vorschlagen";
-"cupthread.features.compose_submit" = "Einreichen";
+"cupthread.features.compose_submit" = "Absenden";
 "cupthread.features.compose_sending" = "Wird gesendet…";
 "cupthread.features.compose_name_prompt" = "Ihr Name (optional)";
 "cupthread.features.compose_desc_prompt" = "Was sollten wir entwickeln und warum?";
 
 "cupthread.roadmap.title" = "Roadmap";
-"cupthread.roadmap.search_prompt" = "In Roadmap suchen";
+"cupthread.roadmap.search_prompt" = "Roadmap durchsuchen";
 "cupthread.roadmap.column_other" = "Sonstige";
 "cupthread.roadmap.empty_column_title" = "Keine Einträge in %@";
 "cupthread.roadmap.empty_column_desc" = "Anfragen in dieser Spalte werden hier angezeigt.";
@@ -67,4 +72,16 @@
 
 "cupthread.error.could_not_load" = "Laden fehlgeschlagen";
 "cupthread.error.try_again" = "Erneut versuchen";
-"cupthread.error.accessibility_failed" = "Laden fehlgeschlagen. %@";
+"cupthread.error.accessibility_failed" = "Laden fehlgeschlagen: %@";
+
+"cupthread.comments.title" = "Kommentare";
+"cupthread.comments.empty_title" = "Noch keine Kommentare";
+"cupthread.comments.empty_description" = "Seien Sie der Erste, der an der Diskussion teilnimmt.";
+"cupthread.comments.reply" = "Antworten";
+"cupthread.comments.replying_to" = "Antwort an @%@";
+"cupthread.comments.compose_prompt" = "Einen Kommentar schreiben…";
+
+"cupthread.profile.title" = "Benutzerprofil";
+"cupthread.profile.apps" = "Apps";
+"cupthread.profile.recent_comments" = "Aktuelle Kommentare";
+"cupthread.profile.no_comments" = "Keine aktuellen Kommentare.";

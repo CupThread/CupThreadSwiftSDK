@@ -10,6 +10,11 @@
 "cupthread.feedback.section_contact_footer" = "任意 — フィードバックの確認・返信にのみ使用されます。";
 "cupthread.feedback.name_label" = "お名前";
 "cupthread.feedback.email_label" = "メールアドレス";
+"cupthread.feedback.section_attachments" = "添付ファイル";
+"cupthread.feedback.section_attachments_footer" = "問題の特定に役立つスクリーンショットやログを添付してください。";
+"cupthread.feedback.add_attachment" = "画像 / スクリーンショットを追加";
+"cupthread.feedback.uploading_attachment" = "添付ファイルをアップロード中…";
+"cupthread.feedback.remove_attachment" = "添付ファイルを削除";
 "cupthread.feedback.send_button" = "フィードバックを送信";
 "cupthread.feedback.sending_button" = "送信中…";
 "cupthread.feedback.thanks_title" = "ありがとうございます！";
@@ -68,3 +73,15 @@
 "cupthread.error.could_not_load" = "読み込めませんでした";
 "cupthread.error.try_again" = "再試行";
 "cupthread.error.accessibility_failed" = "読み込みに失敗しました: %@";
+
+"cupthread.comments.title" = "コメント";
+"cupthread.comments.empty_title" = "コメントはまだありません";
+"cupthread.comments.empty_description" = "最初のコメントを投稿しましょう。";
+"cupthread.comments.reply" = "返信";
+"cupthread.comments.replying_to" = "@%@ に返信";
+"cupthread.comments.compose_prompt" = "コメントを入力…";
+
+"cupthread.profile.title" = "ユーザープロフィール";
+"cupthread.profile.apps" = "アプリ";
+"cupthread.profile.recent_comments" = "最近のコメント";
+"cupthread.profile.no_comments" = "最近のコメントはありません。";
