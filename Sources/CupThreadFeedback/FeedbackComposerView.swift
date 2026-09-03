@@ -151,15 +151,7 @@ public struct FeedbackComposerView: View {
                     matching: .images,
                     photoLibrary: .shared()
                 ) {
-                    HStack(spacing: 8) {
-                        if isUploadingAttachment {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "photo")
-                        }
-                        Text(isUploadingAttachment ? CupThreadStrings.tr("cupthread.feedback.uploading_attachment") : CupThreadStrings.tr("cupthread.feedback.add_attachment"))
-                    }
+                    photosPickerLabel
                 }
                 .disabled(isUploadingAttachment)
             }
@@ -205,6 +197,23 @@ public struct FeedbackComposerView: View {
     }
 
     #if canImport(PhotosUI) && !os(tvOS)
+    @MainActor @ViewBuilder
+    private var photosPickerLabel: some View {
+        HStack(spacing: 8) {
+            if isUploadingAttachment {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image(systemName: "photo")
+            }
+            Text(
+                isUploadingAttachment
+                    ? CupThreadStrings.tr("cupthread.feedback.uploading_attachment")
+                    : CupThreadStrings.tr("cupthread.feedback.add_attachment")
+            )
+        }
+    }
+
     @MainActor
     private func uploadPhotoItem(_ item: PhotosPickerItem) async {
         isUploadingAttachment = true
