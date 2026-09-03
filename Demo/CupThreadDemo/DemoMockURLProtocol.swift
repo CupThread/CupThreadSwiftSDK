@@ -221,6 +221,18 @@ enum DemoMockData {
                     "versionId": "ver_2_5_0",
                     "versionLabel": "v2.5.0",
                     "requesterName": "Sarah Connor",
+                    "requesterAvatarUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=128&h=128&fit=crop",
+                    "recentCommenters": [
+                        [
+                            "authorName": "David Miller",
+                            "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&fit=crop"
+                        ],
+                        [
+                            "authorName": "Elena Rostova",
+                            "avatarUrl": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=128&h=128&fit=crop"
+                        ]
+                    ],
+                    "hasMoreCommenters": true,
                     "approved": true,
                     "voteCount": 142,
                     "hasVoted": true,
@@ -240,6 +252,14 @@ enum DemoMockData {
                     "versionId": "ver_2_5_0",
                     "versionLabel": "v2.5.0",
                     "requesterName": "David Miller",
+                    "requesterAvatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&fit=crop",
+                    "recentCommenters": [
+                        [
+                            "authorName": "Michael Scott",
+                            "avatarUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=128&h=128&fit=crop"
+                        ]
+                    ],
+                    "hasMoreCommenters": false,
                     "approved": true,
                     "voteCount": 98,
                     "hasVoted": false,

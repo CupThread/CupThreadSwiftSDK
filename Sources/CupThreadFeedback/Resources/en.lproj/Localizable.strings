@@ -10,6 +10,11 @@
 "cupthread.feedback.section_contact_footer" = "Optional — we'll only use it to follow up on your feedback.";
 "cupthread.feedback.name_label" = "Name";
 "cupthread.feedback.email_label" = "Email";
+"cupthread.feedback.section_attachments" = "Attachments";
+"cupthread.feedback.section_attachments_footer" = "Attach screenshots or logs to help us diagnose issues.";
+"cupthread.feedback.add_attachment" = "Add Image / Screenshot";
+"cupthread.feedback.uploading_attachment" = "Uploading attachment…";
+"cupthread.feedback.remove_attachment" = "Remove attachment";
 "cupthread.feedback.send_button" = "Send Feedback";
 "cupthread.feedback.sending_button" = "Sending…";
 "cupthread.feedback.thanks_title" = "Thanks!";

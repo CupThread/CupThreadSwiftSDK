@@ -113,6 +113,16 @@ struct FeedbackDemoView: View {
             + "as CSV or PDF reports so we can share them with stakeholders."
         draft.reporterName = "Alex Developer"
         draft.reporterEmail = "alex@example.com"
+        draft.attachments = [
+            FeedbackAttachment(
+                kind: .image,
+                key: "uploads/analytics_preview.png",
+                url: URL(string: "https://example.com/uploads/analytics_preview.png")!,
+                filename: "analytics_preview.png",
+                mimeType: "image/png",
+                size: 245_760
+            )
+        ]
         return draft
     }
 

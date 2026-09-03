@@ -292,6 +292,109 @@ struct ChangelogClientTests {
         #expect(entry.publishedAtDate != nil)
         #expect(entry.publishedAtDate == expected)
     }
+
+    // MARK: - Overlay preparation
+
+    @Test func prepareChangelogOverlayReturnsNilWhenHidden() async throws {
+        var payload = makeConfigJSON()
+        payload["sdk"] = [
+            "theme": "system",
+            "features": ["changelog": false],
+            "changelogOverlay": ["title": "What's New", "entryCount": 3]
+        ]
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            if request.url?.path.contains("/changelog") == true {
+                return (makeHTTPResponse(), try encodeJSON(["entries": [Any]()]))
+            }
+            return (makeHTTPResponse(), try encodeJSON(payload))
+        }
+
+        let prepared = try await Self.makeChangelogClient().prepareChangelogOverlay()
+        #expect(prepared == nil)
+    }
+
+    @Test func prepareChangelogOverlayLimitsEntries() async throws {
+        var payload = makeConfigJSON()
+        payload["sdk"] = [
+            "theme": "sunset",
+            "features": ["changelog": true],
+            "changelogOverlay": ["title": "New", "entryCount": 1]
+        ]
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            if request.url?.path.contains("/changelog") == true {
+                return (makeHTTPResponse(), try encodeJSON([
+                    "entries": [
+                        [
+                            "id": "e2",
+                            "title": "New",
+                            "body": "",
+                            "versionLabel": "1.1",
+                            "publishedAt": "2026-02-01T00:00:00.000Z",
+                            "linkedRequests": []
+                        ],
+                        [
+                            "id": "e1",
+                            "title": "Old",
+                            "body": "",
+                            "versionLabel": "1.0",
+                            "publishedAt": "2026-01-01T00:00:00.000Z",
+                            "linkedRequests": []
+                        ]
+                    ]
+                ]))
+            }
+            return (makeHTTPResponse(), try encodeJSON(payload))
+        }
+
+        let prepared = try await Self.makeChangelogClient().prepareChangelogOverlay()
+        #expect(prepared?.entries.map(\.id) == ["e2"])
+        #expect(prepared?.appearance.theme == .sunset)
+    }
+
+    @Test func prepareChangelogOverlayFiltersSeenWhenOnlyIfUnseenIsTrue() async throws {
+        let theAppKey = "app_unseen_test_\(UUID().uuidString.prefix(8))"
+        let client = makeClient(
+            baseURL: URL(string: "https://\(Self.apiHost)")!,
+            appKey: theAppKey
+        )
+
+        var payload = makeConfigJSON()
+        payload["sdk"] = [
+            "theme": "system",
+            "features": ["changelog": true],
+            "changelogOverlay": ["title": "New", "entryCount": 1]
+        ]
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            if request.url?.path.contains("/changelog") == true {
+                return (makeHTTPResponse(), try encodeJSON([
+                    "entries": [
+                        [
+                            "id": "e_unseen_1",
+                            "title": "Version 3.0",
+                            "body": "Major update",
+                            "versionLabel": "3.0.0",
+                            "publishedAt": "2026-03-01T00:00:00.000Z",
+                            "linkedRequests": []
+                        ]
+                    ]
+                ]))
+            }
+            return (makeHTTPResponse(), try encodeJSON(payload))
+        }
+
+        #expect(client.hasSeenChangelog(version: "3.0.0") == false)
+        let firstFetch = try await client.prepareChangelogOverlay(onlyIfUnseen: true)
+        #expect(firstFetch != nil)
+
+        client.markChangelogSeen(version: "3.0.0")
+        #expect(client.hasSeenChangelog(version: "3.0.0") == true)
+
+        let secondFetch = try await client.prepareChangelogOverlay(onlyIfUnseen: true)
+        #expect(secondFetch == nil)
+
+        let forcedFetch = try await client.prepareChangelogOverlay(onlyIfUnseen: false)
+        #expect(forcedFetch != nil)
+    }
 }
 
 // MARK: - JSON fixtures

@@ -86,6 +86,10 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     ///   - versionLabel: Label of the tagged version, if any.
     ///   - releasedVersion: Version the request shipped in, if released.
     ///   - requesterName: Requester display name, if given.
+    ///   - requesterAvatarUrl: Avatar URL of the requester, if available.
+    ///   - requesterClerkId: Clerk user id of the requester, if available.
+    ///   - recentCommenters: Recent commenters on this request.
+    ///   - hasMoreCommenters: Whether more commenters exist beyond the list.
     ///   - approved: Whether the request passed admin review.
     ///   - voteCount: Current vote count.
     ///   - hasVoted: Whether the requesting user has voted.

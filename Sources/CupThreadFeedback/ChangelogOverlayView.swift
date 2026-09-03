@@ -14,6 +14,7 @@ import AppKit
 /// or the SwiftUI `.changelogOverlay(client:isPresented:)` modifier.
 public struct ChangelogOverlayView: View {
     public let client: FeedbackClient
+    public var autoMarkSeen: Bool
     public var onPrimary: () -> Void
     public var onClose: () -> Void
 
@@ -29,7 +30,7 @@ public struct ChangelogOverlayView: View {
     /// Creates the overlay sheet.
     ///
     /// Pass `entries` and `appearance` only when you already fetched them via
-    /// ``FeedbackClient/prepareChangelogOverlay()``; otherwise the view loads
+    /// ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``; otherwise the view loads
     /// both on first appearance.
     /// - Parameters:
     ///   - client: The shared ``FeedbackClient``.
@@ -37,6 +38,7 @@ public struct ChangelogOverlayView: View {
     ///     them itself.
     ///   - appearance: Pre-fetched console appearance; `nil` makes the view
     ///     fetch it itself.
+    ///   - autoMarkSeen: Automatically marks the displayed version as seen on dismissal.
     ///   - onPrimary: Called when the user taps the console-configured primary
     ///     button; the sheet dismisses afterwards.
     ///   - onClose: Called when the user taps the close button; the sheet
@@ -45,12 +47,14 @@ public struct ChangelogOverlayView: View {
         client: FeedbackClient,
         entries: [ChangelogEntry]? = nil,
         appearance: SdkAppearance? = nil,
+        autoMarkSeen: Bool = true,
         onPrimary: @escaping () -> Void = {},
         onClose: @escaping () -> Void = {}
     ) {
         self.client = client
         self.preparedEntries = entries
         self.preparedAppearance = appearance
+        self.autoMarkSeen = autoMarkSeen
         self.onPrimary = onPrimary
         self.onClose = onClose
     }
@@ -97,6 +101,7 @@ public struct ChangelogOverlayView: View {
         .frame(minWidth: 420, minHeight: 480)
         #endif
         .task { await load() }
+        .onDisappear { markSeenIfEnabled() }
     }
 
     private var content: some View {
@@ -150,12 +155,22 @@ public struct ChangelogOverlayView: View {
         }
     }
 
+    private func markSeenIfEnabled() {
+        guard autoMarkSeen, let first = entries.first else { return }
+        client.markChangelogSeen(version: first.id)
+        if let versionLabel = first.versionLabel {
+            client.markChangelogSeen(version: versionLabel)
+        }
+    }
+
     private func close() {
+        markSeenIfEnabled()
         onClose()
         dismiss()
     }
 
     private func primary() {
+        markSeenIfEnabled()
         onPrimary()
         dismiss()
     }
@@ -165,12 +180,14 @@ public struct ChangelogOverlayView: View {
 
 private struct ChangelogOverlayModifier: ViewModifier {
     let client: FeedbackClient
+    var autoMarkSeen: Bool
     @Binding var isPresented: Bool
 
     func body(content: Content) -> some View {
         content.sheet(isPresented: $isPresented) {
             ChangelogOverlayView(
                 client: client,
+                autoMarkSeen: autoMarkSeen,
                 onPrimary: { isPresented = false },
                 onClose: { isPresented = false }
             )
@@ -194,29 +211,58 @@ extension View {
     ///   - client: The shared ``FeedbackClient``.
     ///   - isPresented: Binding controlling the sheet; set it to `true` to
     ///     show the overlay. Dismissal from inside the sheet writes `false`.
+    ///   - autoMarkSeen: Automatically marks the displayed version as seen on dismissal.
     /// - Returns: A view that presents ``ChangelogOverlayView`` when triggered.
-    public func changelogOverlay(client: FeedbackClient, isPresented: Binding<Bool>) -> some View {
-        modifier(ChangelogOverlayModifier(client: client, isPresented: isPresented))
+    public func changelogOverlay(
+        client: FeedbackClient,
+        isPresented: Binding<Bool>,
+        autoMarkSeen: Bool = true
+    ) -> some View {
+        modifier(ChangelogOverlayModifier(client: client, autoMarkSeen: autoMarkSeen, isPresented: isPresented))
     }
 }
 
 // MARK: - Programmatic presentation
 
 extension FeedbackClient {
+    /// Checks whether the user has already seen the changelog overlay for the given version or entry ID.
+    ///
+    /// - Parameter version: The version label (e.g. `"1.2.0"`) or entry ID.
+    /// - Returns: `true` if previously recorded as seen.
+    public func hasSeenChangelog(version: String) -> Bool {
+        let key = "com.cupthread.changelog.seenVersions.\(configuration.appKey)"
+        let seen = UserDefaults.standard.stringArray(forKey: key) ?? []
+        return seen.contains(version)
+    }
+
+    /// Marks the given changelog version or entry ID as seen.
+    ///
+    /// - Parameter version: The version label or entry ID to record.
+    public func markChangelogSeen(version: String) {
+        let key = "com.cupthread.changelog.seenVersions.\(configuration.appKey)"
+        var seen = UserDefaults.standard.stringArray(forKey: key) ?? []
+        if !seen.contains(version) {
+            seen.append(version)
+            UserDefaults.standard.set(seen, forKey: key)
+        }
+    }
+
     /// Presents the latest changelog overlay using copy and limits from the console.
     ///
     /// Returns `false` when changelog is hidden, there is no host window to present
     /// from, or there are no published entries. Throws if the network request fails.
     ///
-    /// Use ``prepareChangelogOverlay()`` plus ``ChangelogOverlayView`` instead
+    /// Use ``prepareChangelogOverlay(onlyIfUnseen:)`` plus ``ChangelogOverlayView`` instead
     /// when you need control over where and how the sheet appears.
+    /// - Parameter onlyIfUnseen: When `true`, suppresses presentation if the newest
+    ///   version has already been marked as seen via ``hasSeenChangelog(version:)``.
     /// - Returns: Whether the overlay was actually presented.
     /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
     ///   when either network call fails.
     @MainActor
     @discardableResult
-    public func presentLatestChangelog() async throws -> Bool {
-        guard let prepared = try await prepareChangelogOverlay() else { return false }
+    public func presentLatestChangelog(onlyIfUnseen: Bool = false) async throws -> Bool {
+        guard let prepared = try await prepareChangelogOverlay(onlyIfUnseen: onlyIfUnseen) else { return false }
         return await presentPreparedChangelogOverlay(
             client: self,
             entries: prepared.entries,
@@ -225,27 +271,39 @@ extension FeedbackClient {
     }
 
     /// Fetches overlay configuration and the newest published entries.
-    /// Returns `nil` when the console hid changelog or nothing has been published.
+    /// Returns `nil` when the console hid changelog, nothing has been published,
+    /// or when `onlyIfUnseen` is true and the latest release was already seen.
     ///
     /// Pair the result with ``ChangelogOverlayView`` for custom presentation:
     ///
     /// ```swift
-    /// if let prepared = try await client.prepareChangelogOverlay() {
+    /// if let prepared = try await client.prepareChangelogOverlay(onlyIfUnseen: true) {
     ///     overlayEntries = prepared.entries
     ///     showSheet = true
     /// }
     /// ```
     ///
+    /// - Parameter onlyIfUnseen: When `true`, returns `nil` if the newest entry
+    ///   was already marked as seen.
     /// - Returns: Newest entries (capped by the console's entry count) plus
     ///   the appearance, or `nil` when the overlay should stay hidden.
     /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
     ///   when either network call fails.
-    public func prepareChangelogOverlay() async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
+    public func prepareChangelogOverlay(
+        onlyIfUnseen: Bool = false
+    ) async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
         let config = try await fetchAppConfig()
         guard config.sdk.features.changelog else { return nil }
         let all = try await fetchChangelog()
         let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
-        guard !entries.isEmpty else { return nil }
+        guard let latest = entries.first else { return nil }
+
+        if onlyIfUnseen {
+            let isSeen = hasSeenChangelog(version: latest.id) ||
+                (latest.versionLabel.map { hasSeenChangelog(version: $0) } ?? false)
+            if isSeen { return nil }
+        }
+
         return (entries, config.sdk)
     }
 }

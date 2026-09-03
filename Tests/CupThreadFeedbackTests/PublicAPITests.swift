@@ -79,62 +79,6 @@ struct PublicAPITests {
         #expect(config.sdk.changelogOverlay.primaryButton == "Got it")
     }
 
-    @Test func prepareChangelogOverlayReturnsNilWhenHidden() async throws {
-        var payload = makeConfigJSON()
-        payload["sdk"] = [
-            "theme": "system",
-            "features": ["changelog": false],
-            "changelogOverlay": ["title": "What's New", "entryCount": 3]
-        ]
-        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
-            if request.url?.path.contains("/changelog") == true {
-                return (makeHTTPResponse(), try encodeJSON(["entries": [Any]()]))
-            }
-            return (makeHTTPResponse(), try encodeJSON(payload))
-        }
-
-        let prepared = try await Self.makeAPIClient().prepareChangelogOverlay()
-        #expect(prepared == nil)
-    }
-
-    @Test func prepareChangelogOverlayLimitsEntries() async throws {
-        var payload = makeConfigJSON()
-        payload["sdk"] = [
-            "theme": "sunset",
-            "features": ["changelog": true],
-            "changelogOverlay": ["title": "New", "entryCount": 1]
-        ]
-        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
-            if request.url?.path.contains("/changelog") == true {
-                return (makeHTTPResponse(), try encodeJSON([
-                    "entries": [
-                        [
-                            "id": "e2",
-                            "title": "New",
-                            "body": "",
-                            "versionLabel": "1.1",
-                            "publishedAt": "2026-02-01T00:00:00.000Z",
-                            "linkedRequests": []
-                        ],
-                        [
-                            "id": "e1",
-                            "title": "Old",
-                            "body": "",
-                            "versionLabel": "1.0",
-                            "publishedAt": "2026-01-01T00:00:00.000Z",
-                            "linkedRequests": []
-                        ]
-                    ]
-                ]))
-            }
-            return (makeHTTPResponse(), try encodeJSON(payload))
-        }
-
-        let prepared = try await Self.makeAPIClient().prepareChangelogOverlay()
-        #expect(prepared?.entries.map(\.id) == ["e2"])
-        #expect(prepared?.appearance.theme == .sunset)
-    }
-
     @Test func fetchAppConfigThrowsOn404() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (makeHTTPResponse(status: 404), try encodeJSON(["error": "App not found"]))
@@ -397,24 +341,6 @@ struct PublicAPITests {
 }
 
 // MARK: - JSON fixtures
-
-private func makeConfigJSON() -> [String: Any] {
-    [
-        "appId": "app-1",
-        "appKey": "app_testkey123456",
-        "slug": "demo-app",
-        "name": "Demo App",
-        "storeUrl": NSNull(),
-        "storeKind": NSNull(),
-        "iconUrl": "https://example.com/icon.png",
-        "allowPublic": true,
-        "allowedPlatforms": ["ios", "macos"],
-        "maxAttachmentBytes": 20_000_000,
-        "allowAnonymousRoadmap": true,
-        "allowAnonymousVote": false,
-        "allowAnonymousFeedback": true
-    ]
-}
 
 private func makeColumnJSON(id: String, name: String, slug: String, position: Int) -> [String: Any] {
     [

@@ -48,15 +48,18 @@ Integrate the CupThread SwiftUI SDK (roadmap board, changelog overlay, and feedb
 
 ### Swift Package Manager (Recommended)
 
-Add the package dependency in your `Package.swift`:
+Add the package dependency in your `Package.swift` by release version or branch:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", from: "0.1.0")
+    // By release tag / version:
+    .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", from: "0.1.0"),
+    // Or tracking the latest branch:
+    // .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", branch: "main"),
 ]
 ```
 
-Or add `https://github.com/CupThread/CupThreadSwiftSDK.git` via Xcode (File > Add Package Dependencies...).
+Or add `https://github.com/CupThread/CupThreadSwiftSDK.git` via Xcode (*File > Add Package Dependencies...*).
 
 ### Prebuilt Binary Target (XCFramework)
 
@@ -102,9 +105,11 @@ All views adapt per platform (tvOS uses focus-friendly layouts; visionOS and mac
 
 - `RoadmapBoardView(client:userToken:)` — Kanban roadmap grouped by the app's public columns (`GET /api/v1/public/columns`), with vote counts and version badges.
 - `FeatureRequestsView(client:userToken:)` — Browse, vote (optimistic), and submit feature requests.
+- `CommentsView(client:userToken:featureRequestId:featureRequestTitle:)` — Threaded comments with @author mentions, commenter avatars, and live replies.
+- `UserProfileView(client:userId:)` — Public user profile showing public apps and comments history.
 - `WhatsNewView(client:userToken:)` — "What's New" changelog list with version badges, friendly dates, chips for shipped feature requests, and email subscription.
-- `ChangelogOverlayView` / `.changelogOverlay(client:isPresented:)` — Modal sheet of latest changelog entries with developer console configured copy.
-- `FeedbackComposerView(client:userToken:onSubmit:)` — Structured feedback form with attachment uploads.
+- `ChangelogOverlayView` / `.changelogOverlay(client:isPresented:autoMarkSeen:)` — Modal sheet of latest changelog entries with developer console configured copy and built-in seen state persistence.
+- `FeedbackComposerView(client:userToken:onSubmit:)` — Structured feedback form with built-in attachment gallery and image picker.
 
 ```swift
 CupThreadTheme(client: client) {
@@ -113,11 +118,11 @@ CupThreadTheme(client: client) {
     }
 }
 
-// Present the latest changelog after launch:
+// Present the latest changelog after launch (optionally filtering out already seen versions):
 .changelogOverlay(client: client, isPresented: $showWhatsNew)
 
 // Or from UIKit / button action:
-try await client.presentLatestChangelog()
+try await client.presentLatestChangelog(onlyIfUnseen: true)
 ```
 
 ---
@@ -129,11 +134,16 @@ try await client.presentLatestChangelog()
 | `submit(_:userToken:)` | `POST /api/v1/feedback` (sends `X-User-Token`) |
 | `uploadAttachment(data:filename:mimeType:preferredKind:)` | `POST /api/v1/uploads/{images,r2}` |
 | `fetchAppConfig()` | `GET /api/v1/public/config/{appKey}` |
-| `prepareChangelogOverlay()` | Fetches config + newest changelog entries |
-| `presentLatestChangelog()` | Presents overlay sheet using console copy |
+| `prepareChangelogOverlay(onlyIfUnseen:)` | Fetches config + newest changelog entries (with seen state filter) |
+| `presentLatestChangelog(onlyIfUnseen:)` | Presents overlay sheet using console copy |
+| `hasSeenChangelog(version:)` | Checks `UserDefaults` for previously seen changelog version/ID |
+| `markChangelogSeen(version:)` | Marks changelog version/ID as seen |
 | `fetchFeatureRequests(userToken:limit:offset:versionId:query:)` | `GET /api/v1/feature-requests` |
 | `submitFeatureRequest(_:userToken:)` | `POST /api/v1/feature-requests` |
 | `toggleVote(featureRequestId:userToken:)` | `POST /api/v1/feature-requests/{id}/vote` |
+| `fetchComments(featureRequestId:)` | `GET /api/v1/feature-requests/{id}/comments` |
+| `postComment(featureRequestId:draft:userToken:)` | `POST /api/v1/feature-requests/{id}/comments` |
+| `fetchUserProfile(userId:)` | `GET /api/v1/users/{userId}/profile` |
 | `fetchColumns()` | `GET /api/v1/public/columns/{appKey}` |
 | `fetchVersions()` | `GET /api/v1/public/versions/{appKey}` |
 | `fetchChangelog()` | `GET /api/v1/public/apps/{appKey}/changelog` |
@@ -166,7 +176,7 @@ swift test
 xcodebuild test \
     -project Demo/CupThreadDemo.xcodeproj \
     -scheme CupThreadDemo \
-    -destination 'platform=iOS Simulator,name=iPhone 16'
+    -destination 'platform=iOS Simulator,name=iPhone 17'
 
 # Build DocC documentation site
 scripts/build-docs.sh docs-site

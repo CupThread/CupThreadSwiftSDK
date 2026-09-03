@@ -115,3 +115,22 @@ func bodyData(from request: URLRequest) -> Data? {
 func parseJSONDict(_ data: Data) -> [String: Any]? {
     try? JSONSerialization.jsonObject(with: data) as? [String: Any]
 }
+
+/// Make default config JSON dictionary for tests.
+func makeConfigJSON() -> [String: Any] {
+    [
+        "appId": "app-1",
+        "appKey": "app_testkey123456",
+        "slug": "demo-app",
+        "name": "Demo App",
+        "storeUrl": NSNull(),
+        "storeKind": NSNull(),
+        "iconUrl": "https://example.com/icon.png",
+        "allowPublic": true,
+        "allowedPlatforms": ["ios", "macos"],
+        "maxAttachmentBytes": 20_000_000,
+        "allowAnonymousRoadmap": true,
+        "allowAnonymousVote": false,
+        "allowAnonymousFeedback": true
+    ]
+}

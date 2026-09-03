@@ -33,21 +33,23 @@ The overlay fetches the app configuration and newest entries, then renders the t
 
 ## UIKit / AppKit or custom presentation
 
-Call ``FeedbackClient/presentLatestChangelog()`` from any button action or lifecycle hook:
+Call ``FeedbackClient/presentLatestChangelog(onlyIfUnseen:)`` from any button action or lifecycle hook:
 
 ```swift
 try await client.presentLatestChangelog()
 ```
 
-The method returns `false` (without throwing) when there is nothing to show — for example when the console hid the changelog, no entries are published, or no window is available to present from. Network failures throw so you can log them.
+The method returns `false` (without throwing) when there is nothing to show — for example when the console hid the changelog, no entries are published, the latest version was already seen (when `onlyIfUnseen: true`), or no window is available to present from. Network failures throw so you can log them.
 
-For full control over when the sheet appears, split the two halves yourself: ``FeedbackClient/prepareChangelogOverlay()`` fetches the data and returns `nil` when the overlay should stay hidden, and ``ChangelogOverlayView`` renders it wherever you like.
+For full control over when the sheet appears, split the two halves yourself: ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)`` fetches the data and returns `nil` when the overlay should stay hidden, and ``ChangelogOverlayView`` renders it wherever you like.
 
 ## See also
 
 - ``ChangelogOverlayView``
-- `changelogOverlay(client:isPresented:)`
-- ``FeedbackClient/presentLatestChangelog()``
-- ``FeedbackClient/prepareChangelogOverlay()``
+- `changelogOverlay(client:isPresented:autoMarkSeen:)`
+- ``FeedbackClient/presentLatestChangelog(onlyIfUnseen:)``
+- ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``
+- ``FeedbackClient/hasSeenChangelog(version:)``
+- ``FeedbackClient/markChangelogSeen(version:)``
 - <doc:PresentingWhatsNew>
 - <doc:GettingStarted>

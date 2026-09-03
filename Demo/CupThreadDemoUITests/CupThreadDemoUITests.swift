@@ -163,5 +163,10 @@ final class CupThreadDemoUITests: XCTestCase {
 
         let targetFile = doccResourcesDir.appendingPathComponent("\(name).png")
         try? data.write(to: targetFile)
+
+        if let jpegData = screenshot.image.jpegData(compressionQuality: 0.90) {
+            let jpgTarget = doccResourcesDir.appendingPathComponent("\(name).jpg")
+            try? jpegData.write(to: jpgTarget)
+        }
     }
 }

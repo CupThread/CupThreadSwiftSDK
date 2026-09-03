@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(PhotosUI) && !os(tvOS)
+import PhotosUI
+#endif
 
 /// Structured feedback form with a built-in success state.
 ///
@@ -13,8 +16,14 @@ public struct FeedbackComposerView: View {
 
     @State private var draft: FeedbackDraft
     @State private var isSubmitting = false
+    @State private var isUploadingAttachment = false
+    @State private var attachmentErrorMessage: String?
     @State private var errorMessage: String?
     @State private var result: FeedbackSubmissionResult?
+
+    #if canImport(PhotosUI) && !os(tvOS)
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    #endif
 
     /// Creates the feedback form.
     ///
@@ -61,41 +70,24 @@ public struct FeedbackComposerView: View {
         #if os(iOS) || os(visionOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        #if canImport(PhotosUI) && !os(tvOS)
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                await uploadPhotoItem(newItem)
+                selectedPhotoItem = nil
+            }
+        }
+        #endif
         .sdkSurface(client: client, feature: .feedback)
     }
 
     private var composer: some View {
         VStack(spacing: 0) {
             Form {
-                Section {
-                    TextField(CupThreadStrings.tr("cupthread.feedback.title_label"), text: $draft.title, prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary")))
-                        #if canImport(UIKit)
-                        .submitLabel(.next)
-                        #endif
-                    TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
-                        .lineLimit(6...12)
-                        .padding(.top, 2)
-                        #if canImport(UIKit)
-                        .submitLabel(.send)
-                        #endif
-                } header: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
-                } footer: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_feedback_footer"))
-                }
-
-                Section {
-                    TextField(CupThreadStrings.tr("cupthread.feedback.name_label"), text: $draft.reporterName)
-                    TextField(CupThreadStrings.tr("cupthread.feedback.email_label"), text: $draft.reporterEmail)
-                        #if canImport(UIKit)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                        #endif
-                } header: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
-                } footer: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_contact_footer"))
-                }
+                contentSection
+                contactSection
+                attachmentsSection
             }
             // Unavailable on visionOS (and meaningless on macOS/tvOS).
             #if os(iOS)
@@ -111,6 +103,126 @@ public struct FeedbackComposerView: View {
             submitBar
         }
     }
+
+    private var contentSection: some View {
+        Section {
+            TextField(CupThreadStrings.tr("cupthread.feedback.title_label"), text: $draft.title, prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary")))
+                #if canImport(UIKit)
+                .submitLabel(.next)
+                #endif
+            TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
+                .lineLimit(6...12)
+                .padding(.top, 2)
+                #if canImport(UIKit)
+                .submitLabel(.send)
+                #endif
+        } header: {
+            Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
+        } footer: {
+            Text(CupThreadStrings.tr("cupthread.feedback.section_feedback_footer"))
+        }
+    }
+
+    private var contactSection: some View {
+        Section {
+            TextField(CupThreadStrings.tr("cupthread.feedback.name_label"), text: $draft.reporterName)
+            TextField(CupThreadStrings.tr("cupthread.feedback.email_label"), text: $draft.reporterEmail)
+                #if canImport(UIKit)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.emailAddress)
+                #endif
+        } header: {
+            Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
+        } footer: {
+            Text(CupThreadStrings.tr("cupthread.feedback.section_contact_footer"))
+        }
+    }
+
+    private var attachmentsSection: some View {
+        Section {
+            ForEach(draft.attachments) { attachment in
+                attachmentRow(attachment)
+            }
+
+            #if canImport(PhotosUI) && !os(tvOS)
+            if draft.attachments.count < 5 {
+                PhotosPicker(
+                    selection: $selectedPhotoItem,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
+                    HStack(spacing: 8) {
+                        if isUploadingAttachment {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "photo")
+                        }
+                        Text(isUploadingAttachment ? CupThreadStrings.tr("cupthread.feedback.uploading_attachment") : CupThreadStrings.tr("cupthread.feedback.add_attachment"))
+                    }
+                }
+                .disabled(isUploadingAttachment)
+            }
+            #endif
+
+            if let attachmentErrorMessage {
+                ErrorBanner(message: attachmentErrorMessage)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+            }
+        } header: {
+            Text(CupThreadStrings.tr("cupthread.feedback.section_attachments"))
+        } footer: {
+            Text(CupThreadStrings.tr("cupthread.feedback.section_attachments_footer"))
+        }
+    }
+
+    private func attachmentRow(_ attachment: FeedbackAttachment) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: attachment.kind == .image ? "photo" : "doc")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(attachment.filename ?? attachment.key)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                if let size = attachment.size {
+                    Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            Spacer()
+            Button {
+                draft.attachments.removeAll { $0.id == attachment.id }
+            } label: {
+                Image(systemName: "trash")
+                    .font(.subheadline)
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(CupThreadStrings.tr("cupthread.feedback.remove_attachment"))
+        }
+    }
+
+    #if canImport(PhotosUI) && !os(tvOS)
+    @MainActor
+    private func uploadPhotoItem(_ item: PhotosPickerItem) async {
+        isUploadingAttachment = true
+        attachmentErrorMessage = nil
+        defer { isUploadingAttachment = false }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                attachmentErrorMessage = "Could not load photo data"
+                return
+            }
+            let filename = "screenshot_\(Int(Date().timeIntervalSince1970)).jpg"
+            let uploaded = try await client.uploadAttachment(data: data, filename: filename, mimeType: "image/jpeg")
+            draft.attachments.append(uploaded)
+        } catch {
+            attachmentErrorMessage = error.localizedDescription
+        }
+    }
+    #endif
 
     private var submitBar: some View {
         Button {
