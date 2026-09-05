@@ -172,7 +172,8 @@ public struct FeedbackClient: Sendable {
     ///     sent as `X-User-Token` so the backend can link the submission to an end-user identity.
     /// - Returns: The server's receipt, including the submission id and any warning.
     /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` when the
-    ///   server rejects the request, or ``FeedbackClientError/invalidResponse``
+    ///   server rejects the request or answers with an unexpected HTTP status (successful
+    ///   submissions accept HTTP 200, 201, and 202), or ``FeedbackClientError/invalidResponse``
     ///   when the response cannot be interpreted.
     public func submit(
         _ draft: FeedbackDraft,
@@ -211,7 +212,7 @@ public struct FeedbackClient: Sendable {
             throw FeedbackClientError.invalidResponse
         }
 
-        try validateStatus(httpResponse.statusCode, accepted: [200, 202], data: data)
+        try validateStatus(httpResponse.statusCode, accepted: Self.acceptedSubmitStatuses, data: data)
 
         return try decoder.decode(FeedbackSubmissionResult.self, from: data)
     }
@@ -268,7 +269,7 @@ public struct FeedbackClient: Sendable {
             throw FeedbackClientError.invalidResponse
         }
 
-        try validateStatus(httpResponse.statusCode, accepted: [200, 201, 202], data: responseData)
+        try validateStatus(httpResponse.statusCode, accepted: Self.acceptedUploadStatuses, data: responseData)
 
         let uploaded = try decoder.decode(UploadedAttachmentResponse.self, from: responseData)
         guard let kind = FeedbackAttachment.Kind(rawValue: uploaded.kind) else {
@@ -320,6 +321,9 @@ public struct FeedbackClient: Sendable {
         metadata["submittedAt"] = ISO8601DateFormatter().string(from: .now)
         return metadata
     }
+
+    private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]
+    private static let acceptedUploadStatuses: Set<Int> = [200, 201, 202]
 
     private func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
         if let userToken = userToken?.nilIfEmpty {

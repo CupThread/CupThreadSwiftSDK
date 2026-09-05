@@ -15,7 +15,11 @@ struct FeatureRequestComposeView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField(CupThreadStrings.tr("cupthread.feedback.title_label"), text: $draft.title, prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary")))
+                    TextField(
+                        CupThreadStrings.tr("cupthread.feedback.title_label"),
+                        text: $draft.title,
+                        prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary"))
+                    )
                     TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
                         .lineLimit(5...10)
                         .padding(.top, 2)
@@ -53,7 +57,11 @@ struct FeatureRequestComposeView: View {
                     Button(CupThreadStrings.tr("cupthread.whatsnew.close_button")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isSubmitting ? CupThreadStrings.tr("cupthread.features.compose_sending") : CupThreadStrings.tr("cupthread.features.compose_submit")) {
+                    Button(
+                        isSubmitting
+                            ? CupThreadStrings.tr("cupthread.features.compose_sending")
+                            : CupThreadStrings.tr("cupthread.features.compose_submit")
+                    ) {
                         Task { await submit() }
                     }
                     .disabled(isSubmitting || !canSubmit)
