@@ -50,6 +50,18 @@ struct UserProfileModelsTests {
         #expect(profile.updatedAt == nil)
     }
 
+    @Test func userProfileWebsiteUrlNormalizesSafely() throws {
+        // Bare domain becomes https://
+        #expect(normalizeWebsiteURL("example.com") == URL(string: "https://example.com"))
+        // Existing https is preserved
+        #expect(normalizeWebsiteURL("https://example.com") == URL(string: "https://example.com"))
+        // Disallowed schemes are rejected (not tappable)
+        #expect(normalizeWebsiteURL("tel:1234567890") == nil)
+        #expect(normalizeWebsiteURL("javascript:alert(1)") == nil)
+        #expect(normalizeWebsiteURL("shortcuts://run") == nil)
+        #expect(normalizeWebsiteURL("myapp://open") == nil)
+    }
+
     @Test func publicUserProfileResponseDecodes() throws {
         let json = Data("""
         {

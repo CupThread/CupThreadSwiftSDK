@@ -53,6 +53,7 @@ public struct UserProfileView: View {
             }
         }
         .task { await loadProfile() }
+        .safeWebOpenURL()
     }
 
     private func profileHeader(_ profile: UserProfile) -> some View {
@@ -70,7 +71,7 @@ public struct UserProfileView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                if let websiteUrl = profile.websiteUrl, let url = URL(string: websiteUrl) {
+                if let websiteUrl = profile.websiteUrl, let url = normalizeWebsiteURL(websiteUrl) {
                     Link(destination: url) {
                         Label(websiteUrl, systemImage: "link")
                             .font(.footnote)
