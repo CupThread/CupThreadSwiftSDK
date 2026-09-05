@@ -206,9 +206,14 @@ public struct CommentsView: View {
             }
 
             HStack(alignment: .bottom, spacing: 12) {
+                #if os(tvOS)
+                TextField(CupThreadStrings.tr("cupthread.comments.compose_prompt"), text: $draft.body, axis: .vertical)
+                    .lineLimit(1...5)
+                #else
                 TextField(CupThreadStrings.tr("cupthread.comments.compose_prompt"), text: $draft.body, axis: .vertical)
                     .lineLimit(1...5)
                     .textFieldStyle(.roundedBorder)
+                #endif
 
                 Button {
                     Task { await submitComment() }
@@ -216,8 +221,12 @@ public struct CommentsView: View {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 28))
                 }
+                #if os(tvOS)
+                .buttonStyle(.borderedProminent)
+                #else
                 .buttonStyle(.plain)
                 .foregroundStyle(canSubmit ? Color.accentColor : Color.secondary.opacity(0.3))
+                #endif
                 .disabled(!canSubmit || isSubmitting)
             }
         }

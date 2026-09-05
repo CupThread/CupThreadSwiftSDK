@@ -28,3 +28,47 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Run Swift Tests
         run: swift test
+  build-platforms:
+    name: Build (${{ matrix.name }})
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: iOS
+            destination: "generic/platform=iOS"
+          - name: iOS Simulator
+            destination: "generic/platform=iOS Simulator"
+          - name: macOS
+            destination: "generic/platform=macOS"
+          - name: visionOS
+            destination: "generic/platform=visionOS"
+          - name: visionOS Simulator
+            destination: "generic/platform=visionOS Simulator"
+          - name: tvOS
+            destination: "generic/platform=tvOS"
+          - name: tvOS Simulator
+            destination: "generic/platform=tvOS Simulator"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Build ${{ matrix.name }} slice
+        run: |
+          xcodebuild archive \
+            -scheme CupThreadFeedback \
+            -destination "${{ matrix.destination }}" \
+            -archivePath "/tmp/${{ matrix.name }}.xcarchive" \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            -quiet
+  release-dry-run:
+    name: Release Dry-Run
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Verify release build pipeline
+        run: node scripts/release.mjs --version 0.0.0 --dry-run --skip-tests
+
