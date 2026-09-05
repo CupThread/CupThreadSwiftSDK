@@ -70,5 +70,5 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Verify release build pipeline
-        run: node scripts/release.mjs --version 0.0.0-ci --dry-run --skip-tests
+        run: node scripts/release.mjs --version 0.0.0 --dry-run --skip-tests
 
