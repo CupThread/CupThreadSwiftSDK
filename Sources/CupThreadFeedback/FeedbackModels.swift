@@ -46,7 +46,7 @@ public extension FeedbackDraft {
     }
 }
 
-/// A file uploaded through ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:)``
+/// A file uploaded through ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:userToken:)``
 /// and attached to a ``FeedbackDraft``.
 public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
     /// Which storage backend holds the file.
@@ -126,7 +126,7 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
     public var buildNumber: String
     /// Free-form key/value pairs merged into the submission for triage.
     public var metadata: [String: String]
-    /// References returned by ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:)``.
+    /// References returned by ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:userToken:)``.
     public var attachments: [FeedbackAttachment]
 
     /// Creates a draft. All fields except `platform` default to empty.

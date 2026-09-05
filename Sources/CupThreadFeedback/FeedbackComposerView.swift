@@ -225,7 +225,12 @@ public struct FeedbackComposerView: View {
                 return
             }
             let filename = "screenshot_\(Int(Date().timeIntervalSince1970)).jpg"
-            let uploaded = try await client.uploadAttachment(data: data, filename: filename, mimeType: "image/jpeg")
+            let uploaded = try await client.uploadAttachment(
+                data: data,
+                filename: filename,
+                mimeType: "image/jpeg",
+                userToken: userToken
+            )
             draft.attachments.append(uploaded)
         } catch {
             attachmentErrorMessage = error.localizedDescription

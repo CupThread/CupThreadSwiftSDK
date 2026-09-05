@@ -315,6 +315,7 @@ struct FeedbackClientErrorTests {
 
 /// All FeedbackClient network tests run serially to prevent races on MockURLProtocol.requestHandler.
 @Suite("FeedbackClient", .serialized)
+// swiftlint:disable:next type_body_length
 struct FeedbackClientTests {
 
 // MARK: Submit
@@ -670,6 +671,95 @@ struct FeedbackClientUploadTests {
                 Issue.record("Unexpected error type: \(error)")
             }
         }
+    }
+
+    @Test func uploadSetsUserTokenHeaderWhenProvided() async throws {
+        let capture = CaptureBox<String?>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request.value(forHTTPHeaderField: "X-User-Token")
+            return try self.makeR2Response()
+        }
+
+        let token = "user_token_abc123"
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        _ = try await client.uploadAttachment(
+            data: Data("test".utf8),
+            filename: "f.txt",
+            mimeType: "text/plain",
+            userToken: token
+        )
+
+        #expect(capture.value == token)
+    }
+
+    @Test func uploadOmitsUserTokenHeaderWhenNilOrEmpty() async throws {
+        let capture = CaptureBox<String>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request.value(forHTTPHeaderField: "X-User-Token") ?? ""
+            return try self.makeR2Response()
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        _ = try await client.uploadAttachment(
+            data: Data("test".utf8),
+            filename: "f.txt",
+            mimeType: "text/plain",
+            userToken: nil
+        )
+        #expect((capture.value ?? "").isEmpty)
+
+        _ = try await client.uploadAttachment(
+            data: Data("test".utf8),
+            filename: "f.txt",
+            mimeType: "text/plain",
+            userToken: "   \n\t "
+        )
+        #expect((capture.value ?? "").isEmpty)
+    }
+
+    @Test func successfulResponseWith201StatusReturnsAttachment() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            let body: [String: Any] = [
+                "kind": "image", "key": "img-201-created",
+                "url": "https://imagedelivery.net/img-201-created/public",
+                "filename": "screenshot.png", "mimeType": "image/png", "size": 1024
+            ]
+            return (makeHTTPResponse(status: 201), try encodeJSON(body))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let attachment = try await client.uploadAttachment(
+            data: Data([0xFF, 0xD8]),
+            filename: "screenshot.png",
+            mimeType: "image/png",
+            userToken: "user-tok"
+        )
+
+        #expect(attachment.kind == .image)
+        #expect(attachment.key == "img-201-created")
+        #expect(attachment.size == 1024)
+    }
+
+    @Test func successfulResponseWith202StatusReturnsAttachment() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            let body: [String: Any] = [
+                "kind": "r2", "key": "async-key",
+                "url": "https://example.com/async-key",
+                "filename": "dump.log", "mimeType": "text/plain", "size": 2048
+            ]
+            return (makeHTTPResponse(status: 202), try encodeJSON(body))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let attachment = try await client.uploadAttachment(
+            data: Data("log data".utf8),
+            filename: "dump.log",
+            mimeType: "text/plain"
+        )
+
+        #expect(attachment.kind == .r2)
+        #expect(attachment.key == "async-key")
+        #expect(attachment.size == 2048)
     }
 } // end FeedbackClientUploadTests
 

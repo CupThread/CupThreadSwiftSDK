@@ -68,7 +68,8 @@ If you build your own custom feedback UI, you can use ``FeedbackClient`` directl
 let attachment = try await client.uploadAttachment(
     data: screenshotData,
     filename: "screenshot.png",
-    mimeType: "image/png"
+    mimeType: "image/png",
+    userToken: UserTokenStore.shared.token
 )
 
 // 2. Prepare the draft
