@@ -16,10 +16,10 @@ public struct FeedbackComposerView: View {
 
     @State private var draft: FeedbackDraft
     @State private var isSubmitting = false
-    @State private var isUploadingAttachment = false
-    @State private var attachmentErrorMessage: String?
+    @State private var attachmentState: FeedbackAttachmentStateMachine
     @State private var errorMessage: String?
     @State private var result: FeedbackSubmissionResult?
+    @State private var uploadTask: Task<Void, Never>?
 
     #if canImport(PhotosUI) && !os(tvOS)
     @State private var selectedPhotoItem: PhotosPickerItem?
@@ -40,17 +40,23 @@ public struct FeedbackComposerView: View {
     ///     ``FeedbackClientConfiguration/defaultPlatform``.
     ///   - userToken: Optional anonymous token; when given it is sent as
     ///     `X-User-Token` so submissions link to the end-user identity.
+    ///   - maxAttachmentBytes: Optional client-side upload size cap in bytes;
+    ///     falls back to ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB)
+    ///     or the fetched ``PublicAppConfig/maxAttachmentBytes``.
     ///   - onSubmit: Called with the server's receipt after a successful
     ///     submission — use it to log, show a toast, or deep-link elsewhere.
     public init(
         client: FeedbackClient,
         initialDraft: FeedbackDraft? = nil,
         userToken: String? = nil,
+        maxAttachmentBytes: Int? = nil,
         onSubmit: @escaping (FeedbackSubmissionResult) -> Void = { _ in }
     ) {
         self.client = client
         self.userToken = userToken
         self.onSubmit = onSubmit
+        let limit = maxAttachmentBytes ?? PhotoAttachmentHelper.defaultMaxAttachmentBytes
+        _attachmentState = State(initialValue: FeedbackAttachmentStateMachine(maxAttachmentBytes: limit))
         _draft = State(initialValue: initialDraft ?? FeedbackDraft.autofilled(platform: client.configuration.defaultPlatform))
     }
 
@@ -60,6 +66,7 @@ public struct FeedbackComposerView: View {
                 FeedbackSentView(warning: result.warning) {
                     withAnimation(.snappy(duration: 0.3)) {
                         self.result = nil
+                        self.resetForm()
                     }
                 }
             } else {
@@ -73,12 +80,24 @@ public struct FeedbackComposerView: View {
         #if canImport(PhotosUI) && !os(tvOS)
         .onChange(of: selectedPhotoItem) { _, newItem in
             guard let newItem else { return }
-            Task {
-                await uploadPhotoItem(newItem)
-                selectedPhotoItem = nil
+            uploadTask?.cancel()
+            let uploadId = attachmentState.startUpload()
+            uploadTask = Task {
+                await uploadPhotoItem(newItem, uploadId: uploadId)
+                if !Task.isCancelled && attachmentState.activeUploadId == uploadId {
+                    selectedPhotoItem = nil
+                }
             }
         }
         #endif
+        .task {
+            if let config = try? await client.fetchAppConfig() {
+                attachmentState.maxAttachmentBytes = config.maxAttachmentBytes
+            }
+        }
+        .onDisappear {
+            cancelUpload()
+        }
         .sdkSurface(client: client, feature: .feedback)
     }
 
@@ -149,19 +168,20 @@ public struct FeedbackComposerView: View {
             }
 
             #if canImport(PhotosUI) && !os(tvOS)
-            if draft.attachments.count < 5 {
+            if attachmentState.isUploading {
+                uploadingAttachmentRow
+            } else if draft.attachments.count < 5 {
                 PhotosPicker(
                     selection: $selectedPhotoItem,
                     matching: .images,
                     photoLibrary: .shared()
                 ) {
-                    photosPickerLabel
+                    PhotosPickerLabelView()
                 }
-                .disabled(isUploadingAttachment)
             }
             #endif
 
-            if let attachmentErrorMessage {
+            if let attachmentErrorMessage = attachmentState.currentErrorMessage {
                 ErrorBanner(message: attachmentErrorMessage)
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     .listRowBackground(Color.clear)
@@ -189,7 +209,7 @@ public struct FeedbackComposerView: View {
             }
             Spacer()
             Button {
-                draft.attachments.removeAll { $0.id == attachment.id }
+                attachmentState.removeAttachment(id: attachment.id, draft: &draft)
             } label: {
                 Image(systemName: "trash")
                     .font(.subheadline)
@@ -202,42 +222,75 @@ public struct FeedbackComposerView: View {
 
     #if canImport(PhotosUI) && !os(tvOS)
     @MainActor @ViewBuilder
-    private var photosPickerLabel: some View {
+    private var uploadingAttachmentRow: some View {
         HStack(spacing: 8) {
-            if isUploadingAttachment {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Image(systemName: "photo")
+            ProgressView()
+                .controlSize(.small)
+            Text(CupThreadStrings.tr("cupthread.feedback.uploading_attachment"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+                cancelUpload()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            Text(
-                isUploadingAttachment
-                    ? CupThreadStrings.tr("cupthread.feedback.uploading_attachment")
-                    : CupThreadStrings.tr("cupthread.feedback.add_attachment")
-            )
+            .buttonStyle(.plain)
+            .accessibilityLabel(CupThreadStrings.tr("cupthread.feedback.remove_attachment"))
         }
     }
 
     @MainActor
-    private func uploadPhotoItem(_ item: PhotosPickerItem) async {
-        isUploadingAttachment = true
-        attachmentErrorMessage = nil
-        defer { isUploadingAttachment = false }
+    private func uploadPhotoItem(_ item: PhotosPickerItem, uploadId: UUID) async {
+        attachmentState.clearError()
+
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
-                attachmentErrorMessage = "Could not load photo data"
+                guard !Task.isCancelled, attachmentState.activeUploadId == uploadId else { return }
+                _ = attachmentState.uploadFailed(
+                    id: uploadId,
+                    error: NSError(domain: "CupThread", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not load photo data"])
+                )
                 return
             }
-            let filename = "screenshot_\(Int(Date().timeIntervalSince1970)).jpg"
+            try Task.checkCancellation()
+            guard attachmentState.activeUploadId == uploadId else { return }
+
+            try PhotoAttachmentHelper.validateAttachmentSize(
+                data.count,
+                limit: attachmentState.maxAttachmentBytes
+            )
+
+            try Task.checkCancellation()
+            guard attachmentState.activeUploadId == uploadId else { return }
+
+            let metadata = PhotoAttachmentHelper.detectImageFormat(
+                from: data,
+                contentTypes: item.supportedContentTypes
+            )
+            let filename = PhotoAttachmentHelper.makeFilename(
+                fileExtension: metadata.fileExtension,
+                id: uploadId
+            )
+
             let uploaded = try await client.uploadAttachment(
                 data: data,
                 filename: filename,
-                mimeType: "image/jpeg",
+                mimeType: metadata.mimeType,
                 userToken: userToken
             )
-            draft.attachments.append(uploaded)
+
+            guard !Task.isCancelled, attachmentState.activeUploadId == uploadId else { return }
+            _ = attachmentState.uploadSucceeded(id: uploadId, attachment: uploaded, draft: &draft)
+        } catch is CancellationError {
+            if attachmentState.activeUploadId == uploadId {
+                attachmentState.cancelUpload()
+            }
         } catch {
-            attachmentErrorMessage = error.localizedDescription
+            guard !Task.isCancelled, attachmentState.activeUploadId == uploadId else { return }
+            _ = attachmentState.uploadFailed(id: uploadId, error: error)
         }
     }
     #endif
@@ -271,12 +324,12 @@ public struct FeedbackComposerView: View {
     // MARK: Submit
 
     private var canSubmit: Bool {
-        draft.title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
-        draft.description.trimmingCharacters(in: .whitespacesAndNewlines).count >= 5
+        attachmentState.canSubmit(draft: draft)
     }
 
     @MainActor
     private func submitDraft() async {
+        guard canSubmit && !isSubmitting else { return }
         isSubmitting = true
         errorMessage = nil
         let currentDraft = draft
@@ -287,6 +340,7 @@ public struct FeedbackComposerView: View {
             onSubmit(result)
             withAnimation(.snappy(duration: 0.3)) {
                 self.result = result
+                self.resetForm()
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -294,7 +348,35 @@ public struct FeedbackComposerView: View {
 
         isSubmitting = false
     }
+
+    @MainActor
+    private func cancelUpload() {
+        uploadTask?.cancel()
+        uploadTask = nil
+        attachmentState.cancelUpload()
+        #if canImport(PhotosUI) && !os(tvOS)
+        selectedPhotoItem = nil
+        #endif
+    }
+
+    @MainActor
+    private func resetForm() {
+        cancelUpload()
+        attachmentState.reset(draft: &draft, defaultPlatform: client.configuration.defaultPlatform)
+        errorMessage = nil
+    }
 }
+
+#if canImport(PhotosUI) && !os(tvOS)
+private struct PhotosPickerLabelView: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "photo")
+            Text(CupThreadStrings.tr("cupthread.feedback.add_attachment"))
+        }
+    }
+}
+#endif
 
 // MARK: - Success state
 
