@@ -102,6 +102,14 @@ async function main() {
     frameworks.push(path.join(work, `${slice.name}.xcarchive`, FRAMEWORK_PATH));
   }
 
+  console.log("• verifying framework slices");
+  for (const slice of APPLE_SLICES) {
+    const framework = path.join(work, `${slice.name}.xcarchive`, FRAMEWORK_PATH);
+    if (!existsSync(framework)) {
+      fail(`Missing framework slice for ${slice.name} at: ${framework}`);
+    }
+  }
+
   console.log("• assembling XCFramework");
   const xcframework = path.join(work, "CupThreadFeedback.xcframework");
   run("xcodebuild", ["-create-xcframework", ...frameworks.flatMap((f) => ["-framework", f]), "-output", xcframework]);
