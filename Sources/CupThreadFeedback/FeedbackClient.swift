@@ -58,7 +58,8 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 public enum FeedbackClientError: LocalizedError, Sendable {
     /// The server response could not be interpreted as HTTP.
     case invalidResponse
-    /// The upload endpoint returned a 200 response whose body could not be decoded.
+    /// The upload endpoint returned a success response (200, 201, or 202)
+    /// whose body could not be decoded.
     case unreadableUploadResponse
     /// The endpoint requires a signed-in user — e.g. the app's changelog
     /// is restricted and anonymous access is disabled (`401 authentication_required`).
