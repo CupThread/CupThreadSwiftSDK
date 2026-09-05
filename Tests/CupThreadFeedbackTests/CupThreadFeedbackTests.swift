@@ -453,6 +453,24 @@ struct FeedbackClientSubmitTests {
         #expect(result.githubDiscussionId == "D_abc")
     }
 
+    @Test func status201AlsoDecodes() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            let body: [String: Any] = [
+                "submissionId": "sub-201",
+                "forwardedToGithub": false
+            ]
+            return (makeHTTPResponse(status: 201), try encodeJSON(body))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let result = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        #expect(result.submissionId == "sub-201")
+        #expect(result.forwardedToGithub == false)
+        #expect(result.githubDiscussionId == nil)
+        #expect(result.githubDiscussionUrl == nil)
+        #expect(result.warning == nil)
+    }
+
     @Test func status202AlsoDecodes() async throws {
         MockURLProtocol.requestHandler = { _ in
             let body: [String: Any] = [
@@ -468,6 +486,24 @@ struct FeedbackClientSubmitTests {
         #expect(result.submissionId == "sub-202")
         #expect(result.forwardedToGithub == false)
         #expect(result.warning == "Stored but not forwarded yet")
+    }
+
+    @Test func unsupportedStatusThrowsUnexpectedStatus() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            return (makeHTTPResponse(status: 204), try encodeJSON(["error": "No content"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .unexpectedStatus(let code, _) = error {
+                #expect(code == 204)
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
     }
 
     @Test func errorStatusThrowsUnexpectedStatus() async throws {
