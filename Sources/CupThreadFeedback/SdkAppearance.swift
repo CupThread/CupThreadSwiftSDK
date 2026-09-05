@@ -301,6 +301,7 @@ public struct CupThreadTheme<Content: View>: View {
             .tint(appearance.theme.accentColor)
             .preferredColorScheme(appearance.theme.preferredColorScheme)
             .environment(\.sdkAppearance, appearance)
+            .safeWebOpenURL()
             .task {
                 appearance = (try? await client.fetchAppConfig())?.sdk ?? .defaults
             }
@@ -327,6 +328,7 @@ struct SdkSurfaceModifier: ViewModifier {
         .tint(appearance.theme.accentColor)
         .preferredColorScheme(appearance.theme.preferredColorScheme)
         .environment(\.sdkAppearance, appearance)
+        .safeWebOpenURL()
         .task {
             if injected == nil {
                 fetched = (try? await client.fetchAppConfig())?.sdk ?? .defaults

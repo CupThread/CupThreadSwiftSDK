@@ -86,6 +86,7 @@ public struct CommentsView: View {
             }
         }
         .task { await loadComments() }
+        .safeWebOpenURL()
     }
 
     private func commentRow(_ comment: FeatureRequestComment) -> some View {

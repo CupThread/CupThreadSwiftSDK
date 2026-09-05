@@ -101,6 +101,7 @@ public struct ChangelogOverlayView: View {
         .frame(minWidth: 420, minHeight: 480)
         #endif
         .task { await load() }
+        .safeWebOpenURL()
         .onDisappear { markSeenIfEnabled() }
     }
 
