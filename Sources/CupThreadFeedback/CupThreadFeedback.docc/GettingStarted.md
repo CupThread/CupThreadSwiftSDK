@@ -97,7 +97,7 @@ let result = try await client.submit(draft, userToken: UserTokenStore.shared.tok
 print(result.submissionId)
 ```
 
-Drafts can carry attachments you upload with ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:)`` and arbitrary metadata for your own triage tooling.
+Drafts can carry attachments you upload with ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:userToken:)`` and arbitrary metadata for your own triage tooling.
 
 ## Explore guides & articles
 

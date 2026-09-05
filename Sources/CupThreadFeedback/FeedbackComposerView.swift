@@ -255,7 +255,6 @@ public struct FeedbackComposerView: View {
                 )
                 return
             }
-
             try Task.checkCancellation()
             guard attachmentState.activeUploadId == uploadId else { return }
 
@@ -279,7 +278,8 @@ public struct FeedbackComposerView: View {
             let uploaded = try await client.uploadAttachment(
                 data: data,
                 filename: filename,
-                mimeType: metadata.mimeType
+                mimeType: metadata.mimeType,
+                userToken: userToken
             )
 
             guard !Task.isCancelled, attachmentState.activeUploadId == uploadId else { return }
