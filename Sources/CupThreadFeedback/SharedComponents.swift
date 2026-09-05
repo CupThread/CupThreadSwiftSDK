@@ -163,7 +163,11 @@ struct VotePill: View {
                 ? CupThreadStrings.tr("cupthread.features.vote_remove_accessibility", Int64(voteCount))
                 : CupThreadStrings.tr("cupthread.features.vote_add_accessibility", Int64(voteCount))
         )
-        .accessibilityHint(isDisabled ? CupThreadStrings.tr("cupthread.features.vote_own_hint") : CupThreadStrings.tr("cupthread.features.vote_toggle_hint"))
+        .accessibilityHint(
+            isDisabled
+                ? CupThreadStrings.tr("cupthread.features.vote_own_hint")
+                : CupThreadStrings.tr("cupthread.features.vote_toggle_hint")
+        )
     }
 }
 
