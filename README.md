@@ -132,7 +132,7 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | Method | Endpoint |
 | ------ | -------- |
 | `submit(_:userToken:)` | `POST /api/v1/feedback` (sends `X-User-Token`) |
-| `uploadAttachment(data:filename:mimeType:preferredKind:)` | `POST /api/v1/uploads/{images,r2}` |
+| `uploadAttachment(data:filename:mimeType:preferredKind:userToken:)` | `POST /api/v1/uploads/{images,r2}` (sends `X-User-Token`) |
 | `fetchAppConfig()` | `GET /api/v1/public/config/{appKey}` |
 | `prepareChangelogOverlay(onlyIfUnseen:)` | Fetches config + newest changelog entries (with seen state filter) |
 | `presentLatestChangelog(onlyIfUnseen:)` | Presents overlay sheet using console copy |

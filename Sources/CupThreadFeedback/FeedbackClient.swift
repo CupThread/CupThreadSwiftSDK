@@ -202,9 +202,7 @@ public struct FeedbackClient: Sendable {
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feedback"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let userToken {
-            request.setValue(userToken, forHTTPHeaderField: "X-User-Token")
-        }
+        applyUserToken(userToken, to: &request)
         request.httpBody = try encoder.encode(payload)
 
         let (data, response) = try await session.data(for: request)
@@ -212,10 +210,7 @@ public struct FeedbackClient: Sendable {
             throw FeedbackClientError.invalidResponse
         }
 
-        if httpResponse.statusCode != 200 && httpResponse.statusCode != 202 {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: httpResponse.statusCode, message: message)
-        }
+        try validateStatus(httpResponse.statusCode, accepted: [200, 202], data: data)
 
         return try decoder.decode(FeedbackSubmissionResult.self, from: data)
     }
@@ -234,17 +229,21 @@ public struct FeedbackClient: Sendable {
     ///   - preferredKind: Forces the upload endpoint instead of inferring it
     ///     from `mimeType`. `nil` (the default) routes `image/*` to the image
     ///     endpoint and everything else to object storage.
+    ///   - userToken: Optional anonymous token; when given it is sent as
+    ///     `X-User-Token` so uploads link to the end-user identity.
     /// - Returns: The uploaded attachment, including its storage `key` and `url`.
     /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` when the
     ///   server rejects the upload — typically because the file exceeds the
-    ///   app's `maxAttachmentBytes` limit — or
-    ///   ``FeedbackClientError/unreadableUploadResponse`` when the success
+    ///   app's `maxAttachmentBytes` limit — or when the server responds with an
+    ///   unexpected HTTP status (successful responses accept HTTP 200, 201, and 202);
+    ///   or ``FeedbackClientError/unreadableUploadResponse`` when the success
     ///   response cannot be decoded.
     public func uploadAttachment(
         data: Data,
         filename: String,
         mimeType: String,
-        preferredKind: FeedbackAttachment.Kind? = nil
+        preferredKind: FeedbackAttachment.Kind? = nil,
+        userToken: String? = nil
     ) async throws -> FeedbackAttachment {
         let endpointKind = preferredKind ?? (mimeType.hasPrefix("image/") ? .image : .r2)
         let endpoint = endpointKind == .image ? "/api/v1/uploads/images" : "/api/v1/uploads/r2"
@@ -254,6 +253,7 @@ public struct FeedbackClient: Sendable {
 
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        applyUserToken(userToken, to: &request)
         request.httpBody = multipartFormData(
             boundary: boundary,
             appKey: configuration.appKey,
@@ -267,10 +267,7 @@ public struct FeedbackClient: Sendable {
             throw FeedbackClientError.invalidResponse
         }
 
-        if httpResponse.statusCode != 200 {
-            let message = String(data: responseData, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: httpResponse.statusCode, message: message)
-        }
+        try validateStatus(httpResponse.statusCode, accepted: [200, 201, 202], data: responseData)
 
         let uploaded = try decoder.decode(UploadedAttachmentResponse.self, from: responseData)
         guard let kind = FeedbackAttachment.Kind(rawValue: uploaded.kind) else {
@@ -321,6 +318,23 @@ public struct FeedbackClient: Sendable {
         metadata["platform"] = draft.platform.rawValue
         metadata["submittedAt"] = ISO8601DateFormatter().string(from: .now)
         return metadata
+    }
+
+    private func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
+        if let userToken = userToken?.nilIfEmpty {
+            request.setValue(userToken, forHTTPHeaderField: "X-User-Token")
+        }
+    }
+
+    private func validateStatus(
+        _ statusCode: Int,
+        accepted: Set<Int>,
+        data: Data
+    ) throws {
+        guard accepted.contains(statusCode) else {
+            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message)
+        }
     }
 }
 
