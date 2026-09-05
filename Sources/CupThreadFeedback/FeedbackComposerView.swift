@@ -106,7 +106,11 @@ public struct FeedbackComposerView: View {
 
     private var contentSection: some View {
         Section {
-            TextField(CupThreadStrings.tr("cupthread.feedback.title_label"), text: $draft.title, prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary")))
+            TextField(
+                CupThreadStrings.tr("cupthread.feedback.title_label"),
+                text: $draft.title,
+                prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary"))
+            )
                 #if canImport(UIKit)
                 .submitLabel(.next)
                 #endif
@@ -246,7 +250,9 @@ public struct FeedbackComposerView: View {
                 if isSubmitting {
                     ProgressView()
                 }
-                Text(isSubmitting ? CupThreadStrings.tr("cupthread.feedback.sending_button") : CupThreadStrings.tr("cupthread.feedback.send_button"))
+                Text(isSubmitting
+                    ? CupThreadStrings.tr("cupthread.feedback.sending_button")
+                    : CupThreadStrings.tr("cupthread.feedback.send_button"))
                     .font(.headline)
             }
             .frame(maxWidth: .infinity)
