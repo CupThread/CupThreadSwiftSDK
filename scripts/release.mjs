@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline/promises";
@@ -64,6 +64,78 @@ const APPLE_SLICES = [
   { name: "tvos-simulator", destination: "generic/platform=tvOS Simulator" }
 ];
 const FRAMEWORK_PATH = "Products/usr/local/lib/CupThreadFeedback.framework";
+const RESOURCE_BUNDLE_NAME = "CupThreadFeedback_CupThreadFeedback.bundle";
+
+// xcodebuild installs only the framework into the archive Products; the SPM
+// resource bundle stays behind in the archive intermediates, so it must be
+// copied in explicitly or Bundle.module ends in fatalError at first render.
+function findBuiltResourceBundle(derivedData, sliceName) {
+  const uninstalled = path.join(
+    derivedData, "Build", "Intermediates.noindex", "ArchiveIntermediates",
+    "CupThreadFeedback", "IntermediateBuildFilesPath", "UninstalledProducts"
+  );
+  const found = [];
+  const visit = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.name === RESOURCE_BUNDLE_NAME) found.push(full);
+      else visit(full);
+    }
+  };
+  if (existsSync(uninstalled)) visit(uninstalled);
+  if (found.length !== 1) {
+    fail(`Expected exactly one ${RESOURCE_BUNDLE_NAME} under ${uninstalled} for ${sliceName}, found ${found.length}`);
+  }
+  return found[0];
+}
+
+// macOS frameworks are versioned (resources under Versions/A/Resources);
+// iOS-style slices are flat (resources sit next to the binary and Info.plist).
+function frameworkResourcesDir(framework) {
+  const versioned = path.join(framework, "Versions", "A", "Resources");
+  if (existsSync(versioned)) return versioned;
+  return framework;
+}
+
+function embedResourceBundle(derivedData, framework, sliceName) {
+  const bundle = findBuiltResourceBundle(derivedData, sliceName);
+  const dest = path.join(frameworkResourcesDir(framework), RESOURCE_BUNDLE_NAME);
+  run("cp", ["-R", bundle, dest]);
+  // Adding files invalidates the archive-time CodeResources seal, so re-sign.
+  run("codesign", ["--force", "--sign", "-", framework]);
+}
+
+function verifyEmbeddedResourceBundles(xcframework, sourceLprojs) {
+  for (const entry of readdirSync(xcframework, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const framework = path.join(xcframework, entry.name, "CupThreadFeedback.framework");
+    if (!existsSync(framework)) continue;
+    const bundle = [
+      path.join(framework, "Versions", "A", "Resources", RESOURCE_BUNDLE_NAME),
+      path.join(framework, "Resources", RESOURCE_BUNDLE_NAME),
+      path.join(framework, RESOURCE_BUNDLE_NAME)
+    ].find((p) => existsSync(p));
+    if (!bundle) {
+      fail(`XCFramework slice ${entry.name} is missing ${RESOURCE_BUNDLE_NAME} — host apps would crash on first render`);
+    }
+    const resourcesDir = [
+      path.join(bundle, "Contents", "Resources"),
+      bundle
+    ].find((p) => existsSync(path.join(p, "en.lproj")));
+    if (!resourcesDir) {
+      fail(`XCFramework slice ${entry.name} resource bundle has no en.lproj`);
+    }
+    if (!existsSync(path.join(resourcesDir, "en.lproj", "Localizable.strings"))) {
+      fail(`XCFramework slice ${entry.name} resource bundle is missing en.lproj/Localizable.strings`);
+    }
+    const have = new Set(readdirSync(resourcesDir).filter((n) => n.endsWith(".lproj")));
+    const missing = sourceLprojs.filter((lproj) => !have.has(lproj));
+    if (missing.length > 0) {
+      fail(`XCFramework slice ${entry.name} resource bundle missing localizations: ${missing.join(", ")}`);
+    }
+  }
+}
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -90,16 +162,20 @@ async function main() {
   console.log("• archiving platform slices");
   const frameworks = [];
   for (const slice of APPLE_SLICES) {
+    const derivedData = path.join(work, "derived-data", slice.name);
     run("xcodebuild", [
       "archive",
       "-scheme", "CupThreadFeedback",
       "-destination", slice.destination,
       "-archivePath", path.join(work, `${slice.name}.xcarchive`),
+      "-derivedDataPath", derivedData,
       "SKIP_INSTALL=NO",
       "BUILD_LIBRARY_FOR_DISTRIBUTION=YES",
       "-quiet"
     ], { cwd: ROOT });
-    frameworks.push(path.join(work, `${slice.name}.xcarchive`, FRAMEWORK_PATH));
+    const framework = path.join(work, `${slice.name}.xcarchive`, FRAMEWORK_PATH);
+    embedResourceBundle(derivedData, framework, slice.name);
+    frameworks.push(framework);
   }
 
   console.log("• verifying framework slices");
@@ -113,6 +189,11 @@ async function main() {
   console.log("• assembling XCFramework");
   const xcframework = path.join(work, "CupThreadFeedback.xcframework");
   run("xcodebuild", ["-create-xcframework", ...frameworks.flatMap((f) => ["-framework", f]), "-output", xcframework]);
+
+  console.log("• verifying embedded resource bundles");
+  const sourceLprojs = readdirSync(path.join(ROOT, "Sources", "CupThreadFeedback", "Resources"))
+    .filter((name) => name.endsWith(".lproj"));
+  verifyEmbeddedResourceBundles(xcframework, sourceLprojs);
 
   const filename = `CupThreadFeedback-${version}.xcframework.zip`;
   const zipPath = path.join(work, filename);
