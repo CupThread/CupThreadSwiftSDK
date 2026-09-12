@@ -80,6 +80,7 @@
 "cupthread.comments.reply" = "Odpowiedz";
 "cupthread.comments.replying_to" = "W odpowiedzi do @%@";
 "cupthread.comments.compose_prompt" = "Napisz komentarz…";
+"cupthread.comments.removed_by_moderator" = "Ten komentarz został usunięty przez moderatora.";
 
 "cupthread.profile.title" = "Profil użytkownika";
 "cupthread.profile.apps" = "Aplikacje";
