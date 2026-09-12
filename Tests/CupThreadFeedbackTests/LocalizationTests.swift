@@ -63,6 +63,21 @@ struct LocalizationTests {
         }
     }
 
+    @Test func trResolvesStringsThroughModuleBundle() {
+        let resolved = CupThreadStrings.tr("cupthread.features.title")
+        #expect(!resolved.isEmpty)
+        #expect(
+            resolved != "cupthread.features.title",
+            "tr() fell back to the raw key — Bundle.module did not resolve to a bundle carrying Localizable.strings"
+        )
+    }
+
+    @Test func trAppliesFormatArguments() {
+        let resolved = CupThreadStrings.tr("cupthread.features.released_in", "1.2.3")
+        #expect(resolved.contains("1.2.3"), "Format argument was not applied: \(resolved)")
+        #expect(!resolved.contains("%@"), "Format specifier leaked into output: \(resolved)")
+    }
+
     @Test func formatSpecifiersMatchEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let regex = try NSRegularExpression(pattern: "%[0-9]*[a-zA-Z@]")
