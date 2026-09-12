@@ -144,7 +144,12 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.updatedAt = updatedAt
     }
 
-    func withVoteState(voted: Bool, count: Int) -> FeatureRequestItem {
+    /// Returns a copy of this item with updated vote state and count, preserving all other metadata.
+    /// - Parameters:
+    ///   - voted: Whether the current user has voted on this item.
+    ///   - count: The new total vote count.
+    /// - Returns: A copy of `FeatureRequestItem` with the specified vote properties.
+    public func withVoteState(voted: Bool, count: Int) -> FeatureRequestItem {
         FeatureRequestItem(
             id: id,
             appId: appId,
