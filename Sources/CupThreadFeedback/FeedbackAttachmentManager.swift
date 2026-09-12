@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 #if canImport(UniformTypeIdentifiers)
 import UniformTypeIdentifiers
 #endif
@@ -7,6 +8,8 @@ import UniformTypeIdentifiers
 public enum AttachmentValidationError: LocalizedError, Equatable, Sendable {
     /// The attachment exceeds the app's maximum allowed upload size.
     case oversized(size: Int, limit: Int)
+    /// The attachment could not be processed or stripped of sensitive metadata.
+    case unprocessableImage
 
     public var errorDescription: String? {
         switch self {
@@ -14,6 +17,8 @@ public enum AttachmentValidationError: LocalizedError, Equatable, Sendable {
             let formattedLimit = ByteCountFormatter.string(fromByteCount: Int64(limit), countStyle: .file)
             let formattedSize = ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
             return "Attachment (\(formattedSize)) exceeds the maximum allowed size of \(formattedLimit)."
+        case .unprocessableImage:
+            return "The selected photo could not be processed for upload."
         }
     }
 }
@@ -130,6 +135,82 @@ public enum PhotoAttachmentHelper {
     public static func validateAttachmentSize(_ size: Int, limit: Int) throws {
         guard size <= limit else {
             throw AttachmentValidationError.oversized(size: size, limit: limit)
+        }
+    }
+
+    /// Re-encodes image data to strip sensitive metadata (EXIF, GPS location, device serials, TIFF, IPTC),
+    /// while preserving image pixels, visual orientation, and container format compatibility.
+    ///
+    /// - Parameter data: The raw image data.
+    /// - Returns: Sanitized image bytes, or `nil` if the data is corrupt or cannot be decoded.
+    public static func strippingSensitiveMetadata(from data: Data) -> Data? {
+        guard !data.isEmpty else { return nil }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetCount(source) > 0 else {
+            return nil
+        }
+
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
+            ?? CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            return nil
+        }
+
+        let targetType = targetContainerType(for: source, data: data, image: image)
+        let outputData = NSMutableData()
+        guard let destination = makeImageDestination(for: outputData, targetType: targetType, image: image) else {
+            return nil
+        }
+
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+
+        return outputData as Data
+    }
+
+    private static func targetContainerType(for source: CGImageSource, data: Data, image: CGImage) -> CFString {
+        let supportedTypes = Set((CGImageDestinationCopyTypeIdentifiers() as? [String]) ?? [])
+        let hasAlpha = imageHasAlpha(image)
+
+        if let inputType = CGImageSourceGetType(source) as String?, supportedTypes.contains(inputType) {
+            return inputType as CFString
+        }
+
+        if let sniffed = sniffImageFormat(from: data) {
+            if sniffed.mimeType == "image/png" && supportedTypes.contains("public.png") {
+                return "public.png" as CFString
+            }
+            if sniffed.mimeType == "image/heic" && supportedTypes.contains("public.heic") {
+                return "public.heic" as CFString
+            }
+        }
+
+        return (hasAlpha && supportedTypes.contains("public.png")) ? ("public.png" as CFString) : ("public.jpeg" as CFString)
+    }
+
+    private static func makeImageDestination(
+        for outputData: NSMutableData,
+        targetType: CFString,
+        image: CGImage
+    ) -> CGImageDestination? {
+        if let destination = CGImageDestinationCreateWithData(outputData as CFMutableData, targetType, 1, nil) {
+            return destination
+        }
+        let fallbackType = imageHasAlpha(image) ? ("public.png" as CFString) : ("public.jpeg" as CFString)
+        return CGImageDestinationCreateWithData(outputData as CFMutableData, fallbackType, 1, nil)
+    }
+
+    private static func imageHasAlpha(_ image: CGImage) -> Bool {
+        switch image.alphaInfo {
+        case .first, .last, .premultipliedFirst, .premultipliedLast:
+            return true
+        default:
+            return false
         }
     }
 }

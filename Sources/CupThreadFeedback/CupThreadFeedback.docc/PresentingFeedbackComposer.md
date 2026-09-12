@@ -13,7 +13,7 @@ The form automatically captures:
 - **App version & build**: Pulled from `Bundle.main`.
 - **System locale & time zone**.
 - **Optional contact info**: Name and email (remembered between submissions).
-- **Attachments**: Images and log files uploaded to CupThread storage.
+- **Attachments**: Images and log files uploaded to CupThread storage (photo attachments have sensitive EXIF and GPS location metadata stripped before upload to protect user privacy).
 
 ## Basic usage
 
