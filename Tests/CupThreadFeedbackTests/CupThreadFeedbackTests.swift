@@ -309,6 +309,28 @@ struct FeedbackClientErrorTests {
         let desc = try #require(error.errorDescription)
         #expect(desc.contains("400"))
     }
+
+    @Test func scanRejectedHasLocalizedDescriptionWithoutMessage() {
+        let error = FeedbackClientError.scanRejected(message: "")
+        let desc = error.errorDescription
+        #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
+    }
+
+    @Test func scanRejectedHasLocalizedDescriptionWithMessage() throws {
+        let reason = "Upload object upl_123 was rejected by content scan: malware detected"
+        let error = FeedbackClientError.scanRejected(message: reason)
+        let desc = try #require(error.errorDescription)
+        #expect(desc.contains("The referenced attachment could not be uploaded due to content inspection rejection"))
+        #expect(desc.contains(reason))
+    }
+
+    @Test func scanRejectedEquatable() {
+        let error1 = FeedbackClientError.scanRejected(message: "abc")
+        let error2 = FeedbackClientError.scanRejected(message: "abc")
+        let error3 = FeedbackClientError.scanRejected(message: "xyz")
+        #expect(error1 == error2)
+        #expect(error1 != error3)
+    }
 }
 
 // MARK: - FeedbackClient (serialized — tests share a static URLProtocol handler)
@@ -524,6 +546,83 @@ struct FeedbackClientSubmitTests {
         }
     }
 
+    @Test func submitThrowsScanRejectedWhenServerReturns422WithScanRejectedCode() async throws {
+        let errorPayload: [String: Any] = [
+            "error": "Upload object upl_scan_123 was rejected by content scan: malware signature detected",
+            "code": "scan_rejected"
+        ]
+        MockURLProtocol.requestHandler = { _ in
+            (makeHTTPResponse(status: 422), try encodeJSON(errorPayload))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let draft = FeedbackDraft(
+            title: "Bug report with attachment",
+            description: "Here is the attachment that got rejected",
+            platform: .ios,
+            attachments: [
+                FeedbackAttachment(
+                    kind: .image,
+                    key: "upl_scan_123",
+                    url: URL(string: "https://example.com/upl_scan_123")!
+                )
+            ]
+        )
+
+        do {
+            _ = try await client.submit(draft)
+            Issue.record("Expected scanRejected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .scanRejected(let message) = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(message.contains("upl_scan_123"))
+            #expect(message.contains("malware signature detected"))
+            let desc = try #require(error.errorDescription)
+            #expect(desc.contains("The referenced attachment could not be uploaded due to content inspection rejection"))
+            #expect(desc.contains("malware signature detected"))
+        }
+    }
+
+    @Test func submitThrowsUnexpectedStatusWhen422HasNonScanRejectedCode() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            (makeHTTPResponse(status: 422), try encodeJSON(["error": "Invalid format", "code": "unprocessable_data"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .unexpectedStatus(let code, let message) = error {
+                #expect(code == 422)
+                #expect(message.contains("unprocessable_data"))
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
+
+    @Test func submitThrowsUnexpectedStatusWhen422BodyIsNotJSON() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            (makeHTTPResponse(status: 422), Data("Unprocessable Entity".utf8))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .unexpectedStatus(let code, let message) = error {
+                #expect(code == 422)
+                #expect(message == "Unprocessable Entity")
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
+
     @Test func sendsPlatformInBody() async throws {
         let capture = CaptureBox<Data>()
         MockURLProtocol.requestHandler = { request in
@@ -703,6 +802,36 @@ struct FeedbackClientUploadTests {
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(let code, _) = error {
                 #expect(code == 413)
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
+
+    @Test func uploadThrowsScanRejectedWhenServerReturns422WithScanRejectedCode() async throws {
+        let errorPayload: [String: Any] = [
+            "error": "Upload object upl_bad_file was rejected by content scan: prohibited file type",
+            "code": "scan_rejected"
+        ]
+        MockURLProtocol.requestHandler = { _ in
+            (makeHTTPResponse(status: 422), try encodeJSON(errorPayload))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.uploadAttachment(
+                data: Data("test".utf8),
+                filename: "bad.exe",
+                mimeType: "application/octet-stream"
+            )
+            Issue.record("Expected scanRejected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .scanRejected(let message) = error {
+                #expect(message.contains("upl_bad_file"))
+                #expect(message.contains("prohibited file type"))
+                let desc = try #require(error.errorDescription)
+                #expect(desc.contains("The referenced attachment could not be uploaded due to content inspection rejection"))
+                #expect(desc.contains("prohibited file type"))
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
