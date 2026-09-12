@@ -80,6 +80,7 @@
 "cupthread.comments.reply" = "返信";
 "cupthread.comments.replying_to" = "@%@ に返信";
 "cupthread.comments.compose_prompt" = "コメントを入力…";
+"cupthread.comments.removed_by_moderator" = "このコメントはモデレーターによって削除されました。";
 
 "cupthread.profile.title" = "ユーザープロフィール";
 "cupthread.profile.apps" = "アプリ";

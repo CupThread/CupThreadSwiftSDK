@@ -80,6 +80,7 @@
 "cupthread.comments.reply" = "回覆";
 "cupthread.comments.replying_to" = "回覆 @%@";
 "cupthread.comments.compose_prompt" = "寫低你嘅諗法…";
+"cupthread.comments.removed_by_moderator" = "此留言已被版主移除。";
 
 "cupthread.profile.title" = "用戶資料";
 "cupthread.profile.apps" = "應用程式列表";

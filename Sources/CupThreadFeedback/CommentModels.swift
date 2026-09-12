@@ -109,11 +109,74 @@ struct ListCommentsResponse: Codable, Sendable {
     let comments: [FeatureRequestComment]
 }
 
-// MARK: - Date helpers
+// MARK: - Comment display model
+
+/// Presentation representation of a comment row, resolving moderation state.
+public struct CommentDisplayModel: Equatable, Identifiable, Sendable {
+    /// The unique comment id.
+    public let id: String
+    /// Whether the comment has been removed by a moderator.
+    public let isModerated: Bool
+    /// The body text to display (or moderation notice).
+    public let displayBody: String
+    /// The author display name, or nil if redacted due to moderation.
+    public let authorName: String?
+    /// Avatar URL, or nil if redacted due to moderation.
+    public let authorAvatarUrl: String?
+    /// Clerk user id for profile navigation, or nil if redacted.
+    public let authorClerkId: String?
+    /// Whether users can reply to this comment.
+    public let canReply: Bool
+    /// Whether users can tap through to the author's profile.
+    public let canOpenAuthorProfile: Bool
+    /// Display name of the author being replied to, when applicable.
+    public let replyToAuthorName: String?
+    /// Clerk user id of the author being replied to, when applicable.
+    public let replyToClerkId: String?
+    /// Parsed creation date.
+    public let createdAtDate: Date?
+
+    /// Creates a display model from a comment.
+    public init(comment: FeatureRequestComment) {
+        self.id = comment.id
+        self.isModerated = comment.isModerated
+        self.createdAtDate = comment.createdAtDate
+        self.replyToAuthorName = comment.replyToAuthorName
+        self.replyToClerkId = comment.isModerated ? nil : comment.replyToClerkId
+
+        if comment.isModerated {
+            self.displayBody = CupThreadStrings.tr("cupthread.comments.removed_by_moderator")
+            self.authorName = nil
+            self.authorAvatarUrl = nil
+            self.authorClerkId = nil
+            self.canReply = false
+            self.canOpenAuthorProfile = false
+        } else {
+            self.displayBody = comment.body
+            self.authorName = comment.authorName ?? CupThreadStrings.tr("cupthread.features.anonymous")
+            self.authorAvatarUrl = comment.authorAvatarUrl
+            self.authorClerkId = comment.authorClerkId
+            self.canReply = true
+            self.canOpenAuthorProfile = comment.authorClerkId != nil
+        }
+    }
+}
+
+// MARK: - Comment helpers
 
 extension FeatureRequestComment {
+    /// Whether the comment has been hidden by a moderator.
+    public var isModerated: Bool {
+        isHidden == true
+    }
+
+    /// Presentation model for rendering this comment in the UI.
+    public var displayModel: CommentDisplayModel {
+        CommentDisplayModel(comment: self)
+    }
+
     /// Parsed `createdAt`, accepting plain and fractional-second ISO-8601.
-    var createdAtDate: Date? {
+    public var createdAtDate: Date? {
         if let date = try? Date(createdAt, strategy: Self.fractionalISO) {
             return date
         }

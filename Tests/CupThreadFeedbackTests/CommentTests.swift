@@ -97,6 +97,84 @@ struct CommentModelsTests {
         )
         #expect(invalid.createdAtDate == nil)
     }
+
+    @Test func moderatedCommentRedactsContentAndDisablesActions() {
+        let hiddenComment = FeatureRequestComment(
+            id: "c-hidden",
+            featureRequestId: "fr-1",
+            authorName: "OffensiveUser",
+            authorEmail: "bad@example.com",
+            authorAvatarUrl: "https://example.com/avatar.png",
+            authorClerkId: "clerk_bad",
+            body: "Sensitive or abusive content that must not be shown",
+            parentId: "c-0",
+            replyToClerkId: "clerk_parent",
+            replyToAuthorName: "Alice",
+            isHidden: true,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        )
+
+        #expect(hiddenComment.isModerated == true)
+        let display = hiddenComment.displayModel
+        #expect(display.isModerated == true)
+        #expect(display.displayBody != hiddenComment.body)
+        #expect(display.displayBody == CupThreadStrings.tr("cupthread.comments.removed_by_moderator"))
+        #expect(display.authorName == nil)
+        #expect(display.authorAvatarUrl == nil)
+        #expect(display.authorClerkId == nil)
+        #expect(display.canReply == false)
+        #expect(display.canOpenAuthorProfile == false)
+        #expect(display.replyToAuthorName == "Alice")
+        #expect(display.replyToClerkId == nil)
+    }
+
+    @Test func visibleCommentPreservesContentAndAllowsActions() {
+        let visibleComment = FeatureRequestComment(
+            id: "c-visible",
+            featureRequestId: "fr-1",
+            authorName: "Alice",
+            authorEmail: "alice@example.com",
+            authorAvatarUrl: "https://example.com/avatar.png",
+            authorClerkId: "clerk_alice",
+            body: "Helpful feedback",
+            parentId: "c-0",
+            replyToClerkId: "clerk_bob",
+            replyToAuthorName: "Bob",
+            isHidden: false,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        )
+
+        #expect(visibleComment.isModerated == false)
+        let display = visibleComment.displayModel
+        #expect(display.isModerated == false)
+        #expect(display.displayBody == "Helpful feedback")
+        #expect(display.authorName == "Alice")
+        #expect(display.authorAvatarUrl == "https://example.com/avatar.png")
+        #expect(display.authorClerkId == "clerk_alice")
+        #expect(display.canReply == true)
+        #expect(display.canOpenAuthorProfile == true)
+        #expect(display.replyToAuthorName == "Bob")
+        #expect(display.replyToClerkId == "clerk_bob")
+    }
+
+    @Test func unmoderatedCommentWithNilHiddenTreatsAsVisible() {
+        let comment = FeatureRequestComment(
+            id: "c-nil",
+            featureRequestId: "fr-1",
+            authorName: nil,
+            body: "Anonymous comment",
+            isHidden: nil,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        )
+
+        #expect(comment.isModerated == false)
+        let display = comment.displayModel
+        #expect(display.isModerated == false)
+        #expect(display.displayBody == "Anonymous comment")
+        #expect(display.authorName == CupThreadStrings.tr("cupthread.features.anonymous"))
+        #expect(display.canReply == true)
+        #expect(display.canOpenAuthorProfile == false)
+    }
 }
 
 // MARK: - Client

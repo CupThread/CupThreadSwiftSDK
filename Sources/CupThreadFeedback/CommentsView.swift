@@ -90,21 +90,68 @@ public struct CommentsView: View {
     }
 
     private func commentRow(_ comment: FeatureRequestComment) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            commentAvatar(for: comment)
+        let display = comment.displayModel
+        let row = HStack(alignment: .top, spacing: 12) {
+            if display.isModerated {
+                moderatedAvatar
+            } else {
+                commentAvatar(for: comment)
+            }
 
             VStack(alignment: .leading, spacing: 4) {
-                authorHeader(for: comment)
+                if display.isModerated {
+                    moderatedHeader(for: comment)
+                } else {
+                    authorHeader(for: comment)
+                }
+
                 replyTag(for: comment)
 
-                Text(comment.body)
+                Text(display.displayBody)
                     .font(.subheadline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(display.isModerated ? .secondary : .primary)
+                    .italic(display.isModerated)
 
-                replyButton(for: comment)
+                if display.canReply {
+                    replyButton(for: comment)
+                }
             }
         }
         .padding(.vertical, 8)
+
+        return Group {
+            if display.isModerated {
+                row
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(display.displayBody)
+            } else {
+                row
+            }
+        }
+    }
+
+    private var moderatedAvatar: some View {
+        Image(systemName: "slash.circle")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 18, height: 18)
+            .foregroundStyle(.tertiary)
+            .frame(width: 32, height: 32)
+            .background(Color.secondary.opacity(0.12))
+            .clipShape(Circle())
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func moderatedHeader(for comment: FeatureRequestComment) -> some View {
+        HStack {
+            Spacer()
+            if let date = comment.createdAtDate {
+                Text(date, format: .relative(presentation: .named))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 
     @ViewBuilder
@@ -169,6 +216,7 @@ public struct CommentsView: View {
     @ViewBuilder
     private func replyButton(for comment: FeatureRequestComment) -> some View {
         Button {
+            guard !comment.isModerated else { return }
             draft.parentId = comment.id
             draft.replyToAuthorName = comment.authorName ?? CupThreadStrings.tr("cupthread.features.anonymous")
             draft.replyToClerkId = comment.authorClerkId
