@@ -14,17 +14,39 @@ public final class UserTokenStore: @unchecked Sendable {
     /// The shared store, backed by `UserDefaults.standard`.
     public static let shared = UserTokenStore()
 
-    private let key = "com.cupthread.featureRequestUserToken"
+    /// The default key used in `UserDefaults` to store the anonymous token.
+    static let defaultKey = "com.cupthread.featureRequestUserToken"
 
-    private init() {}
+    private static let processLock = NSLock()
+
+    private let userDefaults: UserDefaults
+    private let key: String
+
+    /// Initializes a token store with the specified defaults suite and storage key.
+    /// Internal to allow unit tests to pass isolated `UserDefaults` and keys.
+    init(userDefaults: UserDefaults = .standard, key: String = UserTokenStore.defaultKey) {
+        self.userDefaults = userDefaults
+        self.key = key
+    }
 
     /// Returns the existing token, or generates and persists a new UUID on first access.
+    ///
+    /// Synchronized across threads and instances via double-checked locking so concurrent
+    /// first accesses always resolve and persist the same identity.
     public var token: String {
-        if let existing = UserDefaults.standard.string(forKey: key) {
+        if let existing = userDefaults.string(forKey: key), !existing.isEmpty {
             return existing
         }
+
+        Self.processLock.lock()
+        defer { Self.processLock.unlock() }
+
+        if let existing = userDefaults.string(forKey: key), !existing.isEmpty {
+            return existing
+        }
+
         let new = UUID().uuidString
-        UserDefaults.standard.set(new, forKey: key)
+        userDefaults.set(new, forKey: key)
         return new
     }
 }
