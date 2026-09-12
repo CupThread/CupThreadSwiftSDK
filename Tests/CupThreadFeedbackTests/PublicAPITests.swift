@@ -338,6 +338,56 @@ struct PublicAPITests {
         #expect(updated.recentCommenters == base.recentCommenters)
         #expect(updated.hasMoreCommenters == base.hasMoreCommenters)
     }
+
+    // MARK: - Toggle vote
+
+    @Test func toggleVoteHitsVoteEndpointAndDecodesResult() async throws {
+        let captureUrl = CaptureBox<URL>()
+        let captureMethod = CaptureBox<String>()
+        let captureBody = CaptureBox<Data>()
+
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            captureUrl.value = request.url
+            captureMethod.value = request.httpMethod
+            captureBody.value = bodyData(from: request)
+
+            let json: [String: Any] = [
+                "voted": true,
+                "voteCount": 12
+            ]
+            return (makeHTTPResponse(status: 200), try encodeJSON(json))
+        }
+
+        let result = try await Self.makeAPIClient().toggleVote(
+            featureRequestId: "fr-42",
+            userToken: "tok-abc"
+        )
+
+        let url = try #require(captureUrl.value)
+        #expect(url.path == "/api/v1/feature-requests/fr-42/vote")
+        #expect(captureMethod.value == "POST")
+
+        let data = try #require(captureBody.value)
+        let dict = try #require(parseJSONDict(data))
+        #expect(dict["appKey"] as? String == "app_testkey123456")
+        #expect(dict["userToken"] as? String == "tok-abc")
+
+        #expect(result.voted == true)
+        #expect(result.voteCount == 12)
+    }
+
+    @Test func toggleVoteThrowsOnNon200Status() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 429), Data("Too Many Requests".utf8))
+        }
+
+        await #expect(throws: FeedbackClientError.self) {
+            _ = try await Self.makeAPIClient().toggleVote(
+                featureRequestId: "fr-42",
+                userToken: "tok-abc"
+            )
+        }
+    }
 }
 
 // MARK: - JSON fixtures

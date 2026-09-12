@@ -11,7 +11,7 @@ public struct FeatureRequestsView: View {
     public let client: FeedbackClient
     public let userToken: String
 
-    @State private var items: [FeatureRequestItem] = []
+    @State private var listState = FeatureRequestsListState()
     @State private var isLoading = true
     /// True once the first load finished. Later reloads (search, version filter)
     /// keep showing content instead of flashing skeletons.
@@ -26,8 +26,13 @@ public struct FeatureRequestsView: View {
     @State private var versions: [AppVersion] = []
     @State private var selectedVersionID: String?
 
-    // Tracks which item IDs have an in-flight vote request (prevents double-taps).
-    @State private var votingIds: Set<String> = []
+    private var items: [FeatureRequestItem] {
+        listState.items
+    }
+
+    private var votingIds: Set<String> {
+        listState.votingIds
+    }
 
     /// Creates the feature requests list.
     /// - Parameters:
@@ -273,37 +278,29 @@ public struct FeatureRequestsView: View {
                 versionId: selectedVersionID,
                 query: searchText.isEmpty ? nil : searchText
             )
-            items = result.requests
+            guard !Task.isCancelled else { return }
+            listState.mergeReloadedItems(result.requests)
         } catch {
+            guard !Task.isCancelled else { return }
             loadError = error.localizedDescription
         }
     }
 
     @MainActor
     private func toggleVoteOptimistic(for item: FeatureRequestItem) async {
-        guard let index = items.firstIndex(where: { $0.id == item.id }),
-              !votingIds.contains(item.id) else { return }
-
-        votingIds.insert(item.id)
-        defer { votingIds.remove(item.id) }
-
-        // Apply optimistic update immediately so the UI responds without waiting for the server.
-        items[index] = item.withVoteState(
-            voted: !item.hasVoted,
-            count: item.hasVoted ? item.voteCount - 1 : item.voteCount + 1
-        )
+        guard let (originalVoted, originalCount) = listState.applyOptimisticVote(for: item.id) else {
+            return
+        }
 
         do {
             let result = try await client.toggleVote(featureRequestId: item.id, userToken: userToken)
-            // Reconcile with the authoritative server counts (index may shift during an async gap).
-            if let idx = items.firstIndex(where: { $0.id == item.id }) {
-                items[idx] = items[idx].withVoteState(voted: result.voted, count: result.voteCount)
-            }
+            listState.reconcileVoteSuccess(itemId: item.id, voted: result.voted, voteCount: result.voteCount)
         } catch {
-            // Revert to the pre-optimistic state on failure.
-            if let idx = items.firstIndex(where: { $0.id == item.id }) {
-                items[idx] = item
-            }
+            listState.reconcileVoteFailure(
+                itemId: item.id,
+                originalVoted: originalVoted,
+                originalCount: originalCount
+            )
         }
     }
 }
