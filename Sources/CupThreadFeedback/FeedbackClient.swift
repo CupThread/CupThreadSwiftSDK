@@ -1,13 +1,5 @@
 import Foundation
 
-private extension Data {
-    mutating func append(_ string: String) {
-        if let data = string.data(using: .utf8) {
-            append(data)
-        }
-    }
-}
-
 /// Connection settings for a ``FeedbackClient``.
 ///
 /// Create one configuration per CupThread app and share it across clients:
@@ -37,20 +29,34 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     /// e.g. a Mac Catalyst build that should count as `.macos`.
     public let defaultPlatform: FeedbackPlatform
 
+    /// A stable `X-Request-Id` sent with every request, so server logs can
+    /// correlate a whole session — e.g. a UUID generated once per app run.
+    ///
+    /// The server honors ids matching `^[A-Za-z0-9._-]{8,64}$`; anything else
+    /// is replaced. When `nil` (the default) the SDK generates a fresh UUID
+    /// per request. Every response echoes an `X-Request-Id`, which the SDK
+    /// attaches to ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    /// so users can quote it in support conversations.
+    public let requestID: String?
+
     /// Creates a configuration for a CupThread app.
     /// - Parameters:
     ///   - baseURL: The API root, normally `https://api.cupthread.com`.
     ///   - appKey: Your app's key from the CupThread developer console.
     ///   - defaultPlatform: The platform reported with feedback submissions.
     ///     Defaults to the OS the SDK is running on.
+    ///   - requestID: Optional stable `X-Request-Id` sent with every request;
+    ///     defaults to a per-request UUID.
     public init(
         baseURL: URL,
         appKey: String,
-        defaultPlatform: FeedbackPlatform = FeedbackPlatform.current
+        defaultPlatform: FeedbackPlatform = FeedbackPlatform.current,
+        requestID: String? = nil
     ) {
         self.baseURL = baseURL
         self.appKey = appKey
         self.defaultPlatform = defaultPlatform
+        self.requestID = requestID
     }
 }
 
@@ -67,9 +73,28 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// An attachment referenced in the feedback submission was rejected by server-side content inspection
     /// (e.g. prohibited file types or malware signatures, HTTP `422 scan_rejected`).
     case scanRejected(message: String)
+    /// A metered action hit the server's per-client-IP rate limit (HTTP 429) —
+    /// e.g. voting too fast, or a burst of uploads. Recoverable: wait for the
+    /// rate-limit window before retrying.
+    case rateLimited(message: String?)
+    /// An upload was rejected by the media-type policy (HTTP 415) — e.g. SVG,
+    /// or bytes that do not match the declared MIME type. Only PNG, JPEG,
+    /// WebP, and GIF are accepted.
+    case unsupportedMediaType(message: String?)
+    /// An upload exceeded the server's size limit (HTTP 413).
+    case payloadTooLarge(message: String?)
+    /// No end-user identity could be presented where one is required
+    /// (HTTP 400 `uploader_identity_required`) — upload sessions are always
+    /// bound to an uploader identity.
+    case uploaderIdentityRequired(message: String?)
+    /// The request presented a different identity than the one that created
+    /// the referenced upload session (HTTP 400 `uploader_mismatch`).
+    /// Re-attach the file with the same `userToken` and try again.
+    case uploaderMismatch(message: String?)
     /// The server answered with a status the SDK does not handle. `message`
-    /// carries the raw response body for debugging.
-    case unexpectedStatus(code: Int, message: String)
+    /// carries the raw response body for debugging; `requestId` is the
+    /// response's `X-Request-Id` correlation id for support requests.
+    case unexpectedStatus(code: Int, message: String, requestId: String?)
 
     public var errorDescription: String? {
         switch self {
@@ -78,22 +103,28 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .unreadableUploadResponse:
             return "The feedback server returned an unreadable upload response."
         case .authenticationRequired:
-            return "These updates are only available to signed-in users."
+            return "This action is only available to signed-in users."
         case .scanRejected(let message):
             let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 return "The referenced attachment could not be uploaded due to content inspection rejection."
             }
             return "The referenced attachment could not be uploaded due to content inspection rejection: \(trimmed)"
-        case .unexpectedStatus(let code, let message):
-            return "The feedback request failed (\(code)): \(message)"
+        case .rateLimited:
+            return "You're doing that too often. Please try again in a minute."
+        case .unsupportedMediaType:
+            return "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF."
+        case .payloadTooLarge:
+            return "That file is too large to upload."
+        case .uploaderIdentityRequired:
+            return "Uploads require an end-user identity. Pass a userToken (see UserTokenStore) when uploading attachments."
+        case .uploaderMismatch:
+            return "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again."
+        case .unexpectedStatus(let code, let message, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "The feedback request failed (\(code))\(suffix): \(message)"
         }
     }
-}
-
-private struct APIErrorEnvelope: Decodable, Sendable {
-    let error: String?
-    let code: String?
 }
 
 private struct FeedbackSubmissionPayload: Codable, Sendable {
@@ -106,25 +137,7 @@ private struct FeedbackSubmissionPayload: Codable, Sendable {
     let appVersion: String?
     let buildNumber: String?
     let metadata: [String: String]
-    let attachments: [AttachmentPayload]
-}
-
-private struct AttachmentPayload: Codable, Sendable {
-    let kind: String
-    let key: String
-    let url: URL
-    let filename: String?
-    let mimeType: String?
-    let size: Int?
-}
-
-private struct UploadedAttachmentResponse: Codable, Sendable {
-    let kind: String
-    let key: String
-    let url: URL
-    let filename: String?
-    let mimeType: String?
-    let size: Int?
+    let uploadIds: [String]?
 }
 
 /// The HTTP client for the CupThread feedback API.
@@ -170,8 +183,12 @@ public struct FeedbackClient: Sendable {
     /// Submits a feedback draft.
     ///
     /// Titles and descriptions are trimmed; empty contact fields, version
-    /// strings, and attachment lists are omitted from the payload. The SDK
-    /// adds `sdk`, `platform`, and `submittedAt` metadata automatically.
+    /// strings, and attachment lists are omitted from the payload. Attachments
+    /// contributed by ``uploadAttachment(data:filename:mimeType:userToken:)``
+    /// are sent as `uploadIds` referencing their upload session. The SDK adds
+    /// `sdk`, `platform`, and `submittedAt` metadata automatically and applies
+    /// the server's metadata redaction contract locally (credential-looking
+    /// keys are redacted, values truncated, oversized payloads shrunk).
     ///
     /// ```swift
     /// var draft = FeedbackDraft.autofilled()
@@ -187,10 +204,10 @@ public struct FeedbackClient: Sendable {
     /// - Returns: The server's receipt, including the submission id and any warning.
     /// - Throws: ``FeedbackClientError/scanRejected(message:)`` when an attachment
     ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
-    ///   ``FeedbackClientError/unexpectedStatus(code:message:)`` when the
-    ///   server rejects the request or answers with an unexpected HTTP status (successful
-    ///   submissions accept HTTP 200, 201, and 202), or ``FeedbackClientError/invalidResponse``
-    ///   when the response cannot be interpreted.
+    ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for other
+    ///   server rejections (successful submissions accept HTTP 200, 201, and 202), or
+    ///   ``FeedbackClientError/invalidResponse`` when the response cannot be interpreted.
     public func submit(
         _ draft: FeedbackDraft,
         userToken: String? = nil
@@ -204,23 +221,14 @@ public struct FeedbackClient: Sendable {
             platform: draft.platform,
             appVersion: draft.appVersion.nilIfEmpty,
             buildNumber: draft.buildNumber.nilIfEmpty,
-            metadata: draft.metadata.merging(defaultMetadata(from: draft)) { current, _ in current },
-            attachments: draft.attachments.map {
-                AttachmentPayload(
-                    kind: $0.kind.rawValue,
-                    key: $0.key,
-                    url: $0.url,
-                    filename: $0.filename,
-                    mimeType: $0.mimeType,
-                    size: $0.size
-                )
-            }
+            metadata: FeedbackMetadataSanitizer.sanitize(defaultMetadata(from: draft)),
+            uploadIds: draft.attachments.compactMap(\.uploadId).nilIfEmpty
         )
 
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feedback"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyUserToken(userToken, to: &request)
+        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         request.httpBody = try encoder.encode(payload)
 
         let (data, response) = try await session.data(for: request)
@@ -228,108 +236,9 @@ public struct FeedbackClient: Sendable {
             throw FeedbackClientError.invalidResponse
         }
 
-        try validateStatus(httpResponse.statusCode, accepted: Self.acceptedSubmitStatuses, data: data)
+        try validateResponse(httpResponse, data: data, accepted: Self.acceptedSubmitStatuses)
 
         return try decoder.decode(FeedbackSubmissionResult.self, from: data)
-    }
-
-    /// Uploads a file and returns the attachment reference to embed in a ``FeedbackDraft``.
-    ///
-    /// Image MIME types post to the image endpoint (`POST /api/v1/uploads/images`);
-    /// everything else posts to object storage (`POST /api/v1/uploads/r2`).
-    /// The returned ``FeedbackAttachment`` is already shaped for
-    /// `FeedbackDraft.attachments`.
-    ///
-    /// - Parameters:
-    ///   - data: The raw file bytes.
-    ///   - filename: Name shown in the console, e.g. `"screenshot.png"`.
-    ///   - mimeType: The file's MIME type, e.g. `"image/png"`.
-    ///   - preferredKind: Forces the upload endpoint instead of inferring it
-    ///     from `mimeType`. `nil` (the default) routes `image/*` to the image
-    ///     endpoint and everything else to object storage.
-    ///   - userToken: Optional anonymous token; when given it is sent as
-    ///     `X-User-Token` so uploads link to the end-user identity.
-    /// - Returns: The uploaded attachment, including its storage `key` and `url`.
-    /// - Throws: ``FeedbackClientError/scanRejected(message:)`` when the uploaded file
-    ///   is rejected by server-side content scan (HTTP 422 `scan_rejected`);
-    ///   ``FeedbackClientError/unexpectedStatus(code:message:)`` when the
-    ///   server rejects the upload — typically because the file exceeds the
-    ///   app's `maxAttachmentBytes` limit — or when the server responds with an
-    ///   unexpected HTTP status (successful responses accept HTTP 200, 201, and 202);
-    ///   or ``FeedbackClientError/unreadableUploadResponse`` when the success
-    ///   response cannot be decoded.
-    public func uploadAttachment(
-        data: Data,
-        filename: String,
-        mimeType: String,
-        preferredKind: FeedbackAttachment.Kind? = nil,
-        userToken: String? = nil
-    ) async throws -> FeedbackAttachment {
-        let endpointKind = preferredKind ?? (mimeType.hasPrefix("image/") ? .image : .r2)
-        let endpoint = endpointKind == .image ? "/api/v1/uploads/images" : "/api/v1/uploads/r2"
-
-        var request = URLRequest(url: configuration.baseURL.appending(path: endpoint))
-        request.httpMethod = "POST"
-
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        applyUserToken(userToken, to: &request)
-        request.httpBody = multipartFormData(
-            boundary: boundary,
-            appKey: configuration.appKey,
-            filename: filename,
-            mimeType: mimeType,
-            fileData: data
-        )
-
-        let (responseData, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw FeedbackClientError.invalidResponse
-        }
-
-        try validateStatus(httpResponse.statusCode, accepted: Self.acceptedUploadStatuses, data: responseData)
-
-        let uploaded = try decoder.decode(UploadedAttachmentResponse.self, from: responseData)
-        guard let kind = FeedbackAttachment.Kind(rawValue: uploaded.kind) else {
-            throw FeedbackClientError.unreadableUploadResponse
-        }
-
-        return FeedbackAttachment(
-            kind: kind,
-            key: uploaded.key,
-            url: uploaded.url,
-            filename: uploaded.filename,
-            mimeType: uploaded.mimeType,
-            size: uploaded.size
-        )
-    }
-
-    private func multipartFormData(
-        boundary: String,
-        appKey: String,
-        filename: String,
-        mimeType: String,
-        fileData: Data
-    ) -> Data {
-        var body = Data()
-
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"appKey\"\r\n\r\n")
-        body.append("\(appKey)\r\n")
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(escapedMultipartFilename(filename))\"\r\n")
-        body.append("Content-Type: \(mimeType)\r\n\r\n")
-        body.append(fileData)
-        body.append("\r\n")
-        body.append("--\(boundary)--\r\n")
-
-        return body
-    }
-
-    private func escapedMultipartFilename(_ filename: String) -> String {
-        filename
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
     private func defaultMetadata(from draft: FeedbackDraft) -> [String: String] {
@@ -341,34 +250,25 @@ public struct FeedbackClient: Sendable {
     }
 
     private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]
-    private static let acceptedUploadStatuses: Set<Int> = [200, 201, 202]
 
-    private func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
+    /// Sets the `X-User-Token` header when a token is present.
+    func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
         if let userToken = userToken?.nilIfEmpty {
             request.setValue(userToken, forHTTPHeaderField: "X-User-Token")
         }
     }
-
-    private func validateStatus(
-        _ statusCode: Int,
-        accepted: Set<Int>,
-        data: Data
-    ) throws {
-        guard accepted.contains(statusCode) else {
-            if statusCode == 422,
-               let errorEnvelope = try? decoder.decode(APIErrorEnvelope.self, from: data),
-               errorEnvelope.code == "scan_rejected" {
-                throw FeedbackClientError.scanRejected(message: errorEnvelope.error ?? "")
-            }
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message)
-        }
-    }
 }
 
-private extension String {
+extension String {
+    /// The string trimmed of surrounding whitespace, or `nil` when empty.
     var nilIfEmpty: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+private extension Array where Element == String {
+    var nilIfEmpty: [String]? {
+        isEmpty ? nil : self
     }
 }

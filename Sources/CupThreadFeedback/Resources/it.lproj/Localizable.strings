@@ -86,3 +86,8 @@
 "cupthread.profile.apps" = "App";
 "cupthread.profile.recent_comments" = "Commenti recenti";
 "cupthread.profile.no_comments" = "Nessun commento recente.";
+
+/* September API sync: vote rate limiting + cursor paging */
+"cupthread.features.vote_rate_limited" = "Stai votando troppo velocemente. Riprova tra un minuto.";
+"cupthread.features.load_more" = "Carica altro";
+"cupthread.features.load_more_hint" = "Mostra la pagina successiva delle richieste di funzionalità.";

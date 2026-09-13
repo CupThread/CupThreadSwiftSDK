@@ -10,6 +10,10 @@ public enum AttachmentValidationError: LocalizedError, Equatable, Sendable {
     case oversized(size: Int, limit: Int)
     /// The attachment could not be processed or stripped of sensitive metadata.
     case unprocessableImage
+    /// The attachment's format is not accepted by the upload API (HTTP 415) —
+    /// e.g. SVG, which the server rejects for stored-XSS reasons. The upload
+    /// API accepts PNG, JPEG, WebP, and GIF only.
+    case unsupportedType
 
     public var errorDescription: String? {
         switch self {
@@ -19,6 +23,8 @@ public enum AttachmentValidationError: LocalizedError, Equatable, Sendable {
             return "Attachment (\(formattedSize)) exceeds the maximum allowed size of \(formattedLimit)."
         case .unprocessableImage:
             return "The selected photo could not be processed for upload."
+        case .unsupportedType:
+            return "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF."
         }
     }
 }
@@ -136,6 +142,73 @@ public enum PhotoAttachmentHelper {
         guard size <= limit else {
             throw AttachmentValidationError.oversized(size: size, limit: limit)
         }
+    }
+
+    /// Detects SVG markup by signature, since SVG has no single magic number.
+    ///
+    /// The upload API rejects SVG outright (`415`) because browsers execute
+    /// script in it; this lets the SDK reject it locally with a clear message
+    /// instead of paying a round trip.
+    /// - Parameter data: The raw bytes to inspect.
+    /// - Returns: `true` when the bytes look like SVG markup.
+    public static func looksLikeSVG(_ data: Data) -> Bool {
+        // Skip a UTF-8 BOM and leading whitespace before the first markup byte.
+        var start = data.startIndex
+        if data.count >= 3, data[start] == 0xEF, data[start + 1] == 0xBB, data[start + 2] == 0xBF {
+            start += 3
+        }
+        while start < data.endIndex, data[start] == 0x20 || data[start] == 0x09 || data[start] == 0x0A || data[start] == 0x0D {
+            start += 1
+        }
+        let prefix = data[start...].prefix(256)
+        guard let head = String(bytes: prefix, encoding: .utf8)?.lowercased() else {
+            return false
+        }
+        return head.hasPrefix("<svg") || head.hasPrefix("<?xml")
+    }
+
+    /// Whether the upload API cannot accept these bytes directly and they
+    /// should be transcoded to JPEG first (`#41` media policy): the server
+    /// verifies magic bytes and accepts PNG, JPEG, WebP, and GIF only, so
+    /// HEIC/HEIF photos and unrecognized containers need conversion.
+    /// - Parameter data: The raw image bytes.
+    /// - Returns: `true` when a JPEG transcode is required.
+    public static func requiresJPEGTranscode(_ data: Data) -> Bool {
+        guard let sniffed = sniffImageFormat(from: data) else {
+            return true
+        }
+        return sniffed.mimeType == "image/heic"
+    }
+
+    /// Re-encodes image bytes as JPEG, for sources the upload API does not
+    /// accept directly (HEIC/HEIF photos, unrecognized containers).
+    ///
+    /// The fresh encode also drops any embedded metadata, so this doubles as
+    /// a sanitizer for transcoded paths.
+    ///
+    /// - Parameter data: The raw image bytes.
+    /// - Returns: JPEG bytes, or `nil` when the data cannot be decoded as an image.
+    public static func jpegRepresentationResampled(from data: Data) -> Data? {
+        guard !data.isEmpty,
+              let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: false] as CFDictionary) else {
+            return nil
+        }
+        let outputData = NSMutableData()
+        #if canImport(UniformTypeIdentifiers)
+        let jpegType = UTType.jpeg.identifier as CFString
+        #else
+        let jpegType = "public.jpeg" as CFString
+        #endif
+        guard let destination = CGImageDestinationCreateWithData(outputData as CFMutableData, jpegType, 1, nil) else {
+            return nil
+        }
+        let options: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 0.9]
+        CGImageDestinationAddImage(destination, image, options as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+        return outputData as Data
     }
 
     /// Re-encodes image data to strip sensitive metadata (EXIF, GPS location, device serials, TIFF, IPTC),

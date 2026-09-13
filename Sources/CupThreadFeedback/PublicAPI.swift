@@ -147,8 +147,8 @@ extension FeedbackClient {
     /// feature flags, overlay copy) applied by ``CupThreadTheme`` and every
     /// SDK view.
     /// - Returns: The app's current public configuration.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` — with
-    ///   status 404 for an unknown app key — or
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   — with status 404 for an unknown app key — or
     ///   ``FeedbackClientError/invalidResponse``.
     public func fetchAppConfig() async throws -> PublicAppConfig {
         try await get("/api/v1/public/config/\(configuration.appKey)")
@@ -156,8 +156,8 @@ extension FeedbackClient {
 
     /// Fetches the visible roadmap board columns, ordered by position.
     /// - Returns: The board's visible columns, sorted by ``BoardColumn/position``.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
-    ///   ``FeedbackClientError/invalidResponse``.
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchColumns() async throws -> [BoardColumn] {
         let response: ListColumnsResponse = try await get("/api/v1/public/columns/\(configuration.appKey)")
         return response.columns.sorted { $0.position < $1.position }
@@ -165,8 +165,8 @@ extension FeedbackClient {
 
     /// Fetches the app's versions, ordered by position.
     /// - Returns: Released and planned versions, sorted by ``AppVersion/position``.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
-    ///   ``FeedbackClientError/invalidResponse``.
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchVersions() async throws -> [AppVersion] {
         let response: ListVersionsResponse = try await get("/api/v1/public/versions/\(configuration.appKey)")
         return response.versions.sorted { $0.position < $1.position }
@@ -175,15 +175,13 @@ extension FeedbackClient {
     private func get<T: Decodable>(_ path: String) async throws -> T {
         var request = URLRequest(url: configuration.baseURL.appending(path: path))
         request.httpMethod = "GET"
+        applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode != 200 {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: httpResponse.statusCode, message: message)
-        }
+        try validateResponse(httpResponse, data: data, accepted: [200])
         return try decoder.decode(T.self, from: data)
     }
 }

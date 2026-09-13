@@ -188,12 +188,12 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.requesterClerkId = try container.decodeIfPresent(String.self, forKey: .requesterClerkId)
         self.recentCommenters = try container.decodeIfPresent([RecentCommenter].self, forKey: .recentCommenters) ?? []
         self.hasMoreCommenters = try container.decodeIfPresent(Bool.self, forKey: .hasMoreCommenters) ?? false
-        self.approved = try container.decode(Bool.self, forKey: .approved)
-        self.voteCount = try container.decode(Int.self, forKey: .voteCount)
-        self.hasVoted = try container.decode(Bool.self, forKey: .hasVoted)
-        self.isOwnRequest = try container.decode(Bool.self, forKey: .isOwnRequest)
+        self.approved = try container.decodeIfPresent(Bool.self, forKey: .approved) ?? false
+        self.voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0
+        self.hasVoted = try container.decodeIfPresent(Bool.self, forKey: .hasVoted) ?? false
+        self.isOwnRequest = try container.decodeIfPresent(Bool.self, forKey: .isOwnRequest) ?? false
         self.createdAt = try container.decode(String.self, forKey: .createdAt)
-        self.updatedAt = try container.decode(String.self, forKey: .updatedAt)
+        self.updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt) ?? ""
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -239,19 +239,58 @@ public struct FeatureRequestSubmissionResult: Codable, Equatable, Sendable {
 }
 
 /// Response to ``FeedbackClient/toggleVote(featureRequestId:userToken:)``.
-public struct VoteResult: Codable, Equatable, Sendable {
+public struct VoteResult: Decodable, Equatable, Sendable {
     /// The user's vote state after the toggle.
     public let voted: Bool
     /// The request's authoritative vote count after the toggle.
     public let voteCount: Int
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Older deployments answer `voted`; the OpenAPI schema names it
+        // `hasVoted`. Accept both.
+        voted = try container.decodeIfPresent(Bool.self, forKey: .voted)
+            ?? container.decodeIfPresent(Bool.self, forKey: .hasVoted)
+            ?? false
+        voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case voted, hasVoted, voteCount
+    }
 }
 
 // MARK: - List response
 
-/// Response to ``FeedbackClient/fetchFeatureRequests(userToken:limit:offset:versionId:query:)``.
-public struct ListFeatureRequestsResult: Codable, Sendable {
+/// Response to ``FeedbackClient/fetchFeatureRequests(userToken:limit:offset:versionId:query:cursor:)``.
+public struct ListFeatureRequestsResult: Decodable, Sendable {
     /// One page of requests matching the query and filters.
     public let requests: [FeatureRequestItem]
     /// Total number of matching requests, independent of pagination.
     public let total: Int
+    /// Whether another page exists. Only meaningful for cursor-based
+    /// requests (see ``nextCursor``); `false` when the server omits it.
+    public let hasMore: Bool
+    /// Opaque keyset cursor for the next page; pass it back as the `cursor`
+    /// parameter instead of building deep offsets. `nil` on the last page.
+    public let nextCursor: String?
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        requests = try container.decode([FeatureRequestItem].self, forKey: .requests)
+        total = try container.decodeIfPresent(Int.self, forKey: .total) ?? 0
+        hasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore) ?? false
+        nextCursor = try container.decodeIfPresent(String.self, forKey: .nextCursor)
+    }
+
+    init(requests: [FeatureRequestItem], total: Int, hasMore: Bool, nextCursor: String?) {
+        self.requests = requests
+        self.total = total
+        self.hasMore = hasMore
+        self.nextCursor = nextCursor
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case requests, total, hasMore, nextCursor
+    }
 }

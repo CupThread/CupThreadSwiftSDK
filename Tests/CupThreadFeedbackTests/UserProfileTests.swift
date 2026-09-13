@@ -180,7 +180,7 @@ struct UserProfileClientTests {
             _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_unknown")
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, _) = error {
+            if case .unexpectedStatus(let code, _, _) = error {
                 #expect(code == 404)
             } else {
                 Issue.record("Unexpected error type: \\(error)")

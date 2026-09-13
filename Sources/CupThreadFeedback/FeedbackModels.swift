@@ -46,7 +46,7 @@ public extension FeedbackDraft {
     }
 }
 
-/// A file uploaded through ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:userToken:)``
+/// A file uploaded through ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)``
 /// and attached to a ``FeedbackDraft``.
 public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
     /// Which storage backend holds the file.
@@ -57,9 +57,16 @@ public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
         case image
     }
 
+    /// The upload-session id binding this attachment to its uploaded bytes.
+    /// Sent with feedback submission as `uploadIds`; `nil` only for legacy
+    /// references created before the upload-session flow (those are ignored
+    /// at submission time).
+    public let uploadId: String?
+
     /// The storage backend the file lives in.
     public let kind: Kind
-    /// Server-assigned storage key identifying the upload.
+    /// Server-assigned identifier for the upload. For session uploads this
+    /// equals ``uploadId``; kept for display fallbacks and legacy references.
     public let key: String
     /// URL where the file can be fetched.
     public let url: URL
@@ -76,6 +83,7 @@ public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
     /// Creates an attachment reference, typically from an upload response.
     /// - Parameters:
     ///   - kind: The storage backend holding the file.
+    ///   - uploadId: Upload-session id binding the attachment to its bytes.
     ///   - key: Server-assigned storage key.
     ///   - url: URL where the file can be fetched.
     ///   - filename: Original filename, if any.
@@ -83,6 +91,7 @@ public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
     ///   - size: File size in bytes, if known.
     public init(
         kind: Kind,
+        uploadId: String? = nil,
         key: String,
         url: URL,
         filename: String? = nil,
@@ -90,11 +99,23 @@ public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
         size: Int? = nil
     ) {
         self.kind = kind
+        self.uploadId = uploadId
         self.key = key
         self.url = url
         self.filename = filename
         self.mimeType = mimeType
         self.size = size
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decodeIfPresent(Kind.self, forKey: .kind) ?? .image
+        uploadId = try container.decodeIfPresent(String.self, forKey: .uploadId)
+        key = try container.decode(String.self, forKey: .key)
+        url = try container.decode(URL.self, forKey: .url)
+        filename = try container.decodeIfPresent(String.self, forKey: .filename)
+        mimeType = try container.decodeIfPresent(String.self, forKey: .mimeType)
+        size = try container.decodeIfPresent(Int.self, forKey: .size)
     }
 }
 
@@ -125,8 +146,13 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
     /// The host app's build number, e.g. `"142"`.
     public var buildNumber: String
     /// Free-form key/value pairs merged into the submission for triage.
+    ///
+    /// Sanitized per the server's redaction contract before sending:
+    /// credential-looking keys are replaced with `"[redacted]"`, values are
+    /// truncated to 512 characters, and the payload is capped at 24 keys / 8 KB.
     public var metadata: [String: String]
-    /// References returned by ``FeedbackClient/uploadAttachment(data:filename:mimeType:preferredKind:userToken:)``.
+    /// References returned by ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)``.
+    /// Their `uploadId`s are sent with the submission.
     public var attachments: [FeedbackAttachment]
 
     /// Creates a draft. All fields except `platform` default to empty.
@@ -167,7 +193,12 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
 ///
 /// Returned by ``FeedbackClient/submit(_:userToken:)`` and also delivered to
 /// ``FeedbackComposerView`` host apps through its `onSubmit` callback.
-public struct FeedbackSubmissionResult: Codable, Equatable, Sendable {
+///
+/// Decoding is lenient: the documented response carries `id`, `title`,
+/// `status`, and `createdAt`, while older deployments answered with
+/// `submissionId`, `forwardedToGithub`, and warning fields. The SDK accepts
+/// both shapes.
+public struct FeedbackSubmissionResult: Decodable, Equatable, Sendable {
     /// Server-assigned id for the submission.
     public let submissionId: String
     /// Whether the backend mirrored the submission to its GitHub tracker.
@@ -178,4 +209,20 @@ public struct FeedbackSubmissionResult: Codable, Equatable, Sendable {
     public let githubDiscussionUrl: URL?
     /// Non-fatal warning from the server, shown to the user when present.
     public let warning: String?
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        submissionId = try container.decodeIfPresent(String.self, forKey: .submissionId)
+            ?? container.decodeIfPresent(String.self, forKey: .id)
+            ?? ""
+        forwardedToGithub = try container.decodeIfPresent(Bool.self, forKey: .forwardedToGithub) ?? false
+        githubDiscussionId = try container.decodeIfPresent(String.self, forKey: .githubDiscussionId)
+        githubDiscussionUrl = try container.decodeIfPresent(URL.self, forKey: .githubDiscussionUrl)
+        warning = try container.decodeIfPresent(String.self, forKey: .warning)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case submissionId, id, forwardedToGithub
+        case githubDiscussionId, githubDiscussionUrl, warning
+    }
 }

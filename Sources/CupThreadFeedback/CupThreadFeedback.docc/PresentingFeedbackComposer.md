@@ -13,7 +13,7 @@ The form automatically captures:
 - **App version & build**: Pulled from `Bundle.main`.
 - **System locale & time zone**.
 - **Optional contact info**: Name and email (remembered between submissions).
-- **Attachments**: Images and log files uploaded to CupThread storage (photo attachments have sensitive EXIF and GPS location metadata stripped before upload to protect user privacy).
+- **Attachments**: Images and log files uploaded through upload sessions to CupThread storage (photo attachments have sensitive EXIF and GPS location metadata stripped before upload to protect user privacy, and HEIC photos are transcoded to JPEG — the API accepts PNG, JPEG, WebP, and GIF only).
 
 ## Basic usage
 

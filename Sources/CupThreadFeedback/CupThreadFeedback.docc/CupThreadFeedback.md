@@ -67,7 +67,7 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 - ``FeedbackClient/presentLatestChangelog(onlyIfUnseen:)``: Programmatic overlay presentation.
 - ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``: Fetch overlay data without presenting.
 - ``FeedbackClient/hasSeenChangelog(version:)``, ``FeedbackClient/markChangelogSeen(version:)``
-- ``FeedbackClient/fetchChangelog()``, ``FeedbackClient/subscribeToChangelog(email:userToken:)``, ``FeedbackClient/unsubscribeFromChangelog(email:)``
+- ``FeedbackClient/fetchChangelog()``, ``FeedbackClient/subscribeToChangelog(email:userToken:)``, ``FeedbackClient/unsubscribeFromChangelog(token:)``
 
 ## Appearance & feature flags
 

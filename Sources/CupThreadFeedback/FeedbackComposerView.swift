@@ -255,23 +255,19 @@ public struct FeedbackComposerView: View {
         attachmentState.clearError()
 
         do {
-            let uploadData = try await loadAndPreparePhotoData(from: item)
+            let prepared = try await loadAndPreparePhotoData(from: item)
             try Task.checkCancellation()
             guard attachmentState.activeUploadId == uploadId else { return }
 
-            let metadata = PhotoAttachmentHelper.detectImageFormat(
-                from: uploadData,
-                contentTypes: item.supportedContentTypes
-            )
             let filename = PhotoAttachmentHelper.makeFilename(
-                fileExtension: metadata.fileExtension,
+                fileExtension: prepared.fileExtension,
                 id: uploadId
             )
 
             let uploaded = try await client.uploadAttachment(
-                data: uploadData,
+                data: prepared.data,
                 filename: filename,
-                mimeType: metadata.mimeType,
+                mimeType: prepared.mimeType,
                 userToken: userToken
             )
 
@@ -287,19 +283,46 @@ public struct FeedbackComposerView: View {
         }
     }
 
-    private func loadAndPreparePhotoData(from item: PhotosPickerItem) async throws -> Data {
-        guard let data = try await item.loadTransferable(type: Data.self) else {
+    private struct PreparedPhoto {
+        let data: Data
+        let mimeType: String
+        let fileExtension: String
+    }
+
+    /// Loads the picked photo and normalizes it for the upload API's media
+    /// policy: SVG is rejected locally, HEIC/HEIF photos and unrecognized
+    /// containers are transcoded to JPEG, and metadata is stripped.
+    private func loadAndPreparePhotoData(from item: PhotosPickerItem) async throws -> PreparedPhoto {
+        guard var data = try await item.loadTransferable(type: Data.self) else {
             throw NSError(domain: "CupThread", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not load photo data"])
         }
         try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: attachmentState.maxAttachmentBytes)
+
+        if PhotoAttachmentHelper.looksLikeSVG(data) {
+            throw AttachmentValidationError.unsupportedType
+        }
 
         if stripSensitiveMetadata {
             guard let sanitized = PhotoAttachmentHelper.strippingSensitiveMetadata(from: data) else {
                 throw AttachmentValidationError.unprocessableImage
             }
-            return sanitized
+            data = sanitized
         }
-        return data
+
+        // The upload API verifies magic bytes and accepts PNG, JPEG, WebP,
+        // and GIF only — transcode HEIC/HEIF (the iPhone photo default) and
+        // anything it cannot verify.
+        if PhotoAttachmentHelper.requiresJPEGTranscode(data) {
+            guard let jpeg = PhotoAttachmentHelper.jpegRepresentationResampled(from: data) else {
+                throw AttachmentValidationError.unsupportedType
+            }
+            data = jpeg
+        }
+
+        try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: attachmentState.maxAttachmentBytes)
+
+        let metadata = PhotoAttachmentHelper.detectImageFormat(from: data)
+        return PreparedPhoto(data: data, mimeType: metadata.mimeType, fileExtension: metadata.fileExtension)
     }
     #endif
 

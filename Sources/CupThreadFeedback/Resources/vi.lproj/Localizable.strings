@@ -86,3 +86,8 @@
 "cupthread.profile.apps" = "Ứng dụng";
 "cupthread.profile.recent_comments" = "Bình luận gần đây";
 "cupthread.profile.no_comments" = "Không có bình luận gần đây.";
+
+/* September API sync: vote rate limiting + cursor paging */
+"cupthread.features.vote_rate_limited" = "Bạn đang bình chọn quá nhanh. Vui lòng thử lại sau một phút.";
+"cupthread.features.load_more" = "Tải thêm";
+"cupthread.features.load_more_hint" = "Hiển thị trang tiếp theo của các yêu cầu tính năng.";

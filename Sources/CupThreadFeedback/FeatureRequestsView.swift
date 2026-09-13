@@ -25,6 +25,8 @@ public struct FeatureRequestsView: View {
     @State private var searchText = ""
     @State private var versions: [AppVersion] = []
     @State private var selectedVersionID: String?
+    @State private var isLoadingNextPage = false
+    @State private var voteNotice: String?
 
     private var items: [FeatureRequestItem] {
         listState.items
@@ -124,6 +126,14 @@ public struct FeatureRequestsView: View {
                 showSubmittedBanner = false
             }
         }
+        .task(id: voteNotice) {
+            guard voteNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                voteNotice = nil
+            }
+        }
         .sdkSurface(client: client, feature: .featureRequests)
     }
 
@@ -147,6 +157,10 @@ public struct FeatureRequestsView: View {
                         SubmittedBanner()
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
+                    if let voteNotice {
+                        VoteNoticeBanner(message: voteNotice)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                     ForEach(items) { item in
                         FeatureRequestCard(
                             item: item,
@@ -157,6 +171,9 @@ public struct FeatureRequestsView: View {
                         ) {
                             Task { await toggleVoteOptimistic(for: item) }
                         }
+                    }
+                    if listState.hasMorePages {
+                        loadMoreRow
                     }
                 }
             }
@@ -192,6 +209,10 @@ public struct FeatureRequestsView: View {
                     #if !os(tvOS)
                     .listRowSeparator(.hidden)
                     #endif
+                }
+                if listState.hasMorePages {
+                    loadMoreRow
+                        .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -259,6 +280,26 @@ public struct FeatureRequestsView: View {
 
     // MARK: Actions
 
+    private var loadMoreRow: some View {
+        Button {
+            Task { await loadNextPage() }
+        } label: {
+            HStack(spacing: 8) {
+                if isLoadingNextPage {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(CupThreadStrings.tr("cupthread.features.load_more"))
+                    .font(.subheadline.weight(.medium))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(12)
+        }
+        .buttonStyle(.bordered)
+        .disabled(isLoadingNextPage)
+        .accessibilityHint(CupThreadStrings.tr("cupthread.features.load_more_hint"))
+    }
+
     @MainActor
     private func loadVersions() async {
         versions = (try? await client.fetchVersions()) ?? []
@@ -279,10 +320,32 @@ public struct FeatureRequestsView: View {
                 query: searchText.isEmpty ? nil : searchText
             )
             guard !Task.isCancelled else { return }
-            listState.mergeReloadedItems(result.requests)
+            listState.applyPage(result, replacesExisting: true)
         } catch {
             guard !Task.isCancelled else { return }
             loadError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadNextPage() async {
+        guard !isLoadingNextPage, let cursor = listState.nextCursor else { return }
+        isLoadingNextPage = true
+        defer { isLoadingNextPage = false }
+        do {
+            let result = try await client.fetchFeatureRequests(
+                userToken: userToken,
+                versionId: selectedVersionID,
+                query: searchText.isEmpty ? nil : searchText,
+                cursor: cursor
+            )
+            guard !Task.isCancelled else { return }
+            listState.applyPage(result, replacesExisting: false)
+        } catch {
+            guard !Task.isCancelled else { return }
+            // Deep paging is best-effort; surface the failure without
+            // disturbing the loaded pages.
+            voteNotice = error.localizedDescription
         }
     }
 
@@ -295,6 +358,13 @@ public struct FeatureRequestsView: View {
         do {
             let result = try await client.toggleVote(featureRequestId: item.id, userToken: userToken)
             listState.reconcileVoteSuccess(itemId: item.id, voted: result.voted, voteCount: result.voteCount)
+        } catch FeedbackClientError.rateLimited {
+            listState.reconcileVoteFailure(
+                itemId: item.id,
+                originalVoted: originalVoted,
+                originalCount: originalCount
+            )
+            voteNotice = CupThreadStrings.tr("cupthread.features.vote_rate_limited")
         } catch {
             listState.reconcileVoteFailure(
                 itemId: item.id,
@@ -305,144 +375,22 @@ public struct FeatureRequestsView: View {
     }
 }
 
-// MARK: - Request card
+// MARK: - Vote notice banner
 
-private struct FeatureRequestCard: View {
-    let item: FeatureRequestItem
-    var highlightQuery: String = ""
-    let isVoteInFlight: Bool
-    var onSelectCard: (() -> Void)?
-    var onSelectUser: ((String) -> Void)?
-    let vote: () -> Void
+private struct VoteNoticeBanner: View {
+    let message: String
 
     var body: some View {
-        let stageStyle = StageStyle.forRequest(item)
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                HighlightedText(text: item.title, query: highlightQuery)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
-
-                HStack(spacing: 6) {
-                    CapsuleBadge(icon: stageStyle.icon, text: item.stageName, tint: stageStyle.tint)
-                        .accessibilityLabel("Stage: \(item.stageName)")
-
-                    if item.isOwnRequest && !item.approved {
-                        CapsuleBadge(icon: "clock", text: CupThreadStrings.tr("cupthread.features.pending_review"), tint: .orange)
-                    }
-
-                    if let version = item.versionLabel {
-                        CapsuleBadge(icon: "tag", text: version, tint: .secondary)
-                    }
-                }
-
-                if !item.description.isEmpty {
-                    // Searching highlights the raw text so query ranges line up;
-                    // otherwise render inline Markdown.
-                    Group {
-                        if highlightQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            MarkdownText(content: item.description)
-                        } else {
-                            HighlightedText(text: item.description, query: highlightQuery)
-                        }
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                }
-
-                metaRow
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onSelectCard?()
-            }
-
-            VotePill(
-                voteCount: item.voteCount,
-                hasVoted: item.hasVoted,
-                isInFlight: isVoteInFlight,
-                isDisabled: item.isOwnRequest
-            ) {
-                vote()
-            }
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.footnote.weight(.medium))
+            Spacer(minLength: 0)
         }
-        .requestCard()
-    }
-
-    @ViewBuilder
-    private var metaRow: some View {
-        if let released = item.releasedVersion {
-            CapsuleBadge(icon: "checkmark.seal.fill", text: CupThreadStrings.tr("cupthread.features.released_in", released), tint: .green)
-        } else {
-            HStack(spacing: 10) {
-                requesterLabel
-
-                if !item.recentCommenters.isEmpty {
-                    commentersStack
-                }
-
-                if let date = item.createdAtDate {
-                    Label {
-                        Text(date, format: .relative(presentation: .named))
-                    } icon: {
-                        Image(systemName: "clock")
-                    }
-                }
-            }
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-        }
-    }
-
-    @ViewBuilder
-    private var requesterLabel: some View {
-        if let clerkId = item.requesterClerkId {
-            Button {
-                onSelectUser?(clerkId)
-            } label: {
-                HStack(spacing: 6) {
-                    AvatarView(url: item.requesterAvatarUrl, size: 20)
-                    Text(item.requesterName.flatMap { $0.isEmpty ? nil : $0 } ?? CupThreadStrings.tr("cupthread.features.anonymous"))
-                        .lineLimit(1)
-                }
-                .foregroundStyle(.primary)
-            }
-            .buttonStyle(.plain)
-        } else {
-            HStack(spacing: 6) {
-                AvatarView(url: item.requesterAvatarUrl, size: 20)
-                Text(item.requesterName.flatMap { $0.isEmpty ? nil : $0 } ?? CupThreadStrings.tr("cupthread.features.anonymous"))
-                    .lineLimit(1)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var commentersStack: some View {
-        HStack(spacing: -6) {
-            ForEach(Array(item.recentCommenters.prefix(3).enumerated()), id: \.offset) { index, commenter in
-                if let clerkId = commenter.clerkUserId {
-                    Button {
-                        onSelectUser?(clerkId)
-                    } label: {
-                        AvatarView(url: commenter.avatarUrl, size: 18)
-                    }
-                    .buttonStyle(.plain)
-                    .zIndex(Double(3 - index))
-                } else {
-                    AvatarView(url: commenter.avatarUrl, size: 18)
-                        .zIndex(Double(3 - index))
-                }
-            }
-            if item.hasMoreCommenters {
-                Text("···")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .accessibilityLabel("Recent commenters")
+        .padding(12)
+        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
     }
 }
 

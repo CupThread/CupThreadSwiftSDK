@@ -11,6 +11,15 @@ struct FeatureRequestsListState: Equatable, Sendable {
     /// Tracks which item IDs have an in-flight vote request (prevents double-taps).
     var votingIds: Set<String>
 
+    /// Opaque keyset cursor for the next page, from the most recent fetch.
+    /// `nil` when the last fetch reported no further pages (or used offsets).
+    var nextCursor: String?
+
+    /// Whether the most recent fetch reported another page. Offset-based
+    /// fetches never report it, so this stays `false` until a cursor page
+    /// comes back.
+    var hasMorePages: Bool
+
     /// Creates a list state with optional initial items and in-flight voting IDs.
     /// - Parameters:
     ///   - items: Initial items in the list.
@@ -18,6 +27,29 @@ struct FeatureRequestsListState: Equatable, Sendable {
     init(items: [FeatureRequestItem] = [], votingIds: Set<String> = []) {
         self.items = items
         self.votingIds = votingIds
+        self.nextCursor = nil
+        self.hasMorePages = false
+    }
+
+    /// Applies a fetched page to the list.
+    ///
+    /// A replacing page (first load, search, filter, pull-to-refresh) swaps
+    /// the items for the fresh ones while preserving in-flight optimistic
+    /// votes; an appending page (cursor pagination) adds only items not
+    /// already shown, so overlapping pages never duplicate rows.
+    ///
+    /// - Parameters:
+    ///   - result: The fetched page, including `hasMore`/`nextCursor`.
+    ///   - replacesExisting: `true` for a fresh load, `false` to append.
+    mutating func applyPage(_ result: ListFeatureRequestsResult, replacesExisting: Bool) {
+        nextCursor = result.nextCursor
+        hasMorePages = result.hasMore && result.nextCursor != nil
+        if replacesExisting {
+            mergeReloadedItems(result.requests)
+        } else {
+            let knownIDs = Set(items.map(\.id))
+            items.append(contentsOf: result.requests.filter { !knownIDs.contains($0.id) })
+        }
     }
 
     /// Attempts to apply an optimistic vote for the specified item.

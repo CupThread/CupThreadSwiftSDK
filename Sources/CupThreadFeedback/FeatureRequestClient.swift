@@ -23,7 +23,9 @@ extension FeedbackClient {
     ///
     /// Results include each request's vote count and whether the current user
     /// already voted (`hasVoted`), which is why the call requires a
-    /// `userToken`.
+    /// `userToken`. The token is sent as the `X-User-Token` header — passing
+    /// it in the URL query string is deprecated by the API to keep tokens out
+    /// of access logs and referrers.
     /// - Parameters:
     ///   - userToken: A stable UUID string identifying this user (for own pending requests and vote state).
     ///   - limit: Maximum number of results to return.
@@ -31,15 +33,20 @@ extension FeedbackClient {
     ///   - versionId: Optional version filter (see `fetchVersions()`).
     ///   - query: Optional server-side search over title and description
     ///     (rate-limited per IP and briefly cached by the backend).
-    /// - Returns: The matching requests plus the unpaginated `total`.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
-    ///   ``FeedbackClientError/invalidResponse``.
+    ///   - cursor: Opaque keyset cursor from a previous page's
+    ///     ``ListFeatureRequestsResult/nextCursor`` — the cheaper way to page
+    ///     deeply; takes the place of large `offset` values.
+    /// - Returns: The matching requests, the unpaginated `total`, and cursor
+    ///   paging fields.
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchFeatureRequests(
         userToken: String,
         limit: Int = 50,
         offset: Int = 0,
         versionId: String? = nil,
-        query: String? = nil
+        query: String? = nil,
+        cursor: String? = nil
     ) async throws -> ListFeatureRequestsResult {
         let base = configuration.baseURL.appending(path: "/api/v1/feature-requests")
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
@@ -47,7 +54,6 @@ extension FeedbackClient {
         }
         var queryItems = [
             URLQueryItem(name: "appKey", value: configuration.appKey),
-            URLQueryItem(name: "userToken", value: userToken),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "offset", value: String(offset))
         ]
@@ -57,19 +63,22 @@ extension FeedbackClient {
         if let query, !query.isEmpty {
             queryItems.append(URLQueryItem(name: "q", value: query))
         }
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
         components.queryItems = queryItems
         guard let url = components.url else {
             throw FeedbackClientError.invalidResponse
         }
 
-        let (data, response) = try await session.data(for: URLRequest(url: url))
+        var request = URLRequest(url: url)
+        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode != 200 {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: httpResponse.statusCode, message: message)
-        }
+        try validateResponse(httpResponse, data: data, accepted: [200])
         return try decoder.decode(ListFeatureRequestsResult.self, from: data)
     }
 
@@ -83,8 +92,8 @@ extension FeedbackClient {
     ///   - draft: Title, description, and optional requester name.
     ///   - userToken: A stable UUID string identifying this user.
     /// - Returns: The created request's id and whether it is pending review.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
-    ///   ``FeedbackClientError/invalidResponse``.
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   or ``FeedbackClientError/invalidResponse``.
     public func submitFeatureRequest(
         _ draft: FeatureRequestDraft,
         userToken: String
@@ -100,16 +109,14 @@ extension FeedbackClient {
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feature-requests"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         request.httpBody = try encoder.encode(payload)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode != 200 && httpResponse.statusCode != 201 {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: httpResponse.statusCode, message: message)
-        }
+        try validateResponse(httpResponse, data: data, accepted: [200, 201])
         return try decoder.decode(FeatureRequestSubmissionResult.self, from: data)
     }
 
@@ -118,11 +125,17 @@ extension FeedbackClient {
     /// Calling this on a request the user already voted on removes the vote.
     /// ``FeatureRequestsView`` applies the flip optimistically and reconciles
     /// with the returned server state.
+    ///
+    /// The vote endpoints are rate limited per client IP (20 requests/minute);
+    /// exceeding the limit throws ``FeedbackClientError/rateLimited``, which
+    /// the SDK surfaces as a friendly "try again in a minute" message rather
+    /// than retrying in a tight loop.
     /// - Parameters:
     ///   - featureRequestId: Id of the request to vote on.
     ///   - userToken: A stable UUID string identifying this user.
     /// - Returns: The new vote state and the request's authoritative vote count.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
+    /// - Throws: ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func toggleVote(
         featureRequestId: String,
@@ -135,25 +148,14 @@ extension FeedbackClient {
         )
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         request.httpBody = try encoder.encode(payload)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode != 200 {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: httpResponse.statusCode, message: message)
-        }
+        try validateResponse(httpResponse, data: data, accepted: [200])
         return try decoder.decode(VoteResult.self, from: data)
-    }
-}
-
-// MARK: - Private helpers
-
-private extension String {
-    var nilIfEmpty: String? {
-        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
 }

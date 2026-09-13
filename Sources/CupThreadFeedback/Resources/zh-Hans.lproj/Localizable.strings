@@ -86,3 +86,8 @@
 "cupthread.profile.apps" = "应用列表";
 "cupthread.profile.recent_comments" = "近期评论";
 "cupthread.profile.no_comments" = "暂无近期评论。";
+
+/* September API sync: vote rate limiting + cursor paging */
+"cupthread.features.vote_rate_limited" = "投票太频繁了，请一分钟后再试。";
+"cupthread.features.load_more" = "加载更多";
+"cupthread.features.load_more_hint" = "显示下一页功能请求。";

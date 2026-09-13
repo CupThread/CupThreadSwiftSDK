@@ -94,7 +94,7 @@ struct ChangelogClientTests {
             _ = try await Self.makeChangelogClient().fetchChangelog()
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, _) = error {
+            if case .unexpectedStatus(let code, _, _) = error {
                 #expect(code == 404)
             } else {
                 Issue.record("Unexpected error type: \(error)")
@@ -108,7 +108,7 @@ struct ChangelogClientTests {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
-            return (makeHTTPResponse(status: 201), try encodeJSON(["subscribed": true, "alreadySubscribed": false]))
+            return (makeHTTPResponse(status: 201), try encodeJSON(["subscribed": true]))
         }
 
         let token = UUID().uuidString
@@ -128,12 +128,13 @@ struct ChangelogClientTests {
         #expect(json["email"] as? String == "user@example.com")
 
         #expect(result.subscribed == true)
-        #expect(result.alreadySubscribed == false)
     }
 
-    @Test func subscribeDecodesAlreadySubscribed() async throws {
+    @Test func subscribeDecodesUniformDoubleOptInResponse() async throws {
+        // Double opt-in: the response is uniform and no longer carries
+        // `alreadySubscribed`; the OpenAPI schema names the flag `success`.
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (makeHTTPResponse(status: 201), try encodeJSON(["subscribed": false, "alreadySubscribed": true]))
+            (makeHTTPResponse(status: 201), try encodeJSON(["success": true]))
         }
 
         let result = try await Self.makeChangelogClient().subscribeToChangelog(
@@ -141,8 +142,20 @@ struct ChangelogClientTests {
             userToken: UUID().uuidString
         )
 
-        #expect(result.subscribed == false)
-        #expect(result.alreadySubscribed == true)
+        #expect(result.subscribed == true)
+    }
+
+    @Test func subscribeDecodesEmptyBodyAsSuccess() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 201), Data("{}".utf8))
+        }
+
+        let result = try await Self.makeChangelogClient().subscribeToChangelog(
+            email: "user@example.com",
+            userToken: UUID().uuidString
+        )
+
+        #expect(result.subscribed == true)
     }
 
     @Test func subscribeThrowsOnValidationError() async throws {
@@ -157,7 +170,7 @@ struct ChangelogClientTests {
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, _) = error {
+            if case .unexpectedStatus(let code, _, _) = error {
                 #expect(code == 400)
             } else {
                 Issue.record("Unexpected error type: \(error)")
@@ -167,22 +180,20 @@ struct ChangelogClientTests {
 
     // MARK: - Unsubscribe
 
-    @Test func unsubscribeSendsPostAndDecodesResult() async throws {
+    @Test func unsubscribeSendsSignedTokenInQueryString() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             return (makeHTTPResponse(), try encodeJSON(["unsubscribed": true]))
         }
 
-        let result = try await Self.makeChangelogClient().unsubscribeFromChangelog(email: " user@example.com ")
+        let result = try await Self.makeChangelogClient().unsubscribeFromChangelog(token: "signed-token-abc")
 
         let request = try #require(capture.value)
         #expect(request.url?.path == "/api/v1/public/apps/app_testkey123456/changelog/unsubscribe")
         #expect(request.httpMethod == "POST")
-
-        let rawData = try #require(bodyData(from: request))
-        let json = try #require(parseJSONDict(rawData))
-        #expect(json["email"] as? String == "user@example.com")
+        let query = try #require(request.url?.query)
+        #expect(query.contains("token=signed-token-abc"))
 
         #expect(result.unsubscribed == true)
     }
