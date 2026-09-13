@@ -7,12 +7,15 @@ import PhotosUI
 ///
 /// The draft is pre-filled with the host app's platform and version. Contact
 /// fields are optional; environment details are sent automatically and shown
-/// to the user before submitting. On success the view shows an acknowledgment
+/// to the user before submitting. Photo attachments selected via the photo picker
+/// are stripped of sensitive metadata (EXIF GPS coordinates, camera details, timestamps)
+/// before upload by default to protect user privacy. On success the view shows an acknowledgment
 /// (and calls `onSubmit` for host apps that need the result).
 public struct FeedbackComposerView: View {
     public let client: FeedbackClient
     public let userToken: String?
     public let onSubmit: (FeedbackSubmissionResult) -> Void
+    public let stripSensitiveMetadata: Bool
 
     @State private var draft: FeedbackDraft
     @State private var isSubmitting = false
@@ -43,6 +46,9 @@ public struct FeedbackComposerView: View {
     ///   - maxAttachmentBytes: Optional client-side upload size cap in bytes;
     ///     falls back to ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB)
     ///     or the fetched ``PublicAppConfig/maxAttachmentBytes``.
+    ///   - stripSensitiveMetadata: When `true` (the default), photo attachments selected
+    ///     via the photo picker are re-encoded to strip GPS coordinates, camera details,
+    ///     and sensitive EXIF metadata before upload. Set to `false` to upload original bytes.
     ///   - onSubmit: Called with the server's receipt after a successful
     ///     submission — use it to log, show a toast, or deep-link elsewhere.
     public init(
@@ -50,10 +56,12 @@ public struct FeedbackComposerView: View {
         initialDraft: FeedbackDraft? = nil,
         userToken: String? = nil,
         maxAttachmentBytes: Int? = nil,
+        stripSensitiveMetadata: Bool = true,
         onSubmit: @escaping (FeedbackSubmissionResult) -> Void = { _ in }
     ) {
         self.client = client
         self.userToken = userToken
+        self.stripSensitiveMetadata = stripSensitiveMetadata
         self.onSubmit = onSubmit
         let limit = maxAttachmentBytes ?? PhotoAttachmentHelper.defaultMaxAttachmentBytes
         _attachmentState = State(initialValue: FeedbackAttachmentStateMachine(maxAttachmentBytes: limit))
@@ -247,27 +255,12 @@ public struct FeedbackComposerView: View {
         attachmentState.clearError()
 
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
-                guard !Task.isCancelled, attachmentState.activeUploadId == uploadId else { return }
-                _ = attachmentState.uploadFailed(
-                    id: uploadId,
-                    error: NSError(domain: "CupThread", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not load photo data"])
-                )
-                return
-            }
-            try Task.checkCancellation()
-            guard attachmentState.activeUploadId == uploadId else { return }
-
-            try PhotoAttachmentHelper.validateAttachmentSize(
-                data.count,
-                limit: attachmentState.maxAttachmentBytes
-            )
-
+            let uploadData = try await loadAndPreparePhotoData(from: item)
             try Task.checkCancellation()
             guard attachmentState.activeUploadId == uploadId else { return }
 
             let metadata = PhotoAttachmentHelper.detectImageFormat(
-                from: data,
+                from: uploadData,
                 contentTypes: item.supportedContentTypes
             )
             let filename = PhotoAttachmentHelper.makeFilename(
@@ -276,7 +269,7 @@ public struct FeedbackComposerView: View {
             )
 
             let uploaded = try await client.uploadAttachment(
-                data: data,
+                data: uploadData,
                 filename: filename,
                 mimeType: metadata.mimeType,
                 userToken: userToken
@@ -292,6 +285,21 @@ public struct FeedbackComposerView: View {
             guard !Task.isCancelled, attachmentState.activeUploadId == uploadId else { return }
             _ = attachmentState.uploadFailed(id: uploadId, error: error)
         }
+    }
+
+    private func loadAndPreparePhotoData(from item: PhotosPickerItem) async throws -> Data {
+        guard let data = try await item.loadTransferable(type: Data.self) else {
+            throw NSError(domain: "CupThread", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not load photo data"])
+        }
+        try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: attachmentState.maxAttachmentBytes)
+
+        if stripSensitiveMetadata {
+            guard let sanitized = PhotoAttachmentHelper.strippingSensitiveMetadata(from: data) else {
+                throw AttachmentValidationError.unprocessableImage
+            }
+            return sanitized
+        }
+        return data
     }
     #endif
 
