@@ -1,5 +1,10 @@
 name: CI
 
+# Layered on purpose (see AGENTS.md → Testing Policy):
+# - Pull requests run the cheap gate only: lint + swift test + one iOS
+#   archive slice, so feedback stays fast.
+# - Pushes to main run the full 7-platform archive matrix and the release
+#   dry-run — the cross-platform compile safety net lives here, after merge.
 on:
   push:
     branches: [main]
@@ -28,8 +33,26 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Run Swift Tests
         run: swift test
+  build-ios:
+    name: Build (iOS)
+    if: github.event_name == 'pull_request'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Build iOS slice
+        run: |
+          xcodebuild archive \
+            -scheme CupThreadFeedback \
+            -destination "generic/platform=iOS" \
+            -archivePath "/tmp/iOS.xcarchive" \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            -quiet
   build-platforms:
     name: Build (${{ matrix.name }})
+    if: github.event_name == 'push'
     runs-on: macos-26
     strategy:
       fail-fast: false
@@ -64,6 +87,7 @@ jobs:
             -quiet
   release-dry-run:
     name: Release Dry-Run
+    if: github.event_name == 'push'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
@@ -71,4 +95,3 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Verify release build pipeline
         run: node scripts/release.mjs --version 0.0.0 --dry-run --skip-tests
-
