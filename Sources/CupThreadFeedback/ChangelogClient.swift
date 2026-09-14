@@ -37,16 +37,33 @@ struct ListChangelogResponse: Codable, Sendable {
 // MARK: - Subscription / user-attribute results
 
 /// Result of `POST /api/v1/public/apps/{appKey}/changelog/subscribe`.
-public struct ChangelogSubscriptionResult: Codable, Equatable, Sendable {
-    /// The address is now subscribed.
+///
+/// Subscriptions are double opt-in: the address starts as pending and must
+/// confirm via the single-use link in the confirmation email before it
+/// receives changelog emails.
+public struct ChangelogSubscriptionResult: Decodable, Equatable, Sendable {
+    /// The subscription was recorded (pending confirmation).
     public let subscribed: Bool
-    /// The address was already on the list, so nothing changed.
-    public let alreadySubscribed: Bool
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // The API documented `{ "subscribed": true }`; the OpenAPI schema
+        // names the field `success`. Accept both, defaulting to true so a
+        // uniform 201 is treated as success.
+        subscribed = try container.decodeIfPresent(Bool.self, forKey: .subscribed)
+            ?? container.decodeIfPresent(Bool.self, forKey: .success)
+            ?? true
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case subscribed, success
+    }
 }
 
 /// Result of `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe`.
 public struct ChangelogUnsubscribeResult: Codable, Equatable, Sendable {
-    /// The address was removed from the list.
+    /// The address was removed from the list (uniform whether or not the
+    /// subscription existed).
     public let unsubscribed: Bool
 }
 
@@ -94,14 +111,11 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode != 200 {
-            if httpResponse.statusCode == 401 {
-                // Anonymous changelog disabled for this app.
-                throw FeedbackClientError.authenticationRequired
-            }
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: httpResponse.statusCode, message: message)
+        if httpResponse.statusCode == 401 {
+            // Anonymous changelog disabled for this app.
+            throw FeedbackClientError.authenticationRequired
         }
+        try validateResponse(httpResponse, data: data, accepted: [200])
         let result = try decoder.decode(ListChangelogResponse.self, from: data)
         return result.entries.sorted { lhs, rhs in
             (lhs.publishedAtDate ?? .distantPast) > (rhs.publishedAtDate ?? .distantPast)
@@ -109,12 +123,18 @@ extension FeedbackClient {
     }
 
     /// Subscribes an email address to changelog notifications.
+    ///
+    /// Subscriptions are double opt-in: the address starts as pending and
+    /// receives a confirmation email with a single-use link; only confirmed
+    /// subscriptions receive changelog emails. The response is uniform — the
+    /// API no longer reports whether the address was already subscribed.
     /// - Parameters:
     ///   - email: The address to notify. Trimmed before sending.
     ///   - userToken: Anonymous user token sent as `X-User-Token`, linking the
     ///     subscription to the end-user identity.
-    /// - Returns: Whether the subscription was created or already existed.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
+    /// - Returns: Whether the subscription was recorded (pending confirmation).
+    /// - Throws: ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func subscribeToChangelog(
         email: String,
@@ -129,25 +149,49 @@ extension FeedbackClient {
         )
     }
 
-    /// Removes an email address from changelog notifications.
-    /// - Parameter email: The address to unsubscribe. Trimmed before sending.
+    /// Unsubscribes using the per-subscriber signed token carried by the
+    /// unsubscribe link in every changelog or confirmation email.
+    ///
+    /// The API removed the unauthenticated bare-email unsubscribe; tokens are
+    /// single-subscriber secrets delivered by email, so the SDK's own
+    /// surfaces no longer offer in-app unsubscription.
+    /// - Parameter token: The signed token from the unsubscribe link.
     /// - Returns: Whether the address was removed.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   (status 400 when the token is missing) or
     ///   ``FeedbackClientError/invalidResponse``.
-    public func unsubscribeFromChangelog(email: String) async throws -> ChangelogUnsubscribeResult {
-        try await send(
-            "POST",
-            path: "/api/v1/public/apps/\(configuration.appKey)/changelog/unsubscribe",
-            body: ChangelogEmailPayload(email: email.trimmingCharacters(in: .whitespacesAndNewlines)),
-            userToken: nil,
-            acceptedStatuses: [200]
+    public func unsubscribeFromChangelog(token: String) async throws -> ChangelogUnsubscribeResult {
+        let base = configuration.baseURL.appending(
+            path: "/api/v1/public/apps/\(configuration.appKey)/changelog/unsubscribe"
         )
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
+            throw FeedbackClientError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "token", value: token)]
+        guard let url = components.url else {
+            throw FeedbackClientError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw FeedbackClientError.invalidResponse
+        }
+        try validateResponse(httpResponse, data: data, accepted: [200])
+        return try decoder.decode(ChangelogUnsubscribeResult.self, from: data)
     }
 
     /// Reports host-app revenue signals for the current end user.
     ///
     /// Host apps self-declare these attributes; the SDK never collects payment
     /// details. Omitted parameters are left unchanged server-side.
+    ///
+    /// The endpoint is rate limited per client IP (60 requests/minute), so a
+    /// single HTTP 429 is retried once after a short backoff — bursts of
+    /// first-syncs behind one shared IP recover without caller changes.
     /// - Parameters:
     ///   - isPaying: Whether the user is on a paid plan.
     ///   - plan: Host-app plan name (e.g. `"pro"`).
@@ -155,8 +199,9 @@ extension FeedbackClient {
     ///   - currency: Three-letter ISO 4217 code for `mrr` (the backend defaults to `"USD"`).
     ///   - userToken: Anonymous user token sent as `X-User-Token`.
     /// - Returns: Whether the update was applied and when.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` or
-    ///   ``FeedbackClientError/invalidResponse``.
+    /// - Throws: ``FeedbackClientError/rateLimited`` when the retry is also
+    ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   or ``FeedbackClientError/invalidResponse``.
     public func updateUserAttributes(
         isPaying: Bool? = nil,
         plan: String? = nil,
@@ -164,13 +209,24 @@ extension FeedbackClient {
         currency: String? = nil,
         userToken: String
     ) async throws -> UserAttributesUpdateResult {
-        try await send(
-            "PUT",
-            path: "/api/v1/public/apps/\(configuration.appKey)/user",
-            body: UserAttributesPayload(isPaying: isPaying, plan: plan, mrr: mrr, currency: currency),
-            userToken: userToken,
-            acceptedStatuses: [200]
-        )
+        do {
+            return try await send(
+                "PUT",
+                path: "/api/v1/public/apps/\(configuration.appKey)/user",
+                body: UserAttributesPayload(isPaying: isPaying, plan: plan, mrr: mrr, currency: currency),
+                userToken: userToken,
+                acceptedStatuses: [200]
+            )
+        } catch FeedbackClientError.rateLimited {
+            try await Task.sleep(for: .seconds(1))
+            return try await send(
+                "PUT",
+                path: "/api/v1/public/apps/\(configuration.appKey)/user",
+                body: UserAttributesPayload(isPaying: isPaying, plan: plan, mrr: mrr, currency: currency),
+                userToken: userToken,
+                acceptedStatuses: [200]
+            )
+        }
     }
 
     /// Shared JSON request/response plumbing for the changelog endpoints.
@@ -184,19 +240,14 @@ extension FeedbackClient {
         var request = URLRequest(url: configuration.baseURL.appending(path: path))
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let userToken {
-            request.setValue(userToken, forHTTPHeaderField: "X-User-Token")
-        }
+        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         request.httpBody = try encoder.encode(body)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if !acceptedStatuses.contains(httpResponse.statusCode) {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw FeedbackClientError.unexpectedStatus(code: httpResponse.statusCode, message: message)
-        }
+        try validateResponse(httpResponse, data: data, accepted: acceptedStatuses)
         return try decoder.decode(Response.self, from: data)
     }
 }

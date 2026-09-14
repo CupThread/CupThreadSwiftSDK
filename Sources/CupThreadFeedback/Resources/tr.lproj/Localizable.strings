@@ -86,3 +86,8 @@
 "cupthread.profile.apps" = "Uygulamalar";
 "cupthread.profile.recent_comments" = "Son Yorumlar";
 "cupthread.profile.no_comments" = "Yakın zamanda yapılmış yorum yok.";
+
+/* September API sync: vote rate limiting + cursor paging */
+"cupthread.features.vote_rate_limited" = "Oylarınız çok hızlı geldi. Lütfen bir dakika sonra tekrar deneyin.";
+"cupthread.features.load_more" = "Daha fazla yükle";
+"cupthread.features.load_more_hint" = "Sonraki sayfadaki özellik taleplerini gösterir.";

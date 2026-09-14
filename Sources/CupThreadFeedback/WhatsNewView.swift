@@ -247,8 +247,9 @@ private struct ChangelogSubscribeView: View {
 
     private enum Phase: Equatable {
         case form
-        case subscribed(already: Bool)
-        case unsubscribed
+        /// Subscription recorded; awaiting the user's confirmation via the
+        /// emailed single-use link (double opt-in).
+        case subscribed
     }
 
     @Environment(\.dismiss) private var dismiss
@@ -263,19 +264,12 @@ private struct ChangelogSubscribeView: View {
                 switch phase {
                 case .form:
                     form
-                case .subscribed(let already):
+                case .subscribed:
                     resultView(
-                        icon: "checkmark.circle.fill",
+                        icon: "envelope.badge.checkmark.fill",
                         tint: .green,
-                        title: already ? "You're Already Subscribed" : "You're Subscribed",
-                        message: "Update emails will go to \(trimmedEmail)."
-                    )
-                case .unsubscribed:
-                    resultView(
-                        icon: "envelope",
-                        tint: .secondary,
-                        title: "Unsubscribed",
-                        message: "You'll no longer receive update emails at \(trimmedEmail)."
+                        title: "Check Your Inbox",
+                        message: "We sent a confirmation link to \(trimmedEmail). Confirm it to start receiving update emails."
                     )
                 }
             }
@@ -315,7 +309,8 @@ private struct ChangelogSubscribeView: View {
             } header: {
                 Text("Email")
             } footer: {
-                Text("We'll only email you when this app publishes new updates.")
+                Text("We'll email you a confirmation link; only confirmed addresses receive updates. "
+                    + "You can unsubscribe anytime using the link in any update email.")
             }
 
             if let errorMessage {
@@ -344,13 +339,6 @@ private struct ChangelogSubscribeView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-            }
 
             Spacer(minLength: 24)
         }
@@ -382,8 +370,6 @@ private struct ChangelogSubscribeView: View {
         case .form:
             return isWorking ? "Subscribing…" : "Subscribe"
         case .subscribed:
-            return isWorking ? "Unsubscribing…" : "Unsubscribe"
-        case .unsubscribed:
             return "Done"
         }
     }
@@ -394,8 +380,6 @@ private struct ChangelogSubscribeView: View {
         case .form:
             await subscribe()
         case .subscribed:
-            await unsubscribe()
-        case .unsubscribed:
             dismiss()
         }
     }
@@ -406,24 +390,9 @@ private struct ChangelogSubscribeView: View {
         errorMessage = nil
         defer { isWorking = false }
         do {
-            let result = try await client.subscribeToChangelog(email: trimmedEmail, userToken: userToken)
+            _ = try await client.subscribeToChangelog(email: trimmedEmail, userToken: userToken)
             withAnimation(.snappy(duration: 0.3)) {
-                phase = .subscribed(already: result.alreadySubscribed)
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    @MainActor
-    private func unsubscribe() async {
-        isWorking = true
-        errorMessage = nil
-        defer { isWorking = false }
-        do {
-            _ = try await client.unsubscribeFromChangelog(email: trimmedEmail)
-            withAnimation(.snappy(duration: 0.3)) {
-                phase = .unsubscribed
+                phase = .subscribed
             }
         } catch {
             errorMessage = error.localizedDescription

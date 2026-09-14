@@ -293,19 +293,33 @@ struct FeedbackClientErrorTests {
     }
 
     @Test func unexpectedStatusDescriptionContainsCode() throws {
-        let error = FeedbackClientError.unexpectedStatus(code: 503, message: "Service Unavailable")
+        let error = FeedbackClientError.unexpectedStatus(code: 503, message: "Service Unavailable", requestId: nil)
         let desc = try #require(error.errorDescription)
         #expect(desc.contains("503"))
     }
 
     @Test func unexpectedStatusDescriptionContainsMessage() throws {
-        let error = FeedbackClientError.unexpectedStatus(code: 503, message: "Service Unavailable")
+        let error = FeedbackClientError.unexpectedStatus(code: 503, message: "Service Unavailable", requestId: nil)
         let desc = try #require(error.errorDescription)
         #expect(desc.contains("Service Unavailable"))
     }
 
+    @Test func unexpectedStatusDescriptionContainsRequestIDWhenPresent() throws {
+        let error = FeedbackClientError.unexpectedStatus(
+            code: 503, message: "Service Unavailable", requestId: "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+        )
+        let desc = try #require(error.errorDescription)
+        #expect(desc.contains("request id: 0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"))
+    }
+
+    @Test func unexpectedStatusDescriptionOmitsRequestIDWhenAbsent() throws {
+        let error = FeedbackClientError.unexpectedStatus(code: 503, message: "Service Unavailable", requestId: nil)
+        let desc = try #require(error.errorDescription)
+        #expect(!desc.contains("request id"))
+    }
+
     @Test func unexpectedStatusWith400ContainsCode() throws {
-        let error = FeedbackClientError.unexpectedStatus(code: 400, message: "Validation failed")
+        let error = FeedbackClientError.unexpectedStatus(code: 400, message: "Validation failed", requestId: nil)
         let desc = try #require(error.errorDescription)
         #expect(desc.contains("400"))
     }
@@ -330,6 +344,37 @@ struct FeedbackClientErrorTests {
         let error3 = FeedbackClientError.scanRejected(message: "xyz")
         #expect(error1 == error2)
         #expect(error1 != error3)
+    }
+
+    @Test func rateLimitedHasFriendlyDescription() {
+        let error = FeedbackClientError.rateLimited(message: "Too many votes. Please try again shortly.")
+        let desc = error.errorDescription
+        #expect(desc == "You're doing that too often. Please try again in a minute.")
+    }
+
+    @Test func unsupportedMediaTypeHasFriendlyDescription() {
+        let error = FeedbackClientError.unsupportedMediaType(message: "image/svg+xml is not accepted")
+        let desc = error.errorDescription
+        #expect(desc?.contains("PNG, JPEG, WebP, or GIF") == true)
+    }
+
+    @Test func payloadTooLargeHasFriendlyDescription() {
+        let error = FeedbackClientError.payloadTooLarge(message: nil)
+        let desc = error.errorDescription
+        #expect(desc?.contains("too large") == true)
+    }
+
+    @Test func uploaderMismatchHasReattachGuidance() {
+        let error = FeedbackClientError.uploaderMismatch(message: "Upload session was created by a different uploader")
+        let desc = error.errorDescription
+        #expect(desc?.contains("different identity") == true)
+        #expect(desc?.contains("re-attach") == true)
+    }
+
+    @Test func uploaderIdentityRequiredNamesUserToken() {
+        let error = FeedbackClientError.uploaderIdentityRequired(message: nil)
+        let desc = error.errorDescription
+        #expect(desc?.contains("userToken") == true)
     }
 }
 
@@ -520,7 +565,7 @@ struct FeedbackClientSubmitTests {
             _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, _) = error {
+            if case .unexpectedStatus(let code, _, _) = error {
                 #expect(code == 204)
             } else {
                 Issue.record("Unexpected error type: \(error)")
@@ -538,7 +583,7 @@ struct FeedbackClientSubmitTests {
             _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, _) = error {
+            if case .unexpectedStatus(let code, _, _) = error {
                 #expect(code == 400)
             } else {
                 Issue.record("Unexpected error type: \(error)")
@@ -595,9 +640,9 @@ struct FeedbackClientSubmitTests {
             _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, let message) = error {
+            if case .unexpectedStatus(let code, let message, _) = error {
                 #expect(code == 422)
-                #expect(message.contains("unprocessable_data"))
+                #expect(message.contains("Invalid format"))
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
@@ -614,13 +659,112 @@ struct FeedbackClientSubmitTests {
             _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, let message) = error {
+            if case .unexpectedStatus(let code, let message, _) = error {
                 #expect(code == 422)
                 #expect(message == "Unprocessable Entity")
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
         }
+    }
+
+    @Test func sendsXRequestIDHeaderAndReturnsItOnErrors() async throws {
+        let capture = CaptureBox<String?>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request.value(forHTTPHeaderField: "X-Request-Id")
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 500,
+                httpVersion: nil,
+                headerFields: ["X-Request-Id": "server-generated-id-42", "Content-Type": "application/json"]
+            )!
+            return (response, try encodeJSON(["error": "Boom"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .unexpectedStatus(_, _, let requestId) = error {
+                #expect(requestId == "server-generated-id-42")
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+        #expect(capture.value != nil)
+        #expect(capture.value??.count == 36) // generated UUID
+    }
+
+    @Test func configurationRequestIDOverridesGeneratedUUID() async throws {
+        let capture = CaptureBox<String?>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request.value(forHTTPHeaderField: "X-Request-Id")
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let config = FeedbackClientConfiguration(
+            baseURL: baseURL,
+            appKey: appKey,
+            requestID: "stable-run-identifier-1"
+        )
+        let client = FeedbackClient(configuration: config, session: makeMockSession())
+        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+
+        #expect(capture.value == "stable-run-identifier-1")
+    }
+
+    @Test func attachmentsSentAsUploadIDs() async throws {
+        let capture = CaptureBox<Data>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = bodyData(from: request)
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        draft.attachments = [
+            FeedbackAttachment(kind: .image, uploadId: "upl-1", key: "upl-1", url: URL(string: "https://example.com/1")!),
+            FeedbackAttachment(kind: .r2, uploadId: "upl-2", key: "upl-2", url: URL(string: "https://example.com/2")!),
+            // Legacy references without an uploadId are not submitted.
+            FeedbackAttachment(kind: .image, key: "legacy-key", url: URL(string: "https://example.com/3")!)
+        ]
+        _ = try await client.submit(draft, userToken: "tok")
+
+        let rawData = try #require(capture.value)
+        let json = try #require(parseJSONDict(rawData))
+        let uploadIds = try #require(json["uploadIds"] as? [String])
+        #expect(uploadIds == ["upl-1", "upl-2"])
+        #expect(json["attachments"] == nil)
+    }
+
+    @Test func omitsUploadIDsWhenNoAttachments() async throws {
+        let capture = CaptureBox<Data>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = bodyData(from: request)
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+
+        let rawData = try #require(capture.value)
+        let json = try #require(parseJSONDict(rawData))
+        #expect(json["uploadIds"] == nil)
+    }
+
+    @Test func decodesDocumentedIDOnlyResponseShape() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            return (makeHTTPResponse(), try encodeJSON([
+                "id": "abc-123", "title": "T", "status": "queued", "createdAt": "2026-09-13T00:00:00Z"
+            ]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let result = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        #expect(result.submissionId == "abc-123")
+        #expect(result.forwardedToGithub == false)
+        #expect(result.warning == nil)
     }
 
     @Test func sendsPlatformInBody() async throws {
@@ -642,168 +786,170 @@ struct FeedbackClientSubmitTests {
 
 } // end FeedbackClientSubmitTests
 
-// MARK: Upload
+// MARK: Upload (upload-session flow)
 
 struct FeedbackClientUploadTests {
     let baseURL = URL(string: "https://test.example.com")!
     let appKey = "app_testuploadkey1"
+    let sessionJSON: [String: Any] = [
+        "session": [
+            "sessionId": "sess-1",
+            "sessionToken": "stok-abc",
+            "expiresAt": "2026-09-13T12:00:00Z",
+            "maxFileSizeBytes": 20_000_000,
+            "maxFiles": 8
+        ],
+        "files": [[
+            "clientFileId": "file-1",
+            "uploadId": "upl-1",
+            "uploadUrl": "https://test.example.com/api/v1/uploads/upl-1",
+            "maxSizeBytes": 20_000_000
+        ]]
+    ]
+    let uploadedJSON: [String: Any] = [
+        "uploadId": "upl-1",
+        "clientFileId": "file-1",
+        "filename": "f.txt",
+        "contentType": "text/plain",
+        "sizeBytes": 4,
+        "sha256": "abc",
+        "stored": true,
+        "downloadUrl": "https://example.com/f.txt"
+    ]
 
-    private func makeR2Response() throws -> (HTTPURLResponse, Data) {
-        let body: [String: Any] = [
-            "kind": "r2", "key": "wk/file.txt",
-            "url": "https://example.com/file.txt",
-            "filename": "file.txt", "mimeType": "text/plain", "size": 4
-        ]
-        return (makeHTTPResponse(), try encodeJSON(body))
-    }
-
-    private func makeImageResponse() throws -> (HTTPURLResponse, Data) {
-        let body: [String: Any] = [
-            "kind": "image", "key": "img-key",
-            "url": "https://example.com/img.png",
-            "filename": "photo.png", "mimeType": "image/png", "size": 42
-        ]
-        return (makeHTTPResponse(), try encodeJSON(body))
-    }
-
-    @Test func imagesEndpointUsedForImageMimeType() async throws {
-        let capture = CaptureBox<URL>()
-        MockURLProtocol.requestHandler = { request in
-            capture.value = request.url
-            return try self.makeImageResponse()
-        }
-
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.uploadAttachment(data: Data([0xFF, 0xD8]), filename: "photo.png", mimeType: "image/png")
-
-        let url = try #require(capture.value)
-        #expect(url.path == "/api/v1/uploads/images")
-    }
-
-    @Test func r2EndpointUsedForNonImageMimeType() async throws {
-        let capture = CaptureBox<URL>()
-        MockURLProtocol.requestHandler = { request in
-            capture.value = request.url
-            return try self.makeR2Response()
-        }
-
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.uploadAttachment(data: Data("hello".utf8), filename: "doc.pdf", mimeType: "application/pdf")
-
-        let url = try #require(capture.value)
-        #expect(url.path == "/api/v1/uploads/r2")
-    }
-
-    @Test func r2EndpointUsedForPlainTextMimeType() async throws {
-        let capture = CaptureBox<URL>()
-        MockURLProtocol.requestHandler = { request in
-            capture.value = request.url
-            return try self.makeR2Response()
-        }
-
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.uploadAttachment(data: Data("text".utf8), filename: "log.txt", mimeType: "text/plain")
-
-        let url = try #require(capture.value)
-        #expect(url.path == "/api/v1/uploads/r2")
-    }
-
-    @Test func preferredKindOverridesAutoDetection() async throws {
-        let capture = CaptureBox<URL>()
-        MockURLProtocol.requestHandler = { request in
-            capture.value = request.url
-            return try self.makeR2Response()
-        }
-
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
-        // Force r2 even though mimeType is image/png
-        _ = try await client.uploadAttachment(data: Data([0xFF, 0xD8]), filename: "img.png", mimeType: "image/png", preferredKind: .r2)
-
-        let url = try #require(capture.value)
-        #expect(url.path == "/api/v1/uploads/r2")
-    }
-
-    @Test func requestContentTypeIsMultipartFormData() async throws {
-        let capture = CaptureBox<String>()
-        MockURLProtocol.requestHandler = { request in
-            capture.value = request.value(forHTTPHeaderField: "Content-Type")
-            return try self.makeR2Response()
-        }
-
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.uploadAttachment(data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain")
-
-        let ct = try #require(capture.value)
-        #expect(ct.hasPrefix("multipart/form-data"))
-    }
-
-    @Test func multipartBodyContainsAppKey() async throws {
-        let theAppKey = "app_verifiableuploadkey"
-        let capture = CaptureBox<String>()
-        MockURLProtocol.requestHandler = { request in
-            if let data = bodyData(from: request) {
-                capture.value = String(data: data, encoding: .utf8)
+    /// Handles the full session flow: POST /uploads/sessions then PUT /uploads/{id}.
+    /// Appends every request to `requests` in call order.
+    private func makeSessionFlowHandler(
+        requests: CaptureBox<[URLRequest]>,
+        putBody: CaptureBox<Data>? = nil,
+        sessionStatus: Int = 201,
+        putStatus: Int = 200
+    ) -> (URLRequest) throws -> (HTTPURLResponse, Data) {
+        { request in
+            requests.value = (requests.value ?? []) + [request]
+            if request.httpMethod == "POST" {
+                return (makeHTTPResponse(status: sessionStatus), try encodeJSON(self.sessionJSON))
             }
-            return try self.makeR2Response()
+            putBody?.value = bodyData(from: request)
+            return (makeHTTPResponse(status: putStatus), try encodeJSON(self.uploadedJSON))
         }
-
-        let client = makeClient(baseURL: baseURL, appKey: theAppKey)
-        _ = try await client.uploadAttachment(data: Data("hi".utf8), filename: "f.txt", mimeType: "text/plain")
-
-        let body = try #require(capture.value)
-        #expect(body.contains(theAppKey))
     }
 
-    @Test func successfulResponseReturnsR2Attachment() async throws {
-        MockURLProtocol.requestHandler = { _ in
-            let body: [String: Any] = [
-                "kind": "r2", "key": "workspace/file.txt",
-                "url": "https://example.com/workspace/file.txt",
-                "filename": "file.txt", "mimeType": "text/plain", "size": 128
-            ]
-            return (makeHTTPResponse(), try encodeJSON(body))
-        }
+    @Test func convenienceUploadCreatesSessionThenStreamsBytes() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        let putBody = CaptureBox<Data>()
+        MockURLProtocol.requestHandler = makeSessionFlowHandler(requests: requests, putBody: putBody)
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let attachment = try await client.uploadAttachment(data: Data("content".utf8), filename: "file.txt", mimeType: "text/plain")
+        let attachment = try await client.uploadAttachment(
+            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok-1"
+        )
 
-        #expect(attachment.kind == .r2)
-        #expect(attachment.key == "workspace/file.txt")
-        #expect(attachment.filename == "file.txt")
-        #expect(attachment.size == 128)
+        let captured = try #require(requests.value)
+        #expect(captured.count == 2)
+
+        let sessionRequest = captured[0]
+        #expect(sessionRequest.url?.path == "/api/v1/uploads/sessions")
+        #expect(sessionRequest.httpMethod == "POST")
+        #expect(sessionRequest.value(forHTTPHeaderField: "X-User-Token") == "tok-1")
+        let sessionBodyData = try #require(bodyData(from: sessionRequest))
+        let sessionBody = try #require(parseJSONDict(sessionBodyData))
+        #expect(sessionBody["appKey"] as? String == appKey)
+        let files = try #require(sessionBody["files"] as? [[String: Any]])
+        #expect(files.first?["contentType"] as? String == "text/plain")
+        #expect(files.first?["sizeBytes"] as? Int == 4)
+
+        let putRequest = captured[1]
+        #expect(putRequest.url?.path == "/api/v1/uploads/upl-1")
+        #expect(putRequest.httpMethod == "PUT")
+        #expect(putRequest.value(forHTTPHeaderField: "Authorization") == "Bearer stok-abc")
+        #expect(putRequest.value(forHTTPHeaderField: "Content-Type") == "text/plain")
+        #expect(putBody.value == Data("test".utf8))
+
+        #expect(attachment.uploadId == "upl-1")
+        #expect(attachment.key == "upl-1")
+        #expect(attachment.size == 4)
+        #expect(attachment.url == URL(string: "https://example.com/f.txt"))
     }
 
-    @Test func successfulResponseReturnsImageAttachment() async throws {
-        MockURLProtocol.requestHandler = { _ in
-            let body: [String: Any] = [
-                "kind": "image", "key": "img-uuid-1",
-                "url": "https://imagedelivery.net/img-uuid-1/public",
-                "filename": "screenshot.png", "mimeType": "image/png", "size": 512
-            ]
-            return (makeHTTPResponse(), try encodeJSON(body))
-        }
+    @Test func sessionCreateWithoutTokenFallsBackToSharedStore() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.requestHandler = makeSessionFlowHandler(requests: requests)
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let attachment = try await client.uploadAttachment(data: Data([0xFF, 0xD8]), filename: "screenshot.png", mimeType: "image/png")
+        _ = try await client.uploadAttachment(
+            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: nil
+        )
 
-        #expect(attachment.kind == .image)
-        #expect(attachment.key == "img-uuid-1")
+        let sessionRequest = try #require(requests.value?.first)
+        let token = try #require(sessionRequest.value(forHTTPHeaderField: "X-User-Token"))
+        #expect(!token.isEmpty)
+        #expect(UUID(uuidString: token) != nil)
     }
 
-    @Test func errorResponseThrowsUnexpectedStatus() async throws {
+    @Test func sessionCreateRejects415WithTypedError() async throws {
         MockURLProtocol.requestHandler = { _ in
-            return (makeHTTPResponse(status: 413), try encodeJSON(["error": "File too large"]))
+            return (
+                makeHTTPResponse(status: 415),
+                try encodeJSON(["error": "File content type does not match verified magic bytes"])
+            )
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
-            _ = try await client.uploadAttachment(data: Data("large".utf8), filename: "f.txt", mimeType: "text/plain")
+            _ = try await client.uploadAttachment(
+                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+            )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, _) = error {
-                #expect(code == 413)
-            } else {
+            guard case .unsupportedMediaType(let message) = error else {
                 Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(message?.contains("magic bytes") == true)
+        }
+    }
+
+    @Test func sessionCreateRejects429WithTypedError() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            return (makeHTTPResponse(status: 429), try encodeJSON(["error": "Daily upload byte limit exceeded"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.uploadAttachment(
+                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch FeedbackClientError.rateLimited {
+            // expected
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test func sessionCreateSurfacesUploaderIdentityError() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            return (
+                makeHTTPResponse(status: 400),
+                try encodeJSON([
+                    "error": "A valid X-User-Token UUID is required to create an upload session when not signed in",
+                    "code": "uploader_identity_required"
+                ])
+            )
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.createUploadSession(
+                files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
+                userToken: "not-a-uuid"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .uploaderIdentityRequired = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
             }
         }
     }
@@ -838,93 +984,98 @@ struct FeedbackClientUploadTests {
         }
     }
 
-    @Test func uploadSetsUserTokenHeaderWhenProvided() async throws {
-        let capture = CaptureBox<String?>()
+    @Test func putSurfacesUploaderMismatchError() async throws {
         MockURLProtocol.requestHandler = { request in
-            capture.value = request.value(forHTTPHeaderField: "X-User-Token")
-            return try self.makeR2Response()
+            if request.httpMethod == "POST" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(self.sessionJSON))
+            }
+            return (
+                makeHTTPResponse(status: 400),
+                try encodeJSON(["error": "Upload session was created by a different uploader", "code": "uploader_mismatch"])
+            )
         }
 
-        let token = "user_token_abc123"
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.uploadAttachment(
-            data: Data("test".utf8),
-            filename: "f.txt",
-            mimeType: "text/plain",
-            userToken: token
-        )
-
-        #expect(capture.value == token)
+        do {
+            _ = try await client.uploadAttachment(
+                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .uploaderMismatch = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+        }
     }
 
-    @Test func uploadOmitsUserTokenHeaderWhenNilOrEmpty() async throws {
-        let capture = CaptureBox<String>()
+    @Test func oversizedSlotLimitThrowsBeforeUpload() async throws {
+        var session = self.sessionJSON
+        session["files"] = [[
+            "clientFileId": "file-1",
+            "uploadId": "upl-1",
+            "uploadUrl": "https://test.example.com/api/v1/uploads/upl-1",
+            "maxSizeBytes": 2
+        ]]
+
+        let putReached = CaptureBox<Bool>()
         MockURLProtocol.requestHandler = { request in
-            capture.value = request.value(forHTTPHeaderField: "X-User-Token") ?? ""
-            return try self.makeR2Response()
+            if request.httpMethod == "POST" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(session))
+            }
+            putReached.value = true
+            return (makeHTTPResponse(), try encodeJSON(self.uploadedJSON))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.uploadAttachment(
+                data: Data("toolarge".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch FeedbackClientError.payloadTooLarge {
+            #expect(putReached.value != true)
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test func createUploadSessionDecodesDocumentedResponseShape() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            return (makeHTTPResponse(status: 201), try encodeJSON(self.sessionJSON))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let session = try await client.createUploadSession(
+            files: [FeedbackUploadFileSpec(clientFileId: "file-1", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
+            userToken: "tok"
+        )
+        #expect(session.session.sessionId == "sess-1")
+        #expect(session.session.sessionToken == "stok-abc")
+        #expect(session.session.maxFileSizeBytes == 20_000_000)
+        #expect(session.files.first?.uploadId == "upl-1")
+        #expect(session.files.first?.maxSizeBytes == 20_000_000)
+    }
+
+    @Test func uploadSendsXRequestIDOnEveryRequest() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.requestHandler = { request in
+            requests.value = (requests.value ?? []) + [request]
+            if request.httpMethod == "POST" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(self.sessionJSON))
+            }
+            return (makeHTTPResponse(), try encodeJSON(self.uploadedJSON))
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         _ = try await client.uploadAttachment(
-            data: Data("test".utf8),
-            filename: "f.txt",
-            mimeType: "text/plain",
-            userToken: nil
-        )
-        #expect((capture.value ?? "").isEmpty)
-
-        _ = try await client.uploadAttachment(
-            data: Data("test".utf8),
-            filename: "f.txt",
-            mimeType: "text/plain",
-            userToken: "   \n\t "
-        )
-        #expect((capture.value ?? "").isEmpty)
-    }
-
-    @Test func successfulResponseWith201StatusReturnsAttachment() async throws {
-        MockURLProtocol.requestHandler = { _ in
-            let body: [String: Any] = [
-                "kind": "image", "key": "img-201-created",
-                "url": "https://imagedelivery.net/img-201-created/public",
-                "filename": "screenshot.png", "mimeType": "image/png", "size": 1024
-            ]
-            return (makeHTTPResponse(status: 201), try encodeJSON(body))
-        }
-
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let attachment = try await client.uploadAttachment(
-            data: Data([0xFF, 0xD8]),
-            filename: "screenshot.png",
-            mimeType: "image/png",
-            userToken: "user-tok"
+            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
         )
 
-        #expect(attachment.kind == .image)
-        #expect(attachment.key == "img-201-created")
-        #expect(attachment.size == 1024)
-    }
-
-    @Test func successfulResponseWith202StatusReturnsAttachment() async throws {
-        MockURLProtocol.requestHandler = { _ in
-            let body: [String: Any] = [
-                "kind": "r2", "key": "async-key",
-                "url": "https://example.com/async-key",
-                "filename": "dump.log", "mimeType": "text/plain", "size": 2048
-            ]
-            return (makeHTTPResponse(status: 202), try encodeJSON(body))
-        }
-
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let attachment = try await client.uploadAttachment(
-            data: Data("log data".utf8),
-            filename: "dump.log",
-            mimeType: "text/plain"
-        )
-
-        #expect(attachment.kind == .r2)
-        #expect(attachment.key == "async-key")
-        #expect(attachment.size == 2048)
+        let captured = try #require(requests.value)
+        let ids = captured.compactMap { $0.value(forHTTPHeaderField: "X-Request-Id") }
+        #expect(ids.count == 2)
+        #expect(Set(ids).count == 2) // per-request UUIDs
     }
 } // end FeedbackClientUploadTests
 

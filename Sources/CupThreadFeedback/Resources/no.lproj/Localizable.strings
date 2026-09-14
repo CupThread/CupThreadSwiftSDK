@@ -86,3 +86,8 @@
 "cupthread.profile.apps" = "Apper";
 "cupthread.profile.recent_comments" = "Nylige kommentarer";
 "cupthread.profile.no_comments" = "Ingen nylige kommentarer.";
+
+/* September API sync: vote rate limiting + cursor paging */
+"cupthread.features.vote_rate_limited" = "Du stemmer for raskt. Prøv igjen om ett minutt.";
+"cupthread.features.load_more" = "Last inn mer";
+"cupthread.features.load_more_hint" = "Viser neste side med funksjonsforespørsler.";

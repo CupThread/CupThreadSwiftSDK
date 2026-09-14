@@ -61,6 +61,12 @@ final class DemoMockURLProtocol: URLProtocol, @unchecked Sendable {
         if path.contains("/api/v1/public/apps/") {
             return handleAppsPublic(path: path)
         }
+        if path.contains("/api/v1/uploads/sessions") {
+            return (201, DemoMockData.uploadSessionJSON)
+        }
+        if path.contains("/api/v1/uploads/") {
+            return (200, DemoMockData.uploadedFileJSON)
+        }
         if path.contains("/api/v1/feedback") {
             return (200, DemoMockData.submitFeedbackJSON)
         }
@@ -328,8 +334,9 @@ enum DemoMockData {
 
     static var voteJSON: Data {
         encodeJSON([
-            "voted": true,
-            "voteCount": 143
+            "featureRequestId": "req_1",
+            "voteCount": 143,
+            "hasVoted": true
         ])
     }
 
@@ -368,7 +375,41 @@ enum DemoMockData {
 
     static var submitFeedbackJSON: Data {
         encodeJSON([
-            "submissionId": "sub_demo_123456"
+            "id": "sub_demo_123456",
+            "title": "Demo feedback",
+            "status": "queued",
+            "createdAt": "2026-09-13T12:00:00Z"
+        ])
+    }
+
+    static var uploadSessionJSON: Data {
+        encodeJSON([
+            "session": [
+                "sessionId": "sess_demo_1",
+                "sessionToken": "demo-session-token",
+                "expiresAt": "2026-09-13T18:00:00Z",
+                "maxFileSizeBytes": 20_000_000,
+                "maxFiles": 8
+            ],
+            "files": [[
+                "clientFileId": "file-1",
+                "uploadId": "upl_demo_1",
+                "uploadUrl": "https://api.cupthread.com/api/v1/uploads/upl_demo_1",
+                "maxSizeBytes": 20_000_000
+            ]]
+        ])
+    }
+
+    static var uploadedFileJSON: Data {
+        encodeJSON([
+            "uploadId": "upl_demo_1",
+            "clientFileId": "file-1",
+            "filename": "screenshot.png",
+            "contentType": "image/png",
+            "sizeBytes": 42,
+            "sha256": "demo",
+            "stored": true,
+            "downloadUrl": NSNull()
         ])
     }
 
@@ -381,8 +422,7 @@ enum DemoMockData {
 
     static var subscribeJSON: Data {
         encodeJSON([
-            "subscribed": true,
-            "alreadySubscribed": false
+            "success": true
         ])
     }
 

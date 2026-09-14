@@ -86,3 +86,8 @@
 "cupthread.profile.apps" = "アプリ";
 "cupthread.profile.recent_comments" = "最近のコメント";
 "cupthread.profile.no_comments" = "最近のコメントはありません。";
+
+/* September API sync: vote rate limiting + cursor paging */
+"cupthread.features.vote_rate_limited" = "投票の操作が早すぎます。1分後に再試行してください。";
+"cupthread.features.load_more" = "さらに読み込む";
+"cupthread.features.load_more_hint" = "機能リクエストの次のページを表示します。";
