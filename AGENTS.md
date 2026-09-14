@@ -22,7 +22,7 @@
   - `POST /api/v1/feature-requests` — Submit new feature request.
   - `POST /api/v1/feature-requests/:id/vote` — Toggle vote on a feature request.
   - `POST /api/v1/feedback` — Submit feedback draft with attachments.
-  - `POST /api/v1/uploads/images` & `POST /api/v1/uploads/r2` — Media and log attachment uploads.
+  - `POST /api/v1/uploads/sessions` → `PUT /api/v1/uploads/{uploadId}` — Create an upload session, then stream attachment bytes into its pre-allocated slots (the legacy `POST /api/v1/uploads/images` / `POST /api/v1/uploads/r2` endpoints were removed in the September 2026 API sync).
 
 ## Development & Testing
 - Run test suite: `swift test`
@@ -31,6 +31,18 @@
 - Release dry-run verification: `node scripts/release.mjs --version <semver> --dry-run`
 - Build docs site: `scripts/build-docs.sh docs-site` (DocC source of truth lives in `Sources/CupThreadFeedback/CupThreadFeedback.docc/`)
 - Simulator testing: Use the `Demo/` project (`Demo/CupThreadDemo.xcodeproj`). Use the `axe` CLI for simulator automation.
+
+### Testing Policy (local-first, CI as safety net)
+Test locally before pushing; let CI do only what a Mac cannot. The repo is public, so Actions minutes are free — this policy exists for fast feedback and as insurance if the repo ever goes private (macOS runners bill at 10×).
+
+1. **Local gate before every push (mandatory)**:
+   - Small or targeted change: run the affected suites only, e.g. `swift test --filter FeedbackClient`, plus `swiftlint lint --strict`.
+   - Large or cross-cutting change, and anything touching release scripts/packaging: full `swift test`.
+2. **Platform scope**: iOS is the primary target; the other platforms only need to compile. Note that local `swift test` compiles for macOS only — it does **not** prove tvOS/visionOS slices compile. Cross-platform compile safety (`#if os(...)` branches, API availability) is CI's job (see CI layers below); don't assume a green local build covers it.
+3. **CI layers** (`.github/workflows/ci.yml`):
+   - Pull requests: `lint` + `swift test` + a single iOS archive slice (`build-ios`). Keep PRs under this cheap gate.
+   - Push to `main`: full 7-platform archive matrix (`build-platforms`) + `release-dry-run`. This is the only place cross-platform compile regressions are caught, immediately after merge.
+4. **Before cutting a release**: run the full `swift test` locally, then confirm the latest `main` CI run (matrix + dry-run) is green before invoking `scripts/release.mjs`.
 
 ### Supported Platform Matrix & Release Triage
 The SDK targets four Apple operating systems across seven release archive slices:
@@ -59,7 +71,7 @@ The SDK targets four Apple operating systems across seven release archive slices
        -quiet
      ```
 - **XCFramework assembly errors**: `scripts/release.mjs` verifies that all seven `.framework` slices exist before invoking `xcodebuild -create-xcframework`. If a slice is missing, check the preceding archive step logs for compiler or toolchain warnings and errors.
-- **CI platform matrix**: CI compiles all seven slices in the `build-platforms` matrix job and runs `release-dry-run` to ensure regressions on any platform fail before merging into `main`.
+- **CI platform matrix**: The full 7-slice `build-platforms` matrix and `release-dry-run` run on every push to `main` (not on pull requests — see Testing Policy). A failure there means a cross-platform compile regression just merged: fix forward on a PR, validate the single failing slice locally with the `xcodebuild archive` command above, and merge again.
 
 
 ## Documentation Pipeline
