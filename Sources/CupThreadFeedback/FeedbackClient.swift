@@ -55,7 +55,7 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 }
 
 /// Errors thrown by ``FeedbackClient`` network calls.
-public enum FeedbackClientError: LocalizedError, Sendable {
+public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// The server response could not be interpreted as HTTP.
     case invalidResponse
     /// The upload endpoint returned a success response (200, 201, or 202)
@@ -64,6 +64,9 @@ public enum FeedbackClientError: LocalizedError, Sendable {
     /// The endpoint requires a signed-in user — e.g. the app's changelog
     /// is restricted and anonymous access is disabled (`401 authentication_required`).
     case authenticationRequired
+    /// An attachment referenced in the feedback submission was rejected by server-side content inspection
+    /// (e.g. prohibited file types or malware signatures, HTTP `422 scan_rejected`).
+    case scanRejected(message: String)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the raw response body for debugging.
     case unexpectedStatus(code: Int, message: String)
@@ -76,10 +79,21 @@ public enum FeedbackClientError: LocalizedError, Sendable {
             return "The feedback server returned an unreadable upload response."
         case .authenticationRequired:
             return "These updates are only available to signed-in users."
+        case .scanRejected(let message):
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                return "The referenced attachment could not be uploaded due to content inspection rejection."
+            }
+            return "The referenced attachment could not be uploaded due to content inspection rejection: \(trimmed)"
         case .unexpectedStatus(let code, let message):
             return "The feedback request failed (\(code)): \(message)"
         }
     }
+}
+
+private struct APIErrorEnvelope: Decodable, Sendable {
+    let error: String?
+    let code: String?
 }
 
 private struct FeedbackSubmissionPayload: Codable, Sendable {
@@ -171,7 +185,9 @@ public struct FeedbackClient: Sendable {
     ///   - userToken: Optional anonymous token (UUID string). When provided it is
     ///     sent as `X-User-Token` so the backend can link the submission to an end-user identity.
     /// - Returns: The server's receipt, including the submission id and any warning.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` when the
+    /// - Throws: ``FeedbackClientError/scanRejected(message:)`` when an attachment
+    ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:)`` when the
     ///   server rejects the request or answers with an unexpected HTTP status (successful
     ///   submissions accept HTTP 200, 201, and 202), or ``FeedbackClientError/invalidResponse``
     ///   when the response cannot be interpreted.
@@ -234,7 +250,9 @@ public struct FeedbackClient: Sendable {
     ///   - userToken: Optional anonymous token; when given it is sent as
     ///     `X-User-Token` so uploads link to the end-user identity.
     /// - Returns: The uploaded attachment, including its storage `key` and `url`.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:)`` when the
+    /// - Throws: ``FeedbackClientError/scanRejected(message:)`` when the uploaded file
+    ///   is rejected by server-side content scan (HTTP 422 `scan_rejected`);
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:)`` when the
     ///   server rejects the upload — typically because the file exceeds the
     ///   app's `maxAttachmentBytes` limit — or when the server responds with an
     ///   unexpected HTTP status (successful responses accept HTTP 200, 201, and 202);
@@ -337,6 +355,11 @@ public struct FeedbackClient: Sendable {
         data: Data
     ) throws {
         guard accepted.contains(statusCode) else {
+            if statusCode == 422,
+               let errorEnvelope = try? decoder.decode(APIErrorEnvelope.self, from: data),
+               errorEnvelope.code == "scan_rejected" {
+                throw FeedbackClientError.scanRejected(message: errorEnvelope.error ?? "")
+            }
             let message = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message)
         }
