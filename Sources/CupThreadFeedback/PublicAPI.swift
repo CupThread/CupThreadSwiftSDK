@@ -23,6 +23,12 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     public let storeKind: String?
     /// The app's icon, when uploaded to the console.
     public let iconUrl: URL?
+    /// The app's public website URL, when configured (Web / Universal apps).
+    /// Native SDK surfaces do not render it; mirrored for schema completeness.
+    public let websiteUrl: URL?
+    /// Whether the public web portal hides CupThread branding (logo/title).
+    /// Native SDK surfaces are unaffected; mirrored for schema completeness.
+    public let hideSiteBranding: Bool
     /// Whether the app's public pages (roadmap, changelog) are visible at all.
     public let allowPublic: Bool
     /// Platforms the console allows feedback from; empty means unrestricted.
@@ -51,6 +57,8 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         storeUrl = try container.decodeIfPresent(URL.self, forKey: .storeUrl)
         storeKind = try container.decodeIfPresent(String.self, forKey: .storeKind)
         iconUrl = try container.decodeIfPresent(URL.self, forKey: .iconUrl)
+        websiteUrl = try container.decodeIfPresent(URL.self, forKey: .websiteUrl)
+        hideSiteBranding = try container.decodeIfPresent(Bool.self, forKey: .hideSiteBranding) ?? false
         allowPublic = try container.decodeIfPresent(Bool.self, forKey: .allowPublic) ?? true
         allowedPlatforms = try container.decodeIfPresent([FeedbackPlatform].self, forKey: .allowedPlatforms) ?? []
         maxAttachmentBytes = try container.decodeIfPresent(Int.self, forKey: .maxAttachmentBytes) ?? 20_000_000

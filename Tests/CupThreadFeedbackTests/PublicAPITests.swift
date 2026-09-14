@@ -49,6 +49,33 @@ struct PublicAPITests {
         #expect(config.iconUrl == URL(string: "https://example.com/icon.png"))
     }
 
+    @Test func fetchAppConfigDecodesWebsiteFields() async throws {
+        // #2: additive PublicAppConfig fields (websiteUrl, hideSiteBranding).
+        var payload = makeConfigJSON()
+        payload["websiteUrl"] = "https://example.com"
+        payload["hideSiteBranding"] = true
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(), try encodeJSON(payload))
+        }
+
+        let config = try await Self.makeAPIClient().fetchAppConfig()
+
+        #expect(config.websiteUrl == URL(string: "https://example.com"))
+        #expect(config.hideSiteBranding == true)
+    }
+
+    @Test func fetchAppConfigDefaultsWebsiteFieldsWhenAbsent() async throws {
+        // Older deployments predate the fields; both decode leniently.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(), try encodeJSON(makeConfigJSON()))
+        }
+
+        let config = try await Self.makeAPIClient().fetchAppConfig()
+
+        #expect(config.websiteUrl == nil)
+        #expect(config.hideSiteBranding == false)
+    }
+
     @Test func fetchAppConfigDecodesSdkAppearance() async throws {
         var payload = makeConfigJSON()
         payload["sdk"] = [
