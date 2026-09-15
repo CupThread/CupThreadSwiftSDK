@@ -48,7 +48,9 @@ public struct FeedbackComposerView: View {
     ///     or the fetched ``PublicAppConfig/maxAttachmentBytes``.
     ///   - stripSensitiveMetadata: When `true` (the default), photo attachments selected
     ///     via the photo picker are re-encoded to strip GPS coordinates, camera details,
-    ///     and sensitive EXIF metadata before upload. Set to `false` to upload original bytes.
+    ///     and sensitive EXIF metadata before upload. Multi-frame animations (such as GIF or
+    ///     animated WebP) are preserved intact without flattening to a still image.
+    ///     Set to `false` to upload original bytes for all supported formats.
     ///   - onSubmit: Called with the server's receipt after a successful
     ///     submission — use it to log, show a toast, or deep-link elsewhere.
     public init(
