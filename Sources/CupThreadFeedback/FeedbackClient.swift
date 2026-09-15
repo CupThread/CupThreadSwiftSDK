@@ -242,7 +242,7 @@ public struct FeedbackClient: Sendable {
             platform: draft.platform,
             appVersion: draft.appVersion.nilIfEmpty,
             buildNumber: draft.buildNumber.nilIfEmpty,
-            metadata: FeedbackMetadataSanitizer.sanitize(defaultMetadata(from: draft)),
+            metadata: sanitizedMetadata(from: draft),
             uploadIds: uploadIds
         )
 
@@ -263,12 +263,13 @@ public struct FeedbackClient: Sendable {
         return try decoder.decode(FeedbackSubmissionResult.self, from: data)
     }
 
-    private func defaultMetadata(from draft: FeedbackDraft) -> [String: String] {
-        var metadata = draft.metadata
-        metadata["sdk"] = "cupthread-apple"
-        metadata["platform"] = draft.platform.rawValue
-        metadata["submittedAt"] = ISO8601DateFormatter().string(from: .now)
-        return metadata
+    private func sanitizedMetadata(from draft: FeedbackDraft) -> [String: String] {
+        let reserved = [
+            "sdk": "cupthread-apple",
+            "platform": draft.platform.rawValue,
+            "submittedAt": ISO8601DateFormatter().string(from: .now)
+        ]
+        return FeedbackMetadataSanitizer.sanitize(draft.metadata, reserved: reserved)
     }
 
     private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]
