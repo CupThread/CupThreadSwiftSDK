@@ -187,6 +187,9 @@ public final class UserTokenStore: @unchecked Sendable {
     /// first accesses always resolve and persist the same identity.
     public var token: String {
         if let existing = storage.load(), !existing.isEmpty {
+            if let legacyUserDefaults, let legacyKey {
+                legacyUserDefaults.removeObject(forKey: legacyKey)
+            }
             return existing
         }
 
@@ -194,6 +197,9 @@ public final class UserTokenStore: @unchecked Sendable {
         defer { Self.processLock.unlock() }
 
         if let existing = storage.load(), !existing.isEmpty {
+            if let legacyUserDefaults, let legacyKey {
+                legacyUserDefaults.removeObject(forKey: legacyKey)
+            }
             return existing
         }
 
