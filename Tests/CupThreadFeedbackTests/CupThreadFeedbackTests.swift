@@ -839,6 +839,37 @@ struct FeedbackClientSubmitTests {
         #expect(json["severity"] == nil)
     }
 
+    @Test func reservedMetadataKeysSurviveLargeHostMetadataPayloads() async throws {
+        let capture = CaptureBox<Data>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = bodyData(from: request)
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1", "forwardedToGithub": true]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        var hostMetadata: [String: String] = [:]
+        for index in 0..<30 {
+            hostMetadata[String(format: "hostKey%02d", index)] = "value\(index)"
+        }
+        let draft = FeedbackDraft(
+            title: "Large Metadata Test",
+            description: "Testing reserved metadata survival",
+            platform: .ios,
+            metadata: hostMetadata
+        )
+        _ = try await client.submit(draft)
+
+        let rawData = try #require(capture.value)
+        let json = try #require(parseJSONDict(rawData))
+        let metadata = try #require(json["metadata"] as? [String: String])
+
+        #expect(metadata.count <= 24)
+        #expect(metadata["sdk"] == "cupthread-apple")
+        #expect(metadata["platform"] == "ios")
+        #expect(metadata["submittedAt"] != nil)
+        #expect(metadata["hostKey00"] == "value0")
+    }
+
 } // end FeedbackClientSubmitTests
 
 // MARK: Upload (upload-session flow)
