@@ -204,9 +204,11 @@ public struct FeedbackClient: Sendable {
     /// strings, and attachment lists are omitted from the payload. Attachments
     /// contributed by ``uploadAttachment(data:filename:mimeType:userToken:)``
     /// are sent as `uploadIds` referencing their upload session. The SDK adds
-    /// `sdk`, `platform`, and `submittedAt` metadata automatically and applies
+    /// `sdk` (`cupthread-apple/<semver>`), `sdkVersion` (`<semver>`), `platform`,
+    /// and `submittedAt` metadata automatically and applies
     /// the server's metadata redaction contract locally (credential-looking
-    /// keys are redacted, values truncated, oversized payloads shrunk).
+    /// keys are redacted, values truncated, oversized payloads shrunk). Every
+    /// request also carries the SDK's version in the `X-SDK-Version` header.
     ///
     /// ```swift
     /// var draft = FeedbackDraft.autofilled()
@@ -265,7 +267,8 @@ public struct FeedbackClient: Sendable {
 
     private func defaultMetadata(from draft: FeedbackDraft) -> [String: String] {
         var metadata = draft.metadata
-        metadata["sdk"] = "cupthread-apple"
+        metadata["sdk"] = Self.sdkIdentifier
+        metadata["sdkVersion"] = Self.sdkVersion
         metadata["platform"] = draft.platform.rawValue
         metadata["submittedAt"] = ISO8601DateFormatter().string(from: .now)
         return metadata

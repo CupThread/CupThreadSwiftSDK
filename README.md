@@ -131,8 +131,8 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 
 | Method | Endpoint |
 | ------ | -------- |
-| `submit(_:userToken:)` | `POST /api/v1/feedback` (sends `X-User-Token`) |
-| `uploadAttachment(data:filename:mimeType:preferredKind:userToken:)` | `POST /api/v1/uploads/{images,r2}` (sends `X-User-Token`) |
+| `submit(_:userToken:)` | `POST /api/v1/feedback` (sends `X-User-Token`, `X-SDK-Version`; reports `metadata.sdk` & `metadata.sdkVersion`) |
+| `uploadAttachment(data:filename:mimeType:userToken:)` | `POST /api/v1/uploads/sessions` → `PUT /api/v1/uploads/{id}` (sends `X-User-Token`, `X-SDK-Version`) |
 | `fetchAppConfig()` | `GET /api/v1/public/config/{appKey}` |
 | `prepareChangelogOverlay(onlyIfUnseen:)` | Fetches config + newest changelog entries (with seen state filter) |
 | `presentLatestChangelog(onlyIfUnseen:)` | Presents overlay sheet using console copy |
@@ -148,8 +148,16 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `fetchVersions()` | `GET /api/v1/public/versions/{appKey}` |
 | `fetchChangelog()` | `GET /api/v1/public/apps/{appKey}/changelog` |
 | `subscribeToChangelog(email:userToken:)` | `POST /api/v1/public/apps/{appKey}/changelog/subscribe` |
-| `unsubscribeFromChangelog(email:)` | `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe` |
+| `unsubscribeFromChangelog(token:)` | `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe` |
 | `updateUserAttributes(isPaying:plan:mrr:currency:userToken:)` | `PUT /api/v1/public/apps/{appKey}/user` |
+
+### Headers & Version Reporting
+
+Every API request dispatched by `FeedbackClient` carries:
+- `X-SDK-Version`: Semantic version of the CupThread Apple SDK (`FeedbackClient.sdkVersion`, e.g. `0.1.0`).
+- `X-Request-Id`: Request or session correlation ID.
+
+Feedback submissions (`submit(_:userToken:)`) include `metadata.sdk` (`cupthread-apple/<semver>`) and `metadata.sdkVersion` (`<semver>`), allowing backend analytics and telemetry to segment behavior by SDK release independently of the host app's version.
 
 ---
 
