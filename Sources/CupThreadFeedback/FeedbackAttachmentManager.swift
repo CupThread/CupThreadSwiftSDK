@@ -183,15 +183,24 @@ public enum PhotoAttachmentHelper {
     /// Re-encodes image bytes as JPEG, for sources the upload API does not
     /// accept directly (HEIC/HEIF photos, unrecognized containers).
     ///
-    /// The fresh encode also drops any embedded metadata, so this doubles as
-    /// a sanitizer for transcoded paths.
+    /// Visual orientation is preserved by applying the source's orientation
+    /// transform to the decoded pixel buffer. The fresh encode also drops any
+    /// embedded metadata, so this doubles as a sanitizer for transcoded paths.
     ///
     /// - Parameter data: The raw image bytes.
     /// - Returns: JPEG bytes, or `nil` when the data cannot be decoded as an image.
     public static func jpegRepresentationResampled(from data: Data) -> Data? {
         guard !data.isEmpty,
-              let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: false] as CFDictionary) else {
+              let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else {
+            return nil
+        }
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCache: false
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
+            ?? CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: false] as CFDictionary) else {
             return nil
         }
         let outputData = NSMutableData()
