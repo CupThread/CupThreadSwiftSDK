@@ -45,9 +45,11 @@ public struct FeedbackComposerView: View {
     ///     `X-User-Token` so submissions link to the end-user identity.
     ///     When `userToken` is `nil`, anonymous flows fall back to
     ///     ``UserTokenStore/shared`` when attachments are uploaded and submitted.
-    ///   - maxAttachmentBytes: Optional client-side upload size cap in bytes;
-    ///     falls back to ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB)
-    ///     or the fetched ``PublicAppConfig/maxAttachmentBytes``.
+    ///   - maxAttachmentBytes: Optional client-side upload size cap in bytes.
+    ///     An explicit non-nil value is authoritative and takes precedence over console
+    ///     configuration. When `nil`, falls back to the fetched
+    ///     ``PublicAppConfig/maxAttachmentBytes`` or
+    ///     ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB).
     ///   - stripSensitiveMetadata: When `true` (the default), photo attachments selected
     ///     via the photo picker are re-encoded to strip GPS coordinates, camera details,
     ///     and sensitive EXIF metadata before upload. Multi-frame animations (such as GIF or
@@ -68,8 +70,7 @@ public struct FeedbackComposerView: View {
         self.userToken = userToken
         self.stripSensitiveMetadata = stripSensitiveMetadata
         self.onSubmit = onSubmit
-        let limit = maxAttachmentBytes ?? PhotoAttachmentHelper.defaultMaxAttachmentBytes
-        _attachmentState = State(initialValue: FeedbackAttachmentStateMachine(maxAttachmentBytes: limit))
+        _attachmentState = State(initialValue: FeedbackAttachmentStateMachine(maxAttachmentBytes: maxAttachmentBytes))
         _draft = State(initialValue: initialDraft ?? FeedbackDraft.autofilled(platform: client.configuration.defaultPlatform))
     }
 
@@ -105,7 +106,7 @@ public struct FeedbackComposerView: View {
         #endif
         .task {
             if let config = try? await client.fetchAppConfig() {
-                attachmentState.maxAttachmentBytes = config.maxAttachmentBytes
+                attachmentState.applyConfigLimit(config.maxAttachmentBytes)
             }
         }
         .onDisappear {
@@ -301,7 +302,8 @@ public struct FeedbackComposerView: View {
         guard var data = try await item.loadTransferable(type: Data.self) else {
             throw NSError(domain: "CupThread", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not load photo data"])
         }
-        try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: attachmentState.maxAttachmentBytes)
+        let limit = attachmentState.maxAttachmentBytes
+        try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: limit)
 
         if PhotoAttachmentHelper.looksLikeSVG(data) {
             throw AttachmentValidationError.unsupportedType
@@ -324,7 +326,7 @@ public struct FeedbackComposerView: View {
             data = jpeg
         }
 
-        try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: attachmentState.maxAttachmentBytes)
+        try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: limit)
 
         let metadata = PhotoAttachmentHelper.detectImageFormat(from: data)
         return PreparedPhoto(data: data, mimeType: metadata.mimeType, fileExtension: metadata.fileExtension)
