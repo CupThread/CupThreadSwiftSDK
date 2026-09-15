@@ -172,6 +172,7 @@ public struct FeedbackClient: Sendable {
     let session: URLSession
     let encoder: JSONEncoder
     let decoder: JSONDecoder
+    let overlayPresenter: (any ChangelogOverlayPresenter)?
 
     /// Creates a client for a CupThread app.
     /// - Parameters:
@@ -182,10 +183,19 @@ public struct FeedbackClient: Sendable {
         configuration: FeedbackClientConfiguration,
         session: URLSession = .shared
     ) {
+        self.init(configuration: configuration, session: session, overlayPresenter: nil)
+    }
+
+    init(
+        configuration: FeedbackClientConfiguration,
+        session: URLSession = .shared,
+        overlayPresenter: (any ChangelogOverlayPresenter)? = nil
+    ) {
         self.configuration = configuration
         self.session = session
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
+        self.overlayPresenter = overlayPresenter
     }
 
     /// Submits a feedback draft.
