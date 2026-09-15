@@ -97,6 +97,19 @@ struct FeedbackMetadataSanitizerTests {
         #expect(sanitized["platform"] == "ios")
         #expect(sanitized["submittedAt"] != "[redacted]")
     }
+
+    @Test func sdkVersionKeysSurviveMetadataSanitization() {
+        let sanitized = FeedbackMetadataSanitizer.sanitize([
+            "sdk": FeedbackClient.sdkIdentifier,
+            "sdkVersion": FeedbackClient.sdkVersion,
+            "platform": "macos",
+            "submittedAt": "2026-09-16T00:00:00.000Z"
+        ])
+        #expect(sanitized["sdk"] == "cupthread-apple/\(FeedbackClient.sdkVersion)")
+        #expect(sanitized["sdkVersion"] == FeedbackClient.sdkVersion)
+        #expect(sanitized["platform"] == "macos")
+        #expect(sanitized["submittedAt"] != "[redacted]")
+    }
 }
 
 // MARK: - Feature request paging (cursor) + identity header

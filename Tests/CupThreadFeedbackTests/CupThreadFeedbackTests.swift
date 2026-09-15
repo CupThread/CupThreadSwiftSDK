@@ -461,12 +461,16 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc", platform: .ios))
+        let draft = FeedbackDraft(title: "T", description: "Desc", platform: .ios, appVersion: "2.5.0")
+        _ = try await client.submit(draft)
 
         let rawData = try #require(capture.value)
         let json = try #require(parseJSONDict(rawData))
         let metadata = json["metadata"] as? [String: String]
-        #expect(metadata?["sdk"] == "cupthread-apple")
+        #expect(metadata?["sdk"] == "cupthread-apple/\(FeedbackClient.sdkVersion)")
+        #expect(metadata?["sdkVersion"] == FeedbackClient.sdkVersion)
+        #expect(metadata?["sdkVersion"] != draft.appVersion)
+        #expect(FeedbackClient.sdkVersion.isEmpty == false)
     }
 
     @Test func reporterNameIsOmittedWhenWhitespaceOnly() async throws {
@@ -713,6 +717,29 @@ struct FeedbackClientSubmitTests {
         _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
 
         #expect(capture.value == "stable-run-identifier-1")
+    }
+
+    @Test func sendsXSDKVersionHeaderOnRequests() async throws {
+        let capture = CaptureBox<String?>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request.value(forHTTPHeaderField: "X-SDK-Version")
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+
+        let versionHeader = try #require(capture.value)
+        #expect(versionHeader == FeedbackClient.sdkVersion)
+        #expect(versionHeader?.isEmpty == false)
+    }
+
+    @Test func sdkVersionFollowsSemverFormat() {
+        #expect(!FeedbackClient.sdkVersion.isEmpty)
+        #expect(FeedbackClient.sdkName == "cupthread-apple")
+        #expect(FeedbackClient.sdkIdentifier == "cupthread-apple/\(FeedbackClient.sdkVersion)")
+        let semverPattern = #"^\d+\.\d+\.\d+$"#
+        #expect(FeedbackClient.sdkVersion.range(of: semverPattern, options: .regularExpression) != nil)
     }
 
     @Test func attachmentsSentAsUploadIDs() async throws {
@@ -1166,6 +1193,27 @@ struct FeedbackClientUploadTests {
         let ids = captured.compactMap { $0.value(forHTTPHeaderField: "X-Request-Id") }
         #expect(ids.count == 2)
         #expect(Set(ids).count == 2) // per-request UUIDs
+    }
+
+    @Test func uploadSendsXSDKVersionOnEveryRequest() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.requestHandler = { request in
+            requests.value = (requests.value ?? []) + [request]
+            if request.httpMethod == "POST" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(self.sessionJSON))
+            }
+            return (makeHTTPResponse(), try encodeJSON(self.uploadedJSON))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        _ = try await client.uploadAttachment(
+            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+        )
+
+        let captured = try #require(requests.value)
+        let versions = captured.compactMap { $0.value(forHTTPHeaderField: "X-SDK-Version") }
+        #expect(versions.count == 2)
+        #expect(versions.allSatisfy { $0 == FeedbackClient.sdkVersion })
     }
 } // end FeedbackClientUploadTests
 

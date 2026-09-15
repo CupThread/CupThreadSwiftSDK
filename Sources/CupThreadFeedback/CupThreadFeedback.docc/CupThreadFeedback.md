@@ -20,6 +20,7 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 ## Core types
 
 - ``FeedbackClient``: The HTTP client that talks to the CupThread API.
+- ``FeedbackClient/sdkVersion``: The semantic version string reported in metadata and headers.
 - ``FeedbackClientConfiguration``: Base URL, app key, and reported platform.
 - ``UserTokenStore``: Stable anonymous token that links votes and requests to a device.
 
