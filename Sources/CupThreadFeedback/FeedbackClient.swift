@@ -91,6 +91,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// the referenced upload session (HTTP 400 `uploader_mismatch`).
     /// Re-attach the file with the same `userToken` and try again.
     case uploaderMismatch(message: String?)
+    /// The requested user profile could not be found (HTTP 404).
+    case userProfileNotFound(message: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the raw response body for debugging; `requestId` is the
     /// response's `X-Request-Id` correlation id for support requests.
@@ -120,6 +122,12 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return "Uploads require an end-user identity. Pass a userToken (see UserTokenStore) when uploading attachments."
         case .uploaderMismatch:
             return "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again."
+        case .userProfileNotFound(let message):
+            let trimmed = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+            return "This user profile is no longer available."
         case .unexpectedStatus(let code, let message, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return "The feedback request failed (\(code))\(suffix): \(message)"
