@@ -64,20 +64,20 @@ extension FeedbackClient {
         case 422 where envelope?.code == "scan_rejected":
             // An uploadId referenced by the submission failed the
             // server-side content inspection (PRIV-02 media policy).
-            throw FeedbackClientError.scanRejected(message: envelope?.error ?? "")
+            throw FeedbackClientError.scanRejected(message: envelope?.error ?? "", requestId: requestId)
         case 429:
             // Per-client-IP rate limiting (votes, uploads, PUT /user, search).
-            throw FeedbackClientError.rateLimited(message: envelope?.error)
+            throw FeedbackClientError.rateLimited(message: envelope?.error, requestId: requestId)
         case 415:
             // Upload media policy: SVG rejected, declared MIME must match
             // magic bytes; only PNG, JPEG, WebP, and GIF are accepted.
-            throw FeedbackClientError.unsupportedMediaType(message: envelope?.error)
+            throw FeedbackClientError.unsupportedMediaType(message: envelope?.error, requestId: requestId)
         case 413:
-            throw FeedbackClientError.payloadTooLarge(message: envelope?.error)
+            throw FeedbackClientError.payloadTooLarge(message: envelope?.error, requestId: requestId)
         case 400 where envelope?.code == "uploader_identity_required":
-            throw FeedbackClientError.uploaderIdentityRequired(message: envelope?.error)
+            throw FeedbackClientError.uploaderIdentityRequired(message: envelope?.error, requestId: requestId)
         case 400 where envelope?.code == "uploader_mismatch":
-            throw FeedbackClientError.uploaderMismatch(message: envelope?.error)
+            throw FeedbackClientError.uploaderMismatch(message: envelope?.error, requestId: requestId)
         default:
             throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message, requestId: requestId)
         }
