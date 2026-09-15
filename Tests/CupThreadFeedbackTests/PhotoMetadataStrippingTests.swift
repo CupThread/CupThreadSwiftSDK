@@ -106,6 +106,103 @@ struct PhotoMetadataStrippingTests {
         #expect(decodedImage.height == 100)
     }
 
+    @Test func jpegRepresentationResampledPreservesOrientationForRotatedImage() {
+        guard let image = createTestImage(width: 100, height: 50) else {
+            Issue.record("Failed to create test image")
+            return
+        }
+
+        // kCGImagePropertyOrientation = 6 is .right (90 deg CW)
+        guard let rotatedFixture = createJPEGFixture(cgImage: image, orientation: 6) else {
+            Issue.record("Failed to create rotated fixture")
+            return
+        }
+
+        guard let transcodedData = PhotoAttachmentHelper.jpegRepresentationResampled(from: rotatedFixture) else {
+            Issue.record("Failed to transcode rotated fixture")
+            return
+        }
+
+        guard let source = CGImageSourceCreateWithData(transcodedData as CFData, nil) else {
+            Issue.record("Failed to create source from transcoded data")
+            return
+        }
+
+        guard let decodedImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            Issue.record("Failed to decode transcoded image")
+            return
+        }
+
+        // Orientation was baked into pixel buffer, matching strippingPreservesOrientation
+        #expect(decodedImage.width == 50)
+        #expect(decodedImage.height == 100)
+
+        // Output orientation should be absent or 1 (upright)
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let outputOrientation = properties?[kCGImagePropertyOrientation] as? UInt32
+        #expect(outputOrientation == nil || outputOrientation == 1)
+    }
+
+    @Test func jpegRepresentationResampledKeepsUnswappedDimensionsForOrientation1() {
+        guard let image = createTestImage(width: 100, height: 50) else {
+            Issue.record("Failed to create test image")
+            return
+        }
+
+        guard let fixture = createJPEGFixture(cgImage: image, orientation: 1) else {
+            Issue.record("Failed to create fixture with orientation 1")
+            return
+        }
+
+        guard let transcodedData = PhotoAttachmentHelper.jpegRepresentationResampled(from: fixture) else {
+            Issue.record("Failed to transcode fixture")
+            return
+        }
+
+        guard let source = CGImageSourceCreateWithData(transcodedData as CFData, nil) else {
+            Issue.record("Failed to create source from transcoded data")
+            return
+        }
+
+        guard let decodedImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            Issue.record("Failed to decode transcoded image")
+            return
+        }
+
+        #expect(decodedImage.width == 100)
+        #expect(decodedImage.height == 50)
+
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let outputOrientation = properties?[kCGImagePropertyOrientation] as? UInt32
+        #expect(outputOrientation == nil || outputOrientation == 1)
+    }
+
+    @Test func jpegRepresentationResampledPreservesHEICOrientationIfSupported() {
+        guard let image = createTestImage(width: 100, height: 50),
+              let heicFixture = createHEICFixture(cgImage: image, orientation: 6) else {
+            // HEIC destination encoding not supported on this platform
+            return
+        }
+
+        guard let transcodedData = PhotoAttachmentHelper.jpegRepresentationResampled(from: heicFixture) else {
+            Issue.record("Failed to transcode HEIC fixture")
+            return
+        }
+
+        let sniffed = PhotoAttachmentHelper.sniffImageFormat(from: transcodedData)
+        #expect(sniffed?.mimeType == "image/jpeg")
+
+        guard let source = CGImageSourceCreateWithData(transcodedData as CFData, nil),
+              let decodedImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            Issue.record("Failed to decode transcoded JPEG from HEIC")
+            return
+        }
+
+        // Dimensions must be swapped (portrait upright)
+        #expect(decodedImage.width == 50)
+        #expect(decodedImage.height == 100)
+    }
+
     @Test func strippingCorruptDataFailsClosed() {
         let corruptBytes = Data([0x01, 0x02, 0x03, 0x04])
         #expect(PhotoAttachmentHelper.strippingSensitiveMetadata(from: corruptBytes) == nil)
@@ -182,7 +279,7 @@ struct PhotoMetadataStrippingTests {
         #expect(properties?[kCGImagePropertyGPSDictionary] == nil)
     }
 
-    @Test func feedbackComposerStripSensitiveMetadataConfiguration() {
+    @Test @MainActor func feedbackComposerStripSensitiveMetadataConfiguration() {
         let client = makeClient()
         let defaultComposer = FeedbackComposerView(client: client)
         #expect(defaultComposer.stripSensitiveMetadata == true)
@@ -251,6 +348,32 @@ struct PhotoMetadataStrippingTests {
             return nil
         }
         CGImageDestinationAddImage(dest, cgImage, nil)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return mutableData as Data
+    }
+
+    private func createHEICFixture(
+        cgImage: CGImage,
+        orientation: UInt32? = nil
+    ) -> Data? {
+        let supportedTypes = Set((CGImageDestinationCopyTypeIdentifiers() as? [String]) ?? [])
+        guard supportedTypes.contains("public.heic") else {
+            return nil
+        }
+        let mutableData = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(
+            mutableData as CFMutableData,
+            "public.heic" as CFString,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+        var properties: [CFString: Any] = [:]
+        if let orientation {
+            properties[kCGImagePropertyOrientation] = orientation
+        }
+        CGImageDestinationAddImage(dest, cgImage, properties as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { return nil }
         return mutableData as Data
     }
