@@ -317,12 +317,46 @@ public struct FeedbackAttachmentStateMachine: Sendable {
     public private(set) var state: State
     /// Maximum allowed attachment bytes for client-side preflight validation.
     public var maxAttachmentBytes: Int
+    /// Whether an explicit limit was provided by the caller upon initialization.
+    public let hasExplicitLimit: Bool
 
-    /// Creates a state machine with a given attachment size limit.
-    /// - Parameter maxAttachmentBytes: Upper byte limit for uploaded files.
-    public init(maxAttachmentBytes: Int = PhotoAttachmentHelper.defaultMaxAttachmentBytes) {
+    /// Whether the state machine accepts dynamic console configuration limits (`true` when initialized without an explicit limit).
+    public var usesConfigLimit: Bool {
+        !hasExplicitLimit
+    }
+
+    /// Creates a state machine with an optional explicit attachment size limit.
+    ///
+    /// When `maxAttachmentBytes` is `nil`, the state machine falls back to
+    /// ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` and allows future
+    /// console configuration updates via ``applyConfigLimit(_:)``.
+    /// When an explicit non-nil limit is provided, ``applyConfigLimit(_:)``
+    /// will not override it.
+    ///
+    /// - Parameter maxAttachmentBytes: Upper byte limit for uploaded files, or `nil` to use defaults and console config.
+    public init(maxAttachmentBytes: Int? = nil) {
         self.state = .idle
-        self.maxAttachmentBytes = maxAttachmentBytes
+        if let maxAttachmentBytes {
+            self.maxAttachmentBytes = maxAttachmentBytes
+            self.hasExplicitLimit = true
+        } else {
+            self.maxAttachmentBytes = PhotoAttachmentHelper.defaultMaxAttachmentBytes
+            self.hasExplicitLimit = false
+        }
+    }
+
+    /// Applies the console configuration upload byte limit if no explicit limit was provided by the caller.
+    ///
+    /// If the state machine was initialized with an explicit non-nil `maxAttachmentBytes`, this method is a no-op,
+    /// preserving the caller's explicit limit.
+    ///
+    /// - Parameter limit: The byte limit from `PublicAppConfig.maxAttachmentBytes`.
+    /// - Returns: `true` if the limit was applied, or `false` if ignored due to an explicit caller limit.
+    @discardableResult
+    public mutating func applyConfigLimit(_ limit: Int) -> Bool {
+        guard !hasExplicitLimit else { return false }
+        maxAttachmentBytes = limit
+        return true
     }
 
     /// Whether an upload is currently in flight.
