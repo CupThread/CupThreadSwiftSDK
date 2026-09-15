@@ -246,12 +246,6 @@ extension FeedbackClient {
 
     // MARK: Helpers
 
-    /// Sessions are always bound to an identity; fall back to the shared
-    /// anonymous token store when the caller did not pass one.
-    private func resolvedIdentity(_ userToken: String?) -> String? {
-        userToken?.nilIfEmpty ?? UserTokenStore.shared.token
-    }
-
     private func uploadURL(from uploadUrl: String?) -> URL {
         if let uploadUrl, !uploadUrl.isEmpty, let url = URL(string: uploadUrl), url.scheme != nil {
             return url

@@ -43,6 +43,8 @@ public struct FeedbackComposerView: View {
     ///     ``FeedbackClientConfiguration/defaultPlatform``.
     ///   - userToken: Optional anonymous token; when given it is sent as
     ///     `X-User-Token` so submissions link to the end-user identity.
+    ///     When `userToken` is `nil`, anonymous flows fall back to
+    ///     ``UserTokenStore/shared`` when attachments are uploaded and submitted.
     ///   - maxAttachmentBytes: Optional client-side upload size cap in bytes.
     ///     An explicit non-nil value is authoritative and takes precedence over console
     ///     configuration. When `nil`, falls back to the fetched
@@ -50,7 +52,9 @@ public struct FeedbackComposerView: View {
     ///     ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB).
     ///   - stripSensitiveMetadata: When `true` (the default), photo attachments selected
     ///     via the photo picker are re-encoded to strip GPS coordinates, camera details,
-    ///     and sensitive EXIF metadata before upload. Set to `false` to upload original bytes.
+    ///     and sensitive EXIF metadata before upload. Multi-frame animations (such as GIF or
+    ///     animated WebP) are preserved intact without flattening to a still image.
+    ///     Set to `false` to upload original bytes for all supported formats.
     ///   - onSubmit: Called with the server's receipt after a successful
     ///     submission — use it to log, show a toast, or deep-link elsewhere.
     public init(

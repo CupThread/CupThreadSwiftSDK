@@ -387,6 +387,7 @@ struct FeedbackClientTests {
 
 // MARK: Submit
 
+// swiftlint:disable:next type_body_length
 struct FeedbackClientSubmitTests {
     let baseURL = URL(string: "https://test.example.com")!
     let appKey = "app_testsubmitkey1"
@@ -753,6 +754,60 @@ struct FeedbackClientSubmitTests {
         #expect(json["uploadIds"] == nil)
     }
 
+    @Test func submitWithAttachmentsFallsBackToSharedStoreIdentity() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        draft.attachments = [
+            FeedbackAttachment(kind: .image, uploadId: "upl-1", key: "upl-1", url: URL(string: "https://example.com/1")!)
+        ]
+        _ = try await client.submit(draft, userToken: nil)
+
+        let req = try #require(capture.value)
+        let token = try #require(req.value(forHTTPHeaderField: "X-User-Token"))
+        #expect(!token.isEmpty)
+        #expect(UUID(uuidString: token) != nil)
+        #expect(token == UserTokenStore.shared.token)
+    }
+
+    @Test func submitWithExplicitTokenSendsThatToken() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        draft.attachments = [
+            FeedbackAttachment(kind: .image, uploadId: "upl-1", key: "upl-1", url: URL(string: "https://example.com/1")!)
+        ]
+        _ = try await client.submit(draft, userToken: "tok-explicit")
+
+        let req = try #require(capture.value)
+        #expect(req.value(forHTTPHeaderField: "X-User-Token") == "tok-explicit")
+    }
+
+    @Test func submitWithoutAttachmentsOmitsTokenWhenNil() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        _ = try await client.submit(draft, userToken: nil)
+
+        let req = try #require(capture.value)
+        #expect(req.value(forHTTPHeaderField: "X-User-Token") == nil)
+    }
+
     @Test func decodesDocumentedIDOnlyResponseShape() async throws {
         MockURLProtocol.requestHandler = { _ in
             return (makeHTTPResponse(), try encodeJSON([
@@ -885,6 +940,41 @@ struct FeedbackClientUploadTests {
         let token = try #require(sessionRequest.value(forHTTPHeaderField: "X-User-Token"))
         #expect(!token.isEmpty)
         #expect(UUID(uuidString: token) != nil)
+    }
+
+    @Test func submitIdentityMatchesUploadSessionIdentity() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.requestHandler = { request in
+            requests.value = (requests.value ?? []) + [request]
+            if request.url?.path == "/api/v1/uploads/sessions" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(self.sessionJSON))
+            } else if request.url?.path == "/api/v1/uploads/upl-1" {
+                return (makeHTTPResponse(status: 200), try encodeJSON(self.uploadedJSON))
+            } else if request.url?.path == "/api/v1/feedback" {
+                return (makeHTTPResponse(status: 200), try encodeJSON(["submissionId": "s-1"]))
+            }
+            return (makeHTTPResponse(status: 404), Data())
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let attachment = try await client.uploadAttachment(
+            data: Data("test".utf8),
+            filename: "f.txt",
+            mimeType: "text/plain",
+            userToken: nil
+        )
+
+        var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        draft.attachments = [attachment]
+        _ = try await client.submit(draft, userToken: nil)
+
+        let captured = try #require(requests.value)
+        #expect(captured.count == 3)
+        let sessionToken = try #require(captured[0].value(forHTTPHeaderField: "X-User-Token"))
+        let submitToken = try #require(captured[2].value(forHTTPHeaderField: "X-User-Token"))
+        #expect(!sessionToken.isEmpty)
+        #expect(sessionToken == submitToken)
+        #expect(sessionToken == UserTokenStore.shared.token)
     }
 
     @Test func sessionCreateRejects415WithTypedError() async throws {

@@ -26,6 +26,7 @@ public struct ChangelogOverlayView: View {
     @State private var appearance: SdkAppearance = .defaults
     @State private var isLoading = true
     @State private var loadError: String?
+    @State private var hasMarkedSeen = false
 
     /// Creates the overlay sheet.
     ///
@@ -157,7 +158,8 @@ public struct ChangelogOverlayView: View {
     }
 
     private func markSeenIfEnabled() {
-        guard autoMarkSeen, let first = entries.first else { return }
+        guard autoMarkSeen, !hasMarkedSeen, let first = entries.first else { return }
+        hasMarkedSeen = true
         client.markChangelogSeen(version: first.id)
         if let versionLabel = first.versionLabel {
             client.markChangelogSeen(version: versionLabel)
@@ -228,24 +230,23 @@ extension View {
 extension FeedbackClient {
     /// Checks whether the user has already seen the changelog overlay for the given version or entry ID.
     ///
+    /// Seen versions are tracked in a thread-safe store bounded to the newest 64 releases
+    /// for this app key.
+    ///
     /// - Parameter version: The version label (e.g. `"1.2.0"`) or entry ID.
     /// - Returns: `true` if previously recorded as seen.
     public func hasSeenChangelog(version: String) -> Bool {
-        let key = "com.cupthread.changelog.seenVersions.\(configuration.appKey)"
-        let seen = UserDefaults.standard.stringArray(forKey: key) ?? []
-        return seen.contains(version)
+        ChangelogSeenStore.shared(for: configuration.appKey).hasSeen(version)
     }
 
     /// Marks the given changelog version or entry ID as seen.
     ///
+    /// Persists the version label or entry ID in a thread-safe store scoped to this app key,
+    /// bounded to the newest 64 releases (older entries are automatically pruned).
+    ///
     /// - Parameter version: The version label or entry ID to record.
     public func markChangelogSeen(version: String) {
-        let key = "com.cupthread.changelog.seenVersions.\(configuration.appKey)"
-        var seen = UserDefaults.standard.stringArray(forKey: key) ?? []
-        if !seen.contains(version) {
-            seen.append(version)
-            UserDefaults.standard.set(seen, forKey: key)
-        }
+        ChangelogSeenStore.shared(for: configuration.appKey).markSeen(version)
     }
 
     /// Presents the latest changelog overlay using copy and limits from the console.
@@ -264,10 +265,12 @@ extension FeedbackClient {
     @discardableResult
     public func presentLatestChangelog(onlyIfUnseen: Bool = false) async throws -> Bool {
         guard let prepared = try await prepareChangelogOverlay(onlyIfUnseen: onlyIfUnseen) else { return false }
+        let presenter = overlayPresenter ?? DefaultChangelogOverlayPresenter()
         return await presentPreparedChangelogOverlay(
             client: self,
             entries: prepared.entries,
-            appearance: prepared.appearance
+            appearance: prepared.appearance,
+            presenter: presenter
         )
     }
 
@@ -308,101 +311,3 @@ extension FeedbackClient {
         return (entries, config.sdk)
     }
 }
-
-private final class ResumeBox: @unchecked Sendable {
-    var resumed = false
-    let continuation: CheckedContinuation<Bool, Never>
-    init(_ continuation: CheckedContinuation<Bool, Never>) {
-        self.continuation = continuation
-    }
-    func finish(_ value: Bool) {
-        guard !resumed else { return }
-        resumed = true
-        continuation.resume(returning: value)
-    }
-}
-
-@MainActor
-private func presentPreparedChangelogOverlay(
-    client: FeedbackClient,
-    entries: [ChangelogEntry],
-    appearance: SdkAppearance
-) async -> Bool {
-    await withCheckedContinuation { continuation in
-        let box = ResumeBox(continuation)
-
-        #if canImport(UIKit) && !os(watchOS)
-        guard let presenter = topViewController() else {
-            box.finish(false)
-            return
-        }
-        let host = UIHostingController(
-            rootView: ChangelogOverlayView(
-                client: client,
-                entries: entries,
-                appearance: appearance,
-                onPrimary: {
-                    presenter.dismiss(animated: true) { box.finish(true) }
-                },
-                onClose: {
-                    presenter.dismiss(animated: true) { box.finish(true) }
-                }
-            )
-            .onDisappear { box.finish(true) }
-        )
-        #if os(tvOS)
-        // .pageSheet is unavailable on tvOS; full-screen default fits the
-        // focus-driven layout better anyway.
-        presenter.present(host, animated: true)
-        #else
-        host.modalPresentationStyle = .pageSheet
-        presenter.present(host, animated: true)
-        #endif
-        #elseif os(macOS)
-        guard let controller = NSApp.keyWindow?.contentViewController ?? NSApp.windows.first?.contentViewController else {
-            box.finish(false)
-            return
-        }
-        let host = NSHostingController(
-            rootView: ChangelogOverlayView(
-                client: client,
-                entries: entries,
-                appearance: appearance,
-                onPrimary: {
-                    controller.dismiss(nil)
-                    box.finish(true)
-                },
-                onClose: {
-                    controller.dismiss(nil)
-                    box.finish(true)
-                }
-            )
-            .onDisappear { box.finish(true) }
-        )
-        controller.presentAsSheet(host)
-        #else
-        box.finish(false)
-        #endif
-    }
-}
-
-#if canImport(UIKit) && !os(watchOS)
-@MainActor
-private func topViewController(base: UIViewController? = nil) -> UIViewController? {
-    let root = base ?? UIApplication.shared.connectedScenes
-        .compactMap { $0 as? UIWindowScene }
-        .flatMap(\.windows)
-        .first { $0.isKeyWindow }?
-        .rootViewController
-    if let nav = root as? UINavigationController {
-        return topViewController(base: nav.visibleViewController)
-    }
-    if let tab = root as? UITabBarController {
-        return topViewController(base: tab.selectedViewController)
-    }
-    if let presented = root?.presentedViewController {
-        return topViewController(base: presented)
-    }
-    return root
-}
-#endif
