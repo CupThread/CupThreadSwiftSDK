@@ -33,7 +33,7 @@ public struct UserProfileView: View {
                         appsSection(response.apps)
                     }
 
-                    if !response.hideComments {
+                    if !response.hideComments && !response.profile.hideComments {
                         commentsSection(response.recentComments)
                     }
                 }
