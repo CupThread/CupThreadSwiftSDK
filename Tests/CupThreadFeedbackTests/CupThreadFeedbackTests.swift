@@ -272,6 +272,31 @@ struct FeedbackClientConfigurationTests {
         let b = FeedbackClientConfiguration(baseURL: url, appKey: "key", defaultPlatform: .macos)
         #expect(a != b)
     }
+
+    @Test func storesSigningSecretWhenProvided() {
+        let url = URL(string: "https://api.example.com")!
+        let config = FeedbackClientConfiguration(
+            baseURL: url,
+            appKey: "app_mykey12345",
+            signingSecret: "sec_test_secret"
+        )
+        #expect(config.signingSecret == "sec_test_secret")
+    }
+
+    @Test func defaultSigningSecretIsNil() {
+        let url = URL(string: "https://api.example.com")!
+        let config = FeedbackClientConfiguration(baseURL: url, appKey: "app_mykey12345")
+        #expect(config.signingSecret == nil)
+    }
+
+    @Test func inequalityWhenSigningSecretDiffers() {
+        let url = URL(string: "https://api.example.com")!
+        let a = FeedbackClientConfiguration(baseURL: url, appKey: "key", signingSecret: "secret1")
+        let b = FeedbackClientConfiguration(baseURL: url, appKey: "key", signingSecret: "secret2")
+        let withoutSecret = FeedbackClientConfiguration(baseURL: url, appKey: "key", signingSecret: nil)
+        #expect(a != b)
+        #expect(a != withoutSecret)
+    }
 }
 
 // MARK: - FeedbackClientError
