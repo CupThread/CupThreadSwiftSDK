@@ -3,7 +3,9 @@ import ImageIO
 import Testing
 @testable import CupThreadFeedback
 
+// swiftlint:disable file_length
 @Suite("PhotoMetadataStripping")
+// swiftlint:disable:next type_body_length
 struct PhotoMetadataStrippingTests {
 
     @Test func strippingSensitiveMetadataRemovesGPS() {
