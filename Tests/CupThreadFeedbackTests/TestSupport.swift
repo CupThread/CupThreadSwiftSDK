@@ -73,10 +73,11 @@ func makeMockSession() -> URLSession {
 func makeClient(
     baseURL: URL = URL(string: "https://test.example.com")!,
     appKey: String = "app_testkey123456",
-    platform: FeedbackPlatform = .ios
+    platform: FeedbackPlatform = .ios,
+    overlayPresenter: (any ChangelogOverlayPresenter)? = nil
 ) -> FeedbackClient {
     let config = FeedbackClientConfiguration(baseURL: baseURL, appKey: appKey, defaultPlatform: platform)
-    return FeedbackClient(configuration: config, session: makeMockSession())
+    return FeedbackClient(configuration: config, session: makeMockSession(), overlayPresenter: overlayPresenter)
 }
 
 /// Make an HTTPURLResponse.

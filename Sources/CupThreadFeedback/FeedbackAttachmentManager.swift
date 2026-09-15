@@ -223,6 +223,10 @@ public enum PhotoAttachmentHelper {
     /// Re-encodes image data to strip sensitive metadata (EXIF, GPS location, device serials, TIFF, IPTC),
     /// while preserving image pixels, visual orientation, and container format compatibility.
     ///
+    /// Multi-frame animated images (such as animated GIF or animated WebP) carry animation frame timing
+    /// and sequences rather than photographic metadata (EXIF/GPS/IPTC). Their frames and timing properties
+    /// are preserved intact rather than being flattened to a single static frame.
+    ///
     /// - Parameter data: The raw image data.
     /// - Returns: Sanitized image bytes, or `nil` if the data is corrupt or cannot be decoded.
     public static func strippingSensitiveMetadata(from data: Data) -> Data? {
@@ -230,6 +234,15 @@ public enum PhotoAttachmentHelper {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               CGImageSourceGetCount(source) > 0 else {
             return nil
+        }
+
+        // Multi-frame / animated inputs (e.g. animated GIF, animated WebP):
+        // ImageIO exposes no EXIF/GPS/IPTC dictionaries on GIF or animated WebP frames
+        // (properties carry only palette, loop count, and frame delay timing data).
+        // Returning the original data preserves animation frames and timing intact instead of
+        // silently flattening the image to a single static frame (#85).
+        if CGImageSourceGetCount(source) > 1 {
+            return data
         }
 
         let thumbnailOptions: [CFString: Any] = [

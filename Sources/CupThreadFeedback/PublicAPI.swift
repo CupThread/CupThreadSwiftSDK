@@ -32,7 +32,12 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     /// Whether the app's public pages (roadmap, changelog) are visible at all.
     public let allowPublic: Bool
     /// Platforms the console allows feedback from; empty means unrestricted.
+    ///
+    /// Known platforms are projected to ``FeedbackPlatform``; unknown platform
+    /// values from newer console versions are accessible via ``allowedPlatformValues``.
     public let allowedPlatforms: [FeedbackPlatform]
+    /// Raw platform strings as reported by the console, preserving any platforms unknown to this SDK version.
+    public let allowedPlatformValues: [String]
     /// Largest accepted attachment upload in bytes; defaults to 20 MB.
     public let maxAttachmentBytes: Int
     /// Whether signed-out users may browse the roadmap board.
@@ -48,6 +53,71 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     /// Theme, feature flags, and overlay copy configured in the console.
     public let sdk: SdkAppearance
 
+    private enum CodingKeys: String, CodingKey {
+        case appId
+        case appKey
+        case slug
+        case name
+        case storeUrl
+        case storeKind
+        case iconUrl
+        case websiteUrl
+        case hideSiteBranding
+        case allowPublic
+        case allowedPlatforms
+        case maxAttachmentBytes
+        case allowAnonymousRoadmap
+        case allowAnonymousVote
+        case allowAnonymousFeedback
+        case allowAnonymousChangelog
+        case sdk
+    }
+
+    public init(
+        appId: String,
+        appKey: String,
+        slug: String,
+        name: String,
+        storeUrl: URL? = nil,
+        storeKind: String? = nil,
+        iconUrl: URL? = nil,
+        websiteUrl: URL? = nil,
+        hideSiteBranding: Bool = false,
+        allowPublic: Bool = true,
+        allowedPlatforms: [FeedbackPlatform]? = nil,
+        allowedPlatformValues: [String] = [],
+        maxAttachmentBytes: Int = 20_000_000,
+        allowAnonymousRoadmap: Bool = true,
+        allowAnonymousVote: Bool = true,
+        allowAnonymousFeedback: Bool = true,
+        allowAnonymousChangelog: Bool = true,
+        sdk: SdkAppearance = .defaults
+    ) {
+        self.appId = appId
+        self.appKey = appKey
+        self.slug = slug
+        self.name = name
+        self.storeUrl = storeUrl
+        self.storeKind = storeKind
+        self.iconUrl = iconUrl
+        self.websiteUrl = websiteUrl
+        self.hideSiteBranding = hideSiteBranding
+        self.allowPublic = allowPublic
+        if let allowedPlatforms {
+            self.allowedPlatforms = allowedPlatforms
+            self.allowedPlatformValues = allowedPlatformValues.isEmpty ? allowedPlatforms.map(\.rawValue) : allowedPlatformValues
+        } else {
+            self.allowedPlatformValues = allowedPlatformValues
+            self.allowedPlatforms = allowedPlatformValues.compactMap { FeedbackPlatform(rawValue: $0) }
+        }
+        self.maxAttachmentBytes = maxAttachmentBytes
+        self.allowAnonymousRoadmap = allowAnonymousRoadmap
+        self.allowAnonymousVote = allowAnonymousVote
+        self.allowAnonymousFeedback = allowAnonymousFeedback
+        self.allowAnonymousChangelog = allowAnonymousChangelog
+        self.sdk = sdk
+    }
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         appId = try container.decode(String.self, forKey: .appId)
@@ -60,13 +130,36 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         websiteUrl = try container.decodeIfPresent(URL.self, forKey: .websiteUrl)
         hideSiteBranding = try container.decodeIfPresent(Bool.self, forKey: .hideSiteBranding) ?? false
         allowPublic = try container.decodeIfPresent(Bool.self, forKey: .allowPublic) ?? true
-        allowedPlatforms = try container.decodeIfPresent([FeedbackPlatform].self, forKey: .allowedPlatforms) ?? []
+        let platformStrings = try container.decodeIfPresent([String].self, forKey: .allowedPlatforms) ?? []
+        allowedPlatformValues = platformStrings
+        allowedPlatforms = platformStrings.compactMap { FeedbackPlatform(rawValue: $0) }
         maxAttachmentBytes = try container.decodeIfPresent(Int.self, forKey: .maxAttachmentBytes) ?? 20_000_000
         allowAnonymousRoadmap = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousRoadmap) ?? true
         allowAnonymousVote = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousVote) ?? true
         allowAnonymousFeedback = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousFeedback) ?? true
         allowAnonymousChangelog = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousChangelog) ?? true
         sdk = try container.decodeIfPresent(SdkAppearance.self, forKey: .sdk) ?? .defaults
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(appId, forKey: .appId)
+        try container.encode(appKey, forKey: .appKey)
+        try container.encode(slug, forKey: .slug)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(storeUrl, forKey: .storeUrl)
+        try container.encodeIfPresent(storeKind, forKey: .storeKind)
+        try container.encodeIfPresent(iconUrl, forKey: .iconUrl)
+        try container.encodeIfPresent(websiteUrl, forKey: .websiteUrl)
+        try container.encode(hideSiteBranding, forKey: .hideSiteBranding)
+        try container.encode(allowPublic, forKey: .allowPublic)
+        try container.encode(allowedPlatformValues, forKey: .allowedPlatforms)
+        try container.encode(maxAttachmentBytes, forKey: .maxAttachmentBytes)
+        try container.encode(allowAnonymousRoadmap, forKey: .allowAnonymousRoadmap)
+        try container.encode(allowAnonymousVote, forKey: .allowAnonymousVote)
+        try container.encode(allowAnonymousFeedback, forKey: .allowAnonymousFeedback)
+        try container.encode(allowAnonymousChangelog, forKey: .allowAnonymousChangelog)
+        try container.encode(sdk, forKey: .sdk)
     }
 }
 
@@ -85,6 +178,17 @@ public struct BoardColumn: Codable, Equatable, Identifiable, Sendable {
         case normal
         /// System column for shipped requests.
         case done
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            self = Kind(rawValue: raw) ?? .normal
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
     }
 
     /// Stable id used for grouping and selection.

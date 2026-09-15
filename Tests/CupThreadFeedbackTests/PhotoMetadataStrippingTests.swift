@@ -288,9 +288,87 @@ struct PhotoMetadataStrippingTests {
         #expect(optOutComposer.stripSensitiveMetadata == false)
     }
 
+    @Test func strippingSensitiveMetadataPreservesAnimatedGIF() {
+        guard let frame1 = createTestImage(width: 80, height: 60, red: 0.8, green: 0.2, blue: 0.2),
+              let frame2 = createTestImage(width: 80, height: 60, red: 0.2, green: 0.8, blue: 0.2) else {
+            Issue.record("Failed to create test images")
+            return
+        }
+
+        guard let gifData = createGIFFixture(frames: [frame1, frame2], delayTimes: [0.5, 0.5]) else {
+            Issue.record("Failed to create GIF fixture")
+            return
+        }
+
+        guard let inputSource = CGImageSourceCreateWithData(gifData as CFData, nil) else {
+            Issue.record("Failed to create image source from GIF fixture")
+            return
+        }
+        #expect(CGImageSourceGetCount(inputSource) == 2)
+
+        guard let stripped = PhotoAttachmentHelper.strippingSensitiveMetadata(from: gifData) else {
+            Issue.record("strippingSensitiveMetadata returned nil for animated GIF")
+            return
+        }
+
+        guard let outputSource = CGImageSourceCreateWithData(stripped as CFData, nil) else {
+            Issue.record("Failed to create image source from stripped GIF")
+            return
+        }
+
+        // Multi-frame animation must not be flattened to a single static frame (#85)
+        #expect(CGImageSourceGetCount(outputSource) == 2)
+
+        let format = PhotoAttachmentHelper.sniffImageFormat(from: stripped)
+        #expect(format?.mimeType == "image/gif")
+        #expect(format?.fileExtension == "gif")
+
+        let frameProperties = CGImageSourceCopyPropertiesAtIndex(outputSource, 0, nil) as? [CFString: Any]
+        let gifDict = frameProperties?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+        let delay = (gifDict?[kCGImagePropertyGIFDelayTime] as? Double)
+            ?? (gifDict?[kCGImagePropertyGIFUnclampedDelayTime] as? Double)
+        #expect(delay == 0.5)
+    }
+
+    @Test func strippingSensitiveMetadataPreservesAnimatedWebP() {
+        // ImageIO on Apple platforms includes the WebP reader (org.webmproject.webp) but no
+        // destination encoder in CGImageDestinationCopyTypeIdentifiers(). We verify with a minimal
+        // 2-frame animated WebP container to assert that multi-frame WebP is preserved intact
+        // without flattening to a still image or falling back to single-frame PNG/JPEG (#85).
+        let webpData = createAnimatedWebPFixture()
+
+        guard let inputSource = CGImageSourceCreateWithData(webpData as CFData, nil) else {
+            Issue.record("Failed to create image source from animated WebP fixture")
+            return
+        }
+        #expect(CGImageSourceGetCount(inputSource) == 2)
+
+        guard let stripped = PhotoAttachmentHelper.strippingSensitiveMetadata(from: webpData) else {
+            Issue.record("strippingSensitiveMetadata returned nil for animated WebP")
+            return
+        }
+
+        guard let outputSource = CGImageSourceCreateWithData(stripped as CFData, nil) else {
+            Issue.record("Failed to create image source from stripped WebP")
+            return
+        }
+
+        #expect(CGImageSourceGetCount(outputSource) == 2)
+
+        let format = PhotoAttachmentHelper.sniffImageFormat(from: stripped)
+        #expect(format?.mimeType == "image/webp")
+        #expect(format?.fileExtension == "webp")
+    }
+
     // MARK: - Test Fixture Helpers
 
-    private func createTestImage(width: Int = 100, height: Int = 50) -> CGImage? {
+    private func createTestImage(
+        width: Int = 100,
+        height: Int = 50,
+        red: CGFloat = 0.2,
+        green: CGFloat = 0.5,
+        blue: CGFloat = 0.8
+    ) -> CGImage? {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
         guard let context = CGContext(
@@ -302,9 +380,58 @@ struct PhotoMetadataStrippingTests {
             space: colorSpace,
             bitmapInfo: bitmapInfo.rawValue
         ) else { return nil }
-        context.setFillColor(CGColor(red: 0.2, green: 0.5, blue: 0.8, alpha: 1.0))
+        context.setFillColor(CGColor(red: red, green: green, blue: blue, alpha: 1.0))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         return context.makeImage()
+    }
+
+    private func createGIFFixture(
+        frames: [CGImage],
+        delayTimes: [Double] = [0.5, 0.5]
+    ) -> Data? {
+        guard !frames.isEmpty, frames.count == delayTimes.count else { return nil }
+        let mutableData = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(
+            mutableData as CFMutableData,
+            "com.compuserve.gif" as CFString,
+            frames.count,
+            nil
+        ) else {
+            return nil
+        }
+        for (index, frame) in frames.enumerated() {
+            let frameProperties: [CFString: Any] = [
+                kCGImagePropertyGIFDictionary: [
+                    kCGImagePropertyGIFDelayTime: delayTimes[index]
+                ]
+            ]
+            CGImageDestinationAddImage(dest, frame, frameProperties as CFDictionary)
+        }
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return mutableData as Data
+    }
+
+    private func createAnimatedWebPFixture() -> Data {
+        // Minimal 2-frame 10x10 animated WebP image (204 bytes) with VP8X, ANIM, and two ANMF chunks.
+        let hexChunks = [
+            "52494646c400000057454250565038580a00000002000000090000090000414e494d060000000000",
+            "00000000414e4d464a000000000000000000090000090000f401000256503820320000003001009d",
+            "012a0a000a0001402625a000037000fef2eb7ffff9b03ff6f3ff047a01ffffd2e0fffe9707fff4b8",
+            "3ff4a4000000414e4d4646000000000000000000090000090000f4010000565038202e0000003401",
+            "009d012a0a000a0000002625a000037000fefb55e3ffff4b83fffa5c1fffd2e0ffd2e0fffad5e557",
+            "acaba000"
+        ]
+        let hex = hexChunks.joined()
+        var data = Data()
+        var idx = hex.startIndex
+        while idx < hex.endIndex {
+            let next = hex.index(idx, offsetBy: 2)
+            if let byte = UInt8(hex[idx..<next], radix: 16) {
+                data.append(byte)
+            }
+            idx = next
+        }
+        return data
     }
 
     private func createJPEGFixture(
