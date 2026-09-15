@@ -43,6 +43,8 @@ public struct FeedbackComposerView: View {
     ///     ``FeedbackClientConfiguration/defaultPlatform``.
     ///   - userToken: Optional anonymous token; when given it is sent as
     ///     `X-User-Token` so submissions link to the end-user identity.
+    ///     When `userToken` is `nil`, anonymous flows fall back to
+    ///     ``UserTokenStore/shared`` when attachments are uploaded and submitted.
     ///   - maxAttachmentBytes: Optional client-side upload size cap in bytes;
     ///     falls back to ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB)
     ///     or the fetched ``PublicAppConfig/maxAttachmentBytes``.

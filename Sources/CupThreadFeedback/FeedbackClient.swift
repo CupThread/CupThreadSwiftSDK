@@ -196,11 +196,13 @@ public struct FeedbackClient: Sendable {
     /// draft.description = "Editing while offline loses my last change."
     /// let result = try await client.submit(draft, userToken: token)
     /// ```
-    ///
     /// - Parameters:
     ///   - draft: The feedback to send. See ``FeedbackDraft``.
     ///   - userToken: Optional anonymous token (UUID string). When provided it is
     ///     sent as `X-User-Token` so the backend can link the submission to an end-user identity.
+    ///     When `userToken` is `nil` and the draft contains attachments with upload IDs,
+    ///     the SDK falls back to ``UserTokenStore/shared`` so anonymous flows keep a stable
+    ///     identity across session creation and feedback submission.
     /// - Returns: The server's receipt, including the submission id and any warning.
     /// - Throws: ``FeedbackClientError/scanRejected(message:)`` when an attachment
     ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
@@ -212,6 +214,7 @@ public struct FeedbackClient: Sendable {
         _ draft: FeedbackDraft,
         userToken: String? = nil
     ) async throws -> FeedbackSubmissionResult {
+        let uploadIds = draft.attachments.compactMap(\.uploadId).nilIfEmpty
         let payload = FeedbackSubmissionPayload(
             appKey: configuration.appKey,
             title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -222,13 +225,14 @@ public struct FeedbackClient: Sendable {
             appVersion: draft.appVersion.nilIfEmpty,
             buildNumber: draft.buildNumber.nilIfEmpty,
             metadata: FeedbackMetadataSanitizer.sanitize(defaultMetadata(from: draft)),
-            uploadIds: draft.attachments.compactMap(\.uploadId).nilIfEmpty
+            uploadIds: uploadIds
         )
 
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feedback"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        let effectiveUserToken = resolvedSubmitUserToken(userToken, hasAttachments: uploadIds != nil)
+        applyCorrelationHeaders(userToken: effectiveUserToken, requestID: nextRequestID(), to: &request)
         request.httpBody = try encoder.encode(payload)
 
         let (data, response) = try await session.data(for: request)
@@ -250,6 +254,24 @@ public struct FeedbackClient: Sendable {
     }
 
     private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]
+
+    /// Resolves an anonymous identity for requests that require one.
+    /// Falls back to the shared anonymous token store when the caller did not pass one.
+    func resolvedIdentity(_ userToken: String?) -> String? {
+        userToken?.nilIfEmpty ?? UserTokenStore.shared.token
+    }
+
+    /// Resolves the identity to send on feedback submissions.
+    ///
+    /// When `userToken` is `nil` and the submission contains attachments with upload IDs,
+    /// falls back to ``UserTokenStore/shared`` so the submitter matches the uploader identity.
+    /// When there are no attachments and `userToken` is `nil`, the header is omitted.
+    func resolvedSubmitUserToken(_ userToken: String?, hasAttachments: Bool) -> String? {
+        if let token = userToken?.nilIfEmpty {
+            return token
+        }
+        return hasAttachments ? resolvedIdentity(userToken) : nil
+    }
 
     /// Sets the `X-User-Token` header when a token is present.
     func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
