@@ -298,4 +298,73 @@ struct FeedbackAttachmentManagerTests {
         #expect(draft.attachments.isEmpty)
         #expect(draft.platform == .macos)
     }
+
+    // MARK: - State Machine: Attachment Limit Priority & Config Fallback (#87)
+
+    @Test func explicitMaxAttachmentBytesTakesPrecedenceOverConfigLimit() {
+        var stateMachine = FeedbackAttachmentStateMachine(maxAttachmentBytes: 5_000_000)
+        #expect(stateMachine.hasExplicitLimit)
+        #expect(!stateMachine.usesConfigLimit)
+        #expect(stateMachine.maxAttachmentBytes == 5_000_000)
+
+        let applied = stateMachine.applyConfigLimit(20_000_000)
+        #expect(!applied)
+        #expect(stateMachine.maxAttachmentBytes == 5_000_000)
+
+        // Validations reject based on the explicit limit, not the ignored config limit
+        #expect(throws: AttachmentValidationError.self) {
+            try PhotoAttachmentHelper.validateAttachmentSize(6_000_000, limit: stateMachine.maxAttachmentBytes)
+        }
+    }
+
+    @Test func nilMaxAttachmentBytesFallsBackToDefaultAndAcceptsConfigLimit() {
+        var stateMachine = FeedbackAttachmentStateMachine(maxAttachmentBytes: nil)
+        #expect(!stateMachine.hasExplicitLimit)
+        #expect(stateMachine.usesConfigLimit)
+        #expect(stateMachine.maxAttachmentBytes == PhotoAttachmentHelper.defaultMaxAttachmentBytes)
+
+        let applied = stateMachine.applyConfigLimit(30_000_000)
+        #expect(applied)
+        #expect(stateMachine.maxAttachmentBytes == 30_000_000)
+
+        // Further config updates also succeed when using dynamic config
+        let updated = stateMachine.applyConfigLimit(10_000_000)
+        #expect(updated)
+        #expect(stateMachine.maxAttachmentBytes == 10_000_000)
+    }
+
+    @Test func defaultInitFallsBackToDefaultAndAcceptsConfigLimit() {
+        var stateMachine = FeedbackAttachmentStateMachine()
+        #expect(!stateMachine.hasExplicitLimit)
+        #expect(stateMachine.usesConfigLimit)
+        #expect(stateMachine.maxAttachmentBytes == PhotoAttachmentHelper.defaultMaxAttachmentBytes)
+
+        let applied = stateMachine.applyConfigLimit(15_000_000)
+        #expect(applied)
+        #expect(stateMachine.maxAttachmentBytes == 15_000_000)
+    }
+
+    @Test func nilMaxAttachmentBytesWithoutConfigUpdateRetainsDefaultLimit() {
+        let stateMachine = FeedbackAttachmentStateMachine(maxAttachmentBytes: nil)
+        #expect(stateMachine.maxAttachmentBytes == PhotoAttachmentHelper.defaultMaxAttachmentBytes)
+        #expect(stateMachine.maxAttachmentBytes == 20_000_000)
+    }
+
+    @Test func snapshottedLimitPreventsMidFlightNondeterminism() throws {
+        var stateMachine = FeedbackAttachmentStateMachine(maxAttachmentBytes: nil)
+        let initialLimit = stateMachine.maxAttachmentBytes
+
+        // Snapshot limit as loadAndPreparePhotoData does
+        let snapshottedLimit = initialLimit
+
+        // First validation passes against initial limit (e.g. 15 MB against 20 MB default)
+        try PhotoAttachmentHelper.validateAttachmentSize(15_000_000, limit: snapshottedLimit)
+
+        // Server config arrives mid-flight with a stricter 10 MB limit
+        stateMachine.applyConfigLimit(10_000_000)
+        #expect(stateMachine.maxAttachmentBytes == 10_000_000)
+
+        // Second validation using the snapshotted limit remains consistent
+        try PhotoAttachmentHelper.validateAttachmentSize(15_000_000, limit: snapshottedLimit)
+    }
 }
