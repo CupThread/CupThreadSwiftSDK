@@ -43,6 +43,8 @@ The method returns `false` (without throwing) when there is nothing to show — 
 
 For full control over when the sheet appears, split the two halves yourself: ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)`` fetches the data and returns `nil` when the overlay should stay hidden, and ``ChangelogOverlayView`` renders it wherever you like.
 
+Seen versions are persisted in a thread-safe store scoped to each app key, bounded to the newest 64 releases. Older entries beyond the cap are automatically pruned.
+
 ## See also
 
 - ``ChangelogOverlayView``

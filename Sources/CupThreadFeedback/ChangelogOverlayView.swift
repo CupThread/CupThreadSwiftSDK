@@ -26,6 +26,7 @@ public struct ChangelogOverlayView: View {
     @State private var appearance: SdkAppearance = .defaults
     @State private var isLoading = true
     @State private var loadError: String?
+    @State private var hasMarkedSeen = false
 
     /// Creates the overlay sheet.
     ///
@@ -157,7 +158,8 @@ public struct ChangelogOverlayView: View {
     }
 
     private func markSeenIfEnabled() {
-        guard autoMarkSeen, let first = entries.first else { return }
+        guard autoMarkSeen, !hasMarkedSeen, let first = entries.first else { return }
+        hasMarkedSeen = true
         client.markChangelogSeen(version: first.id)
         if let versionLabel = first.versionLabel {
             client.markChangelogSeen(version: versionLabel)
@@ -228,24 +230,23 @@ extension View {
 extension FeedbackClient {
     /// Checks whether the user has already seen the changelog overlay for the given version or entry ID.
     ///
+    /// Seen versions are tracked in a thread-safe store bounded to the newest 64 releases
+    /// for this app key.
+    ///
     /// - Parameter version: The version label (e.g. `"1.2.0"`) or entry ID.
     /// - Returns: `true` if previously recorded as seen.
     public func hasSeenChangelog(version: String) -> Bool {
-        let key = "com.cupthread.changelog.seenVersions.\(configuration.appKey)"
-        let seen = UserDefaults.standard.stringArray(forKey: key) ?? []
-        return seen.contains(version)
+        ChangelogSeenStore.shared(for: configuration.appKey).hasSeen(version)
     }
 
     /// Marks the given changelog version or entry ID as seen.
     ///
+    /// Persists the version label or entry ID in a thread-safe store scoped to this app key,
+    /// bounded to the newest 64 releases (older entries are automatically pruned).
+    ///
     /// - Parameter version: The version label or entry ID to record.
     public func markChangelogSeen(version: String) {
-        let key = "com.cupthread.changelog.seenVersions.\(configuration.appKey)"
-        var seen = UserDefaults.standard.stringArray(forKey: key) ?? []
-        if !seen.contains(version) {
-            seen.append(version)
-            UserDefaults.standard.set(seen, forKey: key)
-        }
+        ChangelogSeenStore.shared(for: configuration.appKey).markSeen(version)
     }
 
     /// Presents the latest changelog overlay using copy and limits from the console.
