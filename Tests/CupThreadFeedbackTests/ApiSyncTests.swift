@@ -6,6 +6,8 @@ import Testing
 import UniformTypeIdentifiers
 #endif
 
+// swiftlint:disable file_length
+
 // MARK: - Metadata redaction contract (client-side, PRIV-01)
 
 @Suite("FeedbackMetadataSanitizer")
@@ -383,6 +385,166 @@ struct PhotoAttachmentHelperMediaPolicyTests {
 
     @Test func jpegTranscodeReturnsNilForNonImageData() {
         #expect(PhotoAttachmentHelper.jpegRepresentationResampled(from: Data("definitely not an image".utf8)) == nil)
+    }
+}
+
+// MARK: - App-scoped pseudonymous user identifiers (PRIV-06)
+
+/// The server now emits app-scoped pseudonymous user identifiers (`u_*`)
+/// on public payloads instead of global identity-provider IDs. The SDK must
+/// parse, carry, and round-trip them verbatim without any `user_`-prefix or
+/// cross-appKey assumptions.
+@Suite("PseudonymousUserIdentifiers")
+struct PseudonymousUserIdentifiersTests {
+    static let pseudonym = "u_ab12cd34ef56"
+
+    static func makeItemJSON() -> [String: Any] {
+        [
+            "id": "fr-1",
+            "appId": "app-1",
+            "title": "Request",
+            "description": "Desc",
+            "status": "new",
+            "approved": true,
+            "voteCount": 1,
+            "hasVoted": false,
+            "isOwnRequest": false,
+            "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-01T00:00:00Z",
+            "requesterClerkId": pseudonym,
+            "recentCommenters": [[
+                "authorName": "Alice",
+                "clerkUserId": "u_9988aabb",
+                "avatarUrl": "https://example.com/a.png"
+            ]]
+        ]
+    }
+
+    @Test func featureRequestItemDecodesPseudonymousIdsVerbatim() throws {
+        let item = try JSONDecoder().decode(FeatureRequestItem.self, from: try encodeJSON(Self.makeItemJSON()))
+        #expect(item.requesterClerkId == Self.pseudonym)
+        #expect(item.recentCommenters.count == 1)
+        #expect(item.recentCommenters[0].clerkUserId == "u_9988aabb")
+        #expect(item.recentCommenters[0].authorName == "Alice")
+    }
+
+    @Test func commentsDecodePseudonymousAuthorAndReplyIds() throws {
+        let json = Data("""
+        {
+            "comments": [
+                {
+                    "id": "c-1",
+                    "featureRequestId": "fr-1",
+                    "body": "Parent",
+                    "authorClerkId": "u_ab12cd34ef56",
+                    "createdAt": "2026-01-01T00:00:00.000Z"
+                },
+                {
+                    "id": "c-2",
+                    "featureRequestId": "fr-1",
+                    "body": "Reply",
+                    "authorClerkId": "u_deadbeef01",
+                    "parentId": "c-1",
+                    "replyToClerkId": "u_ab12cd34ef56",
+                    "replyToAuthorName": "Alice",
+                    "createdAt": "2026-01-02T00:00:00.000Z"
+                }
+            ]
+        }
+        """.utf8)
+
+        let comments = try JSONDecoder().decode(ListCommentsResponse.self, from: json).comments
+        let displayModels = comments.map(\.displayModel)
+        #expect(displayModels[0].authorClerkId == "u_ab12cd34ef56")
+        #expect(displayModels[0].canOpenAuthorProfile == true)
+        #expect(displayModels[1].replyToClerkId == "u_ab12cd34ef56")
+        #expect(displayModels[1].canReply == true)
+    }
+
+    @Test func postCommentSendsPseudonymousReplyIdAndDecodesPseudonymousResponse() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: "priv06-post.example.com") { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 201), try encodeJSON([
+                "id": "c-new",
+                "featureRequestId": "fr-1",
+                "body": "Reply body",
+                "authorClerkId": "u_0123abcd",
+                "parentId": "c-1",
+                "replyToClerkId": Self.pseudonym,
+                "replyToAuthorName": "Alice",
+                "createdAt": "2026-01-03T00:00:00.000Z"
+            ]))
+        }
+
+        var draft = CommentDraft(body: "Reply body", parentId: "c-1")
+        draft.replyToClerkId = Self.pseudonym
+        draft.replyToAuthorName = "Alice"
+
+        let client = makeClient(baseURL: URL(string: "https://priv06-post.example.com")!)
+        let created = try await client.postComment(featureRequestId: "fr-1", draft: draft, userToken: "tok")
+
+        let request = try #require(capture.value)
+        let rawBody = try #require(bodyData(from: request))
+        let json = try #require(parseJSONDict(rawBody))
+        #expect(json["replyToClerkId"] as? String == Self.pseudonym)
+        #expect(created.authorClerkId == "u_0123abcd")
+        #expect(created.replyToClerkId == Self.pseudonym)
+    }
+
+    @Test func fetchUserProfileBuildsPathFromPseudonymousId() async throws {
+        let capture = CaptureBox<URL>()
+        MockURLProtocol.setHandler(forHost: "priv06.example.com") { request in
+            capture.value = request.url
+            return (makeHTTPResponse(), try encodeJSON([
+                "profile": ["clerkUserId": Self.pseudonym, "displayName": NSNull()],
+                "publicApps": [],
+                "recentComments": []
+            ]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://priv06.example.com")!)
+        let response = try await client.fetchUserProfile(userId: Self.pseudonym)
+
+        let url = try #require(capture.value)
+        #expect(url.path == "/api/v1/users/\(Self.pseudonym)/profile")
+        #expect(response.profile.clerkUserId == Self.pseudonym)
+    }
+
+    @Test func profileOptOutShapeDecodesWithNullDisplayNameAndEmptyCollections() throws {
+        // Users without a public profile: displayName null, empty arrays.
+        let json = Data("""
+        {
+            "profile": {
+                "clerkUserId": "u_cafef00d",
+                "displayName": null
+            },
+            "publicApps": [],
+            "recentComments": []
+        }
+        """.utf8)
+
+        let response = try JSONDecoder().decode(PublicUserProfileResponse.self, from: json)
+        #expect(response.profile.clerkUserId == "u_cafef00d")
+        #expect(response.profile.displayName == nil)
+        #expect(response.publicApps.isEmpty)
+        #expect(response.recentComments.isEmpty)
+        #expect(response.hideComments == false)
+    }
+
+    @Test func pseudonymousIdsFromDifferentAppsAreNotAssumedRelated() throws {
+        // Same pseudonym shape from two appKeys must decode independently;
+        // the SDK treats them as opaque strings with no correlation logic.
+        var first = Self.makeItemJSON()
+        first["requesterClerkId"] = "u_apple1111"
+        var second = Self.makeItemJSON()
+        second["requesterClerkId"] = "u_banana2222"
+
+        let firstItem = try JSONDecoder().decode(FeatureRequestItem.self, from: try encodeJSON(first))
+        let secondItem = try JSONDecoder().decode(FeatureRequestItem.self, from: try encodeJSON(second))
+        #expect(firstItem.requesterClerkId == "u_apple1111")
+        #expect(secondItem.requesterClerkId == "u_banana2222")
+        #expect(firstItem.requesterClerkId != secondItem.requesterClerkId)
     }
 }
 

@@ -63,8 +63,12 @@ function run(cmd, args, opts = {}) {
   const result = spawnSync(cmd, args, {
     cwd: opts.cwd ?? ROOT,
     stdio: opts.capture ? ["ignore", "pipe", "inherit"] : "inherit",
-    encoding: "utf8"
+    encoding: "utf8",
+    // `nm` on a slice archive emits megabytes of symbols; the 1MB default
+    // maxBuffer would SIGTERM the child and lose the output.
+    maxBuffer: 64 * 1024 * 1024
   });
+  if (result.error) fail(`Command failed: ${cmd} ${args.join(" ")} (${result.error.message})`);
   if (result.status !== 0) fail(`Command failed (${result.status}): ${cmd} ${args.join(" ")}`);
   return result.stdout;
 }
@@ -81,20 +85,90 @@ function humanSize(bytes) {
 }
 
 const APPLE_SLICES = [
-  { name: "ios", destination: "generic/platform=iOS" },
-  { name: "ios-simulator", destination: "generic/platform=iOS Simulator" },
-  { name: "macos", destination: "generic/platform=macOS" },
-  { name: "visionos", destination: "generic/platform=visionOS" },
-  { name: "visionos-simulator", destination: "generic/platform=visionOS Simulator" },
-  { name: "tvos", destination: "generic/platform=tvOS" },
-  { name: "tvos-simulator", destination: "generic/platform=tvOS Simulator" }
+  { name: "ios", destination: "generic/platform=iOS", minimumOSVersion: "17.0" },
+  { name: "ios-simulator", destination: "generic/platform=iOS Simulator", minimumOSVersion: "17.0" },
+  { name: "macos", destination: "generic/platform=macOS", minimumOSVersion: "14.0" },
+  { name: "visionos", destination: "generic/platform=visionOS", minimumOSVersion: "1.0" },
+  { name: "visionos-simulator", destination: "generic/platform=visionOS Simulator", minimumOSVersion: "1.0" },
+  { name: "tvos", destination: "generic/platform=tvOS", minimumOSVersion: "17.0" },
+  { name: "tvos-simulator", destination: "generic/platform=tvOS Simulator", minimumOSVersion: "17.0" }
 ];
-const FRAMEWORK_PATH = "Products/usr/local/lib/CupThreadFeedback.framework";
 const RESOURCE_BUNDLE_NAME = "CupThreadFeedback_CupThreadFeedback.bundle";
+const CONSUMER_APP_KEY = "app_static_linkage_probe";
+// Matches the archs each slice must ship (mirrors AGENTS.md's platform matrix).
+const SLICE_ARCHS = {
+  "ios": ["arm64"],
+  "ios-simulator": ["arm64", "x86_64"],
+  "macos": ["arm64", "x86_64"],
+  "visionos": ["arm64"],
+  "visionos-simulator": ["arm64", "x86_64"],
+  "tvos": ["arm64"],
+  "tvos-simulator": ["arm64", "x86_64"]
+};
 
-// xcodebuild installs only the framework into the archive Products; the SPM
+// The SPM product is static (see Package.swift), so archives install a bare
+// Mach-O object instead of a dylib framework. Each XCFramework slice is a
+// static .framework: the libtool'd archive plus the generated ObjC header and
+// the swiftmodule (with library-evolution .swiftinterface files) so both Xcode
+// and SwiftPM `.binaryTarget` consumers can import and statically link it.
+function findArchivedObject(archiveDir, sliceName) {
+  const products = path.join(archiveDir, "Products");
+  const found = [];
+  const visit = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) visit(full);
+      else if (entry.name === "CupThreadFeedback.o") found.push(full);
+    }
+  };
+  if (existsSync(products)) visit(products);
+  if (found.length !== 1) {
+    fail(`Expected exactly one CupThreadFeedback.o under ${products} for ${sliceName}, found ${found.length}`);
+  }
+  return found[0];
+}
+
+function findGeneratedHeader(derivedData, sliceName) {
+  const intermediates = path.join(
+    derivedData, "Build", "Intermediates.noindex", "ArchiveIntermediates",
+    "CupThreadFeedback", "IntermediateBuildFilesPath"
+  );
+  const generatedDirs = readdirSync(intermediates, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && e.name.startsWith("GeneratedModuleMaps"))
+    .map((e) => path.join(intermediates, e.name));
+  const header = generatedDirs
+    .map((dir) => path.join(dir, "CupThreadFeedback-Swift.h"))
+    .find((p) => existsSync(p));
+  if (!header) {
+    fail(`No CupThreadFeedback-Swift.h under GeneratedModuleMaps* for ${sliceName}`);
+  }
+  return header;
+}
+
+function findSwiftmodule(derivedData, sliceName) {
+  const buildProducts = path.join(
+    derivedData, "Build", "Intermediates.noindex", "ArchiveIntermediates",
+    "CupThreadFeedback", "BuildProductsPath"
+  );
+  const found = [];
+  const visit = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (!entry.isDirectory()) continue;
+      if (entry.name === "CupThreadFeedback.swiftmodule") found.push(full);
+      else visit(full);
+    }
+  };
+  if (existsSync(buildProducts)) visit(buildProducts);
+  if (found.length !== 1) {
+    fail(`Expected exactly one CupThreadFeedback.swiftmodule under ${buildProducts} for ${sliceName}, found ${found.length}`);
+  }
+  return found[0];
+}
+
+// xcodebuild installs only the object into the archive Products; the SPM
 // resource bundle stays behind in the archive intermediates, so it must be
-// copied in explicitly or Bundle.module ends in fatalError at first render.
+// copied out explicitly for consumers whose host apps carry the bundle.
 function findBuiltResourceBundle(derivedData, sliceName) {
   const uninstalled = path.join(
     derivedData, "Build", "Intermediates.noindex", "ArchiveIntermediates",
@@ -116,51 +190,210 @@ function findBuiltResourceBundle(derivedData, sliceName) {
   return found[0];
 }
 
-// macOS frameworks are versioned (resources under Versions/A/Resources);
-// iOS-style slices are flat (resources sit next to the binary and Info.plist).
-function frameworkResourcesDir(framework) {
-  const versioned = path.join(framework, "Versions", "A", "Resources");
-  if (existsSync(versioned)) return versioned;
-  return framework;
+function frameworkInfoPlist(version, slice) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleExecutable</key><string>CupThreadFeedback</string>
+  <key>CFBundleIdentifier</key><string>com.cupthread.CupThreadFeedback</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>CupThreadFeedback</string>
+  <key>CFBundlePackageType</key><string>FMWK</string>
+  <key>CFBundleShortVersionString</key><string>${version}</string>
+  <key>CFBundleVersion</key><string>${version}</string>
+  <key>MinimumOSVersion</key><string>${slice.minimumOSVersion}</string>
+</dict>
+</plist>
+`;
 }
 
-function embedResourceBundle(derivedData, framework, sliceName) {
-  const bundle = findBuiltResourceBundle(derivedData, sliceName);
-  const dest = path.join(frameworkResourcesDir(framework), RESOURCE_BUNDLE_NAME);
-  run("cp", ["-R", bundle, dest]);
-  // Adding files invalidates the archive-time CodeResources seal, so re-sign.
-  run("codesign", ["--force", "--sign", "-", framework]);
+function stageStaticFramework(slice, archiveDir, derivedData, work, version) {
+  const fw = path.join(work, "static", slice.name, "CupThreadFeedback.framework");
+  const isMacOS = slice.name === "macos";
+  const binaryDir = isMacOS ? path.join(fw, "Versions", "A") : fw;
+  mkdirSync(path.join(binaryDir, "Headers"), { recursive: true });
+  mkdirSync(path.join(binaryDir, "Modules"), { recursive: true });
+  if (isMacOS) {
+    mkdirSync(path.join(binaryDir, "Resources"), { recursive: true });
+    writeFileSync(path.join(binaryDir, "Resources", "Info.plist"), frameworkInfoPlist(version, slice));
+  } else {
+    writeFileSync(path.join(fw, "Info.plist"), frameworkInfoPlist(version, slice));
+  }
+
+  // The archived object is already fat where the platform is universal
+  // (macOS/simulator slices ship arm64 + x86_64), so a single libtool -static
+  // pass wraps it into the slice's static archive.
+  const object = findArchivedObject(archiveDir, slice.name);
+  run("libtool", ["-static", "-o", path.join(binaryDir, "CupThreadFeedback"), object]);
+  run("cp", [findGeneratedHeader(derivedData, slice.name), path.join(binaryDir, "Headers")]);
+  run("cp", ["-R", findSwiftmodule(derivedData, slice.name), path.join(binaryDir, "Modules", "CupThreadFeedback.swiftmodule")]);
+
+  if (isMacOS) {
+    run("ln", ["-sfn", "A", path.join(fw, "Versions", "Current")]);
+    for (const link of ["CupThreadFeedback", "Headers", "Modules", "Resources"]) {
+      run("ln", ["-sfn", path.join("Versions", "Current", link), path.join(fw, link)]);
+    }
+  }
+  return fw;
 }
 
-function verifyEmbeddedResourceBundles(xcframework, sourceLprojs) {
+function verifyStaticBinary(framework, expectedArchs) {
+  const binary = path.join(framework, "CupThreadFeedback");
+  const archs = run("lipo", ["-archs", binary], { capture: true }).trim().split(/\s+/).sort();
+  const expected = [...expectedArchs].sort();
+  if (archs.join(" ") !== expected.join(" ")) {
+    fail(`${framework}: expected static archive archs [${expected.join(", ")}], found [${archs.join(", ")}]`);
+  }
+  const symbols = run("nm", [binary], { capture: true });
+  // Swift word-substitution mangling means literal type names never appear;
+  // the module token does, in every symbol the SDK defines.
+  if (!symbols.includes("17CupThreadFeedback")) {
+    fail(`${framework}: static archive has no CupThreadFeedback symbols — refusing to ship an empty library`);
+  }
+}
+
+function verifyStaticXCFramework(xcframework) {
   for (const entry of readdirSync(xcframework, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const framework = path.join(xcframework, entry.name, "CupThreadFeedback.framework");
-    if (!existsSync(framework)) continue;
-    const bundle = [
-      path.join(framework, "Versions", "A", "Resources", RESOURCE_BUNDLE_NAME),
-      path.join(framework, "Resources", RESOURCE_BUNDLE_NAME),
-      path.join(framework, RESOURCE_BUNDLE_NAME)
-    ].find((p) => existsSync(p));
-    if (!bundle) {
-      fail(`XCFramework slice ${entry.name} is missing ${RESOURCE_BUNDLE_NAME} — host apps would crash on first render`);
+    if (!existsSync(framework)) {
+      fail(`XCFramework slice ${entry.name} has no CupThreadFeedback.framework`);
     }
-    const resourcesDir = [
-      path.join(bundle, "Contents", "Resources"),
-      bundle
-    ].find((p) => existsSync(path.join(p, "en.lproj")));
-    if (!resourcesDir) {
-      fail(`XCFramework slice ${entry.name} resource bundle has no en.lproj`);
+    // Slice dir names encode their architectures (e.g. ios-arm64,
+    // macos-arm64_x86_64, ios-arm64_x86_64-simulator). The underscore inside
+    // "x86_64" rules out naive splitting, but the SDK matrix only ships
+    // arm64 and x86_64, so substring presence is exact.
+    const archs = entry.name.includes("x86_64") ? ["arm64", "x86_64"] : ["arm64"];
+    verifyStaticBinary(framework, archs);
+
+    const versioned = path.join(framework, "Versions", "A");
+    const base = existsSync(versioned) ? versioned : framework;
+    if (!existsSync(path.join(base, "Headers", "CupThreadFeedback-Swift.h"))) {
+      fail(`XCFramework slice ${entry.name} is missing Headers/CupThreadFeedback-Swift.h`);
     }
-    if (!existsSync(path.join(resourcesDir, "en.lproj", "Localizable.strings"))) {
-      fail(`XCFramework slice ${entry.name} resource bundle is missing en.lproj/Localizable.strings`);
+    const swiftmodule = path.join(base, "Modules", "CupThreadFeedback.swiftmodule");
+    if (!existsSync(swiftmodule)) {
+      fail(`XCFramework slice ${entry.name} is missing Modules/CupThreadFeedback.swiftmodule — Swift consumers could not import the module`);
     }
-    const have = new Set(readdirSync(resourcesDir).filter((n) => n.endsWith(".lproj")));
-    const missing = sourceLprojs.filter((lproj) => !have.has(lproj));
-    if (missing.length > 0) {
-      fail(`XCFramework slice ${entry.name} resource bundle missing localizations: ${missing.join(", ")}`);
+    for (const arch of archs) {
+      const hasInterface = readdirSync(swiftmodule).some(
+        (name) => name.startsWith(`${arch}-apple-`) && name.endsWith(".swiftinterface")
+      );
+      if (!hasInterface) {
+        fail(`XCFramework slice ${entry.name} swiftmodule has no ${arch}-apple-*.swiftinterface`);
+      }
     }
   }
+}
+
+function verifyResourceBundle(bundle, sourceLprojs) {
+  const resourcesDir = [
+    path.join(bundle, "Contents", "Resources"),
+    bundle
+  ].find((p) => existsSync(path.join(p, "en.lproj")));
+  if (!resourcesDir) {
+    fail(`${RESOURCE_BUNDLE_NAME} has no en.lproj`);
+  }
+  if (!existsSync(path.join(resourcesDir, "en.lproj", "Localizable.strings"))) {
+    fail(`${RESOURCE_BUNDLE_NAME} is missing en.lproj/Localizable.strings`);
+  }
+  const have = new Set(readdirSync(resourcesDir).filter((n) => n.endsWith(".lproj")));
+  const missing = sourceLprojs.filter((lproj) => !have.has(lproj));
+  if (missing.length > 0) {
+    fail(`${RESOURCE_BUNDLE_NAME} missing localizations: ${missing.join(", ")}`);
+  }
+}
+
+function installInstructionsMarkdown(version) {
+  return `# Installing CupThreadFeedback ${version}
+
+The XCFramework contains **static** libraries: the SDK is linked into your app
+binary, so nothing is embedded and no \`CupThreadFeedback\` dylib ships in your
+bundle. Static libraries cannot carry resources, so the localized strings
+bundle (\`${RESOURCE_BUNDLE_NAME}\`) is included in this folder and must be
+added to your app target.
+
+## Xcode
+
+1. Drag \`CupThreadFeedback.xcframework\` into your app target's
+   *Frameworks, Libraries, and Embedded Content* (embedding is not needed —
+   "Do Not Embed" is correct for a static framework).
+2. Drag \`${RESOURCE_BUNDLE_NAME}\` into your target and make sure it appears
+   under *Copy Bundle Resources*. Without it, the first localized string
+   lookup crashes.
+
+## Swift Package Manager (binary target)
+
+Point \`.binaryTarget\` at this zip, and add the resource bundle to the app
+target that presents CupThread surfaces (download this folder from the GitHub
+release and add the bundle to *Copy Bundle Resources*).
+
+Source-package consumers get all of this automatically: SwiftPM copies the
+resource bundle and links the library statically.
+`;
+}
+
+async function verifyStaticConsumer(zipPath, work) {
+  const consumer = path.join(work, "consumer-probe");
+  rmSync(consumer, { recursive: true, force: true });
+  mkdirSync(path.join(consumer, "Sources", "ConsumerProbe"), { recursive: true });
+  // SwiftPM rejects absolute paths for local binary targets — the probe
+  // package sits next to the zip, so a relative path is one `..` away.
+  const relativeZip = path.relative(consumer, path.resolve(zipPath));
+  writeFileSync(path.join(consumer, "Package.swift"), `// swift-tools-version: 6.0
+import PackageDescription
+
+let package = Package(
+    name: "ConsumerProbe",
+    platforms: [.macOS(.v14)],
+    targets: [
+        .binaryTarget(name: "CupThreadFeedback", path: "${relativeZip.replace(/"/g, '\\"')}"),
+        .executableTarget(name: "ConsumerProbe", dependencies: ["CupThreadFeedback"])
+    ]
+)
+`);
+  writeFileSync(path.join(consumer, "Sources", "ConsumerProbe", "main.swift"), `import Foundation
+import CupThreadFeedback
+
+let configuration = FeedbackClientConfiguration(
+    baseURL: URL(string: "https://api.cupthread.com")!,
+    appKey: "${CONSUMER_APP_KEY}"
+)
+let client = FeedbackClient(configuration: configuration)
+print("probe:", client.configuration.appKey, FeedbackPlatform.current)
+`);
+  console.log("• verifying binary channel with a consumer probe package");
+  run("swift", ["build"], { cwd: consumer });
+  const probe = run(path.join(consumer, ".build", "debug", "ConsumerProbe"), [], { capture: true, cwd: consumer });
+  if (!probe.includes(CONSUMER_APP_KEY)) {
+    fail(`Consumer probe printed unexpected output: ${probe.trim()}`);
+  }
+
+  const buildDir = path.join(consumer, ".build");
+  const visit = (dir, onEntry) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) visit(full, onEntry);
+      else onEntry(full);
+    }
+  };
+  visit(buildDir, (file) => {
+    if (file.endsWith(".dylib") && path.basename(file).startsWith("libCupThreadFeedback")) {
+      fail(`Consumer build produced a CupThreadFeedback dylib: ${file}`);
+    }
+  });
+  const executable = path.join(buildDir, "debug", "ConsumerProbe");
+  const loads = run("otool", ["-L", executable], { capture: true });
+  if (loads.includes("CupThreadFeedback")) {
+    fail(`Consumer binary still loads CupThreadFeedback dynamically:\n${loads}`);
+  }
+  const symbols = run("nm", [executable], { capture: true });
+  if (!symbols.includes("17CupThreadFeedback")) {
+    fail("Consumer binary does not statically contain CupThreadFeedback symbols");
+  }
+  console.log("  consumer probe: module import, static linkage, and runtime OK");
 }
 
 async function main() {
@@ -218,40 +451,55 @@ async function main() {
       "BUILD_LIBRARY_FOR_DISTRIBUTION=YES",
       "-quiet"
     ], { cwd: ROOT });
-    const framework = path.join(work, `${slice.name}.xcarchive`, FRAMEWORK_PATH);
-    embedResourceBundle(derivedData, framework, slice.name);
-    frameworks.push(framework);
+    frameworks.push(stageStaticFramework(slice, path.join(work, `${slice.name}.xcarchive`), derivedData, work, version));
   }
 
-  console.log("• verifying framework slices");
+  console.log("• verifying static framework slices");
   for (const slice of APPLE_SLICES) {
-    const framework = path.join(work, `${slice.name}.xcarchive`, FRAMEWORK_PATH);
+    const framework = path.join(work, "static", slice.name, "CupThreadFeedback.framework");
     if (!existsSync(framework)) {
-      fail(`Missing framework slice for ${slice.name} at: ${framework}`);
+      fail(`Missing static framework slice for ${slice.name} at: ${framework}`);
     }
+    const binary = path.join(framework, slice.name === "macos"
+      ? path.join("Versions", "A", "CupThreadFeedback")
+      : "CupThreadFeedback");
+    if (!existsSync(binary)) {
+      fail(`Missing static binary for ${slice.name} at: ${binary}`);
+    }
+    verifyStaticBinary(framework, SLICE_ARCHS[slice.name]);
   }
 
   console.log("• assembling XCFramework");
   const xcframework = path.join(work, "CupThreadFeedback.xcframework");
   run("xcodebuild", ["-create-xcframework", ...frameworks.flatMap((f) => ["-framework", f]), "-output", xcframework]);
 
-  console.log("• verifying embedded resource bundles");
+  console.log("• verifying static XCFramework slices");
+  verifyStaticXCFramework(xcframework);
+
+  console.log("• staging resource bundle");
   const sourceLprojs = readdirSync(path.join(ROOT, "Sources", "CupThreadFeedback", "Resources"))
     .filter((name) => name.endsWith(".lproj"));
-  verifyEmbeddedResourceBundles(xcframework, sourceLprojs);
+  const releaseDir = path.join(work, `CupThreadFeedback-${version}`);
+  mkdirSync(releaseDir, { recursive: true });
+  run("cp", ["-R", xcframework, path.join(releaseDir, "CupThreadFeedback.xcframework")]);
+  run("cp", ["-R", findBuiltResourceBundle(path.join(work, "derived-data", "ios"), "ios"), path.join(releaseDir, RESOURCE_BUNDLE_NAME)]);
+  writeFileSync(path.join(releaseDir, "INSTALL.md"), installInstructionsMarkdown(version));
+  verifyResourceBundle(path.join(releaseDir, RESOURCE_BUNDLE_NAME), sourceLprojs);
 
   const filename = `CupThreadFeedback-${version}.xcframework.zip`;
   const zipPath = path.join(work, filename);
-  run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", xcframework, zipPath]);
+  run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", releaseDir, zipPath]);
 
   const artifact = {
-    name: "XCFramework (iOS · macOS · visionOS · tvOS)",
+    name: "XCFramework (iOS · macOS · visionOS · tvOS, static)",
     filename,
     url: `${CDN_BASE}/sdks/apple/${filename}`,
     size: humanSize(statSync(zipPath).size),
     sha256: sha256(zipPath)
   };
   console.log(`  ${filename}  ${artifact.size}  sha256:${artifact.sha256}`);
+
+  await verifyStaticConsumer(zipPath, work);
 
   const releaseInfo = {
     sdk: "apple",
@@ -260,6 +508,8 @@ async function main() {
     artifact,
     notes: [
       `CupThread Apple SDK v${version}`,
+      "Static-library XCFramework: hosts link the SDK into their own binary (no embedded dylib, dead-code stripping applies).",
+      "The zip carries the localized-strings bundle — add it to your app target's Copy Bundle Resources (see INSTALL.md).",
       "SwiftUI surfaces: roadmap board, What's New, feature requests, feedback composer.",
       "iOS 17+ · macOS 14+ (universal arm64 + x86_64) · visionOS 1.0+ · tvOS 17+.",
       `Binary target with checksum ${artifact.sha256}.`

@@ -5,12 +5,12 @@ import PhotosUI
 
 /// Structured feedback form with a built-in success state.
 ///
-/// The draft is pre-filled with the host app's platform and version. Contact
-/// fields are optional; environment details are sent automatically and shown
-/// to the user before submitting. Photo attachments selected via the photo picker
-/// are stripped of sensitive metadata (EXIF GPS coordinates, camera details, timestamps)
-/// before upload by default to protect user privacy. On success the view shows an acknowledgment
-/// (and calls `onSubmit` for host apps that need the result).
+/// The draft is pre-filled with the host app's platform, marketing version,
+/// and build number. Contact fields are optional. Photo attachments selected via
+/// the photo picker are stripped of sensitive metadata (EXIF GPS coordinates,
+/// camera details, timestamps) before upload by default to protect user privacy.
+/// On success the view shows an acknowledgment (and calls `onSubmit` for host
+/// apps that need the result).
 public struct FeedbackComposerView: View {
     public let client: FeedbackClient
     public let userToken: String?
@@ -49,7 +49,10 @@ public struct FeedbackComposerView: View {
     ///     An explicit non-nil value is authoritative and takes precedence over console
     ///     configuration. When `nil`, falls back to the fetched
     ///     ``PublicAppConfig/maxAttachmentBytes`` or
-    ///     ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB).
+    ///     ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB). Photos
+    ///     larger than the limit are automatically downscaled and re-encoded
+    ///     as JPEG to fit before upload (see
+    ///     ``PhotoAttachmentHelper/downscaledImageData(_:limit:maxDimension:)``).
     ///   - stripSensitiveMetadata: When `true` (the default), photo attachments selected
     ///     via the photo picker are re-encoded to strip GPS coordinates, camera details,
     ///     and sensitive EXIF metadata before upload. Multi-frame animations (such as GIF or
@@ -289,47 +292,19 @@ public struct FeedbackComposerView: View {
         }
     }
 
-    private struct PreparedPhoto {
-        let data: Data
-        let mimeType: String
-        let fileExtension: String
-    }
-
     /// Loads the picked photo and normalizes it for the upload API's media
-    /// policy: SVG is rejected locally, HEIC/HEIF photos and unrecognized
+    /// policy: oversized photos are downscaled to fit the configured byte
+    /// limit, SVG is rejected locally, HEIC/HEIF photos and unrecognized
     /// containers are transcoded to JPEG, and metadata is stripped.
-    private func loadAndPreparePhotoData(from item: PhotosPickerItem) async throws -> PreparedPhoto {
-        guard var data = try await item.loadTransferable(type: Data.self) else {
+    private func loadAndPreparePhotoData(from item: PhotosPickerItem) async throws -> PhotoAttachmentHelper.PreparedPhoto {
+        guard let data = try await item.loadTransferable(type: Data.self) else {
             throw NSError(domain: "CupThread", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not load photo data"])
         }
-        let limit = attachmentState.maxAttachmentBytes
-        try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: limit)
-
-        if PhotoAttachmentHelper.looksLikeSVG(data) {
-            throw AttachmentValidationError.unsupportedType
-        }
-
-        if stripSensitiveMetadata {
-            guard let sanitized = PhotoAttachmentHelper.strippingSensitiveMetadata(from: data) else {
-                throw AttachmentValidationError.unprocessableImage
-            }
-            data = sanitized
-        }
-
-        // The upload API verifies magic bytes and accepts PNG, JPEG, WebP,
-        // and GIF only — transcode HEIC/HEIF (the iPhone photo default) and
-        // anything it cannot verify.
-        if PhotoAttachmentHelper.requiresJPEGTranscode(data) {
-            guard let jpeg = PhotoAttachmentHelper.jpegRepresentationResampled(from: data) else {
-                throw AttachmentValidationError.unsupportedType
-            }
-            data = jpeg
-        }
-
-        try PhotoAttachmentHelper.validateAttachmentSize(data.count, limit: limit)
-
-        let metadata = PhotoAttachmentHelper.detectImageFormat(from: data)
-        return PreparedPhoto(data: data, mimeType: metadata.mimeType, fileExtension: metadata.fileExtension)
+        return try PhotoAttachmentHelper.prepareForUpload(
+            data,
+            limit: attachmentState.maxAttachmentBytes,
+            stripSensitiveMetadata: stripSensitiveMetadata
+        )
     }
     #endif
 

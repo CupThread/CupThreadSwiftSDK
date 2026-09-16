@@ -18,13 +18,16 @@ public struct FeatureRequestComment: Codable, Identifiable, Equatable, Sendable 
     public let authorEmail: String?
     /// Avatar URL of the comment author, when given.
     public let authorAvatarUrl: String?
-    /// Clerk user id of the comment author, when given.
+    /// App-scoped pseudonymous user identifier of the comment author (e.g.
+    /// `u_ab12cd34`), when given. Stable within one app only — never assume
+    /// a `user_` prefix or compare it across apps.
     public let authorClerkId: String?
     /// The comment body text.
     public let body: String
     /// Id of the parent comment this is a reply to, when applicable.
     public let parentId: String?
-    /// Clerk user id of the author being replied to, when applicable.
+    /// App-scoped pseudonymous identifier of the author being replied to,
+    /// when applicable. Same app-scoping caveat as ``authorClerkId``.
     public let replyToClerkId: String?
     /// Display name of the author being replied to, when applicable.
     public let replyToAuthorName: String?
@@ -77,7 +80,9 @@ public struct CommentDraft: Equatable, Sendable {
     public var authorAvatarUrl: String
     /// Id of the parent comment this is a reply to, when replying.
     public var parentId: String?
-    /// Clerk user id of the author being replied to, when replying.
+    /// App-scoped pseudonymous identifier of the author being replied to
+    /// (e.g. `u_ab12cd34`), taken verbatim from the parent comment's
+    /// ``FeatureRequestComment/authorClerkId``; pass it through unchanged.
     public var replyToClerkId: String?
     /// Display name of the author being replied to, when replying.
     public var replyToAuthorName: String?
@@ -123,7 +128,8 @@ public struct CommentDisplayModel: Equatable, Identifiable, Sendable {
     public let authorName: String?
     /// Avatar URL, or nil if redacted due to moderation.
     public let authorAvatarUrl: String?
-    /// Clerk user id for profile navigation, or nil if redacted.
+    /// App-scoped pseudonymous user id for profile navigation (e.g.
+    /// `u_ab12cd34`), or nil if redacted.
     public let authorClerkId: String?
     /// Whether users can reply to this comment.
     public let canReply: Bool
@@ -131,7 +137,7 @@ public struct CommentDisplayModel: Equatable, Identifiable, Sendable {
     public let canOpenAuthorProfile: Bool
     /// Display name of the author being replied to, when applicable.
     public let replyToAuthorName: String?
-    /// Clerk user id of the author being replied to, when applicable.
+    /// App-scoped pseudonymous id of the author being replied to, when applicable.
     public let replyToClerkId: String?
     /// Parsed creation date.
     public let createdAtDate: Date?

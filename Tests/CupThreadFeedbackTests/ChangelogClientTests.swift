@@ -5,6 +5,7 @@ import Testing
 // All network tests share the static MockURLProtocol handler, so they run serialized.
 // This suite uses its own base host so it can run in parallel with the other suites.
 @Suite("ChangelogClient", .serialized)
+// swiftlint:disable:next type_body_length
 struct ChangelogClientTests {
     static let apiHost = "changelog.example.com"
 
@@ -196,8 +197,58 @@ struct ChangelogClientTests {
         #expect(request.httpMethod == "POST")
         let query = try #require(request.url?.query)
         #expect(query.contains("token=signed-token-abc"))
+        // The endpoint content-negotiates an HTML landing page for browsers;
+        // without an explicit JSON preference the JSON result is not guaranteed.
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
 
         #expect(result.unsubscribed == true)
+    }
+
+    @Test func unsubscribeThrowsOnMethodNotAllowed() async throws {
+        // A JSON client that hits the non-destructive GET form of the
+        // endpoint receives 405 with an `Allow: POST` header.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 405),
+                try encodeJSON([
+                    "error": "GET does not unsubscribe. POST the token to this endpoint to unsubscribe."
+                ])
+            )
+        }
+
+        do {
+            _ = try await Self.makeChangelogClient().unsubscribeFromChangelog(token: "signed-token-abc")
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .unexpectedStatus(let code, let message, _) = error {
+                #expect(code == 405)
+                #expect(message.contains("GET does not unsubscribe"))
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test func unsubscribeThrowsOnInvalidToken() async throws {
+        // Missing/invalid/expired tokens keep returning 400 as before.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 400), try encodeJSON(["error": "Invalid or expired token"]))
+        }
+
+        do {
+            _ = try await Self.makeChangelogClient().unsubscribeFromChangelog(token: "stale-token")
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .unexpectedStatus(let code, _, _) = error {
+                #expect(code == 400)
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
     }
 
     // MARK: - User attributes

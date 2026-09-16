@@ -74,9 +74,15 @@ func makeClient(
     baseURL: URL = URL(string: "https://test.example.com")!,
     appKey: String = "app_testkey123456",
     platform: FeedbackPlatform = .ios,
-    overlayPresenter: (any ChangelogOverlayPresenter)? = nil
+    overlayPresenter: (any ChangelogOverlayPresenter)? = nil,
+    signingSecret: String? = nil
 ) -> FeedbackClient {
-    let config = FeedbackClientConfiguration(baseURL: baseURL, appKey: appKey, defaultPlatform: platform)
+    let config = FeedbackClientConfiguration(
+        baseURL: baseURL,
+        appKey: appKey,
+        defaultPlatform: platform,
+        signingSecret: signingSecret
+    )
     return FeedbackClient(configuration: config, session: makeMockSession(), overlayPresenter: overlayPresenter)
 }
 
