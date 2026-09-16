@@ -135,6 +135,11 @@ public struct FeedbackComposerView: View {
 
             submitBar
         }
+        .composerDismissGuard(
+            hasContent: draft.hasContent || attachmentState.isUploading,
+            isSubmitting: isSubmitting,
+            discardTitleKey: "cupthread.feedback.discard_title"
+        )
     }
 
     private var contentSection: some View {

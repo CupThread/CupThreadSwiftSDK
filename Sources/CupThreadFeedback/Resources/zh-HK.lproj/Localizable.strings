@@ -91,3 +91,11 @@
 "cupthread.features.vote_rate_limited" = "投票太頻繁了，請一分鐘後再試。";
 "cupthread.features.load_more" = "載入更多";
 "cupthread.features.load_more_hint" = "顯示下一頁功能請求。";
+
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "取消";
+"cupthread.common.discard" = "丟棄";
+"cupthread.common.keep_editing" = "繼續編輯";
+"cupthread.feedback.discard_title" = "丟棄這則意見反饋？";
+"cupthread.features.compose_discard_title" = "丟棄這個建議？";
+"cupthread.comments.discard_title" = "丟棄這則留言？";

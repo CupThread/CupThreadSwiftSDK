@@ -91,3 +91,11 @@
 "cupthread.features.vote_rate_limited" = "Está a votar demasiado rápido. Tente novamente dentro de um minuto.";
 "cupthread.features.load_more" = "Carregar mais";
 "cupthread.features.load_more_hint" = "Mostra a próxima página de pedidos de funcionalidades.";
+
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "Cancelar";
+"cupthread.common.discard" = "Descartar";
+"cupthread.common.keep_editing" = "Continuar a editar";
+"cupthread.feedback.discard_title" = "Descartar este feedback?";
+"cupthread.features.compose_discard_title" = "Descartar esta sugestão de recurso?";
+"cupthread.comments.discard_title" = "Descartar este comentário?";

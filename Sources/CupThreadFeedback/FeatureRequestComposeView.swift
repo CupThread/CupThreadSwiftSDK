@@ -6,7 +6,6 @@ struct FeatureRequestComposeView: View {
     let userToken: String
     let onSubmitted: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var draft = FeatureRequestDraft()
     @State private var isSubmitting = false
     @State private var submitError: String?
@@ -53,9 +52,6 @@ struct FeatureRequestComposeView: View {
             .frame(minWidth: 460, minHeight: 420)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(CupThreadStrings.tr("cupthread.whatsnew.close_button")) { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(
                         isSubmitting
@@ -67,6 +63,11 @@ struct FeatureRequestComposeView: View {
                     .disabled(isSubmitting || !canSubmit)
                 }
             }
+            .composerDismissGuard(
+                hasContent: draft.hasContent,
+                isSubmitting: isSubmitting,
+                discardTitleKey: "cupthread.features.compose_discard_title"
+            )
         }
     }
 

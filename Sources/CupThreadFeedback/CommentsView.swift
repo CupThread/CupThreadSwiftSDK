@@ -10,7 +10,6 @@ public struct CommentsView: View {
     public let featureRequestId: String
     public let featureRequestTitle: String
 
-    @Environment(\.dismiss) private var dismiss
     @State private var comments: [FeatureRequestComment] = []
     @State private var isLoading = true
     @State private var loadError: String?
@@ -68,13 +67,11 @@ public struct CommentsView: View {
         #if os(iOS) || os(visionOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button(CupThreadStrings.tr("cupthread.whatsnew.close_button")) {
-                    dismiss()
-                }
-            }
-        }
+        .composerDismissGuard(
+            hasContent: draft.hasContent,
+            isSubmitting: isSubmitting,
+            discardTitleKey: "cupthread.comments.discard_title"
+        )
         .sheet(isPresented: Binding(
             get: { selectedProfileUserId != nil },
             set: { if !$0 { selectedProfileUserId = nil } }

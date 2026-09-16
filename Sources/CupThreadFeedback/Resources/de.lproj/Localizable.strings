@@ -91,3 +91,11 @@
 "cupthread.features.vote_rate_limited" = "Du stimmst zu schnell ab. Bitte versuche es in einer Minute erneut.";
 "cupthread.features.load_more" = "Mehr laden";
 "cupthread.features.load_more_hint" = "Zeigt die nächste Seite der Funktionsanfragen.";
+
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "Abbrechen";
+"cupthread.common.discard" = "Verwerfen";
+"cupthread.common.keep_editing" = "Weiter bearbeiten";
+"cupthread.feedback.discard_title" = "Dieses Feedback verwerfen?";
+"cupthread.features.compose_discard_title" = "Diesen Funktionswunsch verwerfen?";
+"cupthread.comments.discard_title" = "Diesen Kommentar verwerfen?";

@@ -91,3 +91,11 @@
 "cupthread.features.vote_rate_limited" = "Du stemmer for hurtigt. Prøv igen om et minut.";
 "cupthread.features.load_more" = "Indlæs flere";
 "cupthread.features.load_more_hint" = "Viser næste side af funktionsønsker.";
+
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "Annuller";
+"cupthread.common.discard" = "Kassér";
+"cupthread.common.keep_editing" = "Fortsæt med redigering";
+"cupthread.feedback.discard_title" = "Kassér denne feedback?";
+"cupthread.features.compose_discard_title" = "Kassér dette funktionsønske?";
+"cupthread.comments.discard_title" = "Kassér denne kommentar?";

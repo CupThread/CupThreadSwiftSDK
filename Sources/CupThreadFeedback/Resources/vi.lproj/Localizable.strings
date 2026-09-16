@@ -91,3 +91,11 @@
 "cupthread.features.vote_rate_limited" = "Bạn đang bình chọn quá nhanh. Vui lòng thử lại sau một phút.";
 "cupthread.features.load_more" = "Tải thêm";
 "cupthread.features.load_more_hint" = "Hiển thị trang tiếp theo của các yêu cầu tính năng.";
+
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "Hủy";
+"cupthread.common.discard" = "Xoá";
+"cupthread.common.keep_editing" = "Tiếp tục chỉnh sửa";
+"cupthread.feedback.discard_title" = "Xoá phản hồi này?";
+"cupthread.features.compose_discard_title" = "Xoá đề xuất tính năng này?";
+"cupthread.comments.discard_title" = "Xoá bình luận này?";
