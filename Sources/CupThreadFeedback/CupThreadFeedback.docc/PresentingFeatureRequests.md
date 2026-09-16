@@ -14,7 +14,7 @@ Key features:
 - **Optimistic voting**: Immediate UI response with background server synchronization and duplicate click throttling.
 - **Real-time search**: Debounced search querying the CupThread backend.
 - **Version filtering**: Filter requests by targeted milestone release versions.
-- **Anonymous user identity**: Managed by ``UserTokenStore`` so upvotes and submissions persist across app restarts without user login.
+- **Anonymous user identity**: Managed by ``UserTokenStore`` (scoped per app key) so upvotes and submissions persist across app restarts without user login.
 
 ## Basic usage
 
@@ -26,12 +26,13 @@ import CupThreadFeedback
 
 struct FeatureRequestsTab: View {
     let client: FeedbackClient
+    let tokenStore = UserTokenStore(appKey: "app_xxx")
 
     var body: some View {
         NavigationStack {
             FeatureRequestsView(
                 client: client,
-                userToken: UserTokenStore.shared.token
+                userToken: tokenStore.token
             )
         }
     }
@@ -45,7 +46,7 @@ If you have a quick action or shortcut in your app (such as "Suggest a Feature" 
 ```swift
 FeatureRequestsView(
     client: client,
-    userToken: UserTokenStore.shared.token,
+    userToken: tokenStore.token,
     autoPresentCompose: true
 )
 ```
@@ -57,7 +58,7 @@ You can pre-filter requests to a specific topic or component:
 ```swift
 FeatureRequestsView(
     client: client,
-    userToken: UserTokenStore.shared.token,
+    userToken: tokenStore.token,
     initialSearchText: "Widgets"
 )
 ```

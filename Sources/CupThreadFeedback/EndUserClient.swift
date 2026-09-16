@@ -66,6 +66,28 @@ extension FeedbackClient {
         return try decoder.decode(DataErasureResult.self, from: data)
     }
 
+    /// Erases the end user's profile using the identity held by a
+    /// ``UserTokenStore``, and drops the store's identity after a successful
+    /// erasure.
+    ///
+    /// The server rotates the anonymous token on erasure — the old token
+    /// stops working immediately — so this overload calls
+    /// ``UserTokenStore/reset()`` when the response reports `erased: true`;
+    /// the next ``UserTokenStore/token`` read mints a fresh identity and the
+    /// revoked one is never replayed. When the result is `erased: false`
+    /// (no profile matched the identity), the store is left untouched.
+    ///
+    /// - Parameter store: The store whose identity is erased and reset.
+    /// - Returns: Whether a profile was erased.
+    /// - Throws: Same errors as ``eraseMyData(userToken:)``.
+    public func eraseMyData(store: UserTokenStore) async throws -> DataErasureResult {
+        let result = try await eraseMyData(userToken: store.token)
+        if result.erased {
+            store.reset()
+        }
+        return result
+    }
+
     /// Links the anonymous end-user profile to an authenticated user session
     /// (e.g. a social-login Clerk session token), for apps that let users
     /// transition from anonymous voting/feedback to authenticated accounts.

@@ -25,12 +25,13 @@ import CupThreadFeedback
 struct FeedbackSheet: View {
     let client: FeedbackClient
     @Environment(\.dismiss) private var dismiss
+    let tokenStore = UserTokenStore(appKey: "app_xxx")
 
     var body: some View {
         NavigationStack {
             FeedbackComposerView(
                 client: client,
-                userToken: UserTokenStore.shared.token,
+                userToken: tokenStore.token,
                 onSubmit: { result in
                     print("Feedback submitted: \(result.submissionId)")
                     dismiss()
@@ -54,7 +55,7 @@ draft.metadata = ["plan": "pro", "tier": "gold"]
 FeedbackComposerView(
     client: client,
     initialDraft: draft,
-    userToken: UserTokenStore.shared.token
+    userToken: tokenStore.token
 )
 ```
 
@@ -68,7 +69,7 @@ let attachment = try await client.uploadAttachment(
     data: screenshotData,
     filename: "screenshot.png",
     mimeType: "image/png",
-    userToken: UserTokenStore.shared.token
+    userToken: tokenStore.token
 )
 
 // 2. Prepare the draft
@@ -78,7 +79,7 @@ draft.description = "The new dark mode looks fantastic."
 draft.attachments = [attachment]
 
 // 3. Submit
-let result = try await client.submit(draft, userToken: UserTokenStore.shared.token)
+let result = try await client.submit(draft, userToken: tokenStore.token)
 print("Submitted ID: \(result.submissionId)")
 ```
 

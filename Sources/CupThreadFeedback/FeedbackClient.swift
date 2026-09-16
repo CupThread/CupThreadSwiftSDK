@@ -2,7 +2,10 @@ import Foundation
 
 /// Connection settings for a ``FeedbackClient``.
 ///
-/// Create one configuration per CupThread app and share it across clients:
+/// Create one configuration per CupThread app and share it across clients.
+/// Hosts embedding several CupThread apps should also give each app its own
+/// ``UserTokenStore/init(appKey:)`` — the anonymous end-user identity is
+/// scoped per app key, so votes, comments, and submissions stay isolated:
 ///
 /// ```swift
 /// let configuration = FeedbackClientConfiguration(
@@ -284,6 +287,10 @@ public struct FeedbackClient: Sendable {
     /// ``FeatureRequestsView`` and ``RoadmapBoardView`` spend a single
     /// per-IP budget.
     let searchThrottle: SearchRequestThrottle
+    /// App-key-scoped anonymous identity backing every call that omits an
+    /// explicit `userToken`. One client ⇒ one identity per CupThread app,
+    /// so hosts embedding several apps never bleed identities across them.
+    let tokenStore: UserTokenStore
 
     /// Creates a client for a CupThread app.
     /// - Parameters:
@@ -300,7 +307,8 @@ public struct FeedbackClient: Sendable {
     init(
         configuration: FeedbackClientConfiguration,
         session: URLSession = .shared,
-        overlayPresenter: (any ChangelogOverlayPresenter)? = nil
+        overlayPresenter: (any ChangelogOverlayPresenter)? = nil,
+        tokenStore: UserTokenStore? = nil
     ) {
         self.configuration = configuration
         self.session = session
@@ -308,6 +316,7 @@ public struct FeedbackClient: Sendable {
         self.decoder = JSONDecoder()
         self.overlayPresenter = overlayPresenter
         self.searchThrottle = SearchRequestThrottle()
+        self.tokenStore = tokenStore ?? UserTokenStore(appKey: configuration.appKey)
     }
 
     /// Submits a feedback draft.
@@ -333,7 +342,7 @@ public struct FeedbackClient: Sendable {
     ///   - userToken: Optional anonymous token (UUID string). When provided it is
     ///     sent as `X-User-Token` so the backend can link the submission to an end-user identity.
     ///     When `userToken` is `nil` and the draft contains attachments with upload IDs,
-    ///     the SDK falls back to ``UserTokenStore/shared`` so anonymous flows keep a stable
+    ///     the SDK falls back to this client's app-key-scoped store so anonymous flows keep a stable
     ///     identity across session creation and feedback submission.
     /// - Returns: The server's receipt, including the submission id and any warning.
     /// - Throws: ``FeedbackClientError/scanRejected(message:requestId:)`` when an attachment
@@ -394,15 +403,17 @@ public struct FeedbackClient: Sendable {
     private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]
 
     /// Resolves an anonymous identity for requests that require one.
-    /// Falls back to the shared anonymous token store when the caller did not pass one.
+    /// Falls back to this client's app-key-scoped token store when the caller
+    /// did not pass one, so identities never bleed across app keys.
     func resolvedIdentity(_ userToken: String?) -> String? {
-        userToken?.nilIfEmpty ?? UserTokenStore.shared.token
+        userToken?.nilIfEmpty ?? tokenStore.token
     }
 
     /// Resolves the identity to send on feedback submissions.
     ///
     /// When `userToken` is `nil` and the submission contains attachments with upload IDs,
-    /// falls back to ``UserTokenStore/shared`` so the submitter matches the uploader identity.
+    /// falls back to this client's app-key-scoped store so the submitter matches the
+    /// uploader identity.
     /// When there are no attachments and `userToken` is `nil`, the header is omitted.
     func resolvedSubmitUserToken(_ userToken: String?, hasAttachments: Bool) -> String? {
         if let token = userToken?.nilIfEmpty {

@@ -60,6 +60,64 @@ struct EndUserClientTests {
         }
     }
 
+    @Test func eraseWithStoreResetsIdentityAfterSuccessfulErasure() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            let token = request.value(forHTTPHeaderField: "X-User-Token")
+            return (makeHTTPResponse(), try encodeJSON(["erased": true, "endUserId": token]))
+        }
+
+        let isolated = makeIsolatedTokenStore()
+        defer { isolated.cleanup() }
+        let identity = isolated.store.token
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, tokenStore: isolated.store)
+        let result = try await client.eraseMyData(store: isolated.store)
+
+        #expect(result.erased == true)
+        // The server rotated the token; the store must drop it.
+        let fresh = isolated.store.token
+        #expect(fresh != identity)
+        #expect(isolated.defaults.string(forKey: isolated.tokenKey) == fresh)
+    }
+
+    @Test func eraseWithStoreKeepsIdentityWhenNothingWasErased() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 404), try encodeJSON(["erased": false, "error": "No profile found"]))
+        }
+
+        let isolated = makeIsolatedTokenStore()
+        defer { isolated.cleanup() }
+        let identity = isolated.store.token
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, tokenStore: isolated.store)
+        let result = try await client.eraseMyData(store: isolated.store)
+
+        #expect(result.erased == false)
+        #expect(isolated.store.token == identity)
+    }
+
+    @Test func eraseWithStorePropagatesErrorsWithoutResetting() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 429), try encodeJSON(["error": "Rate limited"]))
+        }
+
+        let isolated = makeIsolatedTokenStore()
+        defer { isolated.cleanup() }
+        let identity = isolated.store.token
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, tokenStore: isolated.store)
+        do {
+            _ = try await client.eraseMyData(store: isolated.store)
+            Issue.record("Expected error to be thrown")
+        } catch FeedbackClientError.rateLimited {
+            // expected
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+
+        #expect(isolated.store.token == identity)
+    }
+
     @Test func linkSendsBearerAndIdentityHeaders() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in

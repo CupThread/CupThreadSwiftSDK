@@ -35,6 +35,10 @@ struct ContentView: View {
         )
     )
 
+    /// Identity scoped to this demo's app key — hosts embedding several
+    /// CupThread apps create one store per app key.
+    let tokenStore = UserTokenStore(appKey: Self.appKey)
+
     @State private var tab: Tab = Tab.fromLaunchArguments()
     @State private var appearance: SdkAppearance = .defaults
     @State private var showChangelogOverlay = ProcessInfo.processInfo.arguments.contains("-openChangelogOverlay")
@@ -53,7 +57,7 @@ struct ContentView: View {
                 // NavigationStack so toolbar items (e.g. the compose button) render.
                 if appearance.features.roadmap {
                     NavigationStack {
-                        RoadmapBoardView(client: client, userToken: UserTokenStore.shared.token)
+                        RoadmapBoardView(client: client, userToken: tokenStore.token)
                     }
                     .tabItem { Label("Roadmap", systemImage: "square.grid.3x3") }
                     .tag(Tab.roadmap)
@@ -61,7 +65,7 @@ struct ContentView: View {
 
                 if appearance.features.changelog {
                     NavigationStack {
-                        WhatsNewView(client: client, userToken: UserTokenStore.shared.token)
+                        WhatsNewView(client: client, userToken: tokenStore.token)
                             .toolbar {
                                 ToolbarItem(placement: .primaryAction) {
                                     Button("Latest") { showChangelogOverlay = true }
@@ -76,7 +80,7 @@ struct ContentView: View {
                     NavigationStack {
                         FeatureRequestsView(
                             client: client,
-                            userToken: UserTokenStore.shared.token,
+                            userToken: tokenStore.token,
                             autoPresentCompose: ProcessInfo.processInfo.arguments.contains("-openCompose"),
                             initialSearchText: Self.launchSearchText()
                         )
@@ -86,7 +90,7 @@ struct ContentView: View {
                 }
 
                 if appearance.features.feedback {
-                    FeedbackDemoView(client: client)
+                    FeedbackDemoView(client: client, userToken: tokenStore.token)
                         .tabItem { Label("Feedback", systemImage: "envelope") }
                         .tag(Tab.feedback)
                 }
@@ -104,6 +108,7 @@ struct ContentView: View {
 /// The SDK composer ships its own success acknowledgment; the demo just hosts it.
 struct FeedbackDemoView: View {
     let client: FeedbackClient
+    let userToken: String
 
     private static var demoInitialDraft: FeedbackDraft? {
         guard ProcessInfo.processInfo.arguments.contains("-prefillFeedback") else { return nil }
@@ -131,7 +136,7 @@ struct FeedbackDemoView: View {
             FeedbackComposerView(
                 client: client,
                 initialDraft: Self.demoInitialDraft,
-                userToken: UserTokenStore.shared.token
+                userToken: userToken
             )
         }
     }

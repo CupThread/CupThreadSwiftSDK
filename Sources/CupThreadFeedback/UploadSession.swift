@@ -81,7 +81,7 @@ extension FeedbackClient {
     /// Anonymous callers must present an `X-User-Token` — the session is
     /// always bound to an uploader identity, and feedback submission must
     /// later present the same identity. When `userToken` is `nil`, the SDK
-    /// falls back to ``UserTokenStore/shared`` so anonymous flows keep a
+    /// falls back to the client's app-key-scoped store so anonymous flows keep a
     /// stable identity.
     ///
     /// - Parameters:
@@ -204,8 +204,8 @@ extension FeedbackClient {
     /// Uploads one file end-to-end: creates a session bound to the end-user
     /// identity, then streams the bytes into the session's first slot.
     ///
-    /// When `userToken` is `nil`, the SDK falls back to ``UserTokenStore/shared``
-    /// so anonymous flows keep a stable identity across session creation and
+    /// When `userToken` is `nil`, the SDK falls back to the client's
+    /// app-key-scoped store so anonymous flows keep a stable identity across session creation and
     /// feedback submission.
     ///
     /// - Parameters:
