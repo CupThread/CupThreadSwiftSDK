@@ -36,10 +36,11 @@ let client = FeedbackClient(
 )
 ```
 
-Every end-user interaction is tied to an anonymous token so votes and pending requests survive relaunches without requiring sign-in. ``UserTokenStore`` persists one for you:
+Every end-user interaction is tied to an anonymous token so votes and pending requests survive relaunches without requiring sign-in. ``UserTokenStore`` persists one for you, scoped to your app key (hosts embedding several CupThread apps create one store per app key so identities never bleed across them):
 
 ```swift
-let userToken = UserTokenStore.shared.token
+let tokenStore = UserTokenStore(appKey: "app_xxx")
+let userToken = tokenStore.token
 ```
 
 ## Show a surface
@@ -51,7 +52,7 @@ struct FeedbackTab: View {
     var body: some View {
         CupThreadTheme(client: client) {
             NavigationStack {
-                FeatureRequestsView(client: client, userToken: UserTokenStore.shared.token)
+                FeatureRequestsView(client: client, userToken: tokenStore.token)
             }
         }
     }
@@ -93,7 +94,7 @@ var draft = FeedbackDraft.autofilled()
 draft.title = "Export to CSV"
 draft.description = "I would love to export my reports."
 
-let result = try await client.submit(draft, userToken: UserTokenStore.shared.token)
+let result = try await client.submit(draft, userToken: tokenStore.token)  // from the store created above
 print(result.submissionId)
 ```
 

@@ -24,12 +24,13 @@ import CupThreadFeedback
 
 struct WhatsNewTab: View {
     let client: FeedbackClient
+    let tokenStore = UserTokenStore(appKey: "app_xxx")
 
     var body: some View {
         NavigationStack {
             WhatsNewView(
                 client: client,
-                userToken: UserTokenStore.shared.token
+                userToken: tokenStore.token
             )
         }
     }

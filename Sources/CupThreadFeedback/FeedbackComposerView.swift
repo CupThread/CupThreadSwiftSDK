@@ -61,7 +61,7 @@ public struct FeedbackComposerView: View {
     ///   - userToken: Optional anonymous token; when given it is sent as
     ///     `X-User-Token` so submissions link to the end-user identity.
     ///     When `userToken` is `nil`, anonymous flows fall back to
-    ///     ``UserTokenStore/shared`` when attachments are uploaded and submitted.
+    ///     the client's app-key-scoped ``UserTokenStore`` when attachments are uploaded and submitted.
     ///   - maxAttachmentBytes: Optional client-side upload size cap in bytes.
     ///     An explicit non-nil value is authoritative and takes precedence over console
     ///     configuration. When `nil`, falls back to the fetched

@@ -1149,7 +1149,8 @@ struct FeedbackClientSubmitTests {
             return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
         }
 
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let isolated = makeIsolatedTokenStore()
+        let client = makeClient(baseURL: baseURL, appKey: appKey, tokenStore: isolated.store)
         var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
         draft.attachments = [
             FeedbackAttachment(kind: .image, uploadId: "upl-1", key: "upl-1", url: URL(string: "https://example.com/1")!)
@@ -1160,7 +1161,7 @@ struct FeedbackClientSubmitTests {
         let token = try #require(req.value(forHTTPHeaderField: "X-User-Token"))
         #expect(!token.isEmpty)
         #expect(UUID(uuidString: token) != nil)
-        #expect(token == UserTokenStore.shared.token)
+        #expect(token == isolated.store.token)
     }
 
     @Test func submitWithExplicitTokenSendsThatToken() async throws {
@@ -1375,7 +1376,8 @@ struct FeedbackClientUploadTests {
             return (makeHTTPResponse(status: 404), Data())
         }
 
-        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let isolated = makeIsolatedTokenStore()
+        let client = makeClient(baseURL: baseURL, appKey: appKey, tokenStore: isolated.store)
         let attachment = try await client.uploadAttachment(
             data: Data("test".utf8),
             filename: "f.txt",
@@ -1393,7 +1395,7 @@ struct FeedbackClientUploadTests {
         let submitToken = try #require(captured[2].value(forHTTPHeaderField: "X-User-Token"))
         #expect(!sessionToken.isEmpty)
         #expect(sessionToken == submitToken)
-        #expect(sessionToken == UserTokenStore.shared.token)
+        #expect(sessionToken == isolated.store.token)
     }
 
     @Test func sessionCreateRejects415WithTypedError() async throws {
