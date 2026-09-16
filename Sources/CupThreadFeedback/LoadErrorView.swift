@@ -38,3 +38,24 @@ struct LoadErrorView: View {
         .accessibilityLabel(CupThreadStrings.tr("cupthread.error.accessibility_failed", message))
     }
 }
+
+/// Transient inline warning notice — e.g. for a failed reload whose previous
+/// results stay on screen (non-destructive failure), or a failed vote.
+struct InlineNoticeBanner: View {
+    var icon: String = "exclamationmark.triangle.fill"
+    var tint: Color = .orange
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+            Text(message)
+                .font(.footnote.weight(.medium))
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+    }
+}

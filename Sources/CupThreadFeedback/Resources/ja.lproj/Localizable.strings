@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "投票の操作が早すぎます。1分後に再試行してください。";
 "cupthread.features.load_more" = "さらに読み込む";
 "cupthread.features.load_more_hint" = "機能リクエストの次のページを表示します。";
+
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "検索の頻度が高すぎます。1分待ってからもう一度お試しください。";

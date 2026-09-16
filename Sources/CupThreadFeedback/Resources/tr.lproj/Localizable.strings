@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "Oylarınız çok hızlı geldi. Lütfen bir dakika sonra tekrar deneyin.";
 "cupthread.features.load_more" = "Daha fazla yükle";
 "cupthread.features.load_more_hint" = "Sonraki sayfadaki özellik taleplerini gösterir.";
+
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "Çok hızlı arama yapıyorsunuz. Lütfen bir dakika bekleyip tekrar deneyin.";

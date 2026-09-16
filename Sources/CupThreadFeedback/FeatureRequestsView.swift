@@ -27,6 +27,9 @@ public struct FeatureRequestsView: View {
     @State private var selectedVersionID: String?
     @State private var isLoadingNextPage = false
     @State private var voteNotice: String?
+    /// Transient notice for a failed reload whose results stay on screen
+    /// (a reload failure never wipes already-rendered content).
+    @State private var reloadNotice: String?
 
     private var items: [FeatureRequestItem] {
         listState.items
@@ -34,6 +37,12 @@ public struct FeatureRequestsView: View {
 
     private var votingIds: Set<String> {
         listState.votingIds
+    }
+
+    /// The query actually sent to the server, trimmed to match the throttle's
+    /// duplicate detection.
+    private var trimmedSearchText: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Creates the feature requests list.
@@ -58,9 +67,11 @@ public struct FeatureRequestsView: View {
     }
 
     /// Any change restarts the task; while the user is typing, the leading sleep
-    /// debounces server calls (a restart cancels the previous sleep).
+    /// debounces server calls (a restart cancels the previous sleep). The key
+    /// is the trimmed query plus the version filter — the identity the shared
+    /// search throttle uses for duplicate suppression.
     private var filterKey: String {
-        "\(searchText)|\(selectedVersionID ?? "")"
+        "features|\(trimmedSearchText)|\(selectedVersionID ?? "")"
     }
 
     public var body: some View {
@@ -112,10 +123,19 @@ public struct FeatureRequestsView: View {
         .refreshable { await loadFeatureRequests() }
         .task { await loadVersions() }
         .task(id: filterKey) {
-            if !searchText.isEmpty {
-                try? await Task.sleep(for: .milliseconds(350))
-                guard !Task.isCancelled else { return }
+            guard !trimmedSearchText.isEmpty else {
+                // Plain listing: the backend does not rate-limit it, so no
+                // debounce or throttle admission is needed.
+                await loadFeatureRequests()
+                return
             }
+            // Debounce keystrokes: each change restarts this task, cancelling
+            // the previous sleep before it triggers a server call. The shared
+            // throttle then spaces query-bearing fetches below the server's
+            // 30/min per-IP search budget and skips duplicate queries.
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            guard await client.searchThrottle.waitForAdmission(key: filterKey) else { return }
             await loadFeatureRequests()
         }
         .task(id: showSubmittedBanner) {
@@ -132,6 +152,14 @@ public struct FeatureRequestsView: View {
             guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.25)) {
                 voteNotice = nil
+            }
+        }
+        .task(id: reloadNotice) {
+            guard reloadNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                reloadNotice = nil
             }
         }
         .sdkSurface(client: client, feature: .featureRequests)
@@ -158,7 +186,11 @@ public struct FeatureRequestsView: View {
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     if let voteNotice {
-                        VoteNoticeBanner(message: voteNotice)
+                        InlineNoticeBanner(message: voteNotice)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                    if let reloadNotice {
+                        InlineNoticeBanner(message: reloadNotice)
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     ForEach(items) { item in
@@ -196,6 +228,9 @@ public struct FeatureRequestsView: View {
                 Text(emptyStateText)
                     .foregroundStyle(.secondary)
             } else {
+                if let reloadNotice {
+                    InlineNoticeBanner(message: reloadNotice)
+                }
                 ForEach(items) { item in
                     FeatureRequestCard(
                         item: item,
@@ -248,22 +283,7 @@ public struct FeatureRequestsView: View {
 
     private var versionFilterToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            Menu {
-                Picker(CupThreadStrings.tr("cupthread.features.version_picker"), selection: $selectedVersionID) {
-                    Text(CupThreadStrings.tr("cupthread.features.all_versions")).tag(String?.none)
-                    ForEach(versions) { version in
-                        Text(version.label).tag(String?.some(version.id))
-                    }
-                }
-            } label: {
-                Label(
-                    selectedVersionID.flatMap { id in versions.first(where: { $0.id == id })?.label }
-                        ?? CupThreadStrings.tr("cupthread.features.all_versions"),
-                    systemImage: "line.3.horizontal.decrease.circle"
-                )
-            }
-            .disabled(versions.isEmpty)
-            .accessibilityLabel(CupThreadStrings.tr("cupthread.features.filter_by_version"))
+            VersionFilterMenu(selectedVersionID: $selectedVersionID, versions: versions)
         }
     }
 
@@ -309,6 +329,7 @@ public struct FeatureRequestsView: View {
     private func loadFeatureRequests() async {
         isLoading = true
         loadError = nil
+        reloadNotice = nil
         defer {
             isLoading = false
             hasLoadedOnce = true
@@ -317,13 +338,21 @@ public struct FeatureRequestsView: View {
             let result = try await client.fetchFeatureRequests(
                 userToken: userToken,
                 versionId: selectedVersionID,
-                query: searchText.isEmpty ? nil : searchText
+                query: trimmedSearchText.isEmpty ? nil : trimmedSearchText
             )
             guard !Task.isCancelled else { return }
             listState.applyPage(result, replacesExisting: true)
         } catch {
             guard !Task.isCancelled else { return }
-            loadError = error.localizedDescription
+            if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
+                await client.searchThrottle.enterCooldown()
+            }
+            switch SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty) {
+            case .inlineNotice(let message):
+                reloadNotice = message
+            case .fullScreenError(let message):
+                loadError = message
+            }
         }
     }
 
@@ -375,22 +404,29 @@ public struct FeatureRequestsView: View {
     }
 }
 
-// MARK: - Vote notice banner
+// MARK: - Version filter menu
 
-private struct VoteNoticeBanner: View {
-    let message: String
+private struct VersionFilterMenu: View {
+    @Binding var selectedVersionID: String?
+    let versions: [AppVersion]
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text(message)
-                .font(.footnote.weight(.medium))
-            Spacer(minLength: 0)
+        Menu {
+            Picker(CupThreadStrings.tr("cupthread.features.version_picker"), selection: $selectedVersionID) {
+                Text(CupThreadStrings.tr("cupthread.features.all_versions")).tag(String?.none)
+                ForEach(versions) { version in
+                    Text(version.label).tag(String?.some(version.id))
+                }
+            }
+        } label: {
+            Label(
+                selectedVersionID.flatMap { id in versions.first(where: { $0.id == id })?.label }
+                    ?? CupThreadStrings.tr("cupthread.features.all_versions"),
+                systemImage: "line.3.horizontal.decrease.circle"
+            )
         }
-        .padding(12)
-        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+        .disabled(versions.isEmpty)
+        .accessibilityLabel(CupThreadStrings.tr("cupthread.features.filter_by_version"))
     }
 }
 

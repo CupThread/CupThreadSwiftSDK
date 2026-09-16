@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "投票太頻繁了，請一分鐘後再試。";
 "cupthread.features.load_more" = "載入更多";
 "cupthread.features.load_more_hint" = "顯示下一頁功能請求。";
+
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "搜尋太頻繁了，請稍候一分鐘後再試。";

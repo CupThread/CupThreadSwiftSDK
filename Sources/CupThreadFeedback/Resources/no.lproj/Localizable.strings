@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "Du stemmer for raskt. Prøv igjen om ett minutt.";
 "cupthread.features.load_more" = "Last inn mer";
 "cupthread.features.load_more_hint" = "Viser neste side med funksjonsforespørsler.";
+
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "Du søker for raskt. Vent ett minutt og prøv igjen.";

@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "Głosujesz zbyt szybko. Spróbuj ponownie za minutę.";
 "cupthread.features.load_more" = "Wczytaj więcej";
 "cupthread.features.load_more_hint" = "Pokazuje następną stronę zgłoszeń funkcji.";
+
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "Zbyt szybko przeprowadzasz wyszukiwania. Odczekaj minutę i spróbuj ponownie.";

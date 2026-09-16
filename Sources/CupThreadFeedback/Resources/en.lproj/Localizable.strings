@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "You're voting too fast. Please try again in a minute.";
 "cupthread.features.load_more" = "Load More";
 "cupthread.features.load_more_hint" = "Shows the next page of feature requests.";
+
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "You're searching too fast. Please wait a minute and try again.";
