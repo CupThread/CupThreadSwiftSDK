@@ -255,10 +255,54 @@ private struct SdkAppearanceKey: EnvironmentKey {
     static let defaultValue: SdkAppearance? = nil
 }
 
+private struct SdkConfigStatusKey: EnvironmentKey {
+    static let defaultValue: SdkConfigStatus? = nil
+}
+
+private struct SdkConfigLoaderKey: EnvironmentKey {
+    static let defaultValue: SdkConfigLoader? = nil
+}
+
 extension EnvironmentValues {
     var sdkAppearance: SdkAppearance? {
         get { self[SdkAppearanceKey.self] }
         set { self[SdkAppearanceKey.self] = newValue }
+    }
+
+    var sdkConfigStatus: SdkConfigStatus? {
+        get { self[SdkConfigStatusKey.self] }
+        set { self[SdkConfigStatusKey.self] = newValue }
+    }
+
+    var sdkConfigLoader: SdkConfigLoader? {
+        get { self[SdkConfigLoaderKey.self] }
+        set { self[SdkConfigLoaderKey.self] = newValue }
+    }
+}
+
+// MARK: - Surface gating
+
+/// How a feature-gated surface should render for the current config status.
+enum SdkSurfaceResolution: Equatable {
+    /// The configuration resolved (fetched, or restored from cache) — render
+    /// with this appearance.
+    case resolved(SdkAppearance)
+    /// The first fetch is still in flight; hold the surface back instead of
+    /// assuming it is enabled.
+    case waiting
+    /// The fetch failed and no cached configuration exists — fail closed.
+    case unavailable
+}
+
+/// Decides how a feature-gated surface renders for the current config status.
+/// A status injected by a managing ``CupThreadTheme`` wins over the surface's
+/// own loader, so a themed hierarchy never fetches or gates twice.
+func sdkSurfaceResolution(injected: SdkConfigStatus?, local: SdkConfigStatus?) -> SdkSurfaceResolution {
+    switch injected ?? local ?? .loading {
+    case .ready(let appearance): return .resolved(appearance)
+    case .failed(let cached?, _): return .resolved(cached)
+    case .loading: return .waiting
+    case .failed(nil, _): return .unavailable
     }
 }
 
@@ -276,6 +320,13 @@ extension EnvironmentValues {
 /// }
 /// ```
 ///
+/// Configuration semantics (see ``SdkConfigStatus``): a successful fetch is
+/// persisted per app key, a later failed fetch keeps the last successful
+/// configuration in force, and a failure with no cache never enables all
+/// features — SDK surfaces stay unavailable until a retry succeeds. Host
+/// content still renders with default theming while the configuration is
+/// unavailable.
+///
 /// Individual SDK views already enforce feature flags on their own; this
 /// container exists so *host* content surrounding them matches the theme.
 public struct CupThreadTheme<Content: View>: View {
@@ -284,56 +335,115 @@ public struct CupThreadTheme<Content: View>: View {
     /// The wrapped host content.
     public let content: Content
 
-    @State private var appearance: SdkAppearance = .defaults
+    private let injectedLoader: SdkConfigLoader?
+    @StateObject private var ownedLoader: SdkConfigLoader
 
     /// Creates the theme container.
     /// - Parameters:
     ///   - client: The shared ``FeedbackClient`` used to fetch the console
     ///     configuration on first appearance.
+    ///   - configLoader: An optional host-owned ``SdkConfigLoader``. Pass one
+    ///     to observe ``SdkConfigLoader/status`` or trigger manual retries
+    ///     with ``SdkConfigLoader/load()``; when `nil` the container creates
+    ///     its own loader.
     ///   - content: The content to theme, collected by a result builder.
-    public init(client: FeedbackClient, @ViewBuilder content: () -> Content) {
+    public init(
+        client: FeedbackClient,
+        configLoader: SdkConfigLoader? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
         self.client = client
         self.content = content()
+        self.injectedLoader = configLoader
+        _ownedLoader = StateObject(wrappedValue: SdkConfigLoader(client: client))
     }
 
     public var body: some View {
+        if let injectedLoader {
+            ThemedRoot(loader: injectedLoader, content: content)
+        } else {
+            ThemedRoot(loader: ownedLoader, content: content)
+        }
+    }
+}
+
+@MainActor
+private struct ThemedRoot<Content: View>: View {
+    @ObservedObject var loader: SdkConfigLoader
+    let content: Content
+
+    private var appearance: SdkAppearance {
+        switch loader.status {
+        case .ready(let resolved): return resolved
+        case .failed(let cached?, _): return cached
+        case .loading, .failed(nil, _): return .defaults
+        }
+    }
+
+    var body: some View {
         content
             .tint(appearance.theme.accentColor)
             .preferredColorScheme(appearance.theme.preferredColorScheme)
             .environment(\.sdkAppearance, appearance)
+            .environment(\.sdkConfigStatus, loader.status)
+            .environment(\.sdkConfigLoader, loader)
             .safeWebOpenURL()
-            .task {
-                appearance = (try? await client.fetchAppConfig())?.sdk ?? .defaults
-            }
+            .task { await loader.load() }
     }
 }
 
 struct SdkSurfaceModifier: ViewModifier {
-    let client: FeedbackClient
     let feature: SdkFeature
 
-    @Environment(\.sdkAppearance) private var injected
-    @State private var fetched: SdkAppearance?
+    @Environment(\.sdkConfigStatus) private var injectedStatus
+    @Environment(\.sdkConfigLoader) private var injectedLoader
+    @StateObject private var loader: SdkConfigLoader
 
-    private var appearance: SdkAppearance { injected ?? fetched ?? .defaults }
+    init(client: FeedbackClient, feature: SdkFeature) {
+        self.feature = feature
+        _loader = StateObject(wrappedValue: SdkConfigLoader(client: client))
+    }
 
     func body(content: Content) -> some View {
-        Group {
-            if appearance.features.isEnabled(feature) {
-                content
-            } else {
-                FeatureDisabledView(feature: feature)
+        gatedBody(content: content)
+            .safeWebOpenURL()
+            .task {
+                guard injectedStatus == nil else { return }
+                await loader.load()
+            }
+    }
+
+    @MainActor
+    @ViewBuilder
+    private func gatedBody(content: Content) -> some View {
+        switch sdkSurfaceResolution(injected: injectedStatus, local: loader.status) {
+        case .resolved(let appearance):
+            Group {
+                if appearance.features.isEnabled(feature) {
+                    content
+                } else {
+                    FeatureDisabledView(feature: feature)
+                }
+            }
+            .tint(appearance.theme.accentColor)
+            .preferredColorScheme(appearance.theme.preferredColorScheme)
+            .environment(\.sdkAppearance, appearance)
+        case .waiting:
+            SdkConfigWaitingView()
+        case .unavailable:
+            LoadErrorView(message: CupThreadStrings.tr("cupthread.config.unavailable_description")) {
+                await (injectedLoader ?? loader).load()
             }
         }
-        .tint(appearance.theme.accentColor)
-        .preferredColorScheme(appearance.theme.preferredColorScheme)
-        .environment(\.sdkAppearance, appearance)
-        .safeWebOpenURL()
-        .task {
-            if injected == nil {
-                fetched = (try? await client.fetchAppConfig())?.sdk ?? .defaults
-            }
-        }
+    }
+}
+
+/// Placeholder shown while the first configuration fetch is in flight.
+struct SdkConfigWaitingView: View {
+    var body: some View {
+        ProgressView()
+            .frame(maxWidth: .infinity, minHeight: 120)
+            .padding()
     }
 }
 

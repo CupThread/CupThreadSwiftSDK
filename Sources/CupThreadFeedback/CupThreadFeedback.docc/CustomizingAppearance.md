@@ -35,6 +35,14 @@ struct MyApp: App {
 
 ``CupThreadTheme`` automatically fetches your remote ``SdkAppearance`` and injects the selected theme colors, corner radii, and surface options into the SwiftUI environment.
 
+The fetched configuration is resilient by design:
+
+- Every successful fetch is persisted per app key.
+- If a later fetch fails, the last successful configuration stays in force — theme, feature flags, and overlay copy never roll back to defaults mid-outage.
+- If the very first fetch fails (nothing cached yet), SDK surfaces stay unavailable with a retry action instead of silently enabling everything. Your host content still renders with default theming.
+
+Pass a host-owned ``SdkConfigLoader`` to ``CupThreadTheme`` to observe the load state or trigger manual retries from your own UI.
+
 ## Theme presets
 
 The SDK supports multiple visual presets configured in the developer console:
@@ -52,7 +60,7 @@ You can enable or disable individual SDK surfaces in the console:
 - **Roadmap** (`.roadmap`)
 - **Changelog** (`.changelog`)
 
-When a feature is disabled in the developer console, the corresponding view automatically displays an informative placeholder banner informing the user that the section is currently unavailable, preventing crashes or blank states.
+When a feature is disabled in the developer console, the corresponding view automatically displays an informative placeholder banner informing the user that the section is currently unavailable, preventing crashes or blank states. While the configuration cannot be loaded at all (see above), surfaces stay unavailable rather than defaulting to enabled, so a console kill-switch is never bypassed by a network failure.
 
 ## Programmatic configuration access
 
@@ -68,6 +76,8 @@ print("Roadmap enabled: \(config.appearance.features.roadmap)")
 ## See also
 
 - ``CupThreadTheme``
+- ``SdkConfigLoader``
+- ``SdkConfigStatus``
 - ``SdkAppearance``
 - ``SdkTheme``
 - ``SdkFeatures``

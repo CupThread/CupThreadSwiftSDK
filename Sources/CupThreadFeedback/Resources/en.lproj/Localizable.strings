@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "You're voting too fast. Please try again in a minute.";
 "cupthread.features.load_more" = "Load More";
 "cupthread.features.load_more_hint" = "Shows the next page of feature requests.";
+
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Couldn't reach the CupThread server to check whether this surface is available. Check your connection and try again.";

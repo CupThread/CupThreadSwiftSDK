@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "Stai votando troppo velocemente. Riprova tra un minuto.";
 "cupthread.features.load_more" = "Carica altro";
 "cupthread.features.load_more_hint" = "Mostra la pagina successiva delle richieste di funzionalità.";
+
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Impossibile raggiungere il server CupThread per verificare se questa sezione è disponibile. Controlla la connessione e riprova.";
