@@ -187,6 +187,21 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
         self.metadata = metadata
         self.attachments = attachments
     }
+
+    /// Whether the draft holds anything the user typed or attached.
+    ///
+    /// Autofilled environment fields (`platform`, `appVersion`, `buildNumber`)
+    /// and `metadata` do not count — only title, description, contact fields,
+    /// and attachments are user content worth protecting from accidental
+    /// dismissal.
+    public var hasContent: Bool {
+        let whitespace = CharacterSet.whitespacesAndNewlines
+        if !title.trimmingCharacters(in: whitespace).isEmpty { return true }
+        if !description.trimmingCharacters(in: whitespace).isEmpty { return true }
+        if !reporterName.trimmingCharacters(in: whitespace).isEmpty { return true }
+        if !reporterEmail.trimmingCharacters(in: whitespace).isEmpty { return true }
+        return !attachments.isEmpty
+    }
 }
 
 /// The server's receipt for a submitted feedback draft.

@@ -105,6 +105,15 @@ public struct CommentDraft: Equatable, Sendable {
         self.replyToClerkId = replyToClerkId
         self.replyToAuthorName = replyToAuthorName
     }
+
+    /// Whether the draft holds a typed comment body.
+    ///
+    /// Reply-target metadata (`parentId` and friends) is set by tapping the
+    /// reply action, not by typing, so it does not count as content worth a
+    /// discard confirmation on its own.
+    public var hasContent: Bool {
+        !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 // MARK: - Server responses

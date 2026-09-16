@@ -92,6 +92,13 @@
 "cupthread.features.load_more" = "Tải thêm";
 "cupthread.features.load_more_hint" = "Hiển thị trang tiếp theo của các yêu cầu tính năng.";
 
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "Hủy";
+"cupthread.common.discard" = "Xoá";
+"cupthread.common.keep_editing" = "Tiếp tục chỉnh sửa";
+"cupthread.feedback.discard_title" = "Xoá phản hồi này?";
+"cupthread.features.compose_discard_title" = "Xoá đề xuất tính năng này?";
+"cupthread.comments.discard_title" = "Xoá bình luận này?";
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "Bạn tìm kiếm quá nhanh. Vui lòng đợi một phút rồi thử lại.";
 /* #61: config fetch failure with no cache (fail closed) */

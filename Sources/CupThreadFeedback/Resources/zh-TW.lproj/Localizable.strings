@@ -92,6 +92,13 @@
 "cupthread.features.load_more" = "載入更多";
 "cupthread.features.load_more_hint" = "顯示下一頁功能請求。";
 
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "取消";
+"cupthread.common.discard" = "丟棄";
+"cupthread.common.keep_editing" = "繼續編輯";
+"cupthread.feedback.discard_title" = "丟棄這則回饋？";
+"cupthread.features.compose_discard_title" = "丟棄這個建議？";
+"cupthread.comments.discard_title" = "丟棄這則留言？";
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "搜尋太頻繁了，請稍候一分鐘後再試。";
 /* #61: config fetch failure with no cache (fail closed) */

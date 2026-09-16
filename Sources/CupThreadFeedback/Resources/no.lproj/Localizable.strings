@@ -92,6 +92,13 @@
 "cupthread.features.load_more" = "Last inn mer";
 "cupthread.features.load_more_hint" = "Viser neste side med funksjonsforespørsler.";
 
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "Avbryt";
+"cupthread.common.discard" = "Forkast";
+"cupthread.common.keep_editing" = "Fortsett å redigere";
+"cupthread.feedback.discard_title" = "Forkaste denne tilbakemeldingen?";
+"cupthread.features.compose_discard_title" = "Forkaste dette funksjonsønsket?";
+"cupthread.comments.discard_title" = "Forkaste denne kommentaren?";
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "Du søker for raskt. Vent ett minutt og prøv igjen.";
 /* #61: config fetch failure with no cache (fail closed) */

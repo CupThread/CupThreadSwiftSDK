@@ -92,6 +92,13 @@
 "cupthread.features.load_more" = "Cargar más";
 "cupthread.features.load_more_hint" = "Muestra la siguiente página de solicitudes de funciones.";
 
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "Cancelar";
+"cupthread.common.discard" = "Descartar";
+"cupthread.common.keep_editing" = "Seguir editando";
+"cupthread.feedback.discard_title" = "¿Descartar este feedback?";
+"cupthread.features.compose_discard_title" = "¿Descartar esta solicitud de función?";
+"cupthread.comments.discard_title" = "¿Descartar este comentario?";
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "Estás buscando demasiado rápido. Espera un minuto e inténtalo de nuevo.";
 /* #61: config fetch failure with no cache (fail closed) */

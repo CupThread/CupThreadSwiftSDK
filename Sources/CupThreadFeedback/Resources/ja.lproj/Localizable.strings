@@ -92,6 +92,13 @@
 "cupthread.features.load_more" = "さらに読み込む";
 "cupthread.features.load_more_hint" = "機能リクエストの次のページを表示します。";
 
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "キャンセル";
+"cupthread.common.discard" = "破棄";
+"cupthread.common.keep_editing" = "編集を続ける";
+"cupthread.feedback.discard_title" = "フィードバックを破棄しますか？";
+"cupthread.features.compose_discard_title" = "機能リクエストを破棄しますか？";
+"cupthread.comments.discard_title" = "コメントを破棄しますか？";
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "検索の頻度が高すぎます。1分待ってからもう一度お試しください。";
 /* #61: config fetch failure with no cache (fail closed) */

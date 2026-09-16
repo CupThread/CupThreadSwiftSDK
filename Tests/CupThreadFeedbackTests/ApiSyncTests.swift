@@ -255,7 +255,7 @@ struct FeatureRequestPagingTests {
             _ = try await client.fetchFeatureRequests(userToken: "tok", query: "sync")
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            guard case .rateLimited(let message) = error else {
+            guard case .rateLimited(let message, _) = error else {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }

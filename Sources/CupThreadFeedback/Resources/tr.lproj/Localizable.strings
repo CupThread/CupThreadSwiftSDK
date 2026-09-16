@@ -92,6 +92,13 @@
 "cupthread.features.load_more" = "Daha fazla yükle";
 "cupthread.features.load_more_hint" = "Sonraki sayfadaki özellik taleplerini gösterir.";
 
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "İptal";
+"cupthread.common.discard" = "Sil";
+"cupthread.common.keep_editing" = "Düzenlemeye Devam Et";
+"cupthread.feedback.discard_title" = "Bu geri bildirim silinsin mi?";
+"cupthread.features.compose_discard_title" = "Bu özellik önerisi silinsin mi?";
+"cupthread.comments.discard_title" = "Bu yorum silinsin mi?";
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "Çok hızlı arama yapıyorsunuz. Lütfen bir dakika bekleyip tekrar deneyin.";
 /* #61: config fetch failure with no cache (fail closed) */

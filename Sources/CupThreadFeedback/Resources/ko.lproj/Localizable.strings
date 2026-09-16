@@ -92,6 +92,13 @@
 "cupthread.features.load_more" = "더 보기";
 "cupthread.features.load_more_hint" = "다음 페이지의 기능 요청을 표시합니다.";
 
+/* Accidental-dismissal guard for compose surfaces (issue #46) */
+"cupthread.common.cancel" = "취소";
+"cupthread.common.discard" = "버리기";
+"cupthread.common.keep_editing" = "계속 편집";
+"cupthread.feedback.discard_title" = "피드백을 버리시겠습니까?";
+"cupthread.features.compose_discard_title" = "기능 요청을 버리시겠습니까?";
+"cupthread.comments.discard_title" = "댓글을 버리시겠습니까?";
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "검색 빈도가 너무 높습니다. 1분 후에 다시 시도해 주세요.";
 /* #61: config fetch failure with no cache (fail closed) */

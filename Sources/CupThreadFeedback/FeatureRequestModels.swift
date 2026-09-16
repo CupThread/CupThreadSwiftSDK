@@ -230,6 +230,14 @@ public struct FeatureRequestDraft: Equatable, Sendable {
         self.description = description
         self.requesterName = requesterName
     }
+
+    /// Whether the draft holds anything the user typed.
+    public var hasContent: Bool {
+        let whitespace = CharacterSet.whitespacesAndNewlines
+        if !title.trimmingCharacters(in: whitespace).isEmpty { return true }
+        if !description.trimmingCharacters(in: whitespace).isEmpty { return true }
+        return !requesterName.trimmingCharacters(in: whitespace).isEmpty
+    }
 }
 
 // MARK: - Server responses
