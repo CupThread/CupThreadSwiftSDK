@@ -275,6 +275,8 @@ public struct FeatureRequestsView: View {
                 Label(CupThreadStrings.tr("cupthread.features.request_a_feature"), systemImage: "plus")
             }
             .accessibilityHint(CupThreadStrings.tr("cupthread.features.request_a_feature_hint"))
+            // Stable hook for host and Demo UI tests.
+            .accessibilityIdentifier("cupthread.features.compose")
         }
     }
 

@@ -92,7 +92,13 @@ extension FeedbackClient {
     ///   - draft: Title, description, and optional requester name.
     ///   - userToken: A stable UUID string identifying this user.
     /// - Returns: The created request's id and whether it is pending review.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    /// - Throws: ``FeedbackClientError/submissionQuotaExceeded(message:)`` when
+    ///   the app's workspace has reached its monthly submission quota
+    ///   (HTTP 402 `tier_limit_submissions`),
+    ///   ``FeedbackClientError/subscriptionInactive(message:)`` when the
+    ///   workspace subscription is inactive or canceled (HTTP 402
+    ///   `subscription_inactive`),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func submitFeatureRequest(
         _ draft: FeatureRequestDraft,

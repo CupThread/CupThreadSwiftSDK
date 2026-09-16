@@ -5,7 +5,12 @@ import Foundation
 extension FeedbackClient {
 
     /// Fetches the public profile for a given user.
-    /// - Parameter userId: The Clerk user id of the profile to fetch.
+    /// - Parameter userId: App-scoped pseudonymous user identifier (as found
+    ///   in `authorClerkId`, `replyToClerkId`, `requesterClerkId`, and
+    ///   `recentCommenters[].clerkUserId` on public payloads); raw user IDs
+    ///   are accepted as well. Profiles are opt-in: callers should expect
+    ///   ``FeedbackClientError/userProfileNotFound(message:)`` for unknown
+    ///   identifiers and an empty profile for users without a public profile.
     /// - Returns: The user's public profile data.
     /// - Throws: ``FeedbackClientError/userProfileNotFound(message:)``,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,

@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "Du stemmer for raskt. Prøv igjen om ett minutt.";
 "cupthread.features.load_more" = "Last inn mer";
 "cupthread.features.load_more_hint" = "Viser neste side med funksjonsforespørsler.";
+
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Kunne ikke nå CupThread-serveren for å sjekke om denne flaten er tilgjengelig. Sjekk tilkoblingen og prøv igjen.";

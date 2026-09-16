@@ -11,11 +11,13 @@ let package = Package(
         .tvOS(.v17)
     ],
     products: [
-        // Dynamic so the product can be archived into an XCFramework for the
-        // binary distribution on cdn.cupthread.com (see scripts/release-sdk.mjs).
+        // Automatic linkage (static by default): consumers' app targets link
+        // the SDK into their own binary, so the linker can dead-strip unused
+        // code and app extensions stop embedding per-target dylib copies.
+        // The CDN XCFramework is assembled from static archives by
+        // scripts/release.mjs.
         .library(
             name: "CupThreadFeedback",
-            type: .dynamic,
             targets: ["CupThreadFeedback"]
         )
     ],

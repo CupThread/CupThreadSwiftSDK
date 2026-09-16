@@ -3,8 +3,9 @@ name: CI
 # Layered on purpose (see AGENTS.md → Testing Policy):
 # - Pull requests run the cheap gate only: lint + swift test + one iOS
 #   archive slice, so feedback stays fast.
-# - Pushes to main run the full 7-platform archive matrix and the release
-#   dry-run — the cross-platform compile safety net lives here, after merge.
+# - Pushes to main run the full 7-platform archive matrix, the Demo UI test
+#   suite, and the release dry-run — the cross-platform compile and render
+#   safety nets live here, after merge.
 on:
   push:
     branches: [main]
@@ -84,6 +85,31 @@ jobs:
             -archivePath "/tmp/${{ matrix.name }}.xcarchive" \
             SKIP_INSTALL=NO \
             BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            -quiet
+  ui-tests:
+    name: UI Tests (Demo)
+    if: github.event_name == 'push'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Pick an available iPhone simulator
+        run: |
+          SIM_UDID=$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && /\(Shutdown\)|\(Booted\)/ {print $2; exit}')
+          if [ -z "$SIM_UDID" ]; then
+            echo "No available iPhone simulator found" >&2
+            exit 1
+          fi
+          echo "Using simulator UDID: $SIM_UDID"
+          echo "SIMULATOR_UDID=$SIM_UDID" >> "$GITHUB_ENV"
+      - name: Run Demo UI tests
+        run: |
+          xcodebuild test \
+            -project Demo/CupThreadDemo.xcodeproj \
+            -scheme CupThreadDemo \
+            -destination "id=${SIMULATOR_UDID}" \
+            -only-testing:CupThreadDemoUITests/CupThreadDemoUITests/testInteractiveNavigationAndVotingFlow \
             -quiet
   release-dry-run:
     name: Release Dry-Run
