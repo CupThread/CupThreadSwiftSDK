@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "Odrzucić tę opinię?";
 "cupthread.features.compose_discard_title" = "Odrzucić tę propozycję funkcji?";
 "cupthread.comments.discard_title" = "Odrzucić ten komentarz?";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Nie udało się połączyć z serwerem CupThread, aby sprawdzić dostępność tej sekcji. Sprawdź połączenie i spróbuj ponownie.";

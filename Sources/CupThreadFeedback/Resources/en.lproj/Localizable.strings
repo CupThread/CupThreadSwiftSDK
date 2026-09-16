@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "Discard This Feedback?";
 "cupthread.features.compose_discard_title" = "Discard This Feature Request?";
 "cupthread.comments.discard_title" = "Discard This Comment?";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Couldn't reach the CupThread server to check whether this surface is available. Check your connection and try again.";

@@ -9,11 +9,10 @@ Collect structured bug reports, feedback, and user ideas with automatic environm
 ``FeedbackComposerView`` provides a ready-made SwiftUI feedback form that handles input validation, platform diagnostics, attachment management, and server submission out of the box.
 
 The form automatically captures:
-- **Device & OS version**: e.g., iOS 17.5, macOS 14.4.
+- **Platform**: The surface the form runs on (iOS, macOS, visionOS, or tvOS).
 - **App version & build**: Pulled from `Bundle.main`.
-- **System locale & time zone**.
-- **Optional contact info**: Name and email (remembered between submissions).
-- **Attachments**: Images and log files uploaded through upload sessions to CupThread storage (photo attachments have sensitive EXIF and GPS location metadata stripped before upload to protect user privacy while preserving multi-frame animations like GIF and animated WebP intact, and HEIC photos are transcoded to JPEG — the API accepts PNG, JPEG, WebP, and GIF only).
+- **Optional contact info**: Name and email, typed by the user and cleared after each successful submission.
+- **Attachments**: Images picked from the user's photo library, uploaded through upload sessions to CupThread storage (photo attachments have sensitive EXIF and GPS location metadata stripped before upload to protect user privacy while preserving multi-frame animations like GIF and animated WebP intact, and HEIC photos are transcoded to JPEG — the API accepts PNG, JPEG, WebP, and GIF only).
 
 ## Basic usage
 
@@ -44,13 +43,13 @@ struct FeedbackSheet: View {
 
 ## Pre-filling drafts
 
-You can pre-fill any part of the draft before presenting the form, such as appending custom diagnostics or logs to the draft:
+You can pre-fill any part of the draft before presenting the form, such as appending custom diagnostics to the free-form ``FeedbackDraft/metadata`` dictionary for your own triage tooling:
 
 ```swift
 var draft = FeedbackDraft.autofilled()
 draft.title = "Crash on checkout"
 draft.description = "Steps to reproduce:\n1. Open cart\n2. Tap pay"
-draft.customMetadata = ["plan": "pro", "tier": "gold"]
+draft.metadata = ["plan": "pro", "tier": "gold"]
 
 FeedbackComposerView(
     client: client,

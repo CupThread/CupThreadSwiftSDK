@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "Xoá phản hồi này?";
 "cupthread.features.compose_discard_title" = "Xoá đề xuất tính năng này?";
 "cupthread.comments.discard_title" = "Xoá bình luận này?";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Không thể kết nối tới máy chủ CupThread để kiểm tra tính khả dụng của mục này. Vui lòng kiểm tra kết nối và thử lại.";

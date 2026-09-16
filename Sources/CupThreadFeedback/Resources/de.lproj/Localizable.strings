@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "Dieses Feedback verwerfen?";
 "cupthread.features.compose_discard_title" = "Diesen Funktionswunsch verwerfen?";
 "cupthread.comments.discard_title" = "Diesen Kommentar verwerfen?";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Der CupThread-Server konnte nicht erreicht werden, um die Verfügbarkeit dieses Bereichs zu prüfen. Bitte prüfe deine Verbindung und versuche es erneut.";

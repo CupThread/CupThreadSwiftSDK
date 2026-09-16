@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "피드백을 버리시겠습니까?";
 "cupthread.features.compose_discard_title" = "기능 요청을 버리시겠습니까?";
 "cupthread.comments.discard_title" = "댓글을 버리시겠습니까?";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "CupThread 서버에 연결하여 이 화면의 사용 가능 여부를 확인하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.";

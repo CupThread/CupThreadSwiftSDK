@@ -9,7 +9,9 @@ import Foundation
 public struct RecentCommenter: Codable, Equatable, Sendable {
     /// Display name of the commenter, when given.
     public let authorName: String?
-    /// Clerk user id, enabling navigation to the commenter's profile.
+    /// App-scoped pseudonymous user identifier (e.g. `u_ab12cd34`), enabling
+    /// navigation to the commenter's profile. Stable within one app only —
+    /// never assume a `user_` prefix or compare it across apps.
     public let clerkUserId: String?
     /// URL of the commenter's avatar image, when given.
     public let avatarUrl: String?
@@ -49,7 +51,9 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     public let requesterName: String?
     /// Avatar URL of the requester, when given.
     public let requesterAvatarUrl: String?
-    /// Clerk user id of the requester, when given.
+    /// App-scoped pseudonymous user identifier of the requester (e.g.
+    /// `u_ab12cd34`), when given. Stable within one app only — never assume
+    /// a `user_` prefix or compare it across apps.
     public let requesterClerkId: String?
     /// Array of recent commenters.
     public let recentCommenters: [RecentCommenter]
@@ -87,7 +91,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     ///   - releasedVersion: Version the request shipped in, if released.
     ///   - requesterName: Requester display name, if given.
     ///   - requesterAvatarUrl: Avatar URL of the requester, if available.
-    ///   - requesterClerkId: Clerk user id of the requester, if available.
+    ///   - requesterClerkId: App-scoped pseudonymous user id of the requester, if available.
     ///   - recentCommenters: Recent commenters on this request.
     ///   - hasMoreCommenters: Whether more commenters exist beyond the list.
     ///   - approved: Whether the request passed admin review.

@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "丟棄這則意見反饋？";
 "cupthread.features.compose_discard_title" = "丟棄這個建議？";
 "cupthread.comments.discard_title" = "丟棄這則留言？";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "無法連線 CupThread 伺服器檢查此功能嘅可用性。請檢查網絡連線後再試一次。";

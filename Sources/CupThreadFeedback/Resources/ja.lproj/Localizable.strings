@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "フィードバックを破棄しますか？";
 "cupthread.features.compose_discard_title" = "機能リクエストを破棄しますか？";
 "cupthread.comments.discard_title" = "コメントを破棄しますか？";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "CupThreadサーバーに接続してこの画面の利用可否を確認できませんでした。接続を確認してもう一度お試しください。";

@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "Descartar este feedback?";
 "cupthread.features.compose_discard_title" = "Descartar esta sugestão de recurso?";
 "cupthread.comments.discard_title" = "Descartar este comentário?";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Não foi possível contactar o servidor do CupThread para verificar se esta secção está disponível. Verifique a sua ligação e tente novamente.";

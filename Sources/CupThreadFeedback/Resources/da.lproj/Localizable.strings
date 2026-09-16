@@ -99,3 +99,5 @@
 "cupthread.feedback.discard_title" = "Kassér denne feedback?";
 "cupthread.features.compose_discard_title" = "Kassér dette funktionsønske?";
 "cupthread.comments.discard_title" = "Kassér denne kommentar?";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Kunne ikke nå CupThread-serveren for at tjekke, om denne overflade er tilgængelig. Tjek din forbindelse, og prøv igen.";
