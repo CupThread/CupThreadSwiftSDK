@@ -81,7 +81,7 @@ struct AvatarView: View {
     var body: some View {
         Group {
             if let url, let imageURL = URL(string: url) {
-                AsyncImage(url: imageURL) { phase in
+                CachedRemoteImage(url: imageURL) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable()
