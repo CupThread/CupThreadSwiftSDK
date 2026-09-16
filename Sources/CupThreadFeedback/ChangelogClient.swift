@@ -40,7 +40,14 @@ struct ListChangelogResponse: Codable, Sendable {
 ///
 /// Subscriptions are double opt-in: the address starts as pending and must
 /// confirm via the single-use link in the confirmation email before it
-/// receives changelog emails.
+/// receives changelog emails. Confirmation is POST-only: the emailed link
+/// renders a page whose form POSTs the token to
+/// `/api/v1/public/apps/{appKey}/changelog/confirm` — the only mutating
+/// confirmation path. The GET form of that endpoint is deliberately
+/// non-destructive (JSON clients receive `405 Method Not Allowed`), so
+/// email scanners and link prefetchers can no longer confirm subscriptions
+/// or burn the single-use token as a side effect of delivery. Never rely on
+/// GET to confirm.
 public struct ChangelogSubscriptionResult: Decodable, Equatable, Sendable {
     /// The subscription was recorded (pending confirmation).
     public let subscribed: Bool
@@ -126,7 +133,11 @@ extension FeedbackClient {
     ///
     /// Subscriptions are double opt-in: the address starts as pending and
     /// receives a confirmation email with a single-use link; only confirmed
-    /// subscriptions receive changelog emails. The response is uniform — the
+    /// subscriptions receive changelog emails. The subscriber confirms by
+    /// submitting the form on the emailed link's page, which POSTs the token
+    /// to the `changelog/confirm` endpoint — GET on that endpoint is
+    /// non-destructive and confirms nothing (see
+    /// ``ChangelogSubscriptionResult``). The response is uniform — the
     /// API no longer reports whether the address was already subscribed.
     /// - Parameters:
     ///   - email: The address to notify. Trimmed before sending.
