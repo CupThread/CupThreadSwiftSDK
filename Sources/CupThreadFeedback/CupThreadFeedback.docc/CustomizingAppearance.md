@@ -33,16 +33,19 @@ struct MyApp: App {
 }
 ```
 
-``CupThreadTheme`` automatically fetches your remote ``SdkAppearance`` and injects the selected theme colors, corner radii, and surface options into the SwiftUI environment.
+``CupThreadTheme`` automatically fetches your remote ``SdkAppearance`` and applies the console-selected accent color (as the SwiftUI `tint`) and color-scheme preference to everything inside, and publishes the full configuration to the SwiftUI environment for SDK views to consult.
 
 ## Theme presets
 
-The SDK supports multiple visual presets configured in the developer console:
+The ``SdkTheme`` enum ships eight visual presets; the developer console selects one for your app:
 - **System**: Adapts cleanly to the device's light and dark mode colors.
-- **Midnight**: Deep dark backgrounds with high-contrast accents.
-- **Sunset**: Warm tones suitable for creative and lifestyle apps.
-- **Emerald**: Modern green accents.
-- **Lavender**: Subtle violet accents.
+- **Light**: Forces light mode with a blue accent.
+- **Dark**: Forces dark mode with a lighter blue accent.
+- **Midnight**: Deep dark backgrounds with a high-contrast indigo accent.
+- **Ocean**: A teal accent suitable for utility and finance apps.
+- **Forest**: A green accent suitable for health and sustainability apps.
+- **Sunset**: A warm orange accent suitable for creative and lifestyle apps.
+- **Candy**: A playful pink accent.
 
 ## Dynamic feature gating
 
@@ -61,8 +64,8 @@ To inspect or react to the console configuration in your own custom views, fetch
 ```swift
 let config = try await client.fetchAppConfig()
 print("App name: \(config.name)")
-print("Active theme: \(config.appearance.theme)")
-print("Roadmap enabled: \(config.appearance.features.roadmap)")
+print("Active theme: \(config.sdk.theme)")
+print("Roadmap enabled: \(config.sdk.features.roadmap)")
 ```
 
 ## See also

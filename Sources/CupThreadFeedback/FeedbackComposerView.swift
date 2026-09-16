@@ -5,12 +5,12 @@ import PhotosUI
 
 /// Structured feedback form with a built-in success state.
 ///
-/// The draft is pre-filled with the host app's platform and version. Contact
-/// fields are optional; environment details are sent automatically and shown
-/// to the user before submitting. Photo attachments selected via the photo picker
-/// are stripped of sensitive metadata (EXIF GPS coordinates, camera details, timestamps)
-/// before upload by default to protect user privacy. On success the view shows an acknowledgment
-/// (and calls `onSubmit` for host apps that need the result).
+/// The draft is pre-filled with the host app's platform, marketing version,
+/// and build number. Contact fields are optional. Photo attachments selected via
+/// the photo picker are stripped of sensitive metadata (EXIF GPS coordinates,
+/// camera details, timestamps) before upload by default to protect user privacy.
+/// On success the view shows an acknowledgment (and calls `onSubmit` for host
+/// apps that need the result).
 public struct FeedbackComposerView: View {
     public let client: FeedbackClient
     public let userToken: String?
