@@ -94,3 +94,5 @@
 
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "Çok hızlı arama yapıyorsunuz. Lütfen bir dakika bekleyip tekrar deneyin.";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Bu bölümün kullanılabilir olup olmadığını kontrol etmek için CupThread sunucusuna ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.";

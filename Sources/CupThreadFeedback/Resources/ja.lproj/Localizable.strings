@@ -94,3 +94,5 @@
 
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "検索の頻度が高すぎます。1分待ってからもう一度お試しください。";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "CupThreadサーバーに接続してこの画面の利用可否を確認できませんでした。接続を確認してもう一度お試しください。";

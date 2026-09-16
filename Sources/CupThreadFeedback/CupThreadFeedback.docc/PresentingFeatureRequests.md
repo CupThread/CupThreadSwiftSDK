@@ -14,7 +14,6 @@ Key features:
 - **Optimistic voting**: Immediate UI response with background server synchronization and duplicate click throttling.
 - **Real-time search**: Debounced search querying the CupThread backend.
 - **Version filtering**: Filter requests by targeted milestone release versions.
-- **Duplicate submission prevention**: Instant search while drafting to highlight existing requests before submission.
 - **Anonymous user identity**: Managed by ``UserTokenStore`` so upvotes and submissions persist across app restarts without user login.
 
 ## Basic usage

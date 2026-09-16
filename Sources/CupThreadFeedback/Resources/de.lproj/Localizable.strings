@@ -94,3 +94,5 @@
 
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "Du suchst zu schnell. Bitte warte eine Minute und versuche es erneut.";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Der CupThread-Server konnte nicht erreicht werden, um die Verfügbarkeit dieses Bereichs zu prüfen. Bitte prüfe deine Verbindung und versuche es erneut.";

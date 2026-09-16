@@ -94,3 +94,5 @@
 
 /* Issue #59: search rate-limit budget — friendly throttle message */
 "cupthread.search.rate_limited" = "Bạn tìm kiếm quá nhanh. Vui lòng đợi một phút rồi thử lại.";
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Không thể kết nối tới máy chủ CupThread để kiểm tra tính khả dụng của mục này. Vui lòng kiểm tra kết nối và thử lại.";

@@ -61,9 +61,11 @@ dependencies: [
 
 Or add `https://github.com/CupThread/CupThreadSwiftSDK.git` via Xcode (*File > Add Package Dependencies...*).
 
+Source-package consumers link the SDK **statically**: no `CupThreadFeedback` dylib is embedded in your app, the app linker dead-strips unused SDK code, and every extension target shares the single statically-linked copy.
+
 ### Prebuilt Binary Target (XCFramework)
 
-Prebuilt XCFrameworks are published to the CupThread CDN with immutable caching:
+Prebuilt **static** XCFrameworks are published to the CupThread CDN with immutable caching. Static libraries are linked into your app's own binary — nothing is embedded, dead code is stripped by your app's linker, and app extensions stop duplicating an SDK dylib:
 
 ```swift
 // Package.swift
@@ -76,7 +78,7 @@ targets: [
 ]
 ```
 
-Or download the zip directly from [Releases](https://github.com/CupThread/CupThreadSwiftSDK/releases) and drag `CupThreadFeedback.xcframework` into your Xcode target's *Frameworks, Libraries, and Embedded Content*.
+Or download the zip directly from [Releases](https://github.com/CupThread/CupThreadSwiftSDK/releases), drag `CupThreadFeedback.xcframework` into your Xcode target's *Frameworks, Libraries, and Embedded Content* ("Do Not Embed" is correct — the framework links statically), and also add the bundled `CupThreadFeedback_CupThreadFeedback.bundle` to your target's *Copy Bundle Resources*. Static libraries cannot carry resources, so the localized-strings bundle ships next to the framework inside the zip; without it the first localized string lookup crashes. See the zip's `INSTALL.md`.
 
 ---
 
@@ -148,7 +150,7 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `fetchVersions()` | `GET /api/v1/public/versions/{appKey}` |
 | `fetchChangelog()` | `GET /api/v1/public/apps/{appKey}/changelog` |
 | `subscribeToChangelog(email:userToken:)` | `POST /api/v1/public/apps/{appKey}/changelog/subscribe` |
-| `unsubscribeFromChangelog(email:)` | `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe` |
+| `unsubscribeFromChangelog(token:)` | `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe` (GET on the same URL is a non-destructive confirmation step) |
 | `updateUserAttributes(isPaying:plan:mrr:currency:userToken:)` | `PUT /api/v1/public/apps/{appKey}/user` |
 
 ---
