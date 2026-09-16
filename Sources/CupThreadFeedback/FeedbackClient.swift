@@ -91,6 +91,16 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// the referenced upload session (HTTP 400 `uploader_mismatch`).
     /// Re-attach the file with the same `userToken` and try again.
     case uploaderMismatch(message: String?)
+    /// The app's workspace reached its monthly submission quota
+    /// (HTTP 402 `tier_limit_submissions`) and the submission was not
+    /// accepted. Submissions succeed again once the quota resets or the
+    /// workspace's plan is upgraded in the developer console.
+    case submissionQuotaExceeded(message: String?)
+    /// The app's workspace subscription is inactive or canceled
+    /// (HTTP 402 `subscription_inactive`) and the submission was not
+    /// accepted. Submissions succeed again once the workspace's subscription
+    /// is reactivated.
+    case subscriptionInactive(message: String?)
     /// The requested user profile could not be found (HTTP 404).
     case userProfileNotFound(message: String?)
     /// The server answered with a status the SDK does not handle. `message`
@@ -122,6 +132,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return "Uploads require an end-user identity. Pass a userToken (see UserTokenStore) when uploading attachments."
         case .uploaderMismatch:
             return "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again."
+        case .submissionQuotaExceeded:
+            return "This app has reached its submission limit for this month. Please try again later."
+        case .subscriptionInactive:
+            return "Submissions are unavailable for this app right now. Please try again later."
         case .userProfileNotFound(let message):
             let trimmed = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !trimmed.isEmpty {
@@ -224,6 +238,10 @@ public struct FeedbackClient: Sendable {
     /// - Returns: The server's receipt, including the submission id and any warning.
     /// - Throws: ``FeedbackClientError/scanRejected(message:)`` when an attachment
     ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
+    ///   ``FeedbackClientError/submissionQuotaExceeded(message:)`` when the app's
+    ///   workspace has reached its monthly submission quota (HTTP 402 `tier_limit_submissions`),
+    ///   ``FeedbackClientError/subscriptionInactive(message:)`` when the workspace
+    ///   subscription is inactive or canceled (HTTP 402 `subscription_inactive`),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for other
     ///   server rejections (successful submissions accept HTTP 200, 201, and 202), or
