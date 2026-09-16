@@ -91,3 +91,6 @@
 "cupthread.features.vote_rate_limited" = "Bạn đang bình chọn quá nhanh. Vui lòng thử lại sau một phút.";
 "cupthread.features.load_more" = "Tải thêm";
 "cupthread.features.load_more_hint" = "Hiển thị trang tiếp theo của các yêu cầu tính năng.";
+
+/* #61: config fetch failure with no cache (fail closed) */
+"cupthread.config.unavailable_description" = "Không thể kết nối tới máy chủ CupThread để kiểm tra tính khả dụng của mục này. Vui lòng kiểm tra kết nối và thử lại.";
