@@ -82,9 +82,39 @@ let result = try await client.submit(draft, userToken: UserTokenStore.shared.tok
 print("Submitted ID: \(result.submissionId)")
 ```
 
+## Attachment upload lifecycle
+
+Attachment uploads are deliberately independent of the composer's view lifecycle:
+
+- **Transient disappearances never cancel an upload.** Pushing a view on top of the composer inside a `NavigationStack`, or switching `TabView` tabs, leaves an in-flight photo upload running. When the user comes back, the attachment row shows the upload still in progress, or the finished attachment.
+- **Cancellation is explicit.** Uploads stop only at user-intent-bearing points: the cancel button on the uploading row, a superseding photo selection, and the form reset after a successful submit.
+- **Real dismissal finishes in the background.** If the composer is dismissed entirely while an upload is running, the upload finishes in the background and its result is discarded along with the destroyed draft.
+
+Hosts that prefer to stop the transfer when the composer is really dismissed can pass a ``FeedbackUploadHandle`` and call ``FeedbackUploadHandle/cancelActiveUpload()`` from the presentation context's `onDismiss` closure:
+
+```swift
+struct FeedbackSheet: View {
+    let client: FeedbackClient
+    @State private var isPresented = false
+    private let uploadHandle = FeedbackUploadHandle()
+
+    var body: some View {
+        Button("Send Feedback") { isPresented = true }
+            .sheet(isPresented: $isPresented, onDismiss: {
+                uploadHandle.cancelActiveUpload()
+            }) {
+                NavigationStack {
+                    FeedbackComposerView(client: client, uploadHandle: uploadHandle)
+                }
+            }
+    }
+}
+```
+
 ## See also
 
 - ``FeedbackComposerView``
+- ``FeedbackUploadHandle``
 - ``FeedbackDraft``
 - ``FeedbackAttachment``
 - ``FeedbackSubmissionResult``

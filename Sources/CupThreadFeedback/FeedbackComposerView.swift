@@ -6,16 +6,33 @@ import PhotosUI
 /// Structured feedback form with a built-in success state.
 ///
 /// The draft is pre-filled with the host app's platform, marketing version,
-/// and build number. Contact fields are optional. Photo attachments selected via
-/// the photo picker are stripped of sensitive metadata (EXIF GPS coordinates,
-/// camera details, timestamps) before upload by default to protect user privacy.
-/// On success the view shows an acknowledgment (and calls `onSubmit` for host
-/// apps that need the result).
+/// and build number. Contact fields are optional; environment details are sent
+/// automatically and shown to the user before submitting. Photo attachments
+/// selected via the photo picker are stripped of sensitive metadata (EXIF GPS
+/// coordinates, camera details, timestamps) before upload by default to
+/// protect user privacy. On success the view shows an acknowledgment (and
+/// calls `onSubmit` for host apps that need the result).
+///
+/// Attachment uploads are independent of the view's lifecycle: transient
+/// disappearances never cancel an in-flight upload. Embedding the composer in
+/// a `NavigationStack` or a `TabView` tab is safe — pushing a view on top or
+/// switching tabs leaves the upload running, and a completed upload is
+/// appended to the draft when the user returns. Uploads stop only at explicit
+/// points: the cancel button on the uploading row, a superseding photo
+/// selection, and the form reset after a successful submit. When the composer
+/// is dismissed entirely, an in-flight upload finishes in the background and
+/// its result is discarded. Hosts that prefer to stop the transfer on real
+/// dismissal can pass a ``FeedbackUploadHandle`` and call
+/// ``FeedbackUploadHandle/cancelActiveUpload()`` from the presentation
+/// context's `onDismiss` closure.
 public struct FeedbackComposerView: View {
     public let client: FeedbackClient
     public let userToken: String?
     public let onSubmit: (FeedbackSubmissionResult) -> Void
     public let stripSensitiveMetadata: Bool
+    /// Optional handle for cancelling the in-flight upload from outside the
+    /// view, e.g. from a sheet's `onDismiss` closure.
+    public let uploadHandle: FeedbackUploadHandle?
 
     @State private var draft: FeedbackDraft
     @State private var isSubmitting = false
@@ -59,6 +76,10 @@ public struct FeedbackComposerView: View {
     ///     animated WebP) are preserved intact without flattening to a still image.
     ///     Set to `false` to upload original bytes for formats accepted as-is (PNG, JPEG, WebP, GIF);
     ///     note that HEIC/HEIF and unrecognized formats are always transcoded to JPEG per server media policy.
+    ///   - uploadHandle: Optional ``FeedbackUploadHandle`` for cancelling the
+    ///     in-flight attachment upload from outside the view — e.g. from a
+    ///     sheet's `onDismiss` closure. Uploads are never cancelled by view
+    ///     lifecycle events; see ``FeedbackComposerView``.
     ///   - onSubmit: Called with the server's receipt after a successful
     ///     submission — use it to log, show a toast, or deep-link elsewhere.
     public init(
@@ -67,11 +88,13 @@ public struct FeedbackComposerView: View {
         userToken: String? = nil,
         maxAttachmentBytes: Int? = nil,
         stripSensitiveMetadata: Bool = true,
+        uploadHandle: FeedbackUploadHandle? = nil,
         onSubmit: @escaping (FeedbackSubmissionResult) -> Void = { _ in }
     ) {
         self.client = client
         self.userToken = userToken
         self.stripSensitiveMetadata = stripSensitiveMetadata
+        self.uploadHandle = uploadHandle
         self.onSubmit = onSubmit
         _attachmentState = State(initialValue: FeedbackAttachmentStateMachine(maxAttachmentBytes: maxAttachmentBytes))
         _draft = State(initialValue: initialDraft ?? FeedbackDraft.autofilled(platform: client.configuration.defaultPlatform))
@@ -99,21 +122,20 @@ public struct FeedbackComposerView: View {
             guard let newItem else { return }
             uploadTask?.cancel()
             let uploadId = attachmentState.startUpload()
-            uploadTask = Task {
+            let task = Task {
                 await uploadPhotoItem(newItem, uploadId: uploadId)
                 if !Task.isCancelled && attachmentState.activeUploadId == uploadId {
                     selectedPhotoItem = nil
                 }
             }
+            uploadTask = task
+            uploadHandle?.setCancelHandler { [task] in task.cancel() }
         }
         #endif
         .task {
             if let config = try? await client.fetchAppConfig() {
                 attachmentState.applyConfigLimit(config.maxAttachmentBytes)
             }
-        }
-        .onDisappear {
-            cancelUpload()
         }
         .sdkSurface(client: client, feature: .feedback)
     }
@@ -280,15 +302,30 @@ public struct FeedbackComposerView: View {
                 userToken: userToken
             )
 
-            guard !Task.isCancelled, attachmentState.activeUploadId == uploadId else { return }
+            // Cancellation discards the result. Reset only when this upload
+            // is still the active one: an explicit cancel button or a
+            // superseding selection has already re-pointed the machine,
+            // while an external FeedbackUploadHandle cancel leaves it
+            // pointing here and needs this unwind to reset it.
+            if Task.isCancelled {
+                if attachmentState.activeUploadId == uploadId {
+                    attachmentState.cancelUpload()
+                }
+                return
+            }
+            guard attachmentState.activeUploadId == uploadId else { return }
             _ = attachmentState.uploadSucceeded(id: uploadId, attachment: uploaded, draft: &draft)
         } catch is CancellationError {
             if attachmentState.activeUploadId == uploadId {
                 attachmentState.cancelUpload()
             }
         } catch {
-            guard !Task.isCancelled, attachmentState.activeUploadId == uploadId else { return }
-            _ = attachmentState.uploadFailed(id: uploadId, error: error)
+            guard attachmentState.activeUploadId == uploadId else { return }
+            if Task.isCancelled {
+                attachmentState.cancelUpload()
+            } else {
+                _ = attachmentState.uploadFailed(id: uploadId, error: error)
+            }
         }
     }
 
@@ -362,6 +399,10 @@ public struct FeedbackComposerView: View {
         isSubmitting = false
     }
 
+    /// Cancels the in-flight upload at an explicit, user-intent-bearing
+    /// point: the uploading row's cancel button, a form reset after submit
+    /// success, or teardown via ``FeedbackUploadHandle``. Never called from
+    /// view lifecycle events — transient disappearances must not stop uploads.
     @MainActor
     private func cancelUpload() {
         uploadTask?.cancel()
@@ -377,73 +418,5 @@ public struct FeedbackComposerView: View {
         cancelUpload()
         attachmentState.reset(draft: &draft, defaultPlatform: client.configuration.defaultPlatform)
         errorMessage = nil
-    }
-}
-
-#if canImport(PhotosUI) && !os(tvOS)
-private struct PhotosPickerLabelView: View {
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "photo")
-            Text(CupThreadStrings.tr("cupthread.feedback.add_attachment"))
-        }
-    }
-}
-#endif
-
-// MARK: - Success state
-
-private struct FeedbackSentView: View {
-    let warning: String?
-    let onSendMore: () -> Void
-
-    @State private var showCheckmark = false
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Spacer(minLength: 24)
-
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(.green)
-                .scaleEffect(showCheckmark ? 1 : 0.4)
-                .opacity(showCheckmark ? 1 : 0)
-                .accessibilityHidden(true)
-
-            VStack(spacing: 6) {
-                Text(CupThreadStrings.tr("cupthread.feedback.thanks_title"))
-                    .font(.title2.weight(.semibold))
-                Text(CupThreadStrings.tr("cupthread.feedback.thanks_subtitle"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            if let warning {
-                Text(warning)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(12)
-                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 16)
-            }
-
-            Button(CupThreadStrings.tr("cupthread.feedback.send_more")) {
-                onSendMore()
-            }
-            .buttonStyle(.bordered)
-            .padding(.top, 8)
-
-            Spacer(minLength: 24)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.6).delay(0.1)) {
-                showCheckmark = true
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(CupThreadStrings.tr("cupthread.feedback.accessibility_sent"))
     }
 }
