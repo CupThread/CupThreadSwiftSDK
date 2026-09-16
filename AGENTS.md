@@ -41,7 +41,7 @@ Test locally before pushing; let CI do only what a Mac cannot. The repo is publi
 2. **Platform scope**: iOS is the primary target; the other platforms only need to compile. Note that local `swift test` compiles for macOS only — it does **not** prove tvOS/visionOS slices compile. Cross-platform compile safety (`#if os(...)` branches, API availability) is CI's job (see CI layers below); don't assume a green local build covers it.
 3. **CI layers** (`.github/workflows/ci.yml`):
    - Pull requests: `lint` + `swift test` + a single iOS archive slice (`build-ios`). Keep PRs under this cheap gate.
-   - Push to `main`: full 7-platform archive matrix (`build-platforms`) + `release-dry-run`. This is the only place cross-platform compile regressions are caught, immediately after merge.
+   - Push to `main`: full 7-platform archive matrix (`build-platforms`) + the Demo interactive UI test (`ui-tests`) + `release-dry-run`. This is the only place cross-platform compile regressions are caught, immediately after merge; the UI test is the safety net for first-render and navigation regressions in the SDK's SwiftUI surfaces. Run the same UI flow locally before pushing view changes: `xcodebuild test -project Demo/CupThreadDemo.xcodeproj -scheme CupThreadDemo -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:CupThreadDemoUITests/CupThreadDemoUITests/testInteractiveNavigationAndVotingFlow`.
 4. **Before cutting a release**: run the full `swift test` locally, then confirm the latest `main` CI run (matrix + dry-run) is green before invoking `scripts/release.mjs`.
 
 ### Supported Platform Matrix & Release Triage

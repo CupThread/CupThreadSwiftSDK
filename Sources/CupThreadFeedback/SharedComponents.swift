@@ -158,6 +158,8 @@ struct VotePill: View {
         .buttonStyle(.plain)
         .disabled(isInFlight || isDisabled)
         .modifier(LightHapticModifier(trigger: hasVoted))
+        // Stable hook for host and Demo UI tests.
+        .accessibilityIdentifier("cupthread.features.vote_pill")
         .accessibilityLabel(
             hasVoted
                 ? CupThreadStrings.tr("cupthread.features.vote_remove_accessibility", Int64(voteCount))
