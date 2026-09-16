@@ -33,7 +33,7 @@ extension FeedbackClient {
         return UUID().uuidString.lowercased()
     }
 
-    /// Sets the correlation headers shared by every request.
+    /// Sets the correlation and version headers shared by every request.
     func applyCorrelationHeaders(
         userToken: String?,
         requestID: String,
@@ -41,6 +41,7 @@ extension FeedbackClient {
     ) {
         applyUserToken(userToken, to: &request)
         request.setValue(requestID, forHTTPHeaderField: "X-Request-Id")
+        request.setValue(Self.sdkVersion, forHTTPHeaderField: "X-SDK-Version")
     }
 
     /// Validates a response status, mapping the API's documented failure
