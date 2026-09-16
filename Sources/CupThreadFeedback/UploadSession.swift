@@ -166,6 +166,7 @@ extension FeedbackClient {
         request.setValue("Bearer \(uploadSession.session.sessionToken)", forHTTPHeaderField: "Authorization")
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.setValue(nextRequestID(), forHTTPHeaderField: "X-Request-Id")
+        request.setValue(Self.sdkVersion, forHTTPHeaderField: "X-SDK-Version")
         request.httpBody = data
 
         let (responseData, response) = try await session.data(for: request)

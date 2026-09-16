@@ -99,5 +99,7 @@
 "cupthread.feedback.discard_title" = "Forkaste denne tilbakemeldingen?";
 "cupthread.features.compose_discard_title" = "Forkaste dette funksjonsønsket?";
 "cupthread.comments.discard_title" = "Forkaste denne kommentaren?";
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "Du søker for raskt. Vent ett minutt og prøv igjen.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Kunne ikke nå CupThread-serveren for å sjekke om denne flaten er tilgjengelig. Sjekk tilkoblingen og prøv igjen.";

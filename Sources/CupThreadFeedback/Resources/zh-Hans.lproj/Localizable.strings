@@ -99,5 +99,7 @@
 "cupthread.feedback.discard_title" = "丢弃这条反馈？";
 "cupthread.features.compose_discard_title" = "丢弃这条需求？";
 "cupthread.comments.discard_title" = "丢弃这条评论？";
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "搜索太频繁了，请稍等一分钟后再试。";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "无法连接 CupThread 服务器检查该功能的可用性。请检查网络连接后重试。";

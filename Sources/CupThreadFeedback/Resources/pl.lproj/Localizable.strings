@@ -99,5 +99,7 @@
 "cupthread.feedback.discard_title" = "Odrzucić tę opinię?";
 "cupthread.features.compose_discard_title" = "Odrzucić tę propozycję funkcji?";
 "cupthread.comments.discard_title" = "Odrzucić ten komentarz?";
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "Zbyt szybko przeprowadzasz wyszukiwania. Odczekaj minutę i spróbuj ponownie.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Nie udało się połączyć z serwerem CupThread, aby sprawdzić dostępność tej sekcji. Sprawdź połączenie i spróbuj ponownie.";

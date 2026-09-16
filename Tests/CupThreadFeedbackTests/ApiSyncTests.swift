@@ -99,6 +99,19 @@ struct FeedbackMetadataSanitizerTests {
         #expect(sanitized["platform"] == "ios")
         #expect(sanitized["submittedAt"] != "[redacted]")
     }
+
+    @Test func sdkVersionKeysSurviveMetadataSanitization() {
+        let sanitized = FeedbackMetadataSanitizer.sanitize([
+            "sdk": FeedbackClient.sdkIdentifier,
+            "sdkVersion": FeedbackClient.sdkVersion,
+            "platform": "macos",
+            "submittedAt": "2026-09-16T00:00:00.000Z"
+        ])
+        #expect(sanitized["sdk"] == "cupthread-apple/\(FeedbackClient.sdkVersion)")
+        #expect(sanitized["sdkVersion"] == FeedbackClient.sdkVersion)
+        #expect(sanitized["platform"] == "macos")
+        #expect(sanitized["submittedAt"] != "[redacted]")
+    }
 }
 
 // MARK: - Feature request paging (cursor) + identity header
@@ -225,6 +238,28 @@ struct FeatureRequestPagingTests {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }
+            #expect(error.errorDescription?.contains("try again in a minute") == true)
+        }
+    }
+
+    @Test func searchMaps429ToRateLimitedNotRawBody() async throws {
+        // Issue #59: the search endpoint is rate-limited per client IP; the
+        // typed `.rateLimited` error (with its friendly message) must reach
+        // the views instead of `unexpectedStatus` carrying the raw JSON body.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 429), try encodeJSON(["error": "Too many searches. Please try again shortly."]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        do {
+            _ = try await client.fetchFeatureRequests(userToken: "tok", query: "sync")
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .rateLimited(let message, _) = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(message == "Too many searches. Please try again shortly.")
             #expect(error.errorDescription?.contains("try again in a minute") == true)
         }
     }

@@ -115,6 +115,7 @@ extension FeedbackClient {
             url: configuration.baseURL.appending(path: "/api/v1/public/apps/\(configuration.appKey)/changelog")
         )
         request.httpMethod = "GET"
+        applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {

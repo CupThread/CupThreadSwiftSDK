@@ -401,6 +401,342 @@ struct FeedbackClientErrorTests {
         let desc = error.errorDescription
         #expect(desc?.contains("userToken") == true)
     }
+
+    @Test func typedErrorsExposeRequestIdProperty() {
+        let reqId = "req-custom-123"
+
+        let scanRejected = FeedbackClientError.scanRejected(message: "malware", requestId: reqId)
+        #expect(scanRejected.requestId == reqId)
+
+        let rateLimited = FeedbackClientError.rateLimited(message: "wait", requestId: reqId)
+        #expect(rateLimited.requestId == reqId)
+
+        let unsupportedMedia = FeedbackClientError.unsupportedMediaType(message: "svg", requestId: reqId)
+        #expect(unsupportedMedia.requestId == reqId)
+
+        let payloadTooLarge = FeedbackClientError.payloadTooLarge(message: "big", requestId: reqId)
+        #expect(payloadTooLarge.requestId == reqId)
+
+        let uploaderIdRequired = FeedbackClientError.uploaderIdentityRequired(message: "id", requestId: reqId)
+        #expect(uploaderIdRequired.requestId == reqId)
+
+        let uploaderMismatch = FeedbackClientError.uploaderMismatch(message: "diff", requestId: reqId)
+        #expect(uploaderMismatch.requestId == reqId)
+
+        let unexpected = FeedbackClientError.unexpectedStatus(code: 500, message: "err", requestId: reqId)
+        #expect(unexpected.requestId == reqId)
+
+        #expect(FeedbackClientError.invalidResponse.requestId == nil)
+        #expect(FeedbackClientError.unreadableUploadResponse.requestId == nil)
+        #expect(FeedbackClientError.authenticationRequired.requestId == nil)
+        #expect(FeedbackClientError.userProfileNotFound(message: "missing").requestId == nil)
+    }
+
+    @Test func typedErrorsDescriptionIncludesRequestIdWhenPresent() throws {
+        let reqId = "req-desc-test"
+
+        let scanRejected = FeedbackClientError.scanRejected(message: "virus", requestId: reqId)
+        let scanDesc = try #require(scanRejected.errorDescription)
+        #expect(scanDesc.contains("(request id: \(reqId))"))
+
+        let scanRejectedEmpty = FeedbackClientError.scanRejected(message: "", requestId: reqId)
+        let scanEmptyDesc = try #require(scanRejectedEmpty.errorDescription)
+        #expect(scanEmptyDesc.contains("(request id: \(reqId))"))
+
+        let rateLimited = FeedbackClientError.rateLimited(message: "limit", requestId: reqId)
+        let rateDesc = try #require(rateLimited.errorDescription)
+        #expect(rateDesc.contains("(request id: \(reqId))"))
+
+        let unsupportedMedia = FeedbackClientError.unsupportedMediaType(message: "type", requestId: reqId)
+        let mediaDesc = try #require(unsupportedMedia.errorDescription)
+        #expect(mediaDesc.contains("(request id: \(reqId))"))
+
+        let payloadTooLarge = FeedbackClientError.payloadTooLarge(message: "size", requestId: reqId)
+        let payloadDesc = try #require(payloadTooLarge.errorDescription)
+        #expect(payloadDesc.contains("(request id: \(reqId))"))
+
+        let uploaderId = FeedbackClientError.uploaderIdentityRequired(message: "auth", requestId: reqId)
+        let uploaderIdDesc = try #require(uploaderId.errorDescription)
+        #expect(uploaderIdDesc.contains("(request id: \(reqId))"))
+
+        let uploaderMis = FeedbackClientError.uploaderMismatch(message: "mis", requestId: reqId)
+        let uploaderMisDesc = try #require(uploaderMis.errorDescription)
+        #expect(uploaderMisDesc.contains("(request id: \(reqId))"))
+    }
+
+    @Test func typedErrorsDescriptionOmitsRequestIdWhenAbsent() throws {
+        let scanRejected = FeedbackClientError.scanRejected(message: "virus", requestId: nil)
+        let scanDesc = try #require(scanRejected.errorDescription)
+        #expect(!scanDesc.contains("request id"))
+
+        let rateLimited = FeedbackClientError.rateLimited(message: "limit", requestId: nil)
+        let rateDesc = try #require(rateLimited.errorDescription)
+        #expect(!rateDesc.contains("request id"))
+
+        let unsupportedMedia = FeedbackClientError.unsupportedMediaType(message: "type", requestId: nil)
+        let mediaDesc = try #require(unsupportedMedia.errorDescription)
+        #expect(!mediaDesc.contains("request id"))
+
+        let payloadTooLarge = FeedbackClientError.payloadTooLarge(message: "size", requestId: nil)
+        let payloadDesc = try #require(payloadTooLarge.errorDescription)
+        #expect(!payloadDesc.contains("request id"))
+
+        let uploaderId = FeedbackClientError.uploaderIdentityRequired(message: "auth", requestId: nil)
+        let uploaderIdDesc = try #require(uploaderId.errorDescription)
+        #expect(!uploaderIdDesc.contains("request id"))
+
+        let uploaderMis = FeedbackClientError.uploaderMismatch(message: "mis", requestId: nil)
+        let uploaderMisDesc = try #require(uploaderMis.errorDescription)
+        #expect(!uploaderMisDesc.contains("request id"))
+    }
+
+    @Test func typedErrorsConvenienceConstructorsDefaultToNilRequestId() {
+        #expect(FeedbackClientError.scanRejected(message: "test").requestId == nil)
+        #expect(FeedbackClientError.rateLimited().requestId == nil)
+        #expect(FeedbackClientError.rateLimited(message: "test").requestId == nil)
+        #expect(FeedbackClientError.unsupportedMediaType().requestId == nil)
+        #expect(FeedbackClientError.unsupportedMediaType(message: "test").requestId == nil)
+        #expect(FeedbackClientError.payloadTooLarge().requestId == nil)
+        #expect(FeedbackClientError.payloadTooLarge(message: "test").requestId == nil)
+        #expect(FeedbackClientError.uploaderIdentityRequired().requestId == nil)
+        #expect(FeedbackClientError.uploaderIdentityRequired(message: "test").requestId == nil)
+        #expect(FeedbackClientError.uploaderMismatch().requestId == nil)
+        #expect(FeedbackClientError.uploaderMismatch(message: "test").requestId == nil)
+    }
+
+    @Test func typedErrorsEquatableConsidersRequestId() {
+        let errWithId1 = FeedbackClientError.rateLimited(message: "msg", requestId: "req-1")
+        let errWithId2 = FeedbackClientError.rateLimited(message: "msg", requestId: "req-2")
+        let errWithNil = FeedbackClientError.rateLimited(message: "msg", requestId: nil)
+        let errSame = FeedbackClientError.rateLimited(message: "msg", requestId: "req-1")
+
+        #expect(errWithId1 == errSame)
+        #expect(errWithId1 != errWithId2)
+        #expect(errWithId1 != errWithNil)
+    }
+}
+
+// MARK: - ValidateResponse Request-Id Propagation
+
+@Suite("ValidateResponseRequestId")
+struct ValidateResponseRequestIdTests {
+    private let client = makeClient(baseURL: URL(string: "https://api.example.com")!, appKey: "app_key")
+
+    @Test func validateResponse429SurfacesRequestIdWhenPresent() throws {
+        let response = makeHTTPResponse(status: 429, headers: ["X-Request-Id": "req-429"])
+        let data = try encodeJSON(["error": "Too many requests"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected .rateLimited to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .rateLimited(let message, let requestId) = error else {
+                Issue.record("Expected .rateLimited, got \(error)")
+                return
+            }
+            #expect(message == "Too many requests")
+            #expect(requestId == "req-429")
+            #expect(error.requestId == "req-429")
+        }
+    }
+
+    @Test func validateResponse429ToleratesNilRequestIdWhenAbsent() throws {
+        let response = makeHTTPResponse(status: 429)
+        let data = try encodeJSON(["error": "Too many requests"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .rateLimited(let message, let requestId) = error else {
+                Issue.record("Expected .rateLimited, got \(error)")
+                return
+            }
+            #expect(message == "Too many requests")
+            #expect(requestId == nil)
+            #expect(error.requestId == nil)
+        }
+    }
+
+    @Test func validateResponse415SurfacesRequestIdWhenPresent() throws {
+        let response = makeHTTPResponse(status: 415, headers: ["X-Request-Id": "req-415"])
+        let data = try encodeJSON(["error": "Unsupported Media Type"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .unsupportedMediaType(let message, let requestId) = error else {
+                Issue.record("Expected .unsupportedMediaType, got \(error)")
+                return
+            }
+            #expect(message == "Unsupported Media Type")
+            #expect(requestId == "req-415")
+            #expect(error.requestId == "req-415")
+        }
+    }
+
+    @Test func validateResponse415ToleratesNilRequestIdWhenAbsent() throws {
+        let response = makeHTTPResponse(status: 415)
+        let data = try encodeJSON(["error": "Unsupported Media Type"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .unsupportedMediaType(let message, let requestId) = error else {
+                Issue.record("Expected .unsupportedMediaType, got \(error)")
+                return
+            }
+            #expect(message == "Unsupported Media Type")
+            #expect(requestId == nil)
+            #expect(error.requestId == nil)
+        }
+    }
+
+    @Test func validateResponse413SurfacesRequestIdWhenPresent() throws {
+        let response = makeHTTPResponse(status: 413, headers: ["X-Request-Id": "req-413"])
+        let data = try encodeJSON(["error": "Payload Too Large"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .payloadTooLarge(let message, let requestId) = error else {
+                Issue.record("Expected .payloadTooLarge, got \(error)")
+                return
+            }
+            #expect(message == "Payload Too Large")
+            #expect(requestId == "req-413")
+            #expect(error.requestId == "req-413")
+        }
+    }
+
+    @Test func validateResponse413ToleratesNilRequestIdWhenAbsent() throws {
+        let response = makeHTTPResponse(status: 413)
+        let data = try encodeJSON(["error": "Payload Too Large"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .payloadTooLarge(let message, let requestId) = error else {
+                Issue.record("Expected .payloadTooLarge, got \(error)")
+                return
+            }
+            #expect(message == "Payload Too Large")
+            #expect(requestId == nil)
+            #expect(error.requestId == nil)
+        }
+    }
+
+    @Test func validateResponse422ScanRejectedSurfacesRequestIdWhenPresent() throws {
+        let response = makeHTTPResponse(status: 422, headers: ["X-Request-Id": "req-422"])
+        let data = try encodeJSON(["error": "File rejected by content scan", "code": "scan_rejected"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .scanRejected(let message, let requestId) = error else {
+                Issue.record("Expected .scanRejected, got \(error)")
+                return
+            }
+            #expect(message == "File rejected by content scan")
+            #expect(requestId == "req-422")
+            #expect(error.requestId == "req-422")
+        }
+    }
+
+    @Test func validateResponse422ScanRejectedToleratesNilRequestIdWhenAbsent() throws {
+        let response = makeHTTPResponse(status: 422)
+        let data = try encodeJSON(["error": "File rejected by content scan", "code": "scan_rejected"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .scanRejected(let message, let requestId) = error else {
+                Issue.record("Expected .scanRejected, got \(error)")
+                return
+            }
+            #expect(message == "File rejected by content scan")
+            #expect(requestId == nil)
+            #expect(error.requestId == nil)
+        }
+    }
+
+    @Test func validateResponse400UploaderIdentityRequiredSurfacesRequestIdWhenPresent() throws {
+        let response = makeHTTPResponse(status: 400, headers: ["X-Request-Id": "req-400-id"])
+        let data = try encodeJSON(["error": "Identity required", "code": "uploader_identity_required"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .uploaderIdentityRequired(let message, let requestId) = error else {
+                Issue.record("Expected .uploaderIdentityRequired, got \(error)")
+                return
+            }
+            #expect(message == "Identity required")
+            #expect(requestId == "req-400-id")
+            #expect(error.requestId == "req-400-id")
+        }
+    }
+
+    @Test func validateResponse400UploaderIdentityRequiredToleratesNilRequestIdWhenAbsent() throws {
+        let response = makeHTTPResponse(status: 400)
+        let data = try encodeJSON(["error": "Identity required", "code": "uploader_identity_required"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .uploaderIdentityRequired(let message, let requestId) = error else {
+                Issue.record("Expected .uploaderIdentityRequired, got \(error)")
+                return
+            }
+            #expect(message == "Identity required")
+            #expect(requestId == nil)
+            #expect(error.requestId == nil)
+        }
+    }
+
+    @Test func validateResponse400UploaderMismatchSurfacesRequestIdWhenPresent() throws {
+        let response = makeHTTPResponse(status: 400, headers: ["X-Request-Id": "req-400-mismatch"])
+        let data = try encodeJSON(["error": "Uploader mismatch", "code": "uploader_mismatch"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .uploaderMismatch(let message, let requestId) = error else {
+                Issue.record("Expected .uploaderMismatch, got \(error)")
+                return
+            }
+            #expect(message == "Uploader mismatch")
+            #expect(requestId == "req-400-mismatch")
+            #expect(error.requestId == "req-400-mismatch")
+        }
+    }
+
+    @Test func validateResponse400UploaderMismatchToleratesNilRequestIdWhenAbsent() throws {
+        let response = makeHTTPResponse(status: 400)
+        let data = try encodeJSON(["error": "Uploader mismatch", "code": "uploader_mismatch"])
+
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            guard case .uploaderMismatch(let message, let requestId) = error else {
+                Issue.record("Expected .uploaderMismatch, got \(error)")
+                return
+            }
+            #expect(message == "Uploader mismatch")
+            #expect(requestId == nil)
+            #expect(error.requestId == nil)
+        }
+    }
 }
 
 // MARK: - FeedbackClient (serialized — tests share a static URLProtocol handler)
@@ -486,12 +822,16 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc", platform: .ios))
+        let draft = FeedbackDraft(title: "T", description: "Desc", platform: .ios, appVersion: "2.5.0")
+        _ = try await client.submit(draft)
 
         let rawData = try #require(capture.value)
         let json = try #require(parseJSONDict(rawData))
         let metadata = json["metadata"] as? [String: String]
-        #expect(metadata?["sdk"] == "cupthread-apple")
+        #expect(metadata?["sdk"] == "cupthread-apple/\(FeedbackClient.sdkVersion)")
+        #expect(metadata?["sdkVersion"] == FeedbackClient.sdkVersion)
+        #expect(metadata?["sdkVersion"] != draft.appVersion)
+        #expect(FeedbackClient.sdkVersion.isEmpty == false)
     }
 
     @Test func reporterNameIsOmittedWhenWhitespaceOnly() async throws {
@@ -644,7 +984,7 @@ struct FeedbackClientSubmitTests {
             _ = try await client.submit(draft)
             Issue.record("Expected scanRejected error to be thrown")
         } catch let error as FeedbackClientError {
-            guard case .scanRejected(let message) = error else {
+            guard case .scanRejected(let message, _) = error else {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }
@@ -738,6 +1078,29 @@ struct FeedbackClientSubmitTests {
         _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
 
         #expect(capture.value == "stable-run-identifier-1")
+    }
+
+    @Test func sendsXSDKVersionHeaderOnRequests() async throws {
+        let capture = CaptureBox<String?>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request.value(forHTTPHeaderField: "X-SDK-Version")
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+
+        let versionHeader = try #require(capture.value)
+        #expect(versionHeader == FeedbackClient.sdkVersion)
+        #expect(versionHeader?.isEmpty == false)
+    }
+
+    @Test func sdkVersionFollowsSemverFormat() {
+        #expect(!FeedbackClient.sdkVersion.isEmpty)
+        #expect(FeedbackClient.sdkName == "cupthread-apple")
+        #expect(FeedbackClient.sdkIdentifier == "cupthread-apple/\(FeedbackClient.sdkVersion)")
+        let semverPattern = #"^\d+\.\d+\.\d+$"#
+        #expect(FeedbackClient.sdkVersion.range(of: semverPattern, options: .regularExpression) != nil)
     }
 
     @Test func attachmentsSentAsUploadIDs() async throws {
@@ -889,7 +1252,7 @@ struct FeedbackClientSubmitTests {
         let metadata = try #require(json["metadata"] as? [String: String])
 
         #expect(metadata.count <= 24)
-        #expect(metadata["sdk"] == "cupthread-apple")
+        #expect(metadata["sdk"] == "cupthread-apple/\(FeedbackClient.sdkVersion)")
         #expect(metadata["platform"] == "ios")
         #expect(metadata["submittedAt"] != nil)
         #expect(metadata["hostKey00"] == "value0")
@@ -1048,7 +1411,7 @@ struct FeedbackClientUploadTests {
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            guard case .unsupportedMediaType(let message) = error else {
+            guard case .unsupportedMediaType(let message, _) = error else {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }
@@ -1118,7 +1481,7 @@ struct FeedbackClientUploadTests {
             )
             Issue.record("Expected scanRejected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .scanRejected(let message) = error {
+            if case .scanRejected(let message, _) = error {
                 #expect(message.contains("upl_bad_file"))
                 #expect(message.contains("prohibited file type"))
                 let desc = try #require(error.errorDescription)
@@ -1222,6 +1585,27 @@ struct FeedbackClientUploadTests {
         let ids = captured.compactMap { $0.value(forHTTPHeaderField: "X-Request-Id") }
         #expect(ids.count == 2)
         #expect(Set(ids).count == 2) // per-request UUIDs
+    }
+
+    @Test func uploadSendsXSDKVersionOnEveryRequest() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.requestHandler = { request in
+            requests.value = (requests.value ?? []) + [request]
+            if request.httpMethod == "POST" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(self.sessionJSON))
+            }
+            return (makeHTTPResponse(), try encodeJSON(self.uploadedJSON))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        _ = try await client.uploadAttachment(
+            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+        )
+
+        let captured = try #require(requests.value)
+        let versions = captured.compactMap { $0.value(forHTTPHeaderField: "X-SDK-Version") }
+        #expect(versions.count == 2)
+        #expect(versions.allSatisfy { $0 == FeedbackClient.sdkVersion })
     }
 } // end FeedbackClientUploadTests
 

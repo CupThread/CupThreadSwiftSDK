@@ -23,6 +23,9 @@
   - `POST /api/v1/feature-requests/:id/vote` — Toggle vote on a feature request.
   - `POST /api/v1/feedback` — Submit feedback draft with attachments.
   - `POST /api/v1/uploads/sessions` → `PUT /api/v1/uploads/{uploadId}` — Create an upload session, then stream attachment bytes into its pre-allocated slots (the legacy `POST /api/v1/uploads/images` / `POST /api/v1/uploads/r2` endpoints were removed in the September 2026 API sync).
+- **Request Headers & Metadata Correlation**:
+  - Every API request carries `X-Request-Id` (session/per-request correlation) and `X-SDK-Version` (semver from `FeedbackClient.sdkVersion`, e.g. `0.1.0`).
+  - Feedback submissions on `POST /api/v1/feedback` report `metadata.sdk` (`cupthread-apple/<semver>`) and `metadata.sdkVersion` (`<semver>`), distinct from the host application's own version (`appVersion`).
 
 ## Development & Testing
 - Run test suite: `swift test`

@@ -27,6 +27,8 @@ struct ChangelogClientTests {
         let request = try #require(capture.value)
         #expect(request.url?.path == "/api/v1/public/apps/app_testkey123456/changelog")
         #expect(request.httpMethod == "GET")
+        #expect(request.value(forHTTPHeaderField: "X-SDK-Version") == FeedbackClient.sdkVersion)
+        #expect(request.value(forHTTPHeaderField: "X-Request-Id") != nil)
     }
 
     @Test func fetchChangelogSortsEntriesNewestFirst() async throws {

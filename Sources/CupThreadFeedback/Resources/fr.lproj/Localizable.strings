@@ -99,5 +99,7 @@
 "cupthread.feedback.discard_title" = "Supprimer ce retour ?";
 "cupthread.features.compose_discard_title" = "Supprimer cette proposition ?";
 "cupthread.comments.discard_title" = "Supprimer ce commentaire ?";
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "Vous effectuez trop de recherches. Veuillez patienter une minute avant de réessayer.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Impossible de joindre le serveur CupThread pour vérifier si cette surface est disponible. Vérifiez votre connexion et réessayez.";
