@@ -74,6 +74,13 @@ extension FeedbackClient {
             throw FeedbackClientError.unsupportedMediaType(message: envelope?.error)
         case 413:
             throw FeedbackClientError.payloadTooLarge(message: envelope?.error)
+        case 402 where envelope?.code == "tier_limit_submissions":
+            // The app's workspace hit its monthly submission quota — feature
+            // requests and feedback enforce the same contract.
+            throw FeedbackClientError.submissionQuotaExceeded(message: envelope?.error)
+        case 402 where envelope?.code == "subscription_inactive":
+            // The app's workspace subscription is inactive or canceled.
+            throw FeedbackClientError.subscriptionInactive(message: envelope?.error)
         case 400 where envelope?.code == "uploader_identity_required":
             throw FeedbackClientError.uploaderIdentityRequired(message: envelope?.error)
         case 400 where envelope?.code == "uploader_mismatch":
