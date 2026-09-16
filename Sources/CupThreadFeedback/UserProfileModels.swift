@@ -7,7 +7,12 @@ import Foundation
 /// Returned as part of ``PublicUserProfileResponse`` from
 /// `GET /api/v1/users/{userId}/profile`.
 public struct UserProfile: Codable, Equatable, Sendable {
-    /// Clerk user id.
+    /// App-scoped pseudonymous user identifier (e.g. `u_ab12cd34`).
+    ///
+    /// Public endpoints no longer expose global identity-provider IDs. The
+    /// value is stable within a single app but is not comparable across
+    /// apps or tenants: do not assume a `user_` prefix and do not correlate
+    /// it with identifiers from other `appKey` instances.
     public let clerkUserId: String
     /// Display name, when set.
     public let displayName: String?
@@ -127,6 +132,12 @@ public struct UserProfileComment: Codable, Equatable, Identifiable, Sendable {
 }
 
 /// Response to `GET /api/v1/users/{userId}/profile`.
+///
+/// Public profiles are opt-in: for a user who has not created a public
+/// profile the server returns an empty profile (`displayName` is `null`,
+/// `publicApps` and `recentComments` are empty), and unknown identifiers
+/// yield a `404` (surfaced as
+/// ``FeedbackClientError/userProfileNotFound(message:)``).
 public struct PublicUserProfileResponse: Codable, Equatable, Sendable {
     /// The user's public profile.
     public let profile: UserProfile
