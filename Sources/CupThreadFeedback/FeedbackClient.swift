@@ -39,6 +39,16 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     /// so users can quote it in support conversations.
     public let requestID: String?
 
+    /// The secret key used to HMAC-SHA256 sign payment-attribute reports
+    /// on `PUT /api/v1/public/apps/{appKey}/user`.
+    ///
+    /// Obtain this secret from the CupThread developer console:
+    /// *App Access → App Credentials → SDK signing secret*.
+    /// When `nil`, requests reporting payment attributes (`isPaying`, `plan`, `mrr`)
+    /// are sent unsigned and will be rejected by the server. Requests without
+    /// payment attributes (identity or `currency`-only updates) do not require a secret.
+    public let signingSecret: String?
+
     /// Creates a configuration for a CupThread app.
     /// - Parameters:
     ///   - baseURL: The API root, normally `https://api.cupthread.com`.
@@ -47,16 +57,20 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///     Defaults to the OS the SDK is running on.
     ///   - requestID: Optional stable `X-Request-Id` sent with every request;
     ///     defaults to a per-request UUID.
+    ///   - signingSecret: Optional SDK signing secret for HMAC-SHA256 request
+    ///     signing when reporting paying-user attributes (`isPaying`, `plan`, `mrr`).
     public init(
         baseURL: URL,
         appKey: String,
         defaultPlatform: FeedbackPlatform = FeedbackPlatform.current,
-        requestID: String? = nil
+        requestID: String? = nil,
+        signingSecret: String? = nil
     ) {
         self.baseURL = baseURL
         self.appKey = appKey
         self.defaultPlatform = defaultPlatform
         self.requestID = requestID
+        self.signingSecret = signingSecret
     }
 }
 

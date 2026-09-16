@@ -93,6 +93,8 @@ private struct UserAttributesPayload: Encodable, Sendable {
     let plan: String?
     let mrr: Double?
     let currency: String?
+    let signature: String?
+    let timestamp: Int64?
 }
 
 // MARK: - FeedbackClient extension
@@ -213,6 +215,13 @@ extension FeedbackClient {
     /// Host apps self-declare these attributes; the SDK never collects payment
     /// details. Omitted parameters are left unchanged server-side.
     ///
+    /// When reporting paying-user attributes (`isPaying`, `plan`, or `mrr`),
+    /// the request must be HMAC-SHA256 signed using the app's SDK signing secret
+    /// (configured on ``FeedbackClientConfiguration/signingSecret`` or provided
+    /// via the `signingSecret` parameter). Requests without payment attributes
+    /// (identity or `currency`-only updates) do not require a signature and are
+    /// sent unsigned.
+    ///
     /// The endpoint is rate limited per client IP (60 requests/minute), so a
     /// single HTTP 429 is retried once after a short backoff — bursts of
     /// first-syncs behind one shared IP recover without caller changes.
@@ -222,6 +231,8 @@ extension FeedbackClient {
     ///   - mrr: Monthly recurring revenue attributable to this user.
     ///   - currency: Three-letter ISO 4217 code for `mrr` (the backend defaults to `"USD"`).
     ///   - userToken: Anonymous user token sent as `X-User-Token`.
+    ///   - signingSecret: Optional override for the SDK signing secret configured
+    ///     on ``FeedbackClientConfiguration/signingSecret``.
     /// - Returns: Whether the update was applied and when.
     /// - Throws: ``FeedbackClientError/rateLimited`` when the retry is also
     ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
@@ -231,13 +242,67 @@ extension FeedbackClient {
         plan: String? = nil,
         mrr: Double? = nil,
         currency: String? = nil,
-        userToken: String
+        userToken: String,
+        signingSecret: String? = nil
     ) async throws -> UserAttributesUpdateResult {
+        try await updateUserAttributes(
+            isPaying: isPaying,
+            plan: plan,
+            mrr: mrr,
+            currency: currency,
+            userToken: userToken,
+            signingSecret: signingSecret,
+            timestamp: nil
+        )
+    }
+
+    func updateUserAttributes(
+        isPaying: Bool? = nil,
+        plan: String? = nil,
+        mrr: Double? = nil,
+        currency: String? = nil,
+        userToken: String,
+        signingSecret: String? = nil,
+        timestamp: Int64? = nil
+    ) async throws -> UserAttributesUpdateResult {
+        let hasPaymentAttributes = isPaying != nil || plan != nil || mrr != nil
+        let signature: String?
+        let effectiveTimestamp: Int64?
+
+        if hasPaymentAttributes, let secret = (signingSecret ?? configuration.signingSecret)?.nilIfEmpty {
+            let epochSeconds = timestamp ?? Int64(Date().timeIntervalSince1970)
+            let canonical = UserAttributesSigner.canonicalString(
+                for: .init(
+                    appKey: configuration.appKey,
+                    userToken: userToken,
+                    isPaying: isPaying,
+                    plan: plan,
+                    mrr: mrr,
+                    currency: currency,
+                    timestamp: epochSeconds
+                )
+            )
+            signature = UserAttributesSigner.signature(for: canonical, secret: secret)
+            effectiveTimestamp = epochSeconds
+        } else {
+            signature = nil
+            effectiveTimestamp = nil
+        }
+
+        let payload = UserAttributesPayload(
+            isPaying: isPaying,
+            plan: plan,
+            mrr: mrr,
+            currency: currency,
+            signature: signature,
+            timestamp: effectiveTimestamp
+        )
+
         do {
             return try await send(
                 "PUT",
                 path: "/api/v1/public/apps/\(configuration.appKey)/user",
-                body: UserAttributesPayload(isPaying: isPaying, plan: plan, mrr: mrr, currency: currency),
+                body: payload,
                 userToken: userToken,
                 acceptedStatuses: [200]
             )
@@ -246,7 +311,7 @@ extension FeedbackClient {
             return try await send(
                 "PUT",
                 path: "/api/v1/public/apps/\(configuration.appKey)/user",
-                body: UserAttributesPayload(isPaying: isPaying, plan: plan, mrr: mrr, currency: currency),
+                body: payload,
                 userToken: userToken,
                 acceptedStatuses: [200]
             )
