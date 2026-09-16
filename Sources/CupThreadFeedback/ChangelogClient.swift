@@ -152,13 +152,22 @@ extension FeedbackClient {
     /// Unsubscribes using the per-subscriber signed token carried by the
     /// unsubscribe link in every changelog or confirmation email.
     ///
+    /// POST is the only destructive unsubscribe path: the GET form of the
+    /// endpoint (the email-footer / `List-Unsubscribe` link) is a
+    /// non-destructive confirmation interstitial, so prefetchers and email
+    /// security scanners can no longer unsubscribe recipients. The token is
+    /// sent as the `token` query item (the RFC 8058 one-click form), and the
+    /// request pins `Accept: application/json` because the endpoint
+    /// content-negotiates an HTML landing page for browser form submissions.
+    ///
     /// The API removed the unauthenticated bare-email unsubscribe; tokens are
     /// single-subscriber secrets delivered by email, so the SDK's own
     /// surfaces no longer offer in-app unsubscription.
     /// - Parameter token: The signed token from the unsubscribe link.
     /// - Returns: Whether the address was removed.
     /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   (status 400 when the token is missing) or
+    ///   (status 400 when the token is missing or expired, or 405 when a
+    ///   JSON client hits the non-destructive GET form) or
     ///   ``FeedbackClientError/invalidResponse``.
     public func unsubscribeFromChangelog(token: String) async throws -> ChangelogUnsubscribeResult {
         let base = configuration.baseURL.appending(
@@ -174,6 +183,10 @@ extension FeedbackClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        // The unsubscribe endpoint content-negotiates: `Accept: text/html`
+        // (or an unspecified preference) can yield the HTML confirmation
+        // landing page instead of the JSON result this method decodes.
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
 
         let (data, response) = try await session.data(for: request)

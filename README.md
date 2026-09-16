@@ -148,7 +148,7 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `fetchVersions()` | `GET /api/v1/public/versions/{appKey}` |
 | `fetchChangelog()` | `GET /api/v1/public/apps/{appKey}/changelog` |
 | `subscribeToChangelog(email:userToken:)` | `POST /api/v1/public/apps/{appKey}/changelog/subscribe` |
-| `unsubscribeFromChangelog(email:)` | `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe` |
+| `unsubscribeFromChangelog(token:)` | `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe` (GET on the same URL is a non-destructive confirmation step) |
 | `updateUserAttributes(isPaying:plan:mrr:currency:userToken:)` | `PUT /api/v1/public/apps/{appKey}/user` |
 
 ---
