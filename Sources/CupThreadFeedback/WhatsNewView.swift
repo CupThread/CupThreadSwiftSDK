@@ -7,7 +7,9 @@ import SwiftUI
 /// Entries are listed newest-first with a version badge, friendly date, body
 /// text, and chips for the feature requests that shipped. iPhone, iPad, macOS,
 /// and visionOS show a card list; tvOS uses a focus-friendly `List`. A toolbar
-/// button (plus a footer entry point) opens the email subscription sheet.
+/// button (plus a footer entry point) opens the email subscription sheet,
+/// which reflects the remembered subscription state
+/// (see `ChangelogSubscriptionStore`) instead of always offering a blank form.
 public struct WhatsNewView: View {
     public let client: FeedbackClient
     public let userToken: String
@@ -19,6 +21,12 @@ public struct WhatsNewView: View {
     @State private var hasLoadedOnce = false
     @State private var loadError: String?
     @State private var isSubscribePresented = false
+    /// The remembered subscription email; drives the entry-point copy.
+    @State private var subscribedEmail: String?
+
+    private var subscriptionStore: ChangelogSubscriptionStore {
+        ChangelogSubscriptionStore(appKey: client.configuration.appKey)
+    }
 
     /// Creates the "What's New" view.
     /// - Parameters:
@@ -48,8 +56,18 @@ public struct WhatsNewView: View {
         .sheet(isPresented: $isSubscribePresented) {
             ChangelogSubscribeView(client: client, userToken: userToken)
         }
+        .onChange(of: isSubscribePresented) { _, isPresented in
+            // Re-read the remembered subscription when the sheet closes so the
+            // entry points reflect a subscription made inside it.
+            if !isPresented {
+                subscribedEmail = subscriptionStore.subscribedEmail()
+            }
+        }
         .refreshable { await loadEntries() }
-        .task { await loadEntries() }
+        .task {
+            subscribedEmail = subscriptionStore.subscribedEmail()
+            await loadEntries()
+        }
         .sdkSurface(client: client, feature: .changelog)
     }
 
@@ -74,7 +92,7 @@ public struct WhatsNewView: View {
                     ForEach(entries) { entry in
                         ChangelogEntryCard(entry: entry)
                     }
-                    SubscribeFooterCard {
+                    SubscribeFooterCard(subscribedEmail: subscribedEmail) {
                         isSubscribePresented = true
                     }
                 }
@@ -108,7 +126,7 @@ public struct WhatsNewView: View {
                 Button {
                     isSubscribePresented = true
                 } label: {
-                    Label(CupThreadStrings.tr("cupthread.whatsnew.subscribe_button"), systemImage: "envelope")
+                    Label(subscribeEntryTitle, systemImage: subscribeEntryIcon)
                 }
             }
         }
@@ -130,10 +148,22 @@ public struct WhatsNewView: View {
             Button {
                 isSubscribePresented = true
             } label: {
-                Label(CupThreadStrings.tr("cupthread.whatsnew.subscribe_button"), systemImage: "envelope")
+                Label(subscribeEntryTitle, systemImage: subscribeEntryIcon)
             }
             .accessibilityHint(CupThreadStrings.tr("cupthread.whatsnew.subscribe_desc"))
         }
+    }
+
+    // MARK: Entry-point labels
+
+    private var subscribeEntryTitle: String {
+        subscribedEmail == nil
+            ? CupThreadStrings.tr("cupthread.whatsnew.subscribe_button")
+            : "Manage Emails"
+    }
+
+    private var subscribeEntryIcon: String {
+        subscribedEmail == nil ? "envelope" : "envelope.open"
     }
 
     // MARK: Actions
@@ -212,191 +242,42 @@ struct ChangelogEntryCard: View {
 // MARK: - Subscribe footer (card list entry point)
 
 private struct SubscribeFooterCard: View {
+    let subscribedEmail: String?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: "envelope")
+                Image(systemName: subscribedEmail == nil ? "envelope" : "envelope.open.fill")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Get Update Emails")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text("Be notified when a new version ships.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let subscribedEmail {
+                        Text("Update Emails On")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("Notifications go to \(subscribedEmail).")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Get Update Emails")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("Be notified when a new version ships.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer(minLength: 0)
             }
             .requestCard()
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Subscribe to update emails")
-    }
-}
-
-// MARK: - Subscribe sheet
-
-private struct ChangelogSubscribeView: View {
-    let client: FeedbackClient
-    let userToken: String
-
-    private enum Phase: Equatable {
-        case form
-        /// Subscription recorded; awaiting the user's confirmation via the
-        /// emailed single-use link (double opt-in).
-        case subscribed
-    }
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
-    @State private var phase: Phase = .form
-    @State private var isWorking = false
-    @State private var errorMessage: String?
-
-    var body: some View {
-        NavigationStack {
-            Group {
-                switch phase {
-                case .form:
-                    form
-                case .subscribed:
-                    resultView(
-                        icon: "envelope.badge.checkmark.fill",
-                        tint: .green,
-                        title: "Check Your Inbox",
-                        message: "We sent a confirmation link to \(trimmedEmail). Confirm it to start receiving update emails."
-                    )
-                }
-            }
-            .navigationTitle("Updates by Email")
-            #if os(iOS) || os(visionOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            #if os(macOS)
-            .frame(minWidth: 420, minHeight: 380)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    if phase == .form {
-                        Button("Cancel") { dismiss() }
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(confirmationTitle) {
-                        Task { await runPrimaryAction() }
-                    }
-                    .disabled(isWorking || (phase == .form && !isValidEmail))
-                }
-            }
-        }
-    }
-
-    // MARK: Form
-
-    private var form: some View {
-        Form {
-            Section {
-                TextField("you@example.com", text: $email)
-                    #if canImport(UIKit)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                    #endif
-            } header: {
-                Text("Email")
-            } footer: {
-                Text("We'll email you a confirmation link; only confirmed addresses receive updates. "
-                    + "You can unsubscribe anytime using the link in any update email.")
-            }
-
-            if let errorMessage {
-                Section {
-                    ErrorBanner(message: errorMessage)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowBackground(Color.clear)
-                }
-            }
-        }
-    }
-
-    private func resultView(icon: String, tint: Color, title: String, message: String) -> some View {
-        VStack(spacing: 14) {
-            Spacer(minLength: 24)
-
-            Image(systemName: icon)
-                .font(.system(size: 56))
-                .foregroundStyle(tint)
-                .accessibilityHidden(true)
-
-            Text(title)
-                .font(.title3.weight(.semibold))
-
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Spacer(minLength: 24)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(24)
-        .accessibilityElement(children: .contain)
-    }
-
-    // MARK: Actions
-
-    private var trimmedEmail: String {
-        email.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Lightweight shape check — full validation happens server-side.
-    private var isValidEmail: Bool {
-        let trimmed = trimmedEmail
-        guard let at = trimmed.firstIndex(of: "@"),
-              at != trimmed.startIndex,
-              at != trimmed.index(before: trimmed.endIndex),
-              trimmed.suffix(from: at).contains(".") else {
-            return false
-        }
-        return !trimmed.contains(where: \.isWhitespace)
-    }
-
-    private var confirmationTitle: String {
-        switch phase {
-        case .form:
-            return isWorking ? "Subscribing…" : "Subscribe"
-        case .subscribed:
-            return "Done"
-        }
-    }
-
-    @MainActor
-    private func runPrimaryAction() async {
-        switch phase {
-        case .form:
-            await subscribe()
-        case .subscribed:
-            dismiss()
-        }
-    }
-
-    @MainActor
-    private func subscribe() async {
-        isWorking = true
-        errorMessage = nil
-        defer { isWorking = false }
-        do {
-            _ = try await client.subscribeToChangelog(email: trimmedEmail, userToken: userToken)
-            withAnimation(.snappy(duration: 0.3)) {
-                phase = .subscribed
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        .accessibilityLabel(subscribedEmail == nil
+            ? "Subscribe to update emails"
+            : "Update emails are on for \(subscribedEmail ?? "")")
     }
 }
 

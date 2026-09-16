@@ -39,6 +39,16 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     /// so users can quote it in support conversations.
     public let requestID: String?
 
+    /// The secret key used to HMAC-SHA256 sign payment-attribute reports
+    /// on `PUT /api/v1/public/apps/{appKey}/user`.
+    ///
+    /// Obtain this secret from the CupThread developer console:
+    /// *App Access → App Credentials → SDK signing secret*.
+    /// When `nil`, requests reporting payment attributes (`isPaying`, `plan`, `mrr`)
+    /// are sent unsigned and will be rejected by the server. Requests without
+    /// payment attributes (identity or `currency`-only updates) do not require a secret.
+    public let signingSecret: String?
+
     /// Creates a configuration for a CupThread app.
     /// - Parameters:
     ///   - baseURL: The API root, normally `https://api.cupthread.com`.
@@ -47,16 +57,20 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///     Defaults to the OS the SDK is running on.
     ///   - requestID: Optional stable `X-Request-Id` sent with every request;
     ///     defaults to a per-request UUID.
+    ///   - signingSecret: Optional SDK signing secret for HMAC-SHA256 request
+    ///     signing when reporting paying-user attributes (`isPaying`, `plan`, `mrr`).
     public init(
         baseURL: URL,
         appKey: String,
         defaultPlatform: FeedbackPlatform = FeedbackPlatform.current,
-        requestID: String? = nil
+        requestID: String? = nil,
+        signingSecret: String? = nil
     ) {
         self.baseURL = baseURL
         self.appKey = appKey
         self.defaultPlatform = defaultPlatform
         self.requestID = requestID
+        self.signingSecret = signingSecret
     }
 }
 
@@ -91,6 +105,16 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// the referenced upload session (HTTP 400 `uploader_mismatch`).
     /// Re-attach the file with the same `userToken` and try again.
     case uploaderMismatch(message: String?, requestId: String?)
+    /// The app's workspace reached its monthly submission quota
+    /// (HTTP 402 `tier_limit_submissions`) and the submission was not
+    /// accepted. Submissions succeed again once the quota resets or the
+    /// workspace's plan is upgraded in the developer console.
+    case submissionQuotaExceeded(message: String?, requestId: String?)
+    /// The app's workspace subscription is inactive or canceled
+    /// (HTTP 402 `subscription_inactive`) and the submission was not
+    /// accepted. Submissions succeed again once the workspace's subscription
+    /// is reactivated.
+    case subscriptionInactive(message: String?, requestId: String?)
     /// The requested user profile could not be found (HTTP 404).
     case userProfileNotFound(message: String?)
     /// The server answered with a status the SDK does not handle. `message`
@@ -112,6 +136,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .uploaderIdentityRequired(_, let requestId):
             return requestId
         case .uploaderMismatch(_, let requestId):
+            return requestId
+        case .submissionQuotaExceeded(_, let requestId):
+            return requestId
+        case .subscriptionInactive(_, let requestId):
             return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
@@ -150,6 +178,12 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .uploaderMismatch(_, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again.\(suffix)"
+        case .submissionQuotaExceeded(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "This app has reached its submission limit for this month. Please try again later.\(suffix)"
+        case .subscriptionInactive(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "Submissions are unavailable for this app right now. Please try again later.\(suffix)"
         case .userProfileNotFound(let message):
             let trimmed = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !trimmed.isEmpty {
@@ -192,6 +226,16 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``uploaderMismatch(message:requestId:)`` with no request id.
     static func uploaderMismatch(message: String? = nil) -> FeedbackClientError {
         .uploaderMismatch(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``submissionQuotaExceeded(message:requestId:)`` with no request id.
+    static func submissionQuotaExceeded(message: String? = nil) -> FeedbackClientError {
+        .submissionQuotaExceeded(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``subscriptionInactive(message:requestId:)`` with no request id.
+    static func subscriptionInactive(message: String? = nil) -> FeedbackClientError {
+        .subscriptionInactive(message: message, requestId: nil)
     }
 }
 
@@ -284,6 +328,10 @@ public struct FeedbackClient: Sendable {
     /// - Returns: The server's receipt, including the submission id and any warning.
     /// - Throws: ``FeedbackClientError/scanRejected(message:requestId:)`` when an attachment
     ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
+    ///   ``FeedbackClientError/submissionQuotaExceeded(message:)`` when the app's
+    ///   workspace has reached its monthly submission quota (HTTP 402 `tier_limit_submissions`),
+    ///   ``FeedbackClientError/subscriptionInactive(message:)`` when the workspace
+    ///   subscription is inactive or canceled (HTTP 402 `subscription_inactive`),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for other
     ///   server rejections (successful submissions accept HTTP 200, 201, and 202), or
@@ -302,7 +350,7 @@ public struct FeedbackClient: Sendable {
             platform: draft.platform,
             appVersion: draft.appVersion.nilIfEmpty,
             buildNumber: draft.buildNumber.nilIfEmpty,
-            metadata: FeedbackMetadataSanitizer.sanitize(defaultMetadata(from: draft)),
+            metadata: sanitizedMetadata(from: draft),
             uploadIds: uploadIds
         )
 
@@ -323,12 +371,13 @@ public struct FeedbackClient: Sendable {
         return try decoder.decode(FeedbackSubmissionResult.self, from: data)
     }
 
-    private func defaultMetadata(from draft: FeedbackDraft) -> [String: String] {
-        var metadata = draft.metadata
-        metadata["sdk"] = "cupthread-apple"
-        metadata["platform"] = draft.platform.rawValue
-        metadata["submittedAt"] = ISO8601DateFormatter().string(from: .now)
-        return metadata
+    private func sanitizedMetadata(from draft: FeedbackDraft) -> [String: String] {
+        let reserved = [
+            "sdk": "cupthread-apple",
+            "platform": draft.platform.rawValue,
+            "submittedAt": ISO8601DateFormatter().string(from: .now)
+        ]
+        return FeedbackMetadataSanitizer.sanitize(draft.metadata, reserved: reserved)
     }
 
     private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]
