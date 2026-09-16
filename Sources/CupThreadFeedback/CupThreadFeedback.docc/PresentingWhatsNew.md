@@ -40,6 +40,8 @@ struct WhatsNewTab: View {
 
 The view automatically adds a toolbar icon allowing users to subscribe with their email address. When submitted, the subscription is linked with the user's `userToken`, letting you coordinate updates and marketing communications seamlessly.
 
+Subscriptions are double opt-in: a new address stays pending until the subscriber opens the confirmation link emailed to them and submits the confirmation form on that page. The form POSTs the single-use token to the `changelog/confirm` endpoint, which is the only mutating confirmation path. The GET form of the endpoint is deliberately non-destructive — API clients receive `405 Method Not Allowed` — so email scanners and link prefetchers can no longer confirm subscriptions, or consume the single-use token, as a side effect of email delivery.
+
 ## Modal overlay alternative
 
 If you want to present release notes modally right when users open a new app version, check out <doc:PresentingTheChangelogOverlay>.
