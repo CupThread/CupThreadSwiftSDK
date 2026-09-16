@@ -38,7 +38,7 @@ struct WhatsNewTab: View {
 
 ## Email updates subscription
 
-The view automatically adds a toolbar icon allowing users to subscribe with their email address. When submitted, the subscription is linked with the user's `userToken`, letting you coordinate updates and marketing communications seamlessly.
+The view automatically adds a toolbar icon allowing users to subscribe with their email address. When submitted, the subscription is linked with the user's `userToken`, letting you coordinate updates and marketing communications seamlessly. After a successful subscribe, the SDK remembers the address per app key: the toolbar and footer entry points switch to a manage affordance, and the sheet reopens showing the subscribed address instead of a blank form. Unsubscription stays in the user's hands via the link in every update email.
 
 ## Modal overlay alternative
 
