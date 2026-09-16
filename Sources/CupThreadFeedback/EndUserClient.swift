@@ -17,7 +17,11 @@ public struct EndUserLinkResult: Codable, Equatable, Sendable {
     public let linked: Bool
     /// The linked end-user profile id.
     public let endUserId: String?
-    /// The authenticated (Clerk) user id the profile is now linked to.
+    /// The authenticated user id the profile is now linked to, as reported
+    /// for the caller's own session. Unlike the user IDs on public payloads
+    /// (``UserProfile/clerkUserId``, ``FeatureRequestItem/requesterClerkId``,
+    /// …), this is not the app-scoped pseudonym shown on the public board —
+    /// never compare it against identifiers from public responses.
     public let clerkUserId: String?
 }
 
