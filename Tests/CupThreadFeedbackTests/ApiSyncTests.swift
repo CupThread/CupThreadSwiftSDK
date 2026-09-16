@@ -242,6 +242,28 @@ struct FeatureRequestPagingTests {
         }
     }
 
+    @Test func searchMaps429ToRateLimitedNotRawBody() async throws {
+        // Issue #59: the search endpoint is rate-limited per client IP; the
+        // typed `.rateLimited` error (with its friendly message) must reach
+        // the views instead of `unexpectedStatus` carrying the raw JSON body.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 429), try encodeJSON(["error": "Too many searches. Please try again shortly."]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        do {
+            _ = try await client.fetchFeatureRequests(userToken: "tok", query: "sync")
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .rateLimited(let message) = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(message == "Too many searches. Please try again shortly.")
+            #expect(error.errorDescription?.contains("try again in a minute") == true)
+        }
+    }
+
     @Test func voteSendsUserTokenHeader() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in

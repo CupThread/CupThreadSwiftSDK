@@ -92,5 +92,7 @@
 "cupthread.features.load_more" = "Indlæs flere";
 "cupthread.features.load_more_hint" = "Viser næste side af funktionsønsker.";
 
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "Du søger for hurtigt. Vent et minut, og prøv igen.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Kunne ikke nå CupThread-serveren for at tjekke, om denne overflade er tilgængelig. Tjek din forbindelse, og prøv igen.";

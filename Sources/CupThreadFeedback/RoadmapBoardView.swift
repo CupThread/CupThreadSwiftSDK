@@ -59,6 +59,15 @@ public struct RoadmapBoardView: View {
     @State private var loadError: String?
     @State private var selectedGroupID: String?
     @State private var searchText = ""
+    /// Transient notice for a failed reload whose groups stay on screen
+    /// (a reload failure never wipes already-rendered content).
+    @State private var reloadNotice: String?
+
+    /// The query actually sent to the server, trimmed to match the throttle's
+    /// duplicate detection.
+    private var trimmedSearchText: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     #if canImport(UIKit)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -95,14 +104,37 @@ public struct RoadmapBoardView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .searchable(text: $searchText, prompt: Text(CupThreadStrings.tr("cupthread.roadmap.search_prompt")))
-        .task(id: searchText) {
-            // Debounce keystrokes: each change restarts this task, cancelling
-            // the previous sleep before it triggers a server call.
-            if !searchText.isEmpty {
-                try? await Task.sleep(for: .milliseconds(350))
-                guard !Task.isCancelled else { return }
+        .overlay(alignment: .top) {
+            if let reloadNotice {
+                InlineNoticeBanner(message: reloadNotice)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
+        }
+        .task(id: trimmedSearchText) {
+            guard !trimmedSearchText.isEmpty else {
+                // Plain listing: the backend does not rate-limit it, so no
+                // debounce or throttle admission is needed.
+                await load()
+                return
+            }
+            // Debounce keystrokes: each change restarts this task, cancelling
+            // the previous sleep before it triggers a server call. The shared
+            // throttle then spaces query-bearing fetches below the server's
+            // 30/min per-IP search budget and skips duplicate queries.
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            guard await client.searchThrottle.waitForAdmission(key: "roadmap|\(trimmedSearchText)") else { return }
             await load()
+        }
+        .task(id: reloadNotice) {
+            guard reloadNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                reloadNotice = nil
+            }
         }
         .sdkSurface(client: client, feature: .roadmap)
     }
@@ -296,6 +328,7 @@ public struct RoadmapBoardView: View {
     private func load() async {
         isLoading = true
         loadError = nil
+        reloadNotice = nil
         defer {
             isLoading = false
             hasLoadedOnce = true
@@ -304,11 +337,19 @@ public struct RoadmapBoardView: View {
             async let columns = client.fetchColumns()
             async let requests = client.fetchFeatureRequests(
                 userToken: userToken,
-                query: searchText.isEmpty ? nil : searchText
+                query: trimmedSearchText.isEmpty ? nil : trimmedSearchText
             )
             groups = makeGroups(columns: try await columns, requests: try await requests.requests)
         } catch {
-            loadError = error.localizedDescription
+            if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
+                await client.searchThrottle.enterCooldown()
+            }
+            switch SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) {
+            case .inlineNotice(let message):
+                reloadNotice = message
+            case .fullScreenError(let message):
+                loadError = message
+            }
         }
     }
 }

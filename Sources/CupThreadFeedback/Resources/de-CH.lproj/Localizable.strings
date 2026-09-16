@@ -92,5 +92,7 @@
 "cupthread.features.load_more" = "Mehr laden";
 "cupthread.features.load_more_hint" = "Zeigt die nächste Seite der Funktionsanfragen.";
 
+/* Issue #59: search rate-limit budget — friendly throttle message */
+"cupthread.search.rate_limited" = "Sie suchen zu schnell. Bitte warten Sie eine Minute und versuchen Sie es erneut.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Der CupThread-Server konnte nicht erreicht werden, um die Verfügbarkeit dieses Bereichs zu prüfen. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.";

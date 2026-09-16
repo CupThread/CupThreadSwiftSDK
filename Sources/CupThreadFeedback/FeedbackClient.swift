@@ -256,7 +256,10 @@ private struct FeedbackSubmissionPayload: Codable, Sendable {
 ///
 /// One client serves every SDK surface — feedback, feature requests, roadmap,
 /// and changelog. Create it once with a ``FeedbackClientConfiguration`` and
-/// share it freely; the client is stateless and `Sendable`.
+/// share it freely; the client is `Sendable` and stateless apart from the
+/// built-in search throttle (``SearchRequestThrottle``), which the search
+/// surfaces share so sustained typing stays below the API's per-IP
+/// search rate limit.
 ///
 /// ```swift
 /// let client = FeedbackClient(
@@ -277,6 +280,10 @@ public struct FeedbackClient: Sendable {
     let encoder: JSONEncoder
     let decoder: JSONDecoder
     let overlayPresenter: (any ChangelogOverlayPresenter)?
+    /// Shared gate for query-bearing searches; one bucket per client so
+    /// ``FeatureRequestsView`` and ``RoadmapBoardView`` spend a single
+    /// per-IP budget.
+    let searchThrottle: SearchRequestThrottle
 
     /// Creates a client for a CupThread app.
     /// - Parameters:
@@ -300,6 +307,7 @@ public struct FeedbackClient: Sendable {
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
         self.overlayPresenter = overlayPresenter
+        self.searchThrottle = SearchRequestThrottle()
     }
 
     /// Submits a feedback draft.
