@@ -86,41 +86,67 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     case authenticationRequired
     /// An attachment referenced in the feedback submission was rejected by server-side content inspection
     /// (e.g. prohibited file types or malware signatures, HTTP `422 scan_rejected`).
-    case scanRejected(message: String)
+    case scanRejected(message: String, requestId: String?)
     /// A metered action hit the server's per-client-IP rate limit (HTTP 429) —
     /// e.g. voting too fast, or a burst of uploads. Recoverable: wait for the
     /// rate-limit window before retrying.
-    case rateLimited(message: String?)
+    case rateLimited(message: String?, requestId: String?)
     /// An upload was rejected by the media-type policy (HTTP 415) — e.g. SVG,
     /// or bytes that do not match the declared MIME type. Only PNG, JPEG,
     /// WebP, and GIF are accepted.
-    case unsupportedMediaType(message: String?)
+    case unsupportedMediaType(message: String?, requestId: String?)
     /// An upload exceeded the server's size limit (HTTP 413).
-    case payloadTooLarge(message: String?)
+    case payloadTooLarge(message: String?, requestId: String?)
     /// No end-user identity could be presented where one is required
     /// (HTTP 400 `uploader_identity_required`) — upload sessions are always
     /// bound to an uploader identity.
-    case uploaderIdentityRequired(message: String?)
+    case uploaderIdentityRequired(message: String?, requestId: String?)
     /// The request presented a different identity than the one that created
     /// the referenced upload session (HTTP 400 `uploader_mismatch`).
     /// Re-attach the file with the same `userToken` and try again.
-    case uploaderMismatch(message: String?)
+    case uploaderMismatch(message: String?, requestId: String?)
     /// The app's workspace reached its monthly submission quota
     /// (HTTP 402 `tier_limit_submissions`) and the submission was not
     /// accepted. Submissions succeed again once the quota resets or the
     /// workspace's plan is upgraded in the developer console.
-    case submissionQuotaExceeded(message: String?)
+    case submissionQuotaExceeded(message: String?, requestId: String?)
     /// The app's workspace subscription is inactive or canceled
     /// (HTTP 402 `subscription_inactive`) and the submission was not
     /// accepted. Submissions succeed again once the workspace's subscription
     /// is reactivated.
-    case subscriptionInactive(message: String?)
+    case subscriptionInactive(message: String?, requestId: String?)
     /// The requested user profile could not be found (HTTP 404).
     case userProfileNotFound(message: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the raw response body for debugging; `requestId` is the
     /// response's `X-Request-Id` correlation id for support requests.
     case unexpectedStatus(code: Int, message: String, requestId: String?)
+
+    /// The `X-Request-Id` correlation identifier associated with this error, if available.
+    public var requestId: String? {
+        switch self {
+        case .scanRejected(_, let requestId):
+            return requestId
+        case .rateLimited(_, let requestId):
+            return requestId
+        case .unsupportedMediaType(_, let requestId):
+            return requestId
+        case .payloadTooLarge(_, let requestId):
+            return requestId
+        case .uploaderIdentityRequired(_, let requestId):
+            return requestId
+        case .uploaderMismatch(_, let requestId):
+            return requestId
+        case .submissionQuotaExceeded(_, let requestId):
+            return requestId
+        case .subscriptionInactive(_, let requestId):
+            return requestId
+        case .unexpectedStatus(_, _, let requestId):
+            return requestId
+        case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound:
+            return nil
+        }
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -130,26 +156,34 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return "The feedback server returned an unreadable upload response."
         case .authenticationRequired:
             return "This action is only available to signed-in users."
-        case .scanRejected(let message):
+        case .scanRejected(let message, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
             let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
-                return "The referenced attachment could not be uploaded due to content inspection rejection."
+                return "The referenced attachment could not be uploaded due to content inspection rejection.\(suffix)"
             }
-            return "The referenced attachment could not be uploaded due to content inspection rejection: \(trimmed)"
-        case .rateLimited:
-            return "You're doing that too often. Please try again in a minute."
-        case .unsupportedMediaType:
-            return "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF."
-        case .payloadTooLarge:
-            return "That file is too large to upload."
-        case .uploaderIdentityRequired:
-            return "Uploads require an end-user identity. Pass a userToken (see UserTokenStore) when uploading attachments."
-        case .uploaderMismatch:
-            return "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again."
-        case .submissionQuotaExceeded:
-            return "This app has reached its submission limit for this month. Please try again later."
-        case .subscriptionInactive:
-            return "Submissions are unavailable for this app right now. Please try again later."
+            return "The referenced attachment could not be uploaded due to content inspection rejection: \(trimmed)\(suffix)"
+        case .rateLimited(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "You're doing that too often. Please try again in a minute.\(suffix)"
+        case .unsupportedMediaType(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF.\(suffix)"
+        case .payloadTooLarge(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "That file is too large to upload.\(suffix)"
+        case .uploaderIdentityRequired(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "Uploads require an end-user identity. Pass a userToken (see UserTokenStore) when uploading attachments.\(suffix)"
+        case .uploaderMismatch(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again.\(suffix)"
+        case .submissionQuotaExceeded(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "This app has reached its submission limit for this month. Please try again later.\(suffix)"
+        case .subscriptionInactive(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "Submissions are unavailable for this app right now. Please try again later.\(suffix)"
         case .userProfileNotFound(let message):
             let trimmed = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !trimmed.isEmpty {
@@ -160,6 +194,48 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return "The feedback request failed (\(code))\(suffix): \(message)"
         }
+    }
+}
+
+public extension FeedbackClientError {
+    /// Convenience constructor for ``scanRejected(message:requestId:)`` with no request id.
+    static func scanRejected(message: String) -> FeedbackClientError {
+        .scanRejected(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``rateLimited(message:requestId:)`` with no request id.
+    static func rateLimited(message: String? = nil) -> FeedbackClientError {
+        .rateLimited(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``unsupportedMediaType(message:requestId:)`` with no request id.
+    static func unsupportedMediaType(message: String? = nil) -> FeedbackClientError {
+        .unsupportedMediaType(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``payloadTooLarge(message:requestId:)`` with no request id.
+    static func payloadTooLarge(message: String? = nil) -> FeedbackClientError {
+        .payloadTooLarge(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``uploaderIdentityRequired(message:requestId:)`` with no request id.
+    static func uploaderIdentityRequired(message: String? = nil) -> FeedbackClientError {
+        .uploaderIdentityRequired(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``uploaderMismatch(message:requestId:)`` with no request id.
+    static func uploaderMismatch(message: String? = nil) -> FeedbackClientError {
+        .uploaderMismatch(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``submissionQuotaExceeded(message:requestId:)`` with no request id.
+    static func submissionQuotaExceeded(message: String? = nil) -> FeedbackClientError {
+        .submissionQuotaExceeded(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``subscriptionInactive(message:requestId:)`` with no request id.
+    static func subscriptionInactive(message: String? = nil) -> FeedbackClientError {
+        .subscriptionInactive(message: message, requestId: nil)
     }
 }
 
@@ -250,7 +326,7 @@ public struct FeedbackClient: Sendable {
     ///     the SDK falls back to ``UserTokenStore/shared`` so anonymous flows keep a stable
     ///     identity across session creation and feedback submission.
     /// - Returns: The server's receipt, including the submission id and any warning.
-    /// - Throws: ``FeedbackClientError/scanRejected(message:)`` when an attachment
+    /// - Throws: ``FeedbackClientError/scanRejected(message:requestId:)`` when an attachment
     ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
     ///   ``FeedbackClientError/submissionQuotaExceeded(message:)`` when the app's
     ///   workspace has reached its monthly submission quota (HTTP 402 `tier_limit_submissions`),

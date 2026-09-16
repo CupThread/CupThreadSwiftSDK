@@ -24,7 +24,7 @@ struct SubmissionQuotaErrorTests {
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            guard case .submissionQuotaExceeded(let message) = error else {
+            guard case .submissionQuotaExceeded(let message, _) = error else {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }
@@ -55,7 +55,6 @@ struct SubmissionQuotaErrorTests {
             #expect(error.errorDescription?.contains("Submissions are unavailable") == true)
         }
     }
-
     @Test func feedbackSubmitMapsQuota402ToSubmissionQuotaExceeded() async throws {
         // POST /api/v1/feedback enforces the same quota contract as
         // POST /api/v1/feature-requests; the shared validateResponse
@@ -123,5 +122,37 @@ struct SubmissionQuotaErrorTests {
             inactive.errorDescription
                 == "Submissions are unavailable for this app right now. Please try again later."
         )
+    }
+
+    @Test func recognized402CarriesRequestID() async throws {
+        // The X-Request-Id correlation id must reach the typed 402 errors too.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            let response = HTTPURLResponse(
+                url: URL(string: "https://\(Self.apiHost)/api/v1/feature-requests")!,
+                statusCode: 402,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json", "X-Request-Id": "req-402-2"]
+            )!
+            return (response, try encodeJSON([
+                "error": "Monthly submission quota reached.",
+                "code": "tier_limit_submissions"
+            ]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        do {
+            _ = try await client.submitFeatureRequest(
+                FeatureRequestDraft(title: "Title", description: "Description"),
+                userToken: "tok"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .submissionQuotaExceeded(_, let requestId) = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(requestId == "req-402-2")
+            #expect(error.errorDescription?.contains("req-402-2") == true)
+        }
     }
 }
