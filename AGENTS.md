@@ -70,7 +70,7 @@ The SDK targets four Apple operating systems across seven release archive slices
        BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
        -quiet
      ```
-- **XCFramework assembly errors**: `scripts/release.mjs` verifies that all seven `.framework` slices exist before invoking `xcodebuild -create-xcframework`. If a slice is missing, check the preceding archive step logs for compiler or toolchain warnings and errors.
+- **XCFramework assembly errors**: The SPM product is static, so each archive installs a bare `CupThreadFeedback.o` instead of a dylib framework. `scripts/release.mjs` wraps each slice's object into a static `.framework` (`libtool -static` plus the generated header and swiftmodule), verifies all seven static slices (archs via `lipo`, `FeedbackClient` symbols via `nm`, swiftmodule interfaces per arch) before invoking `xcodebuild -create-xcframework`, and finishes with a consumer-probe package that imports and statically links the assembled XCFramework. If a slice is missing or fails verification, check the preceding archive step logs for compiler or toolchain warnings and errors.
 - **CI platform matrix**: The full 7-slice `build-platforms` matrix and `release-dry-run` run on every push to `main` (not on pull requests — see Testing Policy). A failure there means a cross-platform compile regression just merged: fix forward on a PR, validate the single failing slice locally with the `xcodebuild archive` command above, and merge again.
 
 
