@@ -26,82 +26,17 @@ public enum SdkConfigStatus: @unchecked Sendable {
     case failed(appearance: SdkAppearance?, error: any Error)
 }
 
-// MARK: - Last-good cache
-
-/// Read/write storage behind the persisted configuration cache.
-protocol SdkConfigCacheStorage: Sendable {
-    /// Loads the cached payload for `key`, or `nil` when absent.
-    func data(forKey key: String) -> Data?
-    /// Persists `data` under `key`.
-    func set(_ data: Data, forKey key: String)
-}
-
-/// `UserDefaults`-backed storage for the last-good configuration cache.
-final class UserDefaultsConfigStorage: SdkConfigCacheStorage, @unchecked Sendable {
-    private let defaults: UserDefaults
-
-    init(userDefaults: UserDefaults) {
-        self.defaults = userDefaults
-    }
-
-    func data(forKey key: String) -> Data? {
-        defaults.data(forKey: key)
-    }
-
-    func set(_ data: Data, forKey key: String) {
-        defaults.set(data, forKey: key)
-    }
-}
-
-/// Persists the last successfully fetched ``SdkAppearance`` per app key.
-///
-/// Consulted only when a fetch fails: the cached theme, feature flags, and
-/// overlay copy stay in force instead of rolling back to defaults, so console
-/// kill-switches keep working through outages. The cache has no TTL — every
-/// successful fetch overwrites it, and entries are namespaced per app key so
-/// multiple apps in one process stay isolated.
-final class SdkConfigCache: Sendable {
-    /// Prefix of the `UserDefaults` keys holding cached appearances.
-    static let keyPrefix = "com.cupthread.sdkConfigCache."
-
-    private let storage: any SdkConfigCacheStorage
-    private let key: String
-
-    /// Creates a cache scoped to one app key.
-    /// - Parameters:
-    ///   - appKey: The CupThread app key that namespaces the entry.
-    ///   - storage: The backing store; defaults to the standard
-    ///     `UserDefaults`.
-    init(
-        appKey: String,
-        storage: any SdkConfigCacheStorage = UserDefaultsConfigStorage(userDefaults: .standard)
-    ) {
-        self.storage = storage
-        self.key = Self.keyPrefix + appKey
-    }
-
-    /// The persisted appearance for this app key, or `nil` when no fetch has
-    /// ever succeeded (or the stored payload cannot be decoded).
-    func cachedAppearance() -> SdkAppearance? {
-        guard let data = storage.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(SdkAppearance.self, from: data)
-    }
-
-    /// Overwrites the cached appearance after a successful fetch.
-    func store(_ appearance: SdkAppearance) {
-        guard let data = try? JSONEncoder().encode(appearance) else { return }
-        storage.set(data, forKey: key)
-    }
-}
-
 // MARK: - Loader
 
 /// Observable loader for the remote console configuration
 /// (`GET /api/v1/public/config/{appKey}`).
 ///
-/// ``CupThreadTheme`` owns one by default. Create your own and pass it to the
-/// theme when you also want to observe the load state or trigger a retry from
-/// host code:
+/// Reads go through the client's shared short-TTL app-config cache: loaders
+/// on the same client coalesce into a single in-flight request, and a read
+/// within the TTL window reuses the last response instead of re-fetching.
+/// ``CupThreadTheme`` owns one loader by default. Create your own and pass it
+/// to the theme when you also want to observe the load state or trigger a
+/// retry from host code:
 ///
 /// ```swift
 /// @StateObject private var config = SdkConfigLoader(client: client)
@@ -115,53 +50,91 @@ final class SdkConfigCache: Sendable {
 ///     // No cached configuration exists; surfaces are unavailable until a
 ///     // retry succeeds.
 /// }
-/// await config.load() // retry
+/// await config.load()    // retry after a failure (failures are never cached)
+/// await config.refresh() // force a refetch, bypassing the short-TTL cache
 /// ```
 ///
 /// Fetch results are applied only on success or via the last-good cache; see
-/// ``SdkConfigStatus`` for the exact semantics.
+/// ``SdkConfigStatus`` for the exact semantics. A loader created while the
+/// client's cache is still within its TTL window starts as
+/// ``SdkConfigStatus/ready(_:)`` immediately, so re-presented surfaces gate on
+/// console state from their first body evaluation.
 @MainActor
 public final class SdkConfigLoader: ObservableObject {
     /// The current load state.
     ///
-    /// Starts as ``SdkConfigStatus/loading`` and never resets: a refresh keeps
-    /// the previously resolved state visible until the new result arrives, so
+    /// Starts as ``SdkConfigStatus/loading`` (unless the shared cache already
+    /// holds a fresh configuration) and never resets: a refresh keeps the
+    /// previously resolved state visible until the new result arrives, so
     /// surfaces never flash back to a placeholder between fetches.
     @Published public private(set) var status: SdkConfigStatus = .loading
 
     private let client: FeedbackClient
-    private let cache: SdkConfigCache
+    private let store: AppConfigStore
 
     /// Creates a loader for the given client.
-    /// - Parameter client: The shared client; its app key scopes the
-    ///   last-good cache.
+    /// - Parameter client: The shared client; its app config store scopes the
+    ///   TTL cache and the last-good fallback.
     public convenience init(client: FeedbackClient) {
-        self.init(client: client, cache: SdkConfigCache(appKey: client.configuration.appKey))
+        self.init(client: client, store: client.configStore)
     }
 
-    init(client: FeedbackClient, cache: SdkConfigCache) {
+    init(client: FeedbackClient, store: AppConfigStore) {
         self.client = client
-        self.cache = cache
+        self.store = store
+        // A synchronous TTL hit resolves the gate before the first body
+        // evaluation — no waiting placeholder on a warm cache.
+        if let cached = store.cachedConfig() {
+            status = .ready(cached.sdk)
+        }
     }
 
-    /// Fetches the console configuration once.
+    /// Resolves the console configuration once.
     ///
-    /// On success the appearance is published via ``SdkConfigStatus/ready(_:)``
-    /// and persisted to the last-good cache. On failure the cached appearance
-    /// (if any) is published via ``SdkConfigStatus/failed(appearance:error:)``.
-    /// Cancellation leaves the current status untouched. Call again to retry.
+    /// A fresh cached value resolves immediately; otherwise the read joins or
+    /// starts a single shared fetch. On success the appearance is published
+    /// via ``SdkConfigStatus/ready(_:)`` and persisted to the last-good cache.
+    /// On failure the cached appearance (if any) is published via
+    /// ``SdkConfigStatus/failed(appearance:error:)``. Cancellation leaves the
+    /// current status untouched.
+    ///
+    /// Because reads share the client's short-TTL cache, a call while the
+    /// cached configuration is still fresh resolves from that cache without a
+    /// network round trip; use ``SdkConfigLoader/refresh()`` when the read
+    /// must bypass the cache.
     public func load() async {
+        let client = self.client
         do {
-            let appearance = try await client.fetchAppConfig().sdk
-            cache.store(appearance)
-            status = .ready(appearance)
+            let config = try await store.config { try await client.fetchAppConfig() }
+            status = .ready(config.sdk)
         } catch is CancellationError {
             // The surrounding task was cancelled (e.g. the view disappeared);
             // keep whatever was resolved before.
         } catch let error as URLError where error.code == .cancelled {
             // URLSession also surfaces task cancellation as URLError.
         } catch {
-            status = .failed(appearance: cache.cachedAppearance(), error: error)
+            status = .failed(appearance: store.lastGoodAppearance(), error: error)
+        }
+    }
+
+    /// Forces a network refresh of the console configuration, bypassing the
+    /// shared TTL cache.
+    ///
+    /// Same semantics as ``SdkConfigLoader/load()`` (success publishes
+    /// ``SdkConfigStatus/ready(_:)`` and persists the last-good copy; failure
+    /// publishes ``SdkConfigStatus/failed(appearance:error:)``), except that
+    /// the fetch always runs and the new value replaces the cached entry.
+    public func refresh() async {
+        let client = self.client
+        do {
+            let config = try await store.forceRefresh { try await client.fetchAppConfig() }
+            status = .ready(config.sdk)
+        } catch is CancellationError {
+            // The surrounding task was cancelled; keep whatever was resolved.
+        } catch let error as URLError where error.code == .cancelled {
+            // URLSession also surfaces task cancellation as URLError.
+        } catch {
+            status = .failed(appearance: store.lastGoodAppearance(), error: error)
         }
     }
 }

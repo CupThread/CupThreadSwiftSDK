@@ -117,7 +117,10 @@ public struct FeedbackComposerView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task {
-            if let config = try? await client.fetchAppConfig() {
+            // Read through the shared config cache: the surface gate's fetch
+            // (and any other surface's) already warmed it, so presenting the
+            // composer costs at most one config GET per TTL window.
+            if let config = try? await client.cachedAppConfig() {
                 attachmentState.applyConfigLimit(config.maxAttachmentBytes)
             }
         }

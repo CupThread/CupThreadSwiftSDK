@@ -299,10 +299,13 @@ private struct FeedbackSubmissionPayload: Codable, Sendable {
 ///
 /// One client serves every SDK surface — feedback, feature requests, roadmap,
 /// and changelog. Create it once with a ``FeedbackClientConfiguration`` and
-/// share it freely; the client is `Sendable` and stateless apart from the
-/// built-in search throttle (``SearchRequestThrottle``), which the search
-/// surfaces share so sustained typing stays below the API's per-IP
-/// search rate limit.
+/// share it freely; the client is `Sendable` and stateless apart from two
+/// shared helpers: the search throttle (``SearchRequestThrottle``), which the
+/// search surfaces share so sustained typing stays below the API's per-IP
+/// search rate limit, and the short-TTL app-config cache
+/// (``FeedbackClient/cachedAppConfig()``), which all surfaces share so
+/// presenting any number of them costs at most one configuration GET per
+/// TTL window.
 ///
 /// ```swift
 /// let client = FeedbackClient(
@@ -331,6 +334,9 @@ public struct FeedbackClient: Sendable {
     /// explicit `userToken`. One client ⇒ one identity per CupThread app,
     /// so hosts embedding several apps never bleed identities across them.
     let tokenStore: UserTokenStore
+    /// Shared short-TTL cache for the app configuration; every config reader
+    /// (theme, surface gating, composer, changelog overlay) goes through it.
+    let configStore: AppConfigStore
 
     /// Creates a client for a CupThread app.
     /// - Parameters:
@@ -348,7 +354,8 @@ public struct FeedbackClient: Sendable {
         configuration: FeedbackClientConfiguration,
         session: URLSession = .shared,
         overlayPresenter: (any ChangelogOverlayPresenter)? = nil,
-        tokenStore: UserTokenStore? = nil
+        tokenStore: UserTokenStore? = nil,
+        configStore: AppConfigStore? = nil
     ) {
         self.configuration = configuration
         self.session = session
@@ -357,6 +364,9 @@ public struct FeedbackClient: Sendable {
         self.overlayPresenter = overlayPresenter
         self.searchThrottle = SearchRequestThrottle()
         self.tokenStore = tokenStore ?? UserTokenStore(appKey: configuration.appKey)
+        self.configStore = configStore ?? AppConfigStore(
+            lastGood: SdkConfigCache(appKey: configuration.appKey)
+        )
     }
 
     /// Submits a feedback draft.
