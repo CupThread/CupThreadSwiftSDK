@@ -183,8 +183,31 @@ struct CommentModelsTests {
 struct CommentClientTests {
     static let apiHost = "comments.example.com"
 
-    static func makeAPIClient() -> FeedbackClient {
-        makeClient(baseURL: URL(string: "https://\(apiHost)")!)
+    static func makeAPIClient(
+        authenticationProvider: (@Sendable () async -> String?)? = nil
+    ) -> FeedbackClient {
+        makeClient(
+            baseURL: URL(string: "https://\(apiHost)")!,
+            authenticationProvider: authenticationProvider
+        )
+    }
+
+    /// The created-comment success envelope the server answers with (`201`).
+    static func createdCommentEnvelope(
+        overrides: [String: Any] = [:]
+    ) throws -> Data {
+        var comment: [String: Any] = [
+            "id": "c-new",
+            "featureRequestId": "fr-123",
+            "body": "New comment body",
+            "authorClerkId": "u_0123abcd",
+            "authorName": NSNull(),
+            "createdAt": "2026-01-01T00:00:00.000Z"
+        ]
+        for (key, value) in overrides {
+            comment[key] = value
+        }
+        return try encodeJSON(["comment": comment])
     }
 
     @Test func fetchCommentsHitsCorrectEndpoint() async throws {
@@ -220,25 +243,26 @@ struct CommentClientTests {
         #expect(comments[0].id == "c-1")
     }
 
-    @Test func postCommentSendsPostWithCorrectBodyAndHeaders() async throws {
+    @Test func postCommentSendsCanonicalPayloadAndDecodesEnvelope() async throws {
+        // Issue #5: the canonical create-comment contract — the request body
+        // carries exactly `body`, `parentId`, and `replyToAuthorName` (nil
+        // optionals omitted, author fields never sent), and the `201`
+        // response is the `{"comment": …}` envelope.
         let capture = CaptureBox<URLRequest>()
         let bodyCapture = CaptureBox<Data>()
 
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             bodyCapture.value = bodyData(from: request)
-
-            let responseBody: [String: Any] = [
-                "id": "c-new",
-                "featureRequestId": "fr-123",
-                "body": "New comment body",
-                "createdAt": "2026-01-01T00:00:00.000Z"
-            ]
-            return (makeHTTPResponse(status: 201), try encodeJSON(responseBody))
+            return (makeHTTPResponse(status: 201), try Self.createdCommentEnvelope())
         }
 
-        let draft = CommentDraft(body: " New comment body ", authorName: "Lex", parentId: "c-0")
-        _ = try await Self.makeAPIClient().postComment(featureRequestId: "fr-123", draft: draft, userToken: "token-123")
+        let draft = CommentDraft(body: "  New comment body  ", authorName: "Lex", parentId: "c-0")
+        let created = try await Self.makeAPIClient().postComment(
+            featureRequestId: "fr-123",
+            draft: draft,
+            userToken: "token-123"
+        )
 
         let req = try #require(capture.value)
         #expect(req.url?.path == "/api/v1/feature-requests/fr-123/comments")
@@ -248,27 +272,152 @@ struct CommentClientTests {
         let rawData = try #require(bodyCapture.value)
         let json = try #require(parseJSONDict(rawData))
         #expect(json["body"] as? String == "New comment body")
-        #expect(json["authorName"] as? String == "Lex")
         #expect(json["parentId"] as? String == "c-0")
+        #expect(json.keys.contains("authorName") == false)
+        #expect(json.keys.contains("authorEmail") == false)
+        #expect(json.keys.contains("authorAvatarUrl") == false)
+        #expect(json.keys.contains("replyToClerkId") == false)
+        #expect(json.values.contains { $0 is NSNull } == false)
+
+        #expect(created.id == "c-new")
+        #expect(created.authorClerkId == "u_0123abcd")
+    }
+
+    @Test func postCommentPayloadOmitsUnsetReplyTargetEntirely() async throws {
+        let bodyCapture = CaptureBox<Data>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            bodyCapture.value = bodyData(from: request)
+            return (makeHTTPResponse(status: 201), try Self.createdCommentEnvelope())
+        }
+
+        _ = try await Self.makeAPIClient().postComment(
+            featureRequestId: "fr-1",
+            draft: CommentDraft(body: "Top-level comment"),
+            userToken: "token-123"
+        )
+
+        let rawData = try #require(bodyCapture.value)
+        let json = try #require(parseJSONDict(rawData))
+        // Optional fields must be omitted, never encoded as null — the
+        // server's schema rejects explicit nulls with 400 before auth.
+        #expect(json.count == 1)
+        #expect(json["body"] as? String == "Top-level comment")
     }
 
     @Test func postCommentSetsUserTokenHeader() async throws {
         let capture = CaptureBox<String?>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request.value(forHTTPHeaderField: "X-User-Token")
-
-            let responseBody: [String: Any] = [
-                "id": "c-new",
-                "featureRequestId": "fr-123",
-                "body": "Test",
-                "createdAt": "2026-01-01T00:00:00.000Z"
-            ]
-            return (makeHTTPResponse(status: 201), try encodeJSON(responseBody))
+            return (makeHTTPResponse(status: 201), try Self.createdCommentEnvelope())
         }
 
         let token = "my-user-token"
-        _ = try await Self.makeAPIClient().postComment(featureRequestId: "fr-123", draft: CommentDraft(body: "Test"), userToken: token)
+        _ = try await Self.makeAPIClient().postComment(
+            featureRequestId: "fr-123",
+            draft: CommentDraft(body: "Test"),
+            userToken: token
+        )
 
         #expect(capture.value == token)
+    }
+
+    @Test func postCommentSendsBearerTokenFromAuthenticationProvider() async throws {
+        let capture = CaptureBox<String?>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request.value(forHTTPHeaderField: "Authorization")
+            return (makeHTTPResponse(status: 201), try Self.createdCommentEnvelope())
+        }
+
+        let client = Self.makeAPIClient(authenticationProvider: { "clerk-jwt-token" })
+        #expect(client.supportsAuthentication)
+        _ = try await client.postComment(
+            featureRequestId: "fr-123",
+            draft: CommentDraft(body: "Test"),
+            userToken: "token-123"
+        )
+
+        #expect(capture.value == "Bearer clerk-jwt-token")
+    }
+
+    @Test func postCommentWithProviderReturningNilOmitsAuthorizationHeader() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 201), try Self.createdCommentEnvelope())
+        }
+
+        let client = Self.makeAPIClient(authenticationProvider: { nil })
+        _ = try await client.postComment(
+            featureRequestId: "fr-123",
+            draft: CommentDraft(body: "Test"),
+            userToken: "token-123"
+        )
+
+        let req = try #require(capture.value)
+        #expect(req.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(req.value(forHTTPHeaderField: "X-User-Token") == "token-123")
+    }
+
+    @Test func postCommentWithoutProviderOmitsAuthorizationHeader() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 201), try Self.createdCommentEnvelope())
+        }
+
+        let client = Self.makeAPIClient()
+        #expect(client.supportsAuthentication == false)
+        _ = try await client.postComment(
+            featureRequestId: "fr-123",
+            draft: CommentDraft(body: "Test"),
+            userToken: "token-123"
+        )
+
+        let req = try #require(capture.value)
+        #expect(req.value(forHTTPHeaderField: "Authorization") == nil)
+    }
+
+    @Test func postCommentMapsAuthenticationRequiredEnvelopeToTypedError() async throws {
+        // Anonymous comment creation: the server answers 401 with the
+        // documented `authentication_required` code (issue #5).
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401),
+                try encodeJSON([
+                    "error": "Sign in is required to comment",
+                    "code": "authentication_required"
+                ])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().postComment(
+                featureRequestId: "fr-123",
+                draft: CommentDraft(body: "Test"),
+                userToken: "token-123"
+            )
+            Issue.record("Expected authenticationRequired")
+        } catch let error as FeedbackClientError {
+            #expect(error == .authenticationRequired)
+        }
+    }
+
+    @Test func other401sStayUnexpectedStatus() async throws {
+        // Only the documented `authentication_required` envelope maps to the
+        // typed error; any other 401 keeps the diagnostic unexpectedStatus.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 401), try encodeJSON(["error": "Invalid token"]))
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchComments(featureRequestId: "fr-123")
+            Issue.record("Expected unexpectedStatus")
+        } catch let error as FeedbackClientError {
+            guard case .unexpectedStatus(let code, _, _) = error else {
+                Issue.record("Expected unexpectedStatus, got \(error)")
+                return
+            }
+            #expect(code == 401)
+        }
     }
 }

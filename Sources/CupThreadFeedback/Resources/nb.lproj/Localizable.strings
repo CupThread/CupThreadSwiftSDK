@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "Svarer til @%@";
 "cupthread.comments.compose_prompt" = "Skriv en kommentar…";
 "cupthread.comments.removed_by_moderator" = "Denne kommentaren ble fjernet av en moderator.";
+"cupthread.comments.sign_in_required" = "Logg inn for å bli med i samtalen.";
 
 "cupthread.profile.title" = "Brukerprofil";
 "cupthread.profile.apps" = "Apper";

@@ -19,9 +19,10 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
     case eraseMyData
     case linkEndUser
 
-    /// HTTP status the mocked endpoint answers with (uploads/sessions is 201).
+    /// HTTP status the mocked endpoint answers with (uploads/sessions and
+    /// comment creation return 201).
     var successStatus: Int {
-        self == .createUploadSession ? 201 : 200
+        self == .createUploadSession || self == .postComment ? 201 : 200
     }
 
     /// Whether the call presents the anonymous identity as `X-User-Token`.
@@ -51,12 +52,12 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
         case .submitFeatureRequest:
             return try encodeJSON(["featureRequestId": "fr-1", "pending": true])
         case .postComment:
-            return try encodeJSON([
+            return try encodeJSON(["comment": [
                 "id": "c-1",
                 "featureRequestId": "fr-1",
                 "body": "hi",
                 "createdAt": "2026-09-18T00:00:00Z"
-            ])
+            ]])
         case .updateUserAttributes:
             return try encodeJSON(["ok": true, "updatedAt": "2026-09-18T00:00:00Z"])
         case .eraseMyData:

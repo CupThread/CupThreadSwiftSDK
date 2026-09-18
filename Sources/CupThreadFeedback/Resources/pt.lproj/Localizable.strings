@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "Respondendo a @%@";
 "cupthread.comments.compose_prompt" = "Escreva um comentário…";
 "cupthread.comments.removed_by_moderator" = "Este comentário foi removido por um moderador.";
+"cupthread.comments.sign_in_required" = "Entre para participar da conversa.";
 
 "cupthread.profile.title" = "Perfil de usuário";
 "cupthread.profile.apps" = "Aplicativos";

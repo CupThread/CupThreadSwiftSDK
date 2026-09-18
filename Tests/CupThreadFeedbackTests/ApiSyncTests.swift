@@ -483,19 +483,24 @@ struct PseudonymousUserIdentifiersTests {
         #expect(displayModels[1].canReply == true)
     }
 
-    @Test func postCommentSendsPseudonymousReplyIdAndDecodesPseudonymousResponse() async throws {
+    @Test func postCommentDecodesPseudonymousResponseWithoutSendingReplyId() async throws {
+        // Signed-in comment creation (issue #5): reply identity is derived
+        // server-side from parentId, so replyToClerkId is never transmitted;
+        // the created-comment envelope still carries `u_*` pseudonyms.
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: "priv06-post.example.com") { request in
             capture.value = request
             return (makeHTTPResponse(status: 201), try encodeJSON([
-                "id": "c-new",
-                "featureRequestId": "fr-1",
-                "body": "Reply body",
-                "authorClerkId": "u_0123abcd",
-                "parentId": "c-1",
-                "replyToClerkId": Self.pseudonym,
-                "replyToAuthorName": "Alice",
-                "createdAt": "2026-01-03T00:00:00.000Z"
+                "comment": [
+                    "id": "c-new",
+                    "featureRequestId": "fr-1",
+                    "body": "Reply body",
+                    "authorClerkId": "u_0123abcd",
+                    "parentId": "c-1",
+                    "replyToClerkId": Self.pseudonym,
+                    "replyToAuthorName": "Alice",
+                    "createdAt": "2026-01-03T00:00:00.000Z"
+                ]
             ]))
         }
 
@@ -509,7 +514,9 @@ struct PseudonymousUserIdentifiersTests {
         let request = try #require(capture.value)
         let rawBody = try #require(bodyData(from: request))
         let json = try #require(parseJSONDict(rawBody))
-        #expect(json["replyToClerkId"] as? String == Self.pseudonym)
+        #expect(json["parentId"] as? String == "c-1")
+        #expect(json["replyToAuthorName"] as? String == "Alice")
+        #expect(json.keys.contains("replyToClerkId") == false)
         #expect(created.authorClerkId == "u_0123abcd")
         #expect(created.replyToClerkId == Self.pseudonym)
     }

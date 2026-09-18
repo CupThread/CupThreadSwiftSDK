@@ -61,11 +61,16 @@ extension FeedbackClient {
         let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
         let message = envelope?.error ?? String(data: data, encoding: .utf8) ?? "Unknown error"
 
+        if let typed = Self.typedError(
+            statusCode: statusCode,
+            code: envelope?.code,
+            envelopeMessage: envelope?.error,
+            requestId: requestId
+        ) {
+            throw typed
+        }
+
         switch statusCode {
-        case 422 where envelope?.code == "scan_rejected":
-            // An uploadId referenced by the submission failed the
-            // server-side content inspection (PRIV-02 media policy).
-            throw FeedbackClientError.scanRejected(message: envelope?.error ?? "", requestId: requestId)
         case 429:
             // Per-client-IP rate limiting (votes, uploads, PUT /user, search).
             throw FeedbackClientError.rateLimited(message: envelope?.error, requestId: requestId)
@@ -75,19 +80,43 @@ extension FeedbackClient {
             throw FeedbackClientError.unsupportedMediaType(message: envelope?.error, requestId: requestId)
         case 413:
             throw FeedbackClientError.payloadTooLarge(message: envelope?.error, requestId: requestId)
-        case 402 where envelope?.code == "tier_limit_submissions":
-            // The app's workspace hit its monthly submission quota — feature
-            // requests and feedback enforce the same contract.
-            throw FeedbackClientError.submissionQuotaExceeded(message: envelope?.error, requestId: requestId)
-        case 402 where envelope?.code == "subscription_inactive":
-            // The app's workspace subscription is inactive or canceled.
-            throw FeedbackClientError.subscriptionInactive(message: envelope?.error, requestId: requestId)
-        case 400 where envelope?.code == "uploader_identity_required":
-            throw FeedbackClientError.uploaderIdentityRequired(message: envelope?.error, requestId: requestId)
-        case 400 where envelope?.code == "uploader_mismatch":
-            throw FeedbackClientError.uploaderMismatch(message: envelope?.error, requestId: requestId)
         default:
             throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message, requestId: requestId)
+        }
+    }
+
+    /// Maps the API's code-qualified failure envelopes to typed errors
+    /// (each pair of status and machine-readable `code` maps to exactly one
+    /// case). Returns `nil` for envelopes without a known pairing, leaving
+    /// the mapping to the caller.
+    private static func typedError(
+        statusCode: Int,
+        code: String?,
+        envelopeMessage: String?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        switch (statusCode, code) {
+        case (401, "authentication_required"):
+            // Signed-in-only action (restricted changelog, comment creation):
+            // every endpoint maps this envelope to the same typed error.
+            return .authenticationRequired
+        case (422, "scan_rejected"):
+            // An uploadId referenced by the submission failed the
+            // server-side content inspection (PRIV-02 media policy).
+            return .scanRejected(message: envelopeMessage ?? "", requestId: requestId)
+        case (402, "tier_limit_submissions"):
+            // The app's workspace hit its monthly submission quota — feature
+            // requests and feedback enforce the same contract.
+            return .submissionQuotaExceeded(message: envelopeMessage, requestId: requestId)
+        case (402, "subscription_inactive"):
+            // The app's workspace subscription is inactive or canceled.
+            return .subscriptionInactive(message: envelopeMessage, requestId: requestId)
+        case (400, "uploader_identity_required"):
+            return .uploaderIdentityRequired(message: envelopeMessage, requestId: requestId)
+        case (400, "uploader_mismatch"):
+            return .uploaderMismatch(message: envelopeMessage, requestId: requestId)
+        default:
+            return nil
         }
     }
 }

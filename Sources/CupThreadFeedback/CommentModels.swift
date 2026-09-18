@@ -69,20 +69,29 @@ public struct FeatureRequestComment: Codable, Identifiable, Equatable, Sendable 
 // MARK: - Comment draft
 
 /// A new comment as typed by the end user, before submission.
+///
+/// Only the body and reply target reach the server: comment creation is
+/// signed-in-only, the author display name and avatar always resolve
+/// server-side from the signed-in profile, and the reply author's identity
+/// is derived from the parent comment. The `authorName`, `authorEmail`,
+/// `authorAvatarUrl`, and `replyToClerkId` fields remain for draft-building
+/// compatibility but are not transmitted.
 public struct CommentDraft: Equatable, Sendable {
     /// The comment body text.
     public var body: String
-    /// Optional display name; empty submits anonymously.
+    /// Optional display name. Not transmitted — the server resolves the
+    /// author's name from the signed-in profile.
     public var authorName: String
-    /// Optional contact email.
+    /// Optional contact email. Not transmitted.
     public var authorEmail: String
-    /// Optional avatar URL for the comment author.
+    /// Optional avatar URL for the comment author. Not transmitted — the
+    /// server resolves the avatar from the signed-in profile.
     public var authorAvatarUrl: String
     /// Id of the parent comment this is a reply to, when replying.
     public var parentId: String?
     /// App-scoped pseudonymous identifier of the author being replied to
-    /// (e.g. `u_ab12cd34`), taken verbatim from the parent comment's
-    /// ``FeatureRequestComment/authorClerkId``; pass it through unchanged.
+    /// (e.g. `u_ab12cd34`). Not transmitted — the server derives reply
+    /// identity from `parentId`.
     public var replyToClerkId: String?
     /// Display name of the author being replied to, when replying.
     public var replyToAuthorName: String?

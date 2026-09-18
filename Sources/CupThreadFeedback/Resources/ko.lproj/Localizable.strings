@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "@%@ 님에게 답글 작성 중";
 "cupthread.comments.compose_prompt" = "댓글을 입력하세요…";
 "cupthread.comments.removed_by_moderator" = "이 댓글은 관리자에 의해 삭제되었습니다.";
+"cupthread.comments.sign_in_required" = "로그인하여 대화에 참여하세요.";
 
 "cupthread.profile.title" = "사용자 프로필";
 "cupthread.profile.apps" = "앱";
