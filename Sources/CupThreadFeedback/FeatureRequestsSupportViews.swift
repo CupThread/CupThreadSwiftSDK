@@ -5,6 +5,36 @@ import SwiftUI
 // Module-internal pieces extracted from FeatureRequestsView.swift to keep the
 // surface file within the library file-size budget.
 
+// MARK: Transient notice auto-clear
+
+/// Clears a transient inline notice a few seconds after it appears.
+///
+/// Equivalent to the per-notice `.task(id:)` blocks it replaces: each new
+/// value restarts the task, so a fresh notice always gets its full display
+/// window and a cleared one cancels the pending sleep.
+private struct AutoClearNoticeModifier: ViewModifier {
+    @Binding var notice: String?
+    let after: Duration
+
+    func body(content: Content) -> some View {
+        content.task(id: notice) {
+            guard notice != nil else { return }
+            try? await Task.sleep(for: after)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                notice = nil
+            }
+        }
+    }
+}
+
+extension View {
+    /// Auto-clears an optional-string notice `after` it appears.
+    func autoClearNotice(_ notice: Binding<String?>, after: Duration = .seconds(4)) -> some View {
+        modifier(AutoClearNoticeModifier(notice: notice, after: after))
+    }
+}
+
 // MARK: Load-more row
 
 /// Sentinel row at the end of the list. Appears once more pages exist and

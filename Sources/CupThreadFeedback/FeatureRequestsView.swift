@@ -162,22 +162,8 @@ public struct FeatureRequestsView: View {
                 showSubmittedBanner = false
             }
         }
-        .task(id: voteNotice) {
-            guard voteNotice != nil else { return }
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.25)) {
-                voteNotice = nil
-            }
-        }
-        .task(id: reloadNotice) {
-            guard reloadNotice != nil else { return }
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.25)) {
-                reloadNotice = nil
-            }
-        }
+        .autoClearNotice($voteNotice)
+        .autoClearNotice($reloadNotice)
         .sdkSurface(client: client, feature: .featureRequests)
     }
 
