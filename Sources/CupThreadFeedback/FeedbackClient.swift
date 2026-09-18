@@ -323,7 +323,8 @@ public struct FeedbackClient: Sendable {
     ///
     /// Titles and descriptions are trimmed; empty contact fields, version
     /// strings, and attachment lists are omitted from the payload. Attachments
-    /// contributed by ``uploadAttachment(data:filename:mimeType:userToken:)``
+    /// contributed by the ``uploadAttachment(data:filename:mimeType:userToken:)``
+    /// and ``uploadAttachment(fileURL:filename:mimeType:userToken:)`` variants
     /// are sent as `uploadIds` referencing their upload session. The SDK adds
     /// `sdk` (`cupthread-apple/<semver>`), `sdkVersion` (`<semver>`), `platform`,
     /// and `submittedAt` metadata automatically and applies
