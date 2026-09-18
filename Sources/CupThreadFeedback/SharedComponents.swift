@@ -105,11 +105,11 @@ struct AvatarView: View {
 
 // MARK: - Vote controls
 
-/// Light haptics when the vote state flips. `SensoryFeedback.impact(weight:)`
+/// Light haptics when the tracked value changes. `SensoryFeedback.impact(weight:)`
 /// is gated to visionOS 26 while the package deploys to visionOS 1, so the
 /// modifier no-ops on earlier visionOS.
 private struct LightHapticModifier: ViewModifier {
-    let trigger: Bool
+    let trigger: Int
 
     func body(content: Content) -> some View {
         if #available(iOS 17.0, macOS 14.0, tvOS 17.0, visionOS 26.0, *) {
@@ -121,11 +121,17 @@ private struct LightHapticModifier: ViewModifier {
 }
 
 /// Interactive vote toggle: 44pt-tall pill with a monospaced digit count.
-/// Bounces its arrow and fires light haptics on state change.
+/// Bounces its arrow and fires light haptics when `successPulse` increments —
+/// i.e. once per *server-confirmed* vote. Keying the cues to a counter instead
+/// of `hasVoted` keeps a reverted (failed) vote from firing success feedback
+/// on the way back down.
 struct VotePill: View {
     let voteCount: Int
     let hasVoted: Bool
     let isInFlight: Bool
+    /// Increments once per confirmed vote on this item; drives the bounce
+    /// and haptic. Starts at 0, so the initial render fires neither.
+    var successPulse: Int = 0
     var isDisabled = false
     let action: () -> Void
 
@@ -134,7 +140,7 @@ struct VotePill: View {
             VStack(spacing: 3) {
                 Image(systemName: hasVoted ? "arrowtriangle.up.fill" : "arrowtriangle.up")
                     .font(.footnote.weight(.semibold))
-                    .symbolEffect(.bounce, value: hasVoted)
+                    .symbolEffect(.bounce, value: successPulse)
                 Text(voteCount, format: .number)
                     .font(.caption.weight(.semibold).monospacedDigit())
             }
@@ -157,7 +163,7 @@ struct VotePill: View {
         }
         .buttonStyle(.plain)
         .disabled(isInFlight || isDisabled)
-        .modifier(LightHapticModifier(trigger: hasVoted))
+        .modifier(LightHapticModifier(trigger: successPulse))
         // Stable hook for host and Demo UI tests.
         .accessibilityIdentifier("cupthread.features.vote_pill")
         .accessibilityLabel(

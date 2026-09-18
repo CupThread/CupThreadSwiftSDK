@@ -89,6 +89,7 @@
 
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "Głosujesz zbyt szybko. Spróbuj ponownie za minutę.";
+"cupthread.features.vote_failed" = "Nie udało się zapisać Twojego głosu. Sprawdź połączenie i spróbuj ponownie.";
 "cupthread.features.load_more" = "Wczytaj więcej";
 "cupthread.features.load_more_hint" = "Pokazuje następną stronę zgłoszeń funkcji.";
 

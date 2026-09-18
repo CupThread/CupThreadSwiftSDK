@@ -89,6 +89,7 @@
 
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "Oylarınız çok hızlı geldi. Lütfen bir dakika sonra tekrar deneyin.";
+"cupthread.features.vote_failed" = "Oyunuz kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.";
 "cupthread.features.load_more" = "Daha fazla yükle";
 "cupthread.features.load_more_hint" = "Sonraki sayfadaki özellik taleplerini gösterir.";
 

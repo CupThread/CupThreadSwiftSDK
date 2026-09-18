@@ -89,6 +89,7 @@
 
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "너무 빠르게 투표하고 있어요. 잠시 후 다시 시도해 주세요.";
+"cupthread.features.vote_failed" = "투표를 등록하지 못했어요. 연결 상태를 확인하고 다시 시도해 주세요.";
 "cupthread.features.load_more" = "더 보기";
 "cupthread.features.load_more_hint" = "다음 페이지의 기능 요청을 표시합니다.";
 
