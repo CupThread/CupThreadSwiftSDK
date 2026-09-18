@@ -30,8 +30,39 @@ public struct ChangelogLinkedRequest: Codable, Identifiable, Equatable, Sendable
     public let title: String
 }
 
-struct ListChangelogResponse: Codable, Sendable {
-    let entries: [ChangelogEntry]
+/// One page of `GET /api/v1/public/apps/{appKey}/changelog`.
+///
+/// The endpoint pages with an opaque keyset cursor: pass
+/// ``nextCursor`` back as the `cursor` parameter of
+/// ``FeedbackClient/fetchChangelog(limit:cursor:)`` to fetch the following
+/// page. Bodies published before pagination shipped (no `hasMore`/
+/// `nextCursor` keys) decode as a single complete page.
+public struct ListChangelogResult: Decodable, Equatable, Sendable {
+    /// The page's published entries, newest first.
+    public let entries: [ChangelogEntry]
+    /// Whether more entries are available beyond this page.
+    public let hasMore: Bool
+    /// Opaque keyset cursor for the next page; `nil` on the last page.
+    public let nextCursor: String?
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        entries = try container.decode([ChangelogEntry].self, forKey: .entries)
+        // Pagination metadata is additive: responses predating it decode as
+        // a complete page (matching the server's former all-entries shape).
+        hasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore) ?? false
+        nextCursor = try container.decodeIfPresent(String.self, forKey: .nextCursor)
+    }
+
+    init(entries: [ChangelogEntry], hasMore: Bool = false, nextCursor: String? = nil) {
+        self.entries = entries
+        self.hasMore = hasMore
+        self.nextCursor = nextCursor
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case entries, hasMore, nextCursor
+    }
 }
 
 // MARK: - Subscription / user-attribute results
@@ -101,19 +132,82 @@ private struct UserAttributesPayload: Encodable, Sendable {
 
 extension FeedbackClient {
 
-    /// Fetches the published changelog for the configured app, sorted newest-first.
+    /// The changelog endpoint's maximum page size (server limit is 100), so
+    /// walking a full history fetches the fewest possible pages.
+    private static let changelogMaxPageSize = 100
+
+    /// Fetches all published changelog entries for the configured app, sorted newest-first.
+    ///
+    /// The endpoint pages results behind a server-side page size (default
+    /// 50), so this walks every cursor page — collecting entries until the
+    /// server reports no more — instead of silently returning only the first
+    /// page. Entries are deduplicated by id across overlapping pages.
+    /// Callers that want explicit page control can use
+    /// ``FeedbackClient/fetchChangelog(limit:cursor:)``.
     ///
     /// Throws `FeedbackClientError.authenticationRequired` when the app has
     /// disabled anonymous changelog access; unknown app keys surface as
     /// `.unexpectedStatus` with status 404.
     /// - Returns: All published entries, newest first.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   changelog access is disabled, ``FeedbackClientError/unexpectedStatus(code:message:)``
+    ///   changelog access is disabled, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   for other HTTP failures, or ``FeedbackClientError/invalidResponse``.
     public func fetchChangelog() async throws -> [ChangelogEntry] {
-        var request = URLRequest(
-            url: configuration.baseURL.appending(path: "/api/v1/public/apps/\(configuration.appKey)/changelog")
+        var collected: [ChangelogEntry] = []
+        var seenIDs = Set<String>()
+        var cursor: String?
+        while true {
+            let page = try await fetchChangelog(limit: Self.changelogMaxPageSize, cursor: cursor)
+            let freshEntries = page.entries.filter { seenIDs.insert($0.id).inserted }
+            collected.append(contentsOf: freshEntries)
+            // A page that yields nothing new would replay forever; stop on
+            // the last page or on a misbehaving cursor.
+            guard page.hasMore, let nextCursor = page.nextCursor, !freshEntries.isEmpty else {
+                break
+            }
+            cursor = nextCursor
+        }
+        return collected.sorted { lhs, rhs in
+            (lhs.publishedAtDate ?? .distantPast) > (rhs.publishedAtDate ?? .distantPast)
+        }
+    }
+
+    /// Fetches one page of the published changelog, newest first.
+    ///
+    /// The server orders entries newest-first and pages them behind an
+    /// opaque keyset cursor: pass a previous page's
+    /// ``ListChangelogResult/nextCursor`` back as `cursor` to move forward.
+    /// Malformed cursors are rejected server-side with `400 Bad Request`.
+    /// - Parameters:
+    ///   - limit: Entries per page. The server accepts 1...100 (default 50).
+    ///   - cursor: Opaque keyset cursor from a previous page's
+    ///     ``ListChangelogResult/nextCursor``; omit for the first page.
+    /// - Returns: The page's entries plus `hasMore`/`nextCursor` paging
+    ///   metadata.
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
+    ///   changelog access is disabled, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   for other HTTP failures (including 400 on a malformed cursor), or
+    ///   ``FeedbackClientError/invalidResponse``.
+    public func fetchChangelog(
+        limit: Int = 50,
+        cursor: String? = nil
+    ) async throws -> ListChangelogResult {
+        let base = configuration.baseURL.appending(
+            path: "/api/v1/public/apps/\(configuration.appKey)/changelog"
         )
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
+            throw FeedbackClientError.invalidResponse
+        }
+        var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components.queryItems = queryItems
+        guard let url = components.url else {
+            throw FeedbackClientError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
         applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
 
@@ -126,10 +220,7 @@ extension FeedbackClient {
             throw FeedbackClientError.authenticationRequired
         }
         try validateResponse(httpResponse, data: data, accepted: [200])
-        let result = try decoder.decode(ListChangelogResponse.self, from: data)
-        return result.entries.sorted { lhs, rhs in
-            (lhs.publishedAtDate ?? .distantPast) > (rhs.publishedAtDate ?? .distantPast)
-        }
+        return try decoder.decode(ListChangelogResult.self, from: data)
     }
 
     /// Subscribes an email address to changelog notifications.
