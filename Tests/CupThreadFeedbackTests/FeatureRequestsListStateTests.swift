@@ -254,4 +254,57 @@ struct FeatureRequestsListStateTests {
         #expect(state.items[1].hasVoted == true)
         #expect(state.items[1].voteCount == 8)
     }
+
+    // MARK: Cursor pagination (applyPage) — overlap-free additions to the
+    // FeatureRequestsListStatePaging suite in ApiSyncTests.swift
+
+    private func makePageResult(
+        _ items: [FeatureRequestItem],
+        total: Int = 0,
+        hasMore: Bool = false,
+        nextCursor: String? = nil
+    ) -> ListFeatureRequestsResult {
+        ListFeatureRequestsResult(
+            requests: items,
+            total: total,
+            hasMore: hasMore,
+            nextCursor: nextCursor
+        )
+    }
+
+    @Test func appendPagePreservesInFlightOptimisticVoteOnExistingRow() {
+        let item = makeItem(id: "fr-1", voteCount: 5, hasVoted: false)
+        var state = FeatureRequestsListState(items: [item])
+        _ = state.applyOptimisticVote(for: "fr-1")
+
+        // An overlapping cursor page repeats fr-1 and introduces fr-2.
+        state.applyPage(
+            makePageResult([makeItem(id: "fr-1", voteCount: 5, hasVoted: false), makeItem(id: "fr-2")]),
+            replacesExisting: false
+        )
+
+        // The repeated row keeps its in-flight optimistic vote; the new row lands.
+        #expect(state.items.map(\.id) == ["fr-1", "fr-2"])
+        #expect(state.items[0].hasVoted == true)
+        #expect(state.items[0].voteCount == 6)
+        #expect(state.votingIds.contains("fr-1"))
+    }
+
+    @Test func replacingPageClearsCursorStateOnceTheLastPageLoads() {
+        var state = FeatureRequestsListState(items: [makeItem(id: "fr-1")])
+        state.applyPage(
+            makePageResult([makeItem(id: "fr-1")], total: 60, hasMore: true, nextCursor: "c1"),
+            replacesExisting: true
+        )
+        #expect(state.hasMorePages == true)
+
+        // The filter reloaded and the (single) result page is the last one —
+        // the load-more affordance must disappear with the stale cursor.
+        state.applyPage(
+            makePageResult([makeItem(id: "fr-1")], total: 60, hasMore: false, nextCursor: nil),
+            replacesExisting: true
+        )
+        #expect(state.nextCursor == nil)
+        #expect(state.hasMorePages == false)
+    }
 }

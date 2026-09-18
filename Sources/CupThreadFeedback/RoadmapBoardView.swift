@@ -1,42 +1,5 @@
 import SwiftUI
 
-// MARK: - Board model
-
-/// Groups feature requests under their board column (by `columnId`).
-/// Requests without a column or with an unlisted/hidden column land in a trailing "Other" group so nothing is dropped.
-struct RoadmapGroup: Identifiable, Equatable, Sendable {
-    let column: BoardColumn?
-    let requests: [FeatureRequestItem]
-
-    var id: String { column?.id ?? "uncategorized" }
-    var name: String { column?.name ?? CupThreadStrings.tr("cupthread.roadmap.column_other") }
-}
-
-/// Groups feature requests under the visible board columns, preserving server ordering.
-///
-/// Feature requests without a column (`columnId == nil`) or whose column is not in the visible
-/// `columns` list (e.g. internal, hidden, or deleted columns) are gathered into a trailing "Other"
-/// group so no requests are dropped.
-func makeGroups(columns: [BoardColumn], requests: [FeatureRequestItem]) -> [RoadmapGroup] {
-    let listedIds = Set(columns.map(\.id))
-    var byColumn = [String: [FeatureRequestItem]]()
-    var uncategorized = [FeatureRequestItem]()
-    for request in requests {
-        if let columnId = request.columnId, listedIds.contains(columnId) {
-            byColumn[columnId, default: []].append(request)
-        } else {
-            uncategorized.append(request)
-        }
-    }
-    var groups = columns.map { column in
-        RoadmapGroup(column: column, requests: byColumn[column.id] ?? [])
-    }
-    if !uncategorized.isEmpty {
-        groups.append(RoadmapGroup(column: nil, requests: uncategorized))
-    }
-    return groups
-}
-
 // MARK: - RoadmapBoardView
 
 /// A native roadmap board grouped by public columns.
@@ -334,12 +297,24 @@ public struct RoadmapBoardView: View {
             hasLoadedOnce = true
         }
         do {
+            // The board needs complete data — grouping a single page would
+            // silently truncate every column once the app outgrows the
+            // server's page size — so page through with a wide page size and
+            // let ``collectAllRequests`` stop at the real end of the result
+            // set. Columns load independently and concurrently.
             async let columns = client.fetchColumns()
-            async let requests = client.fetchFeatureRequests(
-                userToken: userToken,
-                query: trimmedSearchText.isEmpty ? nil : trimmedSearchText
-            )
-            groups = makeGroups(columns: try await columns, requests: try await requests.requests)
+            let boardClient = client
+            let boardUserToken = userToken
+            let query = trimmedSearchText.isEmpty ? nil : trimmedSearchText
+            let requests = try await collectAllRequests { cursor in
+                try await boardClient.fetchFeatureRequests(
+                    userToken: boardUserToken,
+                    limit: 200,
+                    query: query,
+                    cursor: cursor
+                )
+            }
+            groups = makeGroups(columns: try await columns, requests: requests)
         } catch {
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()

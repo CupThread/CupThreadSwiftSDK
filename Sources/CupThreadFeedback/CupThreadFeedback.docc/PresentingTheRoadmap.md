@@ -46,6 +46,10 @@ The roadmap includes an integrated search bar allowing users to quickly search t
 - Milestone version tags
 - Shipped indicators
 
+## Complete data, not just the first page
+
+The board pages through every matching request — not only the first server page — so columns stay complete and counts stay accurate as your backlog grows. Search reloads keep this complete-data behavior and preserve on-screen content when a reload fails.
+
 ## See also
 
 - ``RoadmapBoardView``
