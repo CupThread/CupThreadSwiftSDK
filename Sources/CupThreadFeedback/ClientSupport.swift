@@ -100,7 +100,9 @@ extension FeedbackClient {
 /// normalized (camelCase split to kebab-case, lowercased) and matched with whole-word
 /// boundaries against the authoritative server sensitive pattern, values are truncated
 /// to 512 characters, and the serialized total is capped at 8 KB. SDK-reserved keys
-/// (`sdk`, `platform`, `submittedAt`) are prioritized to survive host key-count eviction.
+/// (`sdk`, `platform`, `submittedAt`) are prioritized to survive host key-count eviction,
+/// and SDK-authored values passed via `reserved` always replace same-named host entries
+/// on the wire, so drafts cannot spoof the SDK's telemetry keys.
 /// Payloads are shrunk, never rejected.
 enum FeedbackMetadataSanitizer {
     static let maxKeys = 24

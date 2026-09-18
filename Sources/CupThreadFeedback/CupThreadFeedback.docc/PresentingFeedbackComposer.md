@@ -44,7 +44,7 @@ struct FeedbackSheet: View {
 
 ## Pre-filling drafts
 
-You can pre-fill any part of the draft before presenting the form, such as appending custom diagnostics to the free-form ``FeedbackDraft/metadata`` dictionary for your own triage tooling:
+You can pre-fill any part of the draft before presenting the form, such as appending custom diagnostics to the free-form ``FeedbackDraft/metadata`` dictionary for your own triage tooling (the reserved `sdk`, `sdkVersion`, `platform`, and `submittedAt` keys are SDK-authored and cannot be overridden):
 
 ```swift
 var draft = FeedbackDraft.autofilled()
