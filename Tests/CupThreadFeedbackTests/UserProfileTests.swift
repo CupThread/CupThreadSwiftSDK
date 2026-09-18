@@ -298,8 +298,11 @@ struct UserProfileClientTests {
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .userProfileNotFound(let message) = error {
+                // The server text stays on the case for diagnostics (#30);
+                // the displayed copy is the friendly fallback.
                 #expect(message == "User profile not found")
-                #expect(error.errorDescription == "User profile not found")
+                #expect(error.responseBody == "User profile not found")
+                #expect(error.errorDescription == "This user profile is no longer available.")
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }

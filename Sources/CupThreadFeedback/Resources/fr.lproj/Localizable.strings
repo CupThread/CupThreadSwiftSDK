@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "Vous effectuez trop de recherches. Veuillez patienter une minute avant de réessayer.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Impossible de joindre le serveur CupThread pour vérifier si cette surface est disponible. Vérifiez votre connexion et réessayez.";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "Une erreur est survenue. Veuillez réessayer.";
+"cupthread.error.http_unauthorized" = "Vous devez vous connecter pour effectuer cette action.";
+"cupthread.error.http_not_found" = "Nous n'avons pas trouvé cet élément. Il a peut-être été supprimé.";
+"cupthread.error.http_rate_limited" = "Vous effectuez cette action trop souvent. Patientez un instant puis réessayez.";
+"cupthread.error.http_server_busy" = "Le serveur rencontre un problème. Veuillez réessayer plus tard.";
+"cupthread.error.offline" = "Vous semblez être hors ligne. Vérifiez votre connexion puis réessayez.";
+"cupthread.error.timed_out" = "La demande a pris trop de temps. Veuillez réessayer.";

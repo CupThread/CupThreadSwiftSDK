@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "Você está pesquisando rápido demais. Aguarde um minuto e tente novamente.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Não foi possível contactar o servidor do CupThread para verificar se esta secção está disponível. Verifique a sua ligação e tente novamente.";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "Algo deu errado. Tente novamente.";
+"cupthread.error.http_unauthorized" = "Você precisa entrar para fazer isso.";
+"cupthread.error.http_not_found" = "Não encontramos isso. Ele pode ter sido removido.";
+"cupthread.error.http_rate_limited" = "Você está fazendo isso com muita frequência. Aguarde um momento e tente novamente.";
+"cupthread.error.http_server_busy" = "O servidor está com problemas no momento. Tente novamente mais tarde.";
+"cupthread.error.offline" = "Você parece estar offline. Verifique sua conexão e tente novamente.";
+"cupthread.error.timed_out" = "A solicitação demorou demais. Tente novamente.";

@@ -382,7 +382,7 @@ public struct FeatureRequestsView: View {
             }
             // Deep paging is best-effort; surface the failure at the end of
             // the list without disturbing the loaded pages.
-            pageError = error.localizedDescription
+            pageError = FriendlyError.message(for: error)
         }
     }
 

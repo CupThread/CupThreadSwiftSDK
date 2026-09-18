@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "Çok hızlı arama yapıyorsunuz. Lütfen bir dakika bekleyip tekrar deneyin.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Bu bölümün kullanılabilir olup olmadığını kontrol etmek için CupThread sunucusuna ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "Bir şeyler ters gitti. Lütfen tekrar deneyin.";
+"cupthread.error.http_unauthorized" = "Bunu yapmak için giriş yapmanız gerekiyor.";
+"cupthread.error.http_not_found" = "Bunu bulamadık. Kaldırılmış olabilir.";
+"cupthread.error.http_rate_limited" = "Bunu çok sık yapıyorsunuz. Lütfen kısa bir süre bekleyip tekrar deneyin.";
+"cupthread.error.http_server_busy" = "Sunucuda şu anda sorun var. Lütfen daha sonra tekrar deneyin.";
+"cupthread.error.offline" = "Çevrimdışı görünüyorsunuz. Bağlantınızı kontrol edip tekrar deneyin.";
+"cupthread.error.timed_out" = "İstek çok uzun sürdü. Lütfen tekrar deneyin.";

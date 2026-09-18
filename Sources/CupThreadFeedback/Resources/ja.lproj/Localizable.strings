@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "検索の頻度が高すぎます。1分待ってからもう一度お試しください。";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "CupThreadサーバーに接続してこの画面の利用可否を確認できませんでした。接続を確認してもう一度お試しください。";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "問題が発生しました。もう一度お試しください。";
+"cupthread.error.http_unauthorized" = "続行するにはサインインしてください。";
+"cupthread.error.http_not_found" = "対象が見つかりません。削除された可能性があります。";
+"cupthread.error.http_rate_limited" = "操作が頻繁すぎます。しばらく待ってからもう一度お試しください。";
+"cupthread.error.http_server_busy" = "サーバーに問題が発生しています。しばらくしてからもう一度お試しください。";
+"cupthread.error.offline" = "オフラインのようです。接続を確認してもう一度お試しください。";
+"cupthread.error.timed_out" = "リクエストがタイムアウトしました。もう一度お試しください。";

@@ -85,7 +85,7 @@ struct FeatureRequestComposeView: View {
             _ = try await client.submitFeatureRequest(draft, userToken: userToken)
             onSubmitted()
         } catch {
-            submitError = error.localizedDescription
+            submitError = FriendlyError.message(for: error)
         }
     }
 }

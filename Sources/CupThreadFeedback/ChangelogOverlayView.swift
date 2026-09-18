@@ -168,7 +168,7 @@ public struct ChangelogOverlayView: View {
                 appearance: config.sdk
             )
         } catch {
-            return .failed(error.localizedDescription)
+            return .failed(FriendlyError.message(for: error))
         }
     }
 

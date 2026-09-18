@@ -152,7 +152,7 @@ public struct UserProfileView: View {
         do {
             profile = try await client.fetchUserProfile(userId: userId)
         } catch {
-            loadError = error.localizedDescription
+            loadError = FriendlyError.message(for: error)
         }
         isLoading = false
     }

@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "Du søker for raskt. Vent ett minutt og prøv igjen.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Kunne ikke nå CupThread-serveren for å sjekke om denne flaten er tilgjengelig. Sjekk tilkoblingen og prøv igjen.";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "Noe gikk galt. Prøv igjen.";
+"cupthread.error.http_unauthorized" = "Du må logge inn for å gjøre dette.";
+"cupthread.error.http_not_found" = "Vi fant ikke dette. Det kan ha blitt fjernet.";
+"cupthread.error.http_rate_limited" = "Du gjør dette for ofte. Vent litt og prøv igjen.";
+"cupthread.error.http_server_busy" = "Serveren har problemer akkurat nå. Prøv igjen senere.";
+"cupthread.error.offline" = "Du ser ut til å være frakoblet. Sjekk tilkoblingen og prøv igjen.";
+"cupthread.error.timed_out" = "Forespørselen tok for lang tid. Prøv igjen.";

@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "검색 빈도가 너무 높습니다. 1분 후에 다시 시도해 주세요.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "CupThread 서버에 연결하여 이 화면의 사용 가능 여부를 확인하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "문제가 발생했습니다. 다시 시도해 주세요.";
+"cupthread.error.http_unauthorized" = "계속하려면 로그인이 필요합니다.";
+"cupthread.error.http_not_found" = "해당 항목을 찾을 수 없습니다. 삭제되었을 수 있습니다.";
+"cupthread.error.http_rate_limited" = "작업이 너무 잦습니다. 잠시 후 다시 시도해 주세요.";
+"cupthread.error.http_server_busy" = "서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+"cupthread.error.offline" = "오프라인 상태인 것 같습니다. 연결을 확인하고 다시 시도해 주세요.";
+"cupthread.error.timed_out" = "요청 시간이 초과되었습니다. 다시 시도해 주세요.";
