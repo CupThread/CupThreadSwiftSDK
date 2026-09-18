@@ -46,7 +46,9 @@ public extension FeedbackDraft {
     }
 }
 
-/// A file uploaded through ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)``
+/// A file uploaded through
+/// ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)`` or
+/// ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:)``
 /// and attached to a ``FeedbackDraft``.
 public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
     /// Which storage backend holds the file.
@@ -151,7 +153,8 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
     /// credential-looking keys are replaced with `"[redacted]"`, values are
     /// truncated to 512 characters, and the payload is capped at 24 keys / 8 KB.
     public var metadata: [String: String]
-    /// References returned by ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)``.
+    /// References returned by the ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)``
+    /// and ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:)`` variants.
     /// Their `uploadId`s are sent with the submission.
     public var attachments: [FeedbackAttachment]
 

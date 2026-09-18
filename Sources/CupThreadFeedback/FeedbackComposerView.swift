@@ -291,18 +291,12 @@ public struct FeedbackComposerView: View {
         attachmentState.clearError()
 
         do {
-            let prepared = try await loadAndPreparePhotoData(from: item)
-            try Task.checkCancellation()
-            guard attachmentState.activeUploadId == uploadId else { return }
-
-            let filename = PhotoAttachmentHelper.makeFilename(
-                fileExtension: prepared.fileExtension,
-                id: uploadId
-            )
+            guard let prepared = try await preparePhotoForUpload(item, uploadId: uploadId) else { return }
+            defer { PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL) }
 
             let uploaded = try await client.uploadAttachment(
-                data: prepared.data,
-                filename: filename,
+                fileURL: prepared.fileURL,
+                filename: prepared.filename,
                 mimeType: prepared.mimeType,
                 userToken: userToken
             )
@@ -346,6 +340,45 @@ public struct FeedbackComposerView: View {
             data,
             limit: attachmentState.maxAttachmentBytes,
             stripSensitiveMetadata: stripSensitiveMetadata
+        )
+    }
+
+    /// A photo readied for the streaming upload path: the spooled temp file
+    /// plus the server-facing name and MIME type.
+    private struct PreparedPhotoUpload {
+        let fileURL: URL
+        let filename: String
+        let mimeType: String
+    }
+
+    /// Prepares the picked photo and spools the upload-ready bytes to a
+    /// temporary file so the upload streams from disk instead of holding a
+    /// second in-memory copy for the whole network round-trip; the prepared
+    /// bytes are released when this returns.
+    ///
+    /// Returns `nil` when the upload was superseded or cancelled before
+    /// preparation finished. Delete the returned file with
+    /// ``PhotoAttachmentHelper/removeTempUploadFile(at:)`` when done.
+    private func preparePhotoForUpload(
+        _ item: PhotosPickerItem,
+        uploadId: UUID
+    ) async throws -> PreparedPhotoUpload? {
+        let prepared = try await loadAndPreparePhotoData(from: item)
+        try Task.checkCancellation()
+        guard attachmentState.activeUploadId == uploadId else { return nil }
+
+        let fileURL = try await PhotoAttachmentHelper.makeTempUploadFile(
+            prepared.data,
+            fileExtension: prepared.fileExtension,
+            id: uploadId
+        )
+        return PreparedPhotoUpload(
+            fileURL: fileURL,
+            filename: PhotoAttachmentHelper.makeFilename(
+                fileExtension: prepared.fileExtension,
+                id: uploadId
+            ),
+            mimeType: prepared.mimeType
         )
     }
     #endif
