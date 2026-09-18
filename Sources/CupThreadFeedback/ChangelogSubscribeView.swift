@@ -9,32 +9,20 @@ import SwiftUI
 /// showing the subscribed address with a safe close action; otherwise it
 /// starts on the blank email form. A successful subscribe persists the
 /// address so later presentations skip the form.
+///
+/// Phase and toolbar decisions are owned by `ChangelogSubscribeModel`, which
+/// guarantees a close affordance in every phase — so on platforms without
+/// swipe-to-dismiss (macOS, tvOS, visionOS) the sheet can always be closed
+/// in one tap without any network call. Unsubscribing happens out-of-band
+/// through the emailed link, never through a button in this sheet.
 struct ChangelogSubscribeView: View {
-    /// Presentation phases of the sheet.
-    enum Phase: Equatable {
-        /// Blank email form; shown when no subscription is remembered.
-        case form
-        /// Subscription just recorded; awaiting the emailed double opt-in.
-        case subscribed
-        /// Returning user; shows the remembered subscribed address.
-        case manage
-    }
-
-    /// The phase a sheet should open in for the given remembered state.
-    static func initialPhase(subscribedEmail: String?) -> Phase {
-        subscribedEmail == nil ? .form : .manage
-    }
-
     let client: FeedbackClient
     let userToken: String
 
     private let store: ChangelogSubscriptionStore
 
     @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
-    @State private var rememberedEmail: String
-    @State private var phase: Phase
-    @State private var isWorking = false
+    @State private var model: ChangelogSubscribeModel
     @State private var errorMessage: String?
 
     init(client: FeedbackClient, userToken: String) {
@@ -42,15 +30,13 @@ struct ChangelogSubscribeView: View {
         self.userToken = userToken
         let store = ChangelogSubscriptionStore(appKey: client.configuration.appKey)
         self.store = store
-        let remembered = store.subscribedEmail()
-        _rememberedEmail = State(initialValue: remembered ?? "")
-        _phase = State(initialValue: Self.initialPhase(subscribedEmail: remembered))
+        _model = State(initialValue: ChangelogSubscribeModel(subscribedEmail: store.subscribedEmail()))
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                switch phase {
+                switch model.phase {
                 case .form:
                     form
                 case .subscribed:
@@ -58,7 +44,7 @@ struct ChangelogSubscribeView: View {
                         icon: "envelope.badge.checkmark.fill",
                         tint: .green,
                         title: "Check Your Inbox",
-                        message: "We sent a confirmation link to \(trimmedEmail). Confirm it to start receiving update emails."
+                        message: "We sent a confirmation link to \(model.trimmedEmail). Confirm it to start receiving update emails."
                     )
                 case .manage:
                     manageView
@@ -73,15 +59,18 @@ struct ChangelogSubscribeView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    if phase == .form {
+                    // In later phases the confirmation button is itself the
+                    // close affordance, so no second dismissal control is
+                    // rendered.
+                    if model.phase == .form {
                         Button("Cancel") { dismiss() }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(confirmationTitle) {
+                    Button(model.primaryTitle) {
                         Task { await runPrimaryAction() }
                     }
-                    .disabled(isWorking || (phase == .form && !isValidEmail))
+                    .disabled(model.isPrimaryDisabled)
                 }
             }
         }
@@ -92,7 +81,7 @@ struct ChangelogSubscribeView: View {
     private var form: some View {
         Form {
             Section {
-                TextField("you@example.com", text: $email)
+                TextField("you@example.com", text: $model.email)
                     #if canImport(UIKit)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
@@ -129,16 +118,15 @@ struct ChangelogSubscribeView: View {
             Text("You're Subscribed")
                 .font(.title3.weight(.semibold))
 
-            Text("Update emails will go to \(rememberedEmail). To change the address or unsubscribe, "
+            Text("Update emails will go to \(model.rememberedEmail). To change the address or unsubscribe, "
                 + "use the link in any update email.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
             Button("Use a Different Email") {
-                email = ""
+                model.startNewEmailEntry()
                 errorMessage = nil
-                phase = .form
             }
             .font(.subheadline.weight(.medium))
 
@@ -175,51 +163,26 @@ struct ChangelogSubscribeView: View {
 
     // MARK: Actions
 
-    private var trimmedEmail: String {
-        email.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Lightweight shape check — full validation happens server-side.
-    private var isValidEmail: Bool {
-        let trimmed = trimmedEmail
-        guard let at = trimmed.firstIndex(of: "@"),
-              at != trimmed.startIndex,
-              at != trimmed.index(before: trimmed.endIndex),
-              trimmed.suffix(from: at).contains(".") else {
-            return false
-        }
-        return !trimmed.contains(where: \.isWhitespace)
-    }
-
-    private var confirmationTitle: String {
-        switch phase {
-        case .form:
-            return isWorking ? "Subscribing…" : "Subscribe"
-        case .subscribed, .manage:
-            return "Done"
-        }
-    }
-
     @MainActor
     private func runPrimaryAction() async {
-        switch phase {
-        case .form:
+        switch model.primaryAction {
+        case .subscribe:
             await subscribe()
-        case .subscribed, .manage:
+        case .close:
             dismiss()
         }
     }
 
     @MainActor
     private func subscribe() async {
-        isWorking = true
+        model.isWorking = true
         errorMessage = nil
-        defer { isWorking = false }
+        defer { model.isWorking = false }
         do {
-            _ = try await client.subscribeToChangelog(email: trimmedEmail, userToken: userToken)
-            store.persist(email: trimmedEmail)
+            _ = try await client.subscribeToChangelog(email: model.trimmedEmail, userToken: userToken)
+            store.persist(email: model.trimmedEmail)
             withAnimation(.snappy(duration: 0.3)) {
-                phase = .subscribed
+                model.didSubscribe()
             }
         } catch {
             errorMessage = error.localizedDescription

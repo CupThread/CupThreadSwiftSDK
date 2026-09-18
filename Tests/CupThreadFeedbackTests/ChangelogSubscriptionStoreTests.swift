@@ -85,8 +85,8 @@ struct ChangelogSubscriptionStoreTests {
     }
 
     @Test func initialPhaseIsFormWithoutStoredEmailAndManageWithOne() {
-        #expect(ChangelogSubscribeView.initialPhase(subscribedEmail: nil) == .form)
-        #expect(ChangelogSubscribeView.initialPhase(subscribedEmail: "user@example.com") == .manage)
+        #expect(ChangelogSubscribeModel.initialPhase(subscribedEmail: nil) == .form)
+        #expect(ChangelogSubscribeModel.initialPhase(subscribedEmail: "user@example.com") == .manage)
     }
 
     @Test func concurrentPersistAndReadNeverLosesAllWrites() async throws {
