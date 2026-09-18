@@ -26,13 +26,16 @@ public struct ChangelogOverlayView: View {
     @State private var appearance: SdkAppearance = .defaults
     @State private var isLoading = true
     @State private var loadError: String?
+    @State private var featureDisabled = false
     @State private var hasMarkedSeen = false
 
     /// Creates the overlay sheet.
     ///
     /// Pass `entries` and `appearance` only when you already fetched them via
     /// ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``; otherwise the view loads
-    /// both on first appearance.
+    /// both on first appearance. The self-loading path enforces the console's
+    /// `sdk.features.changelog` switch: when the surface is off, no changelog
+    /// request is made and the sheet shows an "unavailable" placeholder.
     /// - Parameters:
     ///   - client: The shared ``FeedbackClient``.
     ///   - entries: Pre-fetched changelog entries; `nil` makes the view fetch
@@ -72,6 +75,8 @@ public struct ChangelogOverlayView: View {
                     LoadErrorView(message: loadError) {
                         await load()
                     }
+                } else if featureDisabled {
+                    FeatureDisabledView(feature: .changelog)
                 } else {
                     content
                 }
@@ -86,7 +91,7 @@ public struct ChangelogOverlayView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if !isLoading && loadError == nil {
+                if !isLoading && loadError == nil && !featureDisabled {
                     Button(overlay.primaryButton) { primary() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
@@ -133,6 +138,40 @@ public struct ChangelogOverlayView: View {
         }
     }
 
+    /// Content fetched by the overlay's self-loading path (direct init with
+    /// `entries: nil`, or the `.changelogOverlay` modifier).
+    enum SelfLoadedContent: Equatable {
+        /// The console turned the changelog surface off; no entries were
+        /// fetched and the overlay shows the shared disabled placeholder.
+        case featureDisabled(SdkAppearance)
+        /// Newest entries capped by the console's entry count, plus the
+        /// console appearance.
+        case entries([ChangelogEntry], appearance: SdkAppearance)
+        /// A network or decoding failure, carrying the user-facing message.
+        case failed(String)
+    }
+
+    /// Fetches config and newest entries for the self-loading paths.
+    ///
+    /// Enforces the console's `sdk.features.changelog` switch the same way
+    /// ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)`` does: when
+    /// the surface is off the changelog request is never made.
+    static func fetchSelfLoadedContent(in client: FeedbackClient) async -> SelfLoadedContent {
+        do {
+            let config = try await client.fetchAppConfig()
+            guard config.sdk.features.isEnabled(.changelog) else {
+                return .featureDisabled(config.sdk)
+            }
+            let all = try await client.fetchChangelog()
+            return .entries(
+                Array(all.prefix(config.sdk.changelogOverlay.entryCount)),
+                appearance: config.sdk
+            )
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
     @MainActor
     private func load() async {
         if let preparedAppearance {
@@ -146,14 +185,17 @@ public struct ChangelogOverlayView: View {
 
         isLoading = true
         loadError = nil
+        featureDisabled = false
         defer { isLoading = false }
-        do {
-            let config = try await client.fetchAppConfig()
-            appearance = config.sdk
-            let all = try await client.fetchChangelog()
-            entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
-        } catch {
-            loadError = error.localizedDescription
+        switch await Self.fetchSelfLoadedContent(in: client) {
+        case .entries(let loaded, let loadedAppearance):
+            appearance = loadedAppearance
+            entries = loaded
+        case .featureDisabled(let loadedAppearance):
+            appearance = loadedAppearance
+            featureDisabled = true
+        case .failed(let message):
+            loadError = message
         }
     }
 
@@ -203,6 +245,8 @@ extension View {
     ///
     /// The sheet fetches the app configuration and newest entries when shown,
     /// so the copy (title, buttons, entry count) always matches the console.
+    /// When the console turns the changelog surface off, the sheet shows an
+    /// "unavailable" placeholder instead of fetching entries.
     ///
     /// ```swift
     /// ContentView()
@@ -297,7 +341,7 @@ extension FeedbackClient {
         onlyIfUnseen: Bool = false
     ) async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
         let config = try await fetchAppConfig()
-        guard config.sdk.features.changelog else { return nil }
+        guard config.sdk.features.isEnabled(.changelog) else { return nil }
         let all = try await fetchChangelog()
         let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
         guard let latest = entries.first else { return nil }

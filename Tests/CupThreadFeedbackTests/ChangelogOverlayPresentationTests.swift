@@ -15,7 +15,12 @@ struct ChangelogOverlayPresentationTests {
         )
     }
 
-    private func mockChangelogAPI(changelogEnabled: Bool = true, entries: [[String: Any]] = [makeDefaultEntry()]) {
+    /// Mocks the config + changelog endpoints and records every request path.
+    @discardableResult
+    private func mockChangelogAPI(
+        changelogEnabled: Bool = true,
+        entries: [[String: Any]] = [makeDefaultEntry()]
+    ) -> CaptureBox<[String]> {
         var payload = makeConfigJSON()
         payload["sdk"] = [
             "theme": "system",
@@ -28,12 +33,17 @@ struct ChangelogOverlayPresentationTests {
                 "closeButton": "Close"
             ]
         ]
+        let recordedPaths = CaptureBox<[String]>()
+        recordedPaths.value = []
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
-            if request.url?.path.contains("/changelog") == true {
+            let path = request.url?.path ?? ""
+            recordedPaths.value?.append(path)
+            if path.contains("/changelog") {
                 return (makeHTTPResponse(), try encodeJSON(["entries": entries]))
             }
             return (makeHTTPResponse(), try encodeJSON(payload))
         }
+        return recordedPaths
     }
 
     @Test func refusedPresentationReturnsFalse() async throws {
@@ -139,6 +149,57 @@ struct ChangelogOverlayPresentationTests {
         let result = try await client.presentLatestChangelog()
         #expect(result == false)
         #expect(stub.hasPresented == false)
+    }
+
+    // MARK: - Self-loading overlay feature gate (#38)
+
+    @Test func sdkFeaturesIsEnabledMapsEverySurfaceSwitch() {
+        let allOff = SdkFeatures(feedback: false, featureRequests: false, roadmap: false, changelog: false)
+        #expect(!allOff.isEnabled(.feedback))
+        #expect(!allOff.isEnabled(.featureRequests))
+        #expect(!allOff.isEnabled(.roadmap))
+        #expect(!allOff.isEnabled(.changelog))
+
+        let allOn = SdkFeatures.allEnabled
+        #expect(allOn.isEnabled(.feedback))
+        #expect(allOn.isEnabled(.featureRequests))
+        #expect(allOn.isEnabled(.roadmap))
+        #expect(allOn.isEnabled(.changelog))
+    }
+
+    @Test func selfLoadedOverlaySkipsChangelogFetchWhenFeatureDisabled() async throws {
+        let requests = mockChangelogAPI(changelogEnabled: false)
+        let client = Self.makeChangelogClient()
+
+        let content = await ChangelogOverlayView.fetchSelfLoadedContent(in: client)
+
+        guard case .featureDisabled(let appearance) = content else {
+            Issue.record("Expected .featureDisabled, got \(content)")
+            return
+        }
+        // The console appearance is still applied so the sheet chrome (title,
+        // buttons, tint) keeps matching the console even when disabled.
+        #expect(appearance.changelogOverlay.title == "What's New")
+        let paths = requests.value ?? []
+        #expect(paths.contains { $0.contains("/config/") })
+        #expect(!paths.contains { $0.contains("/changelog") })
+    }
+
+    @Test func selfLoadedOverlayFetchesEntriesWhenFeatureEnabled() async throws {
+        let requests = mockChangelogAPI(changelogEnabled: true)
+        let client = Self.makeChangelogClient()
+
+        let content = await ChangelogOverlayView.fetchSelfLoadedContent(in: client)
+
+        guard case .entries(let loaded, let appearance) = content else {
+            Issue.record("Expected .entries, got \(content)")
+            return
+        }
+        #expect(loaded.map(\.id) == ["e_presentation_1"])
+        #expect(appearance.changelogOverlay.title == "What's New")
+        let paths = requests.value ?? []
+        #expect(paths.contains { $0.contains("/config/") })
+        #expect(paths.contains { $0.contains("/changelog") })
     }
 }
 
