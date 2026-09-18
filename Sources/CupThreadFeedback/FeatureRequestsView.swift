@@ -1,3 +1,6 @@
+#if canImport(UIKit)
+import UIKit
+#endif
 import SwiftUI
 
 // MARK: - FeatureRequestsView
@@ -30,6 +33,10 @@ public struct FeatureRequestsView: View {
     /// Transient notice for a failed reload whose results stay on screen
     /// (a reload failure never wipes already-rendered content).
     @State private var reloadNotice: String?
+    /// Per-item counters incremented once a vote is *confirmed* by the
+    /// server; drives the pill's success bounce/haptic so a reverted
+    /// (failed) vote never fires success cues.
+    @State private var voteSuccessPulses: [String: Int] = [:]
 
     private var items: [FeatureRequestItem] {
         listState.items
@@ -198,6 +205,7 @@ public struct FeatureRequestsView: View {
                             item: item,
                             highlightQuery: searchText,
                             isVoteInFlight: votingIds.contains(item.id),
+                            successPulse: voteSuccessPulses[item.id, default: 0],
                             onSelectCard: { selectedItemForComments = item },
                             onSelectUser: { selectedUserIdForProfile = $0 }
                         ) {
@@ -228,6 +236,9 @@ public struct FeatureRequestsView: View {
                 Text(emptyStateText)
                     .foregroundStyle(.secondary)
             } else {
+                if let voteNotice {
+                    InlineNoticeBanner(message: voteNotice)
+                }
                 if let reloadNotice {
                     InlineNoticeBanner(message: reloadNotice)
                 }
@@ -236,6 +247,7 @@ public struct FeatureRequestsView: View {
                         item: item,
                         highlightQuery: searchText,
                         isVoteInFlight: votingIds.contains(item.id),
+                        successPulse: voteSuccessPulses[item.id, default: 0],
                         onSelectCard: { selectedItemForComments = item },
                         onSelectUser: { selectedUserIdForProfile = $0 }
                     ) {
@@ -389,20 +401,28 @@ public struct FeatureRequestsView: View {
         do {
             let result = try await client.toggleVote(featureRequestId: item.id, userToken: userToken)
             listState.reconcileVoteSuccess(itemId: item.id, voted: result.voted, voteCount: result.voteCount)
-        } catch FeedbackClientError.rateLimited {
-            listState.reconcileVoteFailure(
-                itemId: item.id,
-                originalVoted: originalVoted,
-                originalCount: originalCount
-            )
-            voteNotice = CupThreadStrings.tr("cupthread.features.vote_rate_limited")
+            // Success cues fire here, on the confirmed state — never on the
+            // optimistic flip nor on a reverted failure.
+            voteSuccessPulses[item.id, default: 0] += 1
         } catch {
             listState.reconcileVoteFailure(
                 itemId: item.id,
                 originalVoted: originalVoted,
                 originalCount: originalCount
             )
+            let notice = VoteFailureNotice.notice(for: error)
+            guard notice != .silent else { return }
+            voteNotice = notice.message
+            announceVoteFailure(notice.message)
         }
+    }
+
+    /// VoiceOver announcement for a failed vote; the visual banner alone is
+    /// easy to miss between the flip and the revert.
+    private func announceVoteFailure(_ message: String) {
+        #if canImport(UIKit)
+        UIAccessibility.post(notification: .announcement, argument: message)
+        #endif
     }
 }
 

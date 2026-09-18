@@ -89,6 +89,7 @@
 
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "投票太頻繁了，請一分鐘後再試。";
+"cupthread.features.vote_failed" = "投票沒有成功，請檢查網路後再試。";
 "cupthread.features.load_more" = "載入更多";
 "cupthread.features.load_more_hint" = "顯示下一頁功能請求。";
 

@@ -133,3 +133,48 @@ struct FeatureRequestsListState: Equatable, Sendable {
         }
     }
 }
+
+// MARK: - Vote failure presentation
+
+/// How a failed optimistic vote should be presented to the user.
+///
+/// A reverted vote used to fail silently — the pill flipped and flipped back
+/// with no explanation, so users on flaky connections believed they had voted
+/// when they had not, and rate-limited users had no idea why voting stopped
+/// working. Every real failure now maps to a transient notice; only
+/// cancellation stays silent, because a cancelled vote means the surface went
+/// away rather than that something failed.
+///
+/// The view mutates its state synchronously around the vote's `await` (an
+/// async mutating call would hold exclusive access across the network
+/// round-trip), so classification — not orchestration — is what lives here.
+enum VoteFailureNotice: Equatable {
+    /// Task cancellation (surface dismissed / superseded) — present nothing.
+    case silent
+    /// HTTP 429: the vote endpoint's per-client-IP budget was hit.
+    case rateLimited
+    /// Any other failure (offline, 5xx, voting disabled): generic copy.
+    case generic
+
+    /// Maps a thrown vote error to its presentation.
+    static func notice(for error: Error) -> VoteFailureNotice {
+        if error is CancellationError { return .silent }
+        if let urlError = error as? URLError, urlError.code == .cancelled { return .silent }
+        if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
+            return .rateLimited
+        }
+        return .generic
+    }
+
+    /// The transient banner copy for this failure (empty for `.silent`).
+    var message: String {
+        switch self {
+        case .silent:
+            return ""
+        case .rateLimited:
+            return CupThreadStrings.tr("cupthread.features.vote_rate_limited")
+        case .generic:
+            return CupThreadStrings.tr("cupthread.features.vote_failed")
+        }
+    }
+}

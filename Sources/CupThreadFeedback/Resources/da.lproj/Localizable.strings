@@ -89,6 +89,7 @@
 
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "Du stemmer for hurtigt. Prøv igen om et minut.";
+"cupthread.features.vote_failed" = "Din stemme blev ikke registreret. Tjek din forbindelse, og prøv igen.";
 "cupthread.features.load_more" = "Indlæs flere";
 "cupthread.features.load_more_hint" = "Viser næste side af funktionsønsker.";
 

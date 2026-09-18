@@ -89,6 +89,7 @@
 
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "Está a votar demasiado rápido. Tente novamente dentro de um minuto.";
+"cupthread.features.vote_failed" = "O seu voto não foi registado. Verifique a ligação e tente novamente.";
 "cupthread.features.load_more" = "Carregar mais";
 "cupthread.features.load_more_hint" = "Mostra a próxima página de pedidos de funcionalidades.";
 
