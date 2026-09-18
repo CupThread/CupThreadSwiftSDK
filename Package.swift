@@ -23,7 +23,14 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "CupThreadFeedback"
+            name: "CupThreadFeedback",
+            resources: [
+                // Privacy manifest (required-reason API + collected-data
+                // declarations). Explicitly declared so SwiftPM copies it into
+                // Bundle.module; Xcode 15+ aggregates it into host apps for
+                // both the source-package and the binary-target channel.
+                .copy("PrivacyInfo.xcprivacy")
+            ]
         ),
         .testTarget(
             name: "CupThreadFeedbackTests",
