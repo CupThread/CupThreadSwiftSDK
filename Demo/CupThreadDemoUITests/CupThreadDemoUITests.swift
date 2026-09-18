@@ -171,30 +171,34 @@ final class CupThreadDemoUITests: XCTestCase {
 
     // MARK: - Screenshot Persistence Helper
 
+    /// Staging PNGs are only written when the caller provided a capture
+    /// output directory (scripts/capture-screenshots.sh sets one). A direct
+    /// UI-test run keeps the source tree untouched and only records test
+    /// attachments; it must never mutate the committed gallery itself.
     private func saveScreenshot(_ screenshot: XCUIScreenshot, name: String) {
         let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
 
-        guard let data = screenshot.image.pngData() else { return }
+        guard let stagingDir = ProcessInfo.processInfo.environment["CUPTHREAD_SCREENSHOT_OUTPUT_DIR"] else {
+            return
+        }
 
-        // Locate repository root relative to this test file
-        let currentFile = URL(fileURLWithPath: #filePath)
-        let repoRoot = currentFile
-            .deletingLastPathComponent() // CupThreadDemoUITests
-            .deletingLastPathComponent() // Demo
-            .deletingLastPathComponent() // Repository Root
+        guard let data = screenshot.image.pngData() else {
+            XCTFail("Failed to encode screenshot '\(name)' as lossless PNG")
+            return
+        }
 
-        let doccResourcesDir = repoRoot.appendingPathComponent("Sources/CupThreadFeedback/CupThreadFeedback.docc/Resources")
-        try? FileManager.default.createDirectory(at: doccResourcesDir, withIntermediateDirectories: true)
-
-        let targetFile = doccResourcesDir.appendingPathComponent("\(name).png")
-        try? data.write(to: targetFile)
-
-        if let jpegData = screenshot.image.jpegData(compressionQuality: 0.90) {
-            let jpgTarget = doccResourcesDir.appendingPathComponent("\(name).jpg")
-            try? jpegData.write(to: jpgTarget)
+        do {
+            try FileManager.default.createDirectory(
+                atPath: stagingDir,
+                withIntermediateDirectories: true
+            )
+            let targetFile = URL(fileURLWithPath: stagingDir).appendingPathComponent("\(name).png")
+            try data.write(to: targetFile, options: .atomic)
+        } catch {
+            XCTFail("Failed to stage screenshot '\(name)' into \(stagingDir): \(error)")
         }
     }
 }

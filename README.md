@@ -185,11 +185,18 @@ The site rebuilds and deploys automatically on every push to `main` (see `.githu
 # Run Swift package unit tests
 swift test
 
-# Run UI tests in Demo app & generate core screenshots
+# Run UI tests (screenshots are kept as test attachments only;
+# the committed gallery is never modified)
 xcodebuild test \
     -project Demo/CupThreadDemo.xcodeproj \
     -scheme CupThreadDemo \
     -destination 'platform=iOS Simulator,name=iPhone 17'
+
+# Refresh the six showcase screenshots. The run is all-or-nothing: captures
+# are staged outside the source tree, validated, converted to the canonical
+# JPEG quality, and only swapped into the DocC catalog after everything
+# succeeds. A failed run leaves the committed gallery untouched.
+scripts/capture-screenshots.sh
 
 # Build DocC documentation site
 scripts/build-docs.sh docs-site
