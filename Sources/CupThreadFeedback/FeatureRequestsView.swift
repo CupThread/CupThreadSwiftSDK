@@ -29,6 +29,15 @@ public struct FeatureRequestsView: View {
     @State private var versions: [AppVersion] = []
     @State private var selectedVersionID: String?
     @State private var isLoadingNextPage = false
+    /// Failure of the latest cursor-page ("load more") attempt. Distinct from
+    /// `loadError`, which is the initial-load failure: the loaded pages stay
+    /// on screen and the load-more row turns into an explicit retry.
+    @State private var pageError: String?
+    /// Bumped by every replacing load (search text, version filter,
+    /// pull-to-refresh, submit). A cursor-page response computed for an older
+    /// generation is dropped instead of being appended onto the new filter's
+    /// results.
+    @State private var loadGeneration = 0
     @State private var voteNotice: String?
     /// Transient notice for a failed reload whose results stay on screen
     /// (a reload failure never wipes already-rendered content).
@@ -153,22 +162,8 @@ public struct FeatureRequestsView: View {
                 showSubmittedBanner = false
             }
         }
-        .task(id: voteNotice) {
-            guard voteNotice != nil else { return }
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.25)) {
-                voteNotice = nil
-            }
-        }
-        .task(id: reloadNotice) {
-            guard reloadNotice != nil else { return }
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.25)) {
-                reloadNotice = nil
-            }
-        }
+        .autoClearNotice($voteNotice)
+        .autoClearNotice($reloadNotice)
         .sdkSurface(client: client, feature: .featureRequests)
     }
 
@@ -213,7 +208,12 @@ public struct FeatureRequestsView: View {
                         }
                     }
                     if listState.hasMorePages {
-                        loadMoreRow
+                        LoadMoreRow(
+                            pageError: pageError,
+                            isLoadingNextPage: isLoadingNextPage,
+                            onRetry: { Task { await loadNextPage() } },
+                            onNearEnd: { Task { await loadNextPageIfEligible() } }
+                        )
                     }
                 }
             }
@@ -258,8 +258,13 @@ public struct FeatureRequestsView: View {
                     #endif
                 }
                 if listState.hasMorePages {
-                    loadMoreRow
-                        .frame(maxWidth: .infinity)
+                    LoadMoreRow(
+                        pageError: pageError,
+                        isLoadingNextPage: isLoadingNextPage,
+                        onRetry: { Task { await loadNextPage() } },
+                        onNearEnd: { Task { await loadNextPageIfEligible() } }
+                    )
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -314,26 +319,6 @@ public struct FeatureRequestsView: View {
 
     // MARK: Actions
 
-    private var loadMoreRow: some View {
-        Button {
-            Task { await loadNextPage() }
-        } label: {
-            HStack(spacing: 8) {
-                if isLoadingNextPage {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                Text(CupThreadStrings.tr("cupthread.features.load_more"))
-                    .font(.subheadline.weight(.medium))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(12)
-        }
-        .buttonStyle(.bordered)
-        .disabled(isLoadingNextPage)
-        .accessibilityHint(CupThreadStrings.tr("cupthread.features.load_more_hint"))
-    }
-
     @MainActor
     private func loadVersions() async {
         versions = (try? await client.fetchVersions()) ?? []
@@ -341,9 +326,11 @@ public struct FeatureRequestsView: View {
 
     @MainActor
     private func loadFeatureRequests() async {
+        loadGeneration += 1
         isLoading = true
         loadError = nil
         reloadNotice = nil
+        pageError = nil
         defer {
             isLoading = false
             hasLoadedOnce = true
@@ -373,23 +360,38 @@ public struct FeatureRequestsView: View {
     @MainActor
     private func loadNextPage() async {
         guard !isLoadingNextPage, let cursor = listState.nextCursor else { return }
+        let generationAtStart = loadGeneration
         isLoadingNextPage = true
         defer { isLoadingNextPage = false }
         do {
             let result = try await client.fetchFeatureRequests(
                 userToken: userToken,
                 versionId: selectedVersionID,
-                query: searchText.isEmpty ? nil : searchText,
+                query: trimmedSearchText.isEmpty ? nil : trimmedSearchText,
                 cursor: cursor
             )
-            guard !Task.isCancelled else { return }
+            // A newer replacing load (search/version change, pull-to-refresh)
+            // superseded this cursor page — appending it would mix filters.
+            guard loadGeneration == generationAtStart else { return }
+            pageError = nil
             listState.applyPage(result, replacesExisting: false)
         } catch {
-            guard !Task.isCancelled else { return }
-            // Deep paging is best-effort; surface the failure without
-            // disturbing the loaded pages.
-            voteNotice = error.localizedDescription
+            guard loadGeneration == generationAtStart else { return }
+            if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
+                await client.searchThrottle.enterCooldown()
+            }
+            // Deep paging is best-effort; surface the failure at the end of
+            // the list without disturbing the loaded pages.
+            pageError = error.localizedDescription
         }
+    }
+
+    /// Loads the next page when the load-more row scrolls into view, unless a
+    /// failed attempt is waiting for the explicit retry tap.
+    @MainActor
+    private func loadNextPageIfEligible() async {
+        guard listState.hasMorePages, !isLoadingNextPage, pageError == nil else { return }
+        await loadNextPage()
     }
 
     @MainActor
@@ -423,48 +425,5 @@ public struct FeatureRequestsView: View {
         #if canImport(UIKit)
         UIAccessibility.post(notification: .announcement, argument: message)
         #endif
-    }
-}
-
-// MARK: - Version filter menu
-
-private struct VersionFilterMenu: View {
-    @Binding var selectedVersionID: String?
-    let versions: [AppVersion]
-
-    var body: some View {
-        Menu {
-            Picker(CupThreadStrings.tr("cupthread.features.version_picker"), selection: $selectedVersionID) {
-                Text(CupThreadStrings.tr("cupthread.features.all_versions")).tag(String?.none)
-                ForEach(versions) { version in
-                    Text(version.label).tag(String?.some(version.id))
-                }
-            }
-        } label: {
-            Label(
-                selectedVersionID.flatMap { id in versions.first(where: { $0.id == id })?.label }
-                    ?? CupThreadStrings.tr("cupthread.features.all_versions"),
-                systemImage: "line.3.horizontal.decrease.circle"
-            )
-        }
-        .disabled(versions.isEmpty)
-        .accessibilityLabel(CupThreadStrings.tr("cupthread.features.filter_by_version"))
-    }
-}
-
-// MARK: - Submitted banner
-
-private struct SubmittedBanner: View {
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-            Text(CupThreadStrings.tr("cupthread.features.submitted_banner"))
-                .font(.footnote.weight(.medium))
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .background(Color.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
     }
 }
