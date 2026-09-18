@@ -118,12 +118,54 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// accepted. Submissions succeed again once the workspace's subscription
     /// is reactivated.
     case subscriptionInactive(message: String?, requestId: String?)
-    /// The requested user profile could not be found (HTTP 404).
+    /// The requested user profile could not be found (HTTP 404). `message`
+    /// carries the raw response body for diagnostics — see ``responseBody``;
+    /// it is never shown to end users.
     case userProfileNotFound(message: String?)
     /// The server answered with a status the SDK does not handle. `message`
-    /// carries the raw response body for debugging; `requestId` is the
-    /// response's `X-Request-Id` correlation id for support requests.
+    /// carries the **unsanitized raw response body** for diagnostics (an
+    /// HTML/XML gateway error page, a stack trace, …) — read it through
+    /// ``responseBody`` for logs and support tickets. It is never shown to
+    /// end users: ``LocalizedError/errorDescription`` renders localized,
+    /// status-based copy instead. `requestId` is the response's
+    /// `X-Request-Id` correlation id for support requests.
     case unexpectedStatus(code: Int, message: String, requestId: String?)
+
+    /// The unsanitized server response body this error carries, when one was
+    /// captured — an HTML/XML gateway error page, a stack trace, or a plain
+    /// text error. Intended for logging and support tickets, never for
+    /// display: every user-facing SDK surface renders
+    /// ``LocalizedError/errorDescription`` copy, which never embeds this text.
+    public var responseBody: String? {
+        switch self {
+        case .unexpectedStatus(_, let message, _):
+            return message
+        case .userProfileNotFound(let message):
+            return message
+        case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
+             .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
+             .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
+             .subscriptionInactive:
+            return nil
+        }
+    }
+
+    /// End-user copy for a status the SDK does not map to a typed case —
+    /// localized, and free of any server-controlled text.
+    private static func friendlyStatusMessage(code: Int) -> String {
+        switch code {
+        case 401:
+            return CupThreadStrings.tr("cupthread.error.http_unauthorized")
+        case 404:
+            return CupThreadStrings.tr("cupthread.error.http_not_found")
+        case 429:
+            return CupThreadStrings.tr("cupthread.error.http_rate_limited")
+        case 500...599:
+            return CupThreadStrings.tr("cupthread.error.http_server_busy")
+        default:
+            return CupThreadStrings.tr("cupthread.error.request_failed")
+        }
+    }
 
     /// The `X-Request-Id` correlation identifier associated with this error, if available.
     public var requestId: String? {
@@ -187,15 +229,13 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .subscriptionInactive(_, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return "Submissions are unavailable for this app right now. Please try again later.\(suffix)"
-        case .userProfileNotFound(let message):
-            let trimmed = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if !trimmed.isEmpty {
-                return trimmed
-            }
+        case .userProfileNotFound:
             return "This user profile is no longer available."
-        case .unexpectedStatus(let code, let message, let requestId):
+        case .unexpectedStatus(let code, _, let requestId):
+            // The raw body stays on the case for diagnostics (`responseBody`);
+            // only localized status copy is shown to users (#30).
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "The feedback request failed (\(code))\(suffix): \(message)"
+            return Self.friendlyStatusMessage(code: code) + suffix
         }
     }
 }

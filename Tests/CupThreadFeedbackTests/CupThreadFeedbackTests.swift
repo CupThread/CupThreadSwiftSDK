@@ -317,16 +317,16 @@ struct FeedbackClientErrorTests {
         #expect(!(desc?.isEmpty ?? true))
     }
 
-    @Test func unexpectedStatusDescriptionContainsCode() throws {
+    @Test func unexpectedStatus5xxUsesLocalizedServerBusyCopy() throws {
         let error = FeedbackClientError.unexpectedStatus(code: 503, message: "Service Unavailable", requestId: nil)
         let desc = try #require(error.errorDescription)
-        #expect(desc.contains("503"))
+        #expect(desc == CupThreadStrings.tr("cupthread.error.http_server_busy"))
     }
 
-    @Test func unexpectedStatusDescriptionContainsMessage() throws {
+    @Test func unexpectedStatusDescriptionHidesRawMessage() throws {
         let error = FeedbackClientError.unexpectedStatus(code: 503, message: "Service Unavailable", requestId: nil)
         let desc = try #require(error.errorDescription)
-        #expect(desc.contains("Service Unavailable"))
+        #expect(!desc.contains("Service Unavailable"))
     }
 
     @Test func unexpectedStatusDescriptionContainsRequestIDWhenPresent() throws {
@@ -343,10 +343,10 @@ struct FeedbackClientErrorTests {
         #expect(!desc.contains("request id"))
     }
 
-    @Test func unexpectedStatusWith400ContainsCode() throws {
+    @Test func unexpectedStatusUnmappedCodeUsesGenericCopy() throws {
         let error = FeedbackClientError.unexpectedStatus(code: 400, message: "Validation failed", requestId: nil)
         let desc = try #require(error.errorDescription)
-        #expect(desc.contains("400"))
+        #expect(desc == CupThreadStrings.tr("cupthread.error.request_failed"))
     }
 
     @Test func scanRejectedHasLocalizedDescriptionWithoutMessage() {

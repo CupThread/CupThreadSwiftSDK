@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "You're searching too fast. Please wait a minute and try again.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Couldn't reach the CupThread server to check whether this surface is available. Check your connection and try again.";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "Something went wrong. Please try again.";
+"cupthread.error.http_unauthorized" = "You need to sign in to do that.";
+"cupthread.error.http_not_found" = "We couldn't find that. It may have been removed.";
+"cupthread.error.http_rate_limited" = "You're doing that too often. Please wait a moment and try again.";
+"cupthread.error.http_server_busy" = "The server is having trouble right now. Please try again later.";
+"cupthread.error.offline" = "You appear to be offline. Check your connection and try again.";
+"cupthread.error.timed_out" = "The request took too long. Please try again.";

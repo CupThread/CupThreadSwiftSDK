@@ -138,7 +138,7 @@ enum SearchReloadOutcome: Equatable {
         if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
             message = CupThreadStrings.tr("cupthread.search.rate_limited")
         } else {
-            message = error.localizedDescription
+            message = FriendlyError.message(for: error)
         }
         return hasExistingContent ? .inlineNotice(message) : .fullScreenError(message)
     }

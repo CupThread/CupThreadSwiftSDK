@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "Bạn tìm kiếm quá nhanh. Vui lòng đợi một phút rồi thử lại.";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "Không thể kết nối tới máy chủ CupThread để kiểm tra tính khả dụng của mục này. Vui lòng kiểm tra kết nối và thử lại.";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "Đã xảy ra lỗi. Vui lòng thử lại.";
+"cupthread.error.http_unauthorized" = "Bạn cần đăng nhập để thực hiện việc này.";
+"cupthread.error.http_not_found" = "Không tìm thấy mục này. Có thể nó đã bị xóa.";
+"cupthread.error.http_rate_limited" = "Bạn đang thực hiện việc này quá thường xuyên. Vui lòng đợi một lát rồi thử lại.";
+"cupthread.error.http_server_busy" = "Máy chủ đang gặp sự cố. Vui lòng thử lại sau.";
+"cupthread.error.offline" = "Có vẻ bạn đang ngoại tuyến. Vui lòng kiểm tra kết nối và thử lại.";
+"cupthread.error.timed_out" = "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.";

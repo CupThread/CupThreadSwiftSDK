@@ -388,7 +388,7 @@ public struct FeatureRequestsView: View {
             guard !Task.isCancelled else { return }
             // Deep paging is best-effort; surface the failure without
             // disturbing the loaded pages.
-            voteNotice = error.localizedDescription
+            voteNotice = FriendlyError.message(for: error)
         }
     }
 

@@ -431,7 +431,7 @@ public struct FeedbackAttachmentStateMachine: Sendable {
         if error is CancellationError {
             state = .idle
         } else {
-            state = .failed(id: id, message: error.localizedDescription)
+            state = .failed(id: id, message: FriendlyError.message(for: error))
         }
         return true
     }

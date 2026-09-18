@@ -104,3 +104,11 @@
 "cupthread.search.rate_limited" = "搜索太频繁了，请稍等一分钟后再试。";
 /* #61: config fetch failure with no cache (fail closed) */
 "cupthread.config.unavailable_description" = "无法连接 CupThread 服务器检查该功能的可用性。请检查网络连接后重试。";
+/* Issue #30: friendly status & connectivity copy — raw server bodies stay on FeedbackClientError.responseBody, never in UI text */
+"cupthread.error.request_failed" = "出了点问题，请重试。";
+"cupthread.error.http_unauthorized" = "请先登录后再执行此操作。";
+"cupthread.error.http_not_found" = "找不到相关内容，它可能已被移除。";
+"cupthread.error.http_rate_limited" = "操作过于频繁，请稍候再试。";
+"cupthread.error.http_server_busy" = "服务器暂时出现问题，请稍后再试。";
+"cupthread.error.offline" = "当前似乎没有网络连接，请检查网络后再试一次。";
+"cupthread.error.timed_out" = "请求耗时过长，请重试。";

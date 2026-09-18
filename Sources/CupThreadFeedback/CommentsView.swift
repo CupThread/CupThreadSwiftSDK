@@ -290,7 +290,7 @@ public struct CommentsView: View {
         do {
             comments = try await client.fetchComments(featureRequestId: featureRequestId)
         } catch {
-            loadError = error.localizedDescription
+            loadError = FriendlyError.message(for: error)
         }
         isLoading = false
     }
@@ -311,7 +311,7 @@ public struct CommentsView: View {
             draft.replyToAuthorName = nil
             draft.replyToClerkId = nil
         } catch {
-            submitError = error.localizedDescription
+            submitError = FriendlyError.message(for: error)
         }
         isSubmitting = false
     }

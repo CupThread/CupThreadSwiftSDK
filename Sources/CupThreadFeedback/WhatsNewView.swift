@@ -179,7 +179,7 @@ public struct WhatsNewView: View {
         do {
             entries = try await client.fetchChangelog()
         } catch {
-            loadError = error.localizedDescription
+            loadError = FriendlyError.message(for: error)
         }
     }
 }
