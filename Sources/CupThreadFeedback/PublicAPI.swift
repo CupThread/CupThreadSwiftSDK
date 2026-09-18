@@ -30,6 +30,12 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     /// Native SDK surfaces are unaffected; mirrored for schema completeness.
     public let hideSiteBranding: Bool
     /// Whether the app's public pages (roadmap, changelog) are visible at all.
+    ///
+    /// Since the September 2026 API sync, the config endpoints answer a
+    /// private app with `404` — the same body as an unknown app key — instead
+    /// of a `200` payload with `allowPublic: false`, so a successfully decoded
+    /// ``PublicAppConfig`` always carries `true`. The field is kept for schema
+    /// parity with the server's `PublicAppConfig`.
     public let allowPublic: Bool
     /// Platforms the console allows feedback from; empty means unrestricted.
     ///
@@ -260,8 +266,9 @@ extension FeedbackClient {
     /// SDK view.
     /// - Returns: The app's current public configuration.
     /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   — with status 404 for an unknown app key — or
-    ///   ``FeedbackClientError/invalidResponse``.
+    ///   — with status 404 for an unknown app key or for a private
+    ///   (non-public) app, which the API answers identically with
+    ///   `"App not found"` — or ``FeedbackClientError/invalidResponse``.
     public func fetchAppConfig() async throws -> PublicAppConfig {
         try await get("/api/v1/public/config/\(configuration.appKey)")
     }

@@ -107,6 +107,8 @@ struct PublicAPITests {
     }
 
     @Test func fetchAppConfigThrowsOn404() async throws {
+        // #129: a private app answers the config endpoint with the same 404
+        // body as an unknown app key; both surface as .unexpectedStatus.
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (makeHTTPResponse(status: 404), try encodeJSON(["error": "App not found"]))
         }
@@ -115,8 +117,9 @@ struct PublicAPITests {
             _ = try await Self.makeAPIClient().fetchAppConfig()
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .unexpectedStatus(let code, _, _) = error {
+            if case .unexpectedStatus(let code, let message, _) = error {
                 #expect(code == 404)
+                #expect(message == "App not found")
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
