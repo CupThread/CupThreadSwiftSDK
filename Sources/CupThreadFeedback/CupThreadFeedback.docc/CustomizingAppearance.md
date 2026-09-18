@@ -35,11 +35,12 @@ struct MyApp: App {
 
 ``CupThreadTheme`` automatically fetches your remote ``SdkAppearance`` and applies the console-selected accent color (as the SwiftUI `tint`) and color-scheme preference to everything inside, and publishes the full configuration to the SwiftUI environment for SDK views to consult.
 
-The fetched configuration is resilient by design:
+The fetched configuration is resilient and frugal by design:
 
 - Every successful fetch is persisted per app key.
 - If a later fetch fails, the last successful configuration stays in force — theme, feature flags, and overlay copy never roll back to defaults mid-outage.
 - If the very first fetch fails (nothing cached yet), SDK surfaces stay unavailable with a retry action instead of silently enabling everything. Your host content still renders with default theming.
+- Fetches are shared through a short-TTL in-memory cache (about 30 seconds): presenting any number of SDK surfaces — sheets, the composer, the changelog overlay — costs at most one configuration request per window, and a re-presented surface resolves instantly from that cache instead of flashing a loading placeholder.
 
 Pass a host-owned ``SdkConfigLoader`` to ``CupThreadTheme`` to observe the load state or trigger manual retries from your own UI.
 
@@ -70,11 +71,13 @@ When a feature is disabled in the developer console, the corresponding view auto
 To inspect or react to the console configuration in your own custom views, fetch ``PublicAppConfig``:
 
 ```swift
-let config = try await client.fetchAppConfig()
+let config = try await client.cachedAppConfig()
 print("App name: \(config.name)")
 print("Active theme: \(config.sdk.theme)")
 print("Roadmap enabled: \(config.sdk.features.roadmap)")
 ```
+
+Use ``FeedbackClient/cachedAppConfig()`` to share the SDK's short-TTL cache (recommended for read-along use cases like the one above); call ``FeedbackClient/fetchAppConfig()`` when a read must bypass the cache and always hit the network.
 
 ## See also
 

@@ -158,7 +158,7 @@ public struct ChangelogOverlayView: View {
     /// the surface is off the changelog request is never made.
     static func fetchSelfLoadedContent(in client: FeedbackClient) async -> SelfLoadedContent {
         do {
-            let config = try await client.fetchAppConfig()
+            let config = try await client.cachedAppConfig()
             guard config.sdk.features.isEnabled(.changelog) else {
                 return .featureDisabled(config.sdk)
             }
@@ -340,7 +340,7 @@ extension FeedbackClient {
     public func prepareChangelogOverlay(
         onlyIfUnseen: Bool = false
     ) async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
-        let config = try await fetchAppConfig()
+        let config = try await cachedAppConfig()
         guard config.sdk.features.isEnabled(.changelog) else { return nil }
         let all = try await fetchChangelog()
         let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))

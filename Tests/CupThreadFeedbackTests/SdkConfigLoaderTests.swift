@@ -19,16 +19,24 @@ struct SdkConfigLoaderTests {
 
     // MARK: - Helpers
 
-    private func buildClient(appKey: String) -> FeedbackClient {
-        makeClient(baseURL: URL(string: "https://\(Self.host)")!, appKey: appKey)
+    private func buildClient(appKey: String, store: AppConfigStore? = nil) -> FeedbackClient {
+        makeClient(baseURL: URL(string: "https://\(Self.host)")!, appKey: appKey, configStore: store)
+    }
+
+    private func makeStore(appKey: String, ttl: TimeInterval = AppConfigStore.defaultTTL) -> AppConfigStore {
+        AppConfigStore(
+            ttl: ttl,
+            lastGood: SdkConfigCache(appKey: appKey, storage: UserDefaultsConfigStorage(userDefaults: defaults))
+        )
     }
 
     private func makeCache(appKey: String) -> SdkConfigCache {
         SdkConfigCache(appKey: appKey, storage: UserDefaultsConfigStorage(userDefaults: defaults))
     }
 
-    private func makeLoader(appKey: String) -> SdkConfigLoader {
-        SdkConfigLoader(client: buildClient(appKey: appKey), cache: makeCache(appKey: appKey))
+    private func makeLoader(appKey: String, ttl: TimeInterval = AppConfigStore.defaultTTL) -> SdkConfigLoader {
+        let store = makeStore(appKey: appKey, ttl: ttl)
+        return SdkConfigLoader(client: buildClient(appKey: appKey, store: store), store: store)
     }
 
     private func configJSON(appKey: String, featureRequests: Bool = false, theme: String = "ocean") -> [String: Any] {
@@ -127,7 +135,9 @@ struct SdkConfigLoaderTests {
     @Test func failureAfterSuccessKeepsLastGoodConfig() async throws {
         try setSuccessHandler(appKey: "app_keep_good", featureRequests: false)
 
-        let loader = makeLoader(appKey: "app_keep_good")
+        // ttl: 0 makes every load hit the network, matching the pre-cache
+        // loader semantics this regression guards.
+        let loader = makeLoader(appKey: "app_keep_good", ttl: 0)
         await loader.load()
         let good = try requireReady(loader.status)
 
@@ -144,7 +154,7 @@ struct SdkConfigLoaderTests {
         // and keep the last-good appearance instead of ever resolving .ready.
         try setSuccessHandler(appKey: "app_private_404", featureRequests: false)
 
-        let loader = makeLoader(appKey: "app_private_404")
+        let loader = makeLoader(appKey: "app_private_404", ttl: 0)
         await loader.load()
         let good = try requireReady(loader.status)
 
@@ -236,6 +246,40 @@ struct SdkConfigLoaderTests {
         case .loading, .ready:
             break
         }
+    }
+
+    @Test func loadWithinTTLServesCachedConfigWithoutFetching() async throws {
+        // #28: a load while the client's short-TTL cache is fresh resolves
+        // from the shared cache — the network is never consulted, so even a
+        // failing endpoint cannot regress the resolved state.
+        try setSuccessHandler(appKey: "app_load_cached", featureRequests: false)
+
+        let loader = makeLoader(appKey: "app_load_cached")
+        await loader.load()
+        let good = try requireReady(loader.status)
+
+        setFailureHandler()
+        await loader.load()
+
+        let stillReady = try requireReady(loader.status)
+        #expect(stillReady == good, "A cached load must keep the fetched appearance")
+    }
+
+    @Test func refreshBypassesTheSharedCache() async throws {
+        // #28: the host-initiated forced refresh always hits the network,
+        // even while the shared cache is still fresh.
+        try setSuccessHandler(appKey: "app_refresh", featureRequests: false)
+
+        let loader = makeLoader(appKey: "app_refresh")
+        await loader.load()
+        let stale = try requireReady(loader.status)
+        #expect(stale.features.featureRequests == false)
+
+        try setSuccessHandler(appKey: "app_refresh", featureRequests: true)
+        await loader.refresh()
+
+        let appearance = try requireReady(loader.status)
+        #expect(appearance.features.featureRequests == true, "refresh() must refetch within the TTL window")
     }
 }
 

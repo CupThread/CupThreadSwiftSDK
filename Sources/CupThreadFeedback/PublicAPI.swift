@@ -263,7 +263,9 @@ extension FeedbackClient {
     ///
     /// This is also the request that carries the ``SdkAppearance`` (theme,
     /// feature flags, overlay copy) applied by ``CupThreadTheme`` and every
-    /// SDK view.
+    /// SDK view. This call always hits the network; use
+    /// ``FeedbackClient/cachedAppConfig()`` to read through the shared
+    /// short-TTL cache instead.
     /// - Returns: The app's current public configuration.
     /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   — with status 404 for an unknown app key or for a private
@@ -271,6 +273,26 @@ extension FeedbackClient {
     ///   `"App not found"` — or ``FeedbackClientError/invalidResponse``.
     public func fetchAppConfig() async throws -> PublicAppConfig {
         try await get("/api/v1/public/config/\(configuration.appKey)")
+    }
+
+    /// Fetches the app's public configuration through the client's shared
+    /// short-TTL cache.
+    ///
+    /// Equivalent to ``FeedbackClient/fetchAppConfig()``, except that
+    /// concurrent callers coalesce into a single request and reads within the
+    /// TTL window reuse the last response. The SDK's own surfaces resolve
+    /// their console configuration through this method — ``CupThreadTheme``,
+    /// per-surface gating, the feedback composer's attachment limit, and the
+    /// changelog overlay — so presenting any number of surfaces costs at most
+    /// one configuration GET per window per client. The response is also
+    /// written to the last-good on-disk cache, and a failed refresh throws
+    /// the same errors as ``FeedbackClient/fetchAppConfig()``.
+    /// - Returns: The app's current public configuration (fresh, or cached
+    ///   within the TTL window).
+    /// - Throws: The same errors as ``FeedbackClient/fetchAppConfig()`` when
+    ///   the window has expired and the refresh fails.
+    public func cachedAppConfig() async throws -> PublicAppConfig {
+        try await configStore.config { [self] in try await fetchAppConfig() }
     }
 
     /// Fetches the visible roadmap board columns, ordered by position.
