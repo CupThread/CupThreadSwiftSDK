@@ -102,30 +102,46 @@ public struct RoadmapBoardView: View {
         .sdkSurface(client: client, feature: .roadmap)
     }
 
+    /// The single source of truth for what the board renders; every layout
+    /// switches over it so loading, error, empty, and content states agree.
+    private var displayState: RoadmapBoardDisplayState {
+        makeBoardDisplayState(
+            isLoading: isLoading,
+            hasLoadedOnce: hasLoadedOnce,
+            loadError: loadError,
+            searchText: searchText,
+            groups: groups
+        )
+    }
+
     /// While searching, columns without matches are hidden so the pager only
-    /// shows relevant columns.
+    /// shows relevant columns. Derived from ``displayState`` so the filter
+    /// lives in exactly one place.
     private var visibleGroups: [RoadmapGroup] {
-        searchText.isEmpty ? groups : groups.filter { !$0.requests.isEmpty }
+        if case let .board(groups) = displayState { return groups }
+        return []
     }
 
     // MARK: iPhone — sticky column chips + paged full-width lists
 
     private var pagedBoard: some View {
         VStack(spacing: 0) {
-            if isLoading && !hasLoadedOnce {
+            switch displayState {
+            case .loading:
                 ScrollView {
                     SkeletonCardList()
                         .padding(16)
                 }
-            } else if let loadError {
+            case .error(let message):
                 stateContainer(
-                    LoadErrorView(message: loadError) {
+                    LoadErrorView(message: message) {
                         await load()
                     }
                 )
-            } else if visibleGroups.isEmpty {
+            case .emptySearch, .emptyBoard:
                 stateContainer(emptyState)
-            } else {                columnChips
+            case .board:
+                columnChips
                 pager
             }
         }
@@ -208,19 +224,20 @@ public struct RoadmapBoardView: View {
     private var boardScroll: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 16) {
-                if isLoading && !hasLoadedOnce {
+                switch displayState {
+                case .loading:
                     ForEach(0..<3, id: \.self) { _ in
                         SkeletonColumn()
                     }
-                } else if let loadError {
-                    LoadErrorView(message: loadError) {
+                case .error(let message):
+                    LoadErrorView(message: message) {
                         await load()
                     }
                     .frame(maxWidth: .infinity)
-                } else if groups.isEmpty {
+                case .emptySearch, .emptyBoard:
                     emptyState
                         .frame(maxWidth: .infinity)
-                } else {
+                case .board(let visibleGroups):
                     ForEach(visibleGroups) { group in
                         ColumnCard(group: group, highlightQuery: searchText)
                     }
@@ -234,17 +251,18 @@ public struct RoadmapBoardView: View {
     // tvOS: sections stack vertically for focus-driven navigation.
     private var boardList: some View {
         List {
-            if isLoading && !hasLoadedOnce {
+            switch displayState {
+            case .loading:
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let loadError {
-                LoadErrorView(message: loadError) {
+            case .error(let message):
+                LoadErrorView(message: message) {
                     await load()
                 }
                 .frame(maxWidth: .infinity)
-            } else if groups.isEmpty {
+            case .emptySearch, .emptyBoard:
                 emptyState
-            } else {
+            case .board(let visibleGroups):
                 ForEach(visibleGroups) { group in
                     Section(group.name) {
                         ForEach(group.requests) { item in
