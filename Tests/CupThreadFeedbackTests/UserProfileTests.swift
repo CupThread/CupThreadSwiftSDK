@@ -241,6 +241,82 @@ struct UserProfileClientTests {
         #expect(url.path == "/api/v1/users/user_123/profile")
     }
 
+    @Test func fetchUserProfileSendsAppKeyForAppScopedPublicIds() async throws {
+        // Board/comment payloads carry app-scoped public ids (`u_<32-hex>`),
+        // which the server only resolves with an `appKey` query parameter
+        // (#139); without it an existing user answers 404.
+        let appScopedID = "u_" + String(repeating: "a", count: 32)
+        let capture = CaptureBox<URL>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request.url
+            let body: [String: Any] = [
+                "profile": ["clerkUserId": appScopedID, "createdAt": "2026-01-01T00:00:00.000Z"],
+                "publicApps": [],
+                "recentComments": []
+            ]
+            return (makeHTTPResponse(), try encodeJSON(body))
+        }
+
+        _ = try await Self.makeAPIClient().fetchUserProfile(userId: appScopedID)
+
+        let url = try #require(capture.value)
+        #expect(url.path == "/api/v1/users/\(appScopedID)/profile")
+        let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let queryItems = try #require(components.queryItems)
+        #expect(queryItems.count == 1)
+        #expect(queryItems.first?.name == "appKey")
+        #expect(queryItems.first?.value == "app_testkey123456")
+    }
+
+    @Test func fetchUserProfileOmitsAppKeyForRawClerkIds() async throws {
+        // Raw Clerk ids (`user_*`) keep working for existing /u/ bookmarks
+        // without the app-scoped lookup parameter.
+        let capture = CaptureBox<URL>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request.url
+            let body: [String: Any] = [
+                "profile": ["clerkUserId": "user_bookmark", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "publicApps": [],
+                "recentComments": []
+            ]
+            return (makeHTTPResponse(), try encodeJSON(body))
+        }
+
+        _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_bookmark")
+
+        let url = try #require(capture.value)
+        let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        #expect(components.queryItems?.contains { $0.name == "appKey" } != true)
+    }
+
+    @Test func fetchUserProfileThrowsRateLimitedOn429() async throws {
+        // Per-client-IP rate limiting (September 2026 API sync, #139) maps to
+        // the shared typed 429 error with friendly copy, like other public
+        // metered endpoints.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 429, headers: ["X-Request-Id": "req-429-profile"]),
+                try encodeJSON(["error": "Too many requests. Please try again shortly."])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_ratelimited")
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .rateLimited(let message, let requestId) = error {
+                #expect(message == "Too many requests. Please try again shortly.")
+                #expect(requestId == "req-429-profile")
+                #expect(
+                    error.errorDescription == "You're doing that too often. Please try again in a minute. (request id: req-429-profile)"
+                )
+                #expect(error.responseBody == nil)
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
+
     @Test func fetchUserProfileDecodesAuthoritativeResponse() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             let body: [String: Any] = [
