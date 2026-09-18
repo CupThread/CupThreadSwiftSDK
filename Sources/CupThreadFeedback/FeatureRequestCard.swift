@@ -6,6 +6,9 @@ struct FeatureRequestCard: View {
     let item: FeatureRequestItem
     var highlightQuery: String = ""
     let isVoteInFlight: Bool
+    /// Increments once per server-confirmed vote on this item; drives the
+    /// vote pill's success bounce and haptic (a reverted vote fires none).
+    var successPulse: Int = 0
     var onSelectCard: (() -> Void)?
     var onSelectUser: ((String) -> Void)?
     let vote: () -> Void
@@ -58,6 +61,7 @@ struct FeatureRequestCard: View {
                 voteCount: item.voteCount,
                 hasVoted: item.hasVoted,
                 isInFlight: isVoteInFlight,
+                successPulse: successPulse,
                 isDisabled: item.isOwnRequest
             ) {
                 vote()

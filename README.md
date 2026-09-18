@@ -63,6 +63,8 @@ Or add `https://github.com/CupThread/CupThreadSwiftSDK.git` via Xcode (*File > A
 
 Source-package consumers link the SDK **statically**: no `CupThreadFeedback` dylib is embedded in your app, the app linker dead-strips unused SDK code, and every extension target shares the single statically-linked copy.
 
+The SDK ships a [privacy manifest](https://developer.apple.com/documentation/bundleresources/privacy_manifest_files) (`PrivacyInfo.xcprivacy`) as a package resource. Xcode 15+ aggregates it into your app automatically — it declares the SDK's `UserDefaults` required-reason API usage (reason `CA92.1`), that the SDK performs no tracking, and the data types it transmits (anonymous user ID, optional name/email, user content, host-reported revenue attributes). You don't need to add anything by hand; mirror the declarations in your own privacy labels if your app reports them.
+
 ### Prebuilt Binary Target (XCFramework)
 
 Prebuilt **static** XCFrameworks are published to the CupThread CDN with immutable caching. Static libraries are linked into your app's own binary — nothing is embedded, dead code is stripped by your app's linker, and app extensions stop duplicating an SDK dylib:
@@ -79,6 +81,8 @@ targets: [
 ```
 
 Or download the zip directly from [Releases](https://github.com/CupThread/CupThreadSwiftSDK/releases), drag `CupThreadFeedback.xcframework` into your Xcode target's *Frameworks, Libraries, and Embedded Content* ("Do Not Embed" is correct — the framework links statically), and also add the bundled `CupThreadFeedback_CupThreadFeedback.bundle` to your target's *Copy Bundle Resources*. Static libraries cannot carry resources, so the localized-strings bundle ships next to the framework inside the zip; without it the first localized string lookup crashes. See the zip's `INSTALL.md`.
+
+Every framework slice in the XCFramework embeds a `PrivacyInfo.xcprivacy` manifest at its bundle root; Xcode 15+ aggregates it into your app during the build, so no manual privacy declarations are needed for the binary channel either.
 
 ---
 

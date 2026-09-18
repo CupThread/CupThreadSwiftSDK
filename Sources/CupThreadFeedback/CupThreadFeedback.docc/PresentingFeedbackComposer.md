@@ -83,6 +83,20 @@ let result = try await client.submit(draft, userToken: tokenStore.token)
 print("Submitted ID: \(result.submissionId)")
 ```
 
+For large files, prefer the file-based variant: it streams the attachment
+off disk (`upload(for:fromFile:)`), so the bytes are never fully buffered in
+memory during the network round-trip — a good fit for app extensions and
+other memory-constrained hosts:
+
+```swift
+let attachment = try await client.uploadAttachment(
+    fileURL: screenshotURL,
+    filename: "screenshot.png",
+    mimeType: "image/png",
+    userToken: tokenStore.token
+)
+```
+
 ## Attachment upload lifecycle
 
 Attachment uploads are deliberately independent of the composer's view lifecycle:

@@ -98,7 +98,7 @@ let result = try await client.submit(draft, userToken: tokenStore.token)  // fro
 print(result.submissionId)
 ```
 
-Drafts can carry attachments you upload with ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)`` and arbitrary metadata for your own triage tooling. Metadata is sanitized locally per the server's redaction contract (credential-looking keys are redacted, values truncated, oversized payloads shrunk).
+Drafts can carry attachments you upload with ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)`` (or ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:)`` for large files, which streams from disk instead of buffering the body in memory) and arbitrary metadata for your own triage tooling. Metadata is sanitized locally per the server's redaction contract (credential-looking keys are redacted, values truncated, oversized payloads shrunk).
 
 ## Explore guides & articles
 
