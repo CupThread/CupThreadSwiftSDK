@@ -29,7 +29,7 @@ struct MyApp: App {
 }
 ```
 
-The overlay fetches the app configuration and newest entries, then renders the title, subtitle, button labels, and entry count you configured in the CupThread console.
+The overlay fetches the app configuration and newest entries, then renders the title, subtitle, button labels, and entry count you configured in the CupThread console. When the console's changelog switch is off, the sheet shows an "unavailable" placeholder and no changelog request is made — the same rule that makes ``FeedbackClient/presentLatestChangelog(onlyIfUnseen:)`` return `false` on a hidden surface.
 
 ## UIKit / AppKit or custom presentation
 
