@@ -17,6 +17,8 @@
   - `GET /api/v1/public/apps/:appKey/changelog` — Published release notes & changelog entries.
   - `POST /api/v1/public/apps/:appKey/changelog/subscribe` — Email subscription.
   - `POST /api/v1/public/apps/:appKey/changelog/unsubscribe` — Unsubscribe from updates.
+  - `GET /api/v1/public/digest/unsubscribe?token={token}` — Weekly-digest unsubscribe confirmation page (non-destructive; JSON-only clients receive `405` with `Allow: POST`).
+  - `POST /api/v1/public/digest/unsubscribe` — RFC 8058 one-click weekly-digest unsubscribe (token via query string, form field, or JSON body; idempotent replay).
   - `PUT /api/v1/public/apps/:appKey/user` — Report user attributes (paying status, MRR).
   - `GET /api/v1/feature-requests` — Feature requests list and search with `q` query parameter.
   - `POST /api/v1/feature-requests` — Submit new feature request.
