@@ -112,3 +112,5 @@
 "cupthread.error.http_server_busy" = "Der Server hat gerade Probleme. Bitte versuche es später erneut.";
 "cupthread.error.offline" = "Du scheinst offline zu sein. Prüfe deine Verbindung und versuche es erneut.";
 "cupthread.error.timed_out" = "Die Anfrage hat zu lange gedauert. Bitte versuche es erneut.";
+/* Issue #53: Turnstile-gated intake — typed error copy */
+"cupthread.error.turnstile_required" = "Das Senden wurde durch die menschliche Verifizierung blockiert. Bitte versuche es später erneut.";

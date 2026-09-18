@@ -62,10 +62,6 @@ extension FeedbackClient {
         let message = envelope?.error ?? String(data: data, encoding: .utf8) ?? "Unknown error"
 
         switch statusCode {
-        case 422 where envelope?.code == "scan_rejected":
-            // An uploadId referenced by the submission failed the
-            // server-side content inspection (PRIV-02 media policy).
-            throw FeedbackClientError.scanRejected(message: envelope?.error ?? "", requestId: requestId)
         case 429:
             // Per-client-IP rate limiting (votes, uploads, PUT /user, search).
             throw FeedbackClientError.rateLimited(message: envelope?.error, requestId: requestId)
@@ -75,20 +71,148 @@ extension FeedbackClient {
             throw FeedbackClientError.unsupportedMediaType(message: envelope?.error, requestId: requestId)
         case 413:
             throw FeedbackClientError.payloadTooLarge(message: envelope?.error, requestId: requestId)
-        case 402 where envelope?.code == "tier_limit_submissions":
-            // The app's workspace hit its monthly submission quota — feature
-            // requests and feedback enforce the same contract.
-            throw FeedbackClientError.submissionQuotaExceeded(message: envelope?.error, requestId: requestId)
-        case 402 where envelope?.code == "subscription_inactive":
-            // The app's workspace subscription is inactive or canceled.
-            throw FeedbackClientError.subscriptionInactive(message: envelope?.error, requestId: requestId)
-        case 400 where envelope?.code == "uploader_identity_required":
-            throw FeedbackClientError.uploaderIdentityRequired(message: envelope?.error, requestId: requestId)
-        case 400 where envelope?.code == "uploader_mismatch":
-            throw FeedbackClientError.uploaderMismatch(message: envelope?.error, requestId: requestId)
         default:
+            if let typed = Self.typedEnvelopeError(
+                statusCode: statusCode,
+                envelope: envelope,
+                requestId: requestId
+            ) {
+                throw typed
+            }
             throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message, requestId: requestId)
         }
+    }
+
+    /// Maps the envelope-code-driven failure modes to typed errors, or `nil`
+    /// when the status/envelope pair has no typed mapping.
+    private static func typedEnvelopeError(
+        statusCode: Int,
+        envelope: APIErrorEnvelope?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        switch (statusCode, envelope?.code) {
+        case (422, "scan_rejected"):
+            // An uploadId referenced by the submission failed the
+            // server-side content inspection (PRIV-02 media policy).
+            return .scanRejected(message: envelope?.error ?? "", requestId: requestId)
+        case (402, "tier_limit_submissions"):
+            // The app's workspace hit its monthly submission quota — feature
+            // requests and feedback enforce the same contract.
+            return .submissionQuotaExceeded(message: envelope?.error, requestId: requestId)
+        case (402, "subscription_inactive"):
+            // The app's workspace subscription is inactive or canceled.
+            return .subscriptionInactive(message: envelope?.error, requestId: requestId)
+        case (403, let code) where isTurnstileRejection(code: code, message: envelope?.error):
+            // The Turnstile human-verification gate (#53): the uploads
+            // sessions route rejects with a machine-readable code; the intake
+            // endpoints return only the human message until their Phase 0
+            // code ships, so the message matches as a fallback.
+            return .turnstileRequired(message: envelope?.error, requestId: requestId)
+        case (400, "uploader_identity_required"):
+            return .uploaderIdentityRequired(message: envelope?.error, requestId: requestId)
+        case (400, "uploader_mismatch"):
+            return .uploaderMismatch(message: envelope?.error, requestId: requestId)
+        default:
+            return nil
+        }
+    }
+
+    /// Resolves an anonymous identity for requests that require one.
+    /// Falls back to this client's app-key-scoped token store when the caller
+    /// did not pass one, so identities never bleed across app keys.
+    func resolvedIdentity(_ userToken: String?) -> String? {
+        userToken?.nilIfEmpty ?? tokenStore.token
+    }
+
+    /// Resolves the identity to send on feedback submissions.
+    ///
+    /// When `userToken` is `nil` and the submission contains attachments with upload IDs,
+    /// falls back to this client's app-key-scoped store so the submitter matches the
+    /// uploader identity.
+    /// When there are no attachments and `userToken` is `nil`, the header is omitted.
+    func resolvedSubmitUserToken(_ userToken: String?, hasAttachments: Bool) -> String? {
+        if let token = userToken?.nilIfEmpty {
+            return token
+        }
+        return hasAttachments ? resolvedIdentity(userToken) : nil
+    }
+
+    /// Sets the `X-User-Token` header when a token is present.
+    func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
+        if let userToken = userToken?.nilIfEmpty {
+            request.setValue(userToken, forHTTPHeaderField: "X-User-Token")
+        }
+    }
+}
+
+// MARK: - Shared trimming helpers
+
+extension String {
+    /// The string trimmed of surrounding whitespace, or `nil` when empty.
+    var nilIfEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+extension Array where Element == String {
+    /// The array itself, or `nil` when empty.
+    var nilIfEmpty: [String]? {
+        isEmpty ? nil : self
+    }
+}
+
+// MARK: - Feedback submission plumbing
+
+/// Wire payload of `POST /api/v1/feedback`. `turnstileToken` is only present
+/// when the client can present one (#53).
+struct FeedbackSubmissionPayload: Codable, Sendable {
+    let appKey: String
+    let title: String
+    let description: String
+    let reporterName: String?
+    let reporterEmail: String?
+    let platform: FeedbackPlatform
+    let appVersion: String?
+    let buildNumber: String?
+    let metadata: [String: String]
+    let uploadIds: [String]?
+    let turnstileToken: String?
+}
+
+extension FeedbackClient {
+    /// Assembles the `POST /api/v1/feedback` wire payload from a draft:
+    /// trims titles/descriptions, drops empty optionals, applies the
+    /// metadata redaction contract, and attaches the attempt's Turnstile
+    /// token when one was resolved.
+    func submissionPayload(
+        for draft: FeedbackDraft,
+        uploadIds: [String]?,
+        turnstileToken: String?
+    ) -> FeedbackSubmissionPayload {
+        FeedbackSubmissionPayload(
+            appKey: configuration.appKey,
+            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+            reporterName: draft.reporterName.nilIfEmpty,
+            reporterEmail: draft.reporterEmail.nilIfEmpty,
+            platform: draft.platform,
+            appVersion: draft.appVersion.nilIfEmpty,
+            buildNumber: draft.buildNumber.nilIfEmpty,
+            metadata: sanitizedMetadata(from: draft),
+            uploadIds: uploadIds,
+            turnstileToken: turnstileToken
+        )
+    }
+
+    private func sanitizedMetadata(from draft: FeedbackDraft) -> [String: String] {
+        let reserved = [
+            "sdk": Self.sdkIdentifier,
+            "sdkVersion": Self.sdkVersion,
+            "platform": draft.platform.rawValue,
+            "submittedAt": ISO8601DateFormatter().string(from: .now)
+        ]
+        return FeedbackMetadataSanitizer.sanitize(draft.metadata, reserved: reserved)
     }
 }
 

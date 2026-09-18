@@ -112,3 +112,5 @@
 "cupthread.error.http_server_busy" = "服务器暂时出现问题，请稍后再试。";
 "cupthread.error.offline" = "当前似乎没有网络连接，请检查网络后再试一次。";
 "cupthread.error.timed_out" = "请求耗时过长，请重试。";
+/* Issue #53: Turnstile-gated intake — typed error copy */
+"cupthread.error.turnstile_required" = "发送已被人机验证拦截，请稍后再试。";
