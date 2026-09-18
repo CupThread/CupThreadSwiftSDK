@@ -152,6 +152,9 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
     /// Sanitized per the server's redaction contract before sending:
     /// credential-looking keys are replaced with `"[redacted]"`, values are
     /// truncated to 512 characters, and the payload is capped at 24 keys / 8 KB.
+    /// The reserved keys `sdk`, `sdkVersion`, `platform`, and `submittedAt`
+    /// are SDK-authored: draft entries with those names cannot replace the
+    /// SDK's values on the wire, while every other custom key is preserved.
     public var metadata: [String: String]
     /// References returned by the ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)``
     /// and ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:)`` variants.

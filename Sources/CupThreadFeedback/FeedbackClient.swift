@@ -367,8 +367,11 @@ public struct FeedbackClient: Sendable {
     /// and ``uploadAttachment(fileURL:filename:mimeType:userToken:)`` variants
     /// are sent as `uploadIds` referencing their upload session. The SDK adds
     /// `sdk` (`cupthread-apple/<semver>`), `sdkVersion` (`<semver>`), `platform`,
-    /// and `submittedAt` metadata automatically and applies
-    /// the server's metadata redaction contract locally (credential-looking
+    /// and `submittedAt` metadata automatically; these reserved keys are
+    /// SDK-authored, so draft metadata entries with the same names are replaced
+    /// before sending (mirroring the Android SDK's merge where the SDK map
+    /// wins), while all other custom metadata is preserved. Submissions then
+    /// apply the server's metadata redaction contract locally (credential-looking
     /// keys are redacted, values truncated, oversized payloads shrunk). Every
     /// request also carries the SDK's version in the `X-SDK-Version` header.
     ///
