@@ -168,8 +168,8 @@ struct VotePill: View {
         .accessibilityIdentifier("cupthread.features.vote_pill")
         .accessibilityLabel(
             hasVoted
-                ? CupThreadStrings.tr("cupthread.features.vote_remove_accessibility", Int64(voteCount))
-                : CupThreadStrings.tr("cupthread.features.vote_add_accessibility", Int64(voteCount))
+                ? CupThreadStrings.trPlural("cupthread.features.vote_remove_accessibility", count: Int64(voteCount))
+                : CupThreadStrings.trPlural("cupthread.features.vote_add_accessibility", count: Int64(voteCount))
         )
         .accessibilityHint(
             isDisabled
@@ -195,8 +195,8 @@ struct VoteCountBadge: View {
             tint: hasVoted ? .accentColor : .secondary
         )
         .accessibilityLabel(
-            CupThreadStrings.tr(
-                "cupthread.features.vote_count_accessibility", Int64(count), includingYours
+            CupThreadStrings.trPlural(
+                "cupthread.features.vote_count_accessibility", count: Int64(count), includingYours
             )
         )
     }
@@ -212,6 +212,7 @@ struct ColumnHeader: View {
     let style: StageStyle
 
     var body: some View {
+        let items = CupThreadStrings.trPlural("cupthread.roadmap.column_items", count: Int64(count))
         HStack(spacing: 10) {
             Image(systemName: style.icon)
                 .font(.system(size: 13, weight: .semibold))
@@ -221,14 +222,14 @@ struct ColumnHeader: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
                     .font(.subheadline.weight(.semibold))
-                Text("\(count) \(count == 1 ? "item" : "items")")
+                Text(items)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Column \(name), \(count) items")
+        .accessibilityLabel(CupThreadStrings.columnAccessibilityLabel(name: name, count: count))
     }
 }
 
