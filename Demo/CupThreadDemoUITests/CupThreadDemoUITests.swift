@@ -138,10 +138,11 @@ final class CupThreadDemoUITests: XCTestCase {
         let composeSheetTitle = app.navigationBars["Request a Feature"]
         XCTAssertTrue(composeSheetTitle.waitForExistence(timeout: 5), "Request a Feature sheet should appear after tapping compose")
 
-        // 5. Dismiss it again (the SDK's cancellation action is labeled "Close").
-        let closeButton = app.buttons["Close"]
-        XCTAssertTrue(closeButton.waitForExistence(timeout: 5), "Compose sheet should expose a Close button")
-        closeButton.tap()
+        // 5. Dismiss it again (the compose sheet's cancellation action comes
+        // from the shared dismiss guard, whose localized label is "Cancel").
+        let cancelButton = app.navigationBars["Request a Feature"].buttons["Cancel"]
+        XCTAssertTrue(cancelButton.waitForExistence(timeout: 5), "Compose sheet should expose a Cancel button")
+        cancelButton.tap()
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: composeSheetTitle)
         waitForExpectations(timeout: 5, handler: nil)
 
