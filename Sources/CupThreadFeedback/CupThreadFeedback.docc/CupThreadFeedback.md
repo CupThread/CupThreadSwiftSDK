@@ -70,6 +70,7 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 - ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``: Fetch overlay data without presenting.
 - ``FeedbackClient/hasSeenChangelog(version:)``, ``FeedbackClient/markChangelogSeen(version:)``
 - ``FeedbackClient/fetchChangelog()``, ``FeedbackClient/fetchChangelog(limit:cursor:)``, ``FeedbackClient/subscribeToChangelog(email:userToken:)``, ``FeedbackClient/unsubscribeFromChangelog(token:)``
+- ``FeedbackClient/unsubscribeFromWeeklyDigest(token:)``: Complete the RFC 8058 one-click unsubscribe from a weekly digest email.
 
 ## Appearance & feature flags
 
