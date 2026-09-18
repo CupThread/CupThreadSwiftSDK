@@ -63,6 +63,10 @@ FeatureRequestsView(
 )
 ```
 
+## Pagination
+
+The list loads the first page of matching requests and fetches further pages automatically as the end of the list scrolls into view. The trailing row doubles as an explicit retry when a page fails to load; already-loaded requests stay on screen either way. Changing the search text or the version filter restarts from the first page of the new filter.
+
 ## Platform adaptations
 
 ``FeatureRequestsView`` tailors its presentation for each Apple platform:

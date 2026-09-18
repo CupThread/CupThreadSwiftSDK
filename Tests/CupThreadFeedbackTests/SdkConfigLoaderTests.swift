@@ -60,6 +60,14 @@ struct SdkConfigLoaderTests {
         }
     }
 
+    private func setNotFoundHandler() {
+        // #129: a private app answers the config endpoint with the same 404
+        // body as an unknown app key.
+        MockURLProtocol.setHandler(forHost: Self.host) { _ in
+            (makeHTTPResponse(status: 404), Data(#"{"error": "App not found"}"#.utf8))
+        }
+    }
+
     private func requireReady(_ status: SdkConfigStatus) throws -> SdkAppearance {
         guard case .ready(let appearance) = status else {
             Issue.record("Expected .ready, got \(status)")
@@ -128,6 +136,43 @@ struct SdkConfigLoaderTests {
 
         let failure = try requireFailed(loader.status)
         #expect(failure.appearance == good, "A later failure must keep the last successful feature flags")
+    }
+
+    @Test func appMadePrivate404KeepsLastGoodConfig() async throws {
+        // Regression for #129: an app switched to private answers the config
+        // endpoint with 404 ("App not found"). The loader must fail closed
+        // and keep the last-good appearance instead of ever resolving .ready.
+        try setSuccessHandler(appKey: "app_private_404", featureRequests: false)
+
+        let loader = makeLoader(appKey: "app_private_404")
+        await loader.load()
+        let good = try requireReady(loader.status)
+
+        setNotFoundHandler()
+        await loader.load()
+
+        let failure = try requireFailed(loader.status)
+        #expect(failure.appearance == good, "A private app's 404 must keep the last-good config")
+        guard case .unexpectedStatus(let code, let message, _) = failure.error as? FeedbackClientError else {
+            Issue.record("Expected .unexpectedStatus, got \(failure.error)")
+            return
+        }
+        #expect(code == 404)
+        #expect(message == "App not found")
+    }
+
+    @Test func firstLoadAgainstPrivateApp404FailsClosed() async throws {
+        // #129: an app key that is private (or unknown) answers the config
+        // endpoint with 404; a fresh install must resolve to no appearance,
+        // never .defaults.
+        setNotFoundHandler()
+
+        let loader = makeLoader(appKey: "app_private_first_load")
+        await loader.load()
+
+        let failure = try requireFailed(loader.status)
+        #expect(failure.appearance == nil, "A 404 config fetch with no cache must resolve to no appearance")
+        #expect(failure.error is FeedbackClientError, "The fetch error must be propagated to observers")
     }
 
     @Test func relaunchRestoresCachedConfigOnFailure() async throws {
