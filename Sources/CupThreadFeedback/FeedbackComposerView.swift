@@ -39,10 +39,9 @@ public struct FeedbackComposerView: View {
     @State private var attachmentState: FeedbackAttachmentStateMachine
     @State private var errorMessage: String?
     @State private var result: FeedbackSubmissionResult?
-    @State private var uploadTask: Task<Void, Never>?
 
     #if canImport(PhotosUI) && !os(tvOS)
-    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectionCoordinator = PhotoSelectionUploadCoordinator<PhotosPickerItem>()
     #endif
 
     /// Creates the feedback form.
@@ -116,21 +115,6 @@ public struct FeedbackComposerView: View {
         .navigationTitle(CupThreadStrings.tr("cupthread.feedback.title"))
         #if os(iOS) || os(visionOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
-        #if canImport(PhotosUI) && !os(tvOS)
-        .onChange(of: selectedPhotoItem) { _, newItem in
-            guard let newItem else { return }
-            uploadTask?.cancel()
-            let uploadId = attachmentState.startUpload()
-            let task = Task {
-                await uploadPhotoItem(newItem, uploadId: uploadId)
-                if !Task.isCancelled && attachmentState.activeUploadId == uploadId {
-                    selectedPhotoItem = nil
-                }
-            }
-            uploadTask = task
-            uploadHandle?.setCancelHandler { [task] in task.cancel() }
-        }
         #endif
         .task {
             if let config = try? await client.fetchAppConfig() {
@@ -216,7 +200,7 @@ public struct FeedbackComposerView: View {
                 uploadingAttachmentRow
             } else if draft.attachments.count < 5 {
                 PhotosPicker(
-                    selection: $selectedPhotoItem,
+                    selection: photoSelectionBinding,
                     matching: .images,
                     photoLibrary: .shared()
                 ) {
@@ -265,6 +249,30 @@ public struct FeedbackComposerView: View {
     }
 
     #if canImport(PhotosUI) && !os(tvOS)
+    /// Drives the photo selection through the coordinator: a fresh pick
+    /// starts its upload attempt, a picker-reported deselection only clears,
+    /// and the coordinator clears the selection after every terminal upload
+    /// path so re-picking the same photo re-triggers the flow.
+    private var photoSelectionBinding: Binding<PhotosPickerItem?> {
+        Binding(
+            get: { selectionCoordinator.selection },
+            set: { newValue in
+                guard let newValue else {
+                    selectionCoordinator.clearSelection()
+                    return
+                }
+                let task = selectionCoordinator.select(
+                    newValue,
+                    startUpload: { attachmentState.startUpload() },
+                    upload: { item, uploadId in
+                        await uploadPhotoItem(item, uploadId: uploadId)
+                    }
+                )
+                uploadHandle?.setCancelHandler { [task] in task.cancel() }
+            }
+        )
+    }
+
     @MainActor @ViewBuilder
     private var uploadingAttachmentRow: some View {
         HStack(spacing: 8) {
@@ -443,12 +451,10 @@ public struct FeedbackComposerView: View {
     /// view lifecycle events — transient disappearances must not stop uploads.
     @MainActor
     private func cancelUpload() {
-        uploadTask?.cancel()
-        uploadTask = nil
-        attachmentState.cancelUpload()
         #if canImport(PhotosUI) && !os(tvOS)
-        selectedPhotoItem = nil
+        selectionCoordinator.cancel()
         #endif
+        attachmentState.cancelUpload()
     }
 
     @MainActor
