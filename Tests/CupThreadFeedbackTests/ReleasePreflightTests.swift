@@ -311,7 +311,10 @@ struct ReleasePreflightTests {
         "cdnExistsBeforeBuildOnlyWarns": Expectation(warningContains: ["already exists"]),
         "cdnObjectMatchesArtifact": Expectation(completed: ["cdnObject"]),
         "cdnMismatchWithDraftOverwrites": Expectation(warningContains: ["overwrite it with the verified build"]),
-        "cdnMismatchWithPublishedRejected": Expectation(errorContains: ["refusing to mutate a published artifact"], completed: ["githubRelease"]),
+        "cdnMismatchWithPublishedRejected": Expectation(
+            errorContains: ["refusing to mutate a published artifact"],
+            completed: ["githubRelease"]
+        ),
         "everythingDoneCompletes": Expectation(completed: ["tag", "githubRelease", "cdnObject"])
     ]
 }
