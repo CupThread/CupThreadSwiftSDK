@@ -94,6 +94,12 @@ const APPLE_SLICES = [
   { name: "tvos-simulator", destination: "generic/platform=tvOS Simulator", minimumOSVersion: "17.0" }
 ];
 const RESOURCE_BUNDLE_NAME = "CupThreadFeedback_CupThreadFeedback.bundle";
+// Privacy manifest shipped at the root of every static framework slice (and
+// inside the SPM resource bundle for source-package consumers). Xcode 15+
+// aggregates it into host apps; a slice without one would leave host apps to
+// declare the SDK's required-reason API usage by hand (ITMS-91053).
+const PRIVACY_MANIFEST_NAME = "PrivacyInfo.xcprivacy";
+const PRIVACY_MANIFEST_SOURCE = path.join(ROOT, "Sources", "CupThreadFeedback", PRIVACY_MANIFEST_NAME);
 const CONSUMER_APP_KEY = "app_static_linkage_probe";
 // Matches the archs each slice must ship (mirrors AGENTS.md's platform matrix).
 const SLICE_ARCHS = {
@@ -229,6 +235,7 @@ function stageStaticFramework(slice, archiveDir, derivedData, work, version) {
   run("libtool", ["-static", "-o", path.join(binaryDir, "CupThreadFeedback"), object]);
   run("cp", [findGeneratedHeader(derivedData, slice.name), path.join(binaryDir, "Headers")]);
   run("cp", ["-R", findSwiftmodule(derivedData, slice.name), path.join(binaryDir, "Modules", "CupThreadFeedback.swiftmodule")]);
+  run("cp", [PRIVACY_MANIFEST_SOURCE, path.join(binaryDir, PRIVACY_MANIFEST_NAME)]);
 
   if (isMacOS) {
     run("ln", ["-sfn", "A", path.join(fw, "Versions", "Current")]);
@@ -251,6 +258,30 @@ function verifyStaticBinary(framework, expectedArchs) {
   // the module token does, in every symbol the SDK defines.
   if (!symbols.includes("17CupThreadFeedback")) {
     fail(`${framework}: static archive has no CupThreadFeedback symbols — refusing to ship an empty library`);
+  }
+}
+
+// The privacy manifest must sit at the framework bundle root so Xcode 15+
+// aggregates the SDK's required-reason API and collected-data declarations
+// into host apps. The spot-checked markers mirror PrivacyManifestTests.swift.
+function verifyPrivacyManifest(framework, label) {
+  const versioned = path.join(framework, "Versions", "A");
+  const base = existsSync(versioned) ? versioned : framework;
+  const manifest = path.join(base, PRIVACY_MANIFEST_NAME);
+  if (!existsSync(manifest)) {
+    fail(`${label} is missing ${PRIVACY_MANIFEST_NAME} at the framework root — host apps would be left to declare the SDK's required-reason API usage by hand`);
+  }
+  const content = readFileSync(manifest, "utf8");
+  for (const marker of [
+    "NSPrivacyTracking",
+    "NSPrivacyAccessedAPICategoryUserDefaults",
+    "CA92.1",
+    "NSPrivacyCollectedDataTypeUserID",
+    "NSPrivacyCollectedDataTypeOtherUserContent"
+  ]) {
+    if (!content.includes(marker)) {
+      fail(`${label} privacy manifest is missing the ${marker} declaration`);
+    }
   }
 }
 
@@ -277,6 +308,7 @@ function verifyStaticXCFramework(xcframework) {
     if (!existsSync(swiftmodule)) {
       fail(`XCFramework slice ${entry.name} is missing Modules/CupThreadFeedback.swiftmodule — Swift consumers could not import the module`);
     }
+    verifyPrivacyManifest(framework, `XCFramework slice ${entry.name}`);
     for (const arch of archs) {
       const hasInterface = readdirSync(swiftmodule).some(
         (name) => name.startsWith(`${arch}-apple-`) && name.endsWith(".swiftinterface")
@@ -314,6 +346,13 @@ binary, so nothing is embedded and no \`CupThreadFeedback\` dylib ships in your
 bundle. Static libraries cannot carry resources, so the localized strings
 bundle (\`${RESOURCE_BUNDLE_NAME}\`) is included in this folder and must be
 added to your app target.
+
+Each framework slice embeds a \`PrivacyInfo.xcprivacy\` manifest at its bundle
+root. Xcode 15+ automatically aggregates it into your app's privacy report —
+it declares the SDK's \`UserDefaults\` required-reason usage (CA92.1) and the
+data types the SDK transmits (anonymous user ID, optional name/email, user
+content). No manual action is needed; mirror the declarations in your own
+privacy labels if your app reports them.
 
 ## Xcode
 
@@ -467,6 +506,7 @@ async function main() {
       fail(`Missing static binary for ${slice.name} at: ${binary}`);
     }
     verifyStaticBinary(framework, SLICE_ARCHS[slice.name]);
+    verifyPrivacyManifest(framework, `Static framework slice ${slice.name}`);
   }
 
   console.log("• assembling XCFramework");
@@ -510,6 +550,7 @@ async function main() {
       `CupThread Apple SDK v${version}`,
       "Static-library XCFramework: hosts link the SDK into their own binary (no embedded dylib, dead-code stripping applies).",
       "The zip carries the localized-strings bundle — add it to your app target's Copy Bundle Resources (see INSTALL.md).",
+      "Every framework slice ships a PrivacyInfo.xcprivacy manifest (UserDefaults CA92.1 + collected-data types), aggregated automatically by Xcode 15+.",
       "SwiftUI surfaces: roadmap board, What's New, feature requests, feedback composer.",
       "iOS 17+ · macOS 14+ (universal arm64 + x86_64) · visionOS 1.0+ · tvOS 17+.",
       `Binary target with checksum ${artifact.sha256}.`
