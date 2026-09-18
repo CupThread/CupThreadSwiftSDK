@@ -1,42 +1,5 @@
 import SwiftUI
 
-// MARK: - Board model
-
-/// Groups feature requests under their board column (by `columnId`).
-/// Requests without a column or with an unlisted/hidden column land in a trailing "Other" group so nothing is dropped.
-struct RoadmapGroup: Identifiable, Equatable, Sendable {
-    let column: BoardColumn?
-    let requests: [FeatureRequestItem]
-
-    var id: String { column?.id ?? "uncategorized" }
-    var name: String { column?.name ?? CupThreadStrings.tr("cupthread.roadmap.column_other") }
-}
-
-/// Groups feature requests under the visible board columns, preserving server ordering.
-///
-/// Feature requests without a column (`columnId == nil`) or whose column is not in the visible
-/// `columns` list (e.g. internal, hidden, or deleted columns) are gathered into a trailing "Other"
-/// group so no requests are dropped.
-func makeGroups(columns: [BoardColumn], requests: [FeatureRequestItem]) -> [RoadmapGroup] {
-    let listedIds = Set(columns.map(\.id))
-    var byColumn = [String: [FeatureRequestItem]]()
-    var uncategorized = [FeatureRequestItem]()
-    for request in requests {
-        if let columnId = request.columnId, listedIds.contains(columnId) {
-            byColumn[columnId, default: []].append(request)
-        } else {
-            uncategorized.append(request)
-        }
-    }
-    var groups = columns.map { column in
-        RoadmapGroup(column: column, requests: byColumn[column.id] ?? [])
-    }
-    if !uncategorized.isEmpty {
-        groups.append(RoadmapGroup(column: nil, requests: uncategorized))
-    }
-    return groups
-}
-
 // MARK: - RoadmapBoardView
 
 /// A native roadmap board grouped by public columns.
@@ -139,30 +102,46 @@ public struct RoadmapBoardView: View {
         .sdkSurface(client: client, feature: .roadmap)
     }
 
+    /// The single source of truth for what the board renders; every layout
+    /// switches over it so loading, error, empty, and content states agree.
+    private var displayState: RoadmapBoardDisplayState {
+        makeBoardDisplayState(
+            isLoading: isLoading,
+            hasLoadedOnce: hasLoadedOnce,
+            loadError: loadError,
+            searchText: searchText,
+            groups: groups
+        )
+    }
+
     /// While searching, columns without matches are hidden so the pager only
-    /// shows relevant columns.
+    /// shows relevant columns. Derived from ``displayState`` so the filter
+    /// lives in exactly one place.
     private var visibleGroups: [RoadmapGroup] {
-        searchText.isEmpty ? groups : groups.filter { !$0.requests.isEmpty }
+        if case let .board(groups) = displayState { return groups }
+        return []
     }
 
     // MARK: iPhone — sticky column chips + paged full-width lists
 
     private var pagedBoard: some View {
         VStack(spacing: 0) {
-            if isLoading && !hasLoadedOnce {
+            switch displayState {
+            case .loading:
                 ScrollView {
                     SkeletonCardList()
                         .padding(16)
                 }
-            } else if let loadError {
+            case .error(let message):
                 stateContainer(
-                    LoadErrorView(message: loadError) {
+                    LoadErrorView(message: message) {
                         await load()
                     }
                 )
-            } else if visibleGroups.isEmpty {
+            case .emptySearch, .emptyBoard:
                 stateContainer(emptyState)
-            } else {                columnChips
+            case .board:
+                columnChips
                 pager
             }
         }
@@ -245,19 +224,20 @@ public struct RoadmapBoardView: View {
     private var boardScroll: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 16) {
-                if isLoading && !hasLoadedOnce {
+                switch displayState {
+                case .loading:
                     ForEach(0..<3, id: \.self) { _ in
                         SkeletonColumn()
                     }
-                } else if let loadError {
-                    LoadErrorView(message: loadError) {
+                case .error(let message):
+                    LoadErrorView(message: message) {
                         await load()
                     }
                     .frame(maxWidth: .infinity)
-                } else if groups.isEmpty {
+                case .emptySearch, .emptyBoard:
                     emptyState
                         .frame(maxWidth: .infinity)
-                } else {
+                case .board(let visibleGroups):
                     ForEach(visibleGroups) { group in
                         ColumnCard(group: group, highlightQuery: searchText)
                     }
@@ -271,17 +251,18 @@ public struct RoadmapBoardView: View {
     // tvOS: sections stack vertically for focus-driven navigation.
     private var boardList: some View {
         List {
-            if isLoading && !hasLoadedOnce {
+            switch displayState {
+            case .loading:
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let loadError {
-                LoadErrorView(message: loadError) {
+            case .error(let message):
+                LoadErrorView(message: message) {
                     await load()
                 }
                 .frame(maxWidth: .infinity)
-            } else if groups.isEmpty {
+            case .emptySearch, .emptyBoard:
                 emptyState
-            } else {
+            case .board(let visibleGroups):
                 ForEach(visibleGroups) { group in
                     Section(group.name) {
                         ForEach(group.requests) { item in
