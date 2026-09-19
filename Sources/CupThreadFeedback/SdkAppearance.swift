@@ -15,10 +15,10 @@ public enum SdkFeature: String, Sendable {
 
     var unavailableTitle: String {
         switch self {
-        case .feedback: return "Feedback Unavailable"
-        case .featureRequests: return "Requests Unavailable"
-        case .roadmap: return "Roadmap Unavailable"
-        case .changelog: return "Updates Unavailable"
+        case .feedback: return CupThreadStrings.tr("cupthread.features.unavailable_feedback")
+        case .featureRequests: return CupThreadStrings.tr("cupthread.features.unavailable_requests")
+        case .roadmap: return CupThreadStrings.tr("cupthread.features.unavailable_roadmap")
+        case .changelog: return CupThreadStrings.tr("cupthread.features.unavailable_updates")
         }
     }
 }
@@ -471,7 +471,7 @@ struct FeatureDisabledView: View {
         ContentUnavailableView {
             Label(feature.unavailableTitle, systemImage: "eye.slash")
         } description: {
-            Text("This surface is turned off in the CupThread console.")
+            Text(CupThreadStrings.tr("cupthread.config.disabled_description"))
         }
         .padding()
     }

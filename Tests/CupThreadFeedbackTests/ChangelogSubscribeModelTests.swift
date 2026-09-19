@@ -44,7 +44,7 @@ struct ChangelogSubscribeModelTests {
         for phase in [ChangelogSubscribePhase.subscribed, .manage] {
             let model = makeModel(in: phase)
             #expect(model.primaryAction == .close)
-            #expect(model.primaryTitle == "Done")
+            #expect(model.primaryTitle == CupThreadStrings.tr("cupthread.subscribe.done_button"))
             // The close button must never be blocked, even when leftover
             // form state (or none) would fail email validation.
             #expect(!model.isPrimaryDisabled)
@@ -55,7 +55,7 @@ struct ChangelogSubscribeModelTests {
 
     @Test func formPrimaryButtonFollowsEmailValidity() {
         var model = makeModel(in: .form)
-        #expect(model.primaryTitle == "Subscribe")
+        #expect(model.primaryTitle == CupThreadStrings.tr("cupthread.subscribe.subscribe_button"))
 
         model.email = "not-an-email"
         #expect(!model.isValidEmail)
@@ -70,7 +70,7 @@ struct ChangelogSubscribeModelTests {
         var model = makeModel(in: .form)
         model.email = "user@example.com"
         model.isWorking = true
-        #expect(model.primaryTitle == "Subscribing…")
+        #expect(model.primaryTitle == CupThreadStrings.tr("cupthread.subscribe.subscribing_button"))
         #expect(model.isPrimaryDisabled)
     }
 

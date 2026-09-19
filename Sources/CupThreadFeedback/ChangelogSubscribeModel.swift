@@ -70,9 +70,11 @@ struct ChangelogSubscribeModel: Equatable, Sendable {
     var primaryTitle: String {
         switch phase {
         case .form:
-            return isWorking ? "Subscribing…" : "Subscribe"
+            return isWorking
+                ? CupThreadStrings.tr("cupthread.subscribe.subscribing_button")
+                : CupThreadStrings.tr("cupthread.subscribe.subscribe_button")
         case .subscribed, .manage:
-            return "Done"
+            return CupThreadStrings.tr("cupthread.subscribe.done_button")
         }
     }
 

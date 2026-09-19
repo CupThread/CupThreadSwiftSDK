@@ -361,7 +361,11 @@ public struct FeedbackComposerView: View {
     /// main thread (#79).
     private func loadAndPreparePhotoData(from item: PhotosPickerItem) async throws -> PhotoAttachmentHelper.PreparedPhoto {
         guard let data = try await item.loadTransferable(type: Data.self) else {
-            throw NSError(domain: "CupThread", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not load photo data"])
+            throw NSError(
+                domain: "CupThread",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: CupThreadStrings.tr("cupthread.feedback.photo_load_failed")]
+            )
         }
         return try await PhotoAttachmentHelper.prepareForUpload(
             data,

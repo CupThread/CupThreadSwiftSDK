@@ -285,7 +285,7 @@ public struct RoadmapBoardView: View {
                                 #endif
                         }
                         if group.requests.isEmpty {
-                            Text("Nothing here yet.")
+                            Text(CupThreadStrings.tr("cupthread.roadmap.empty_card"))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -301,9 +301,9 @@ public struct RoadmapBoardView: View {
     private var emptyState: some View {
         if searchText.isEmpty {
             ContentUnavailableView {
-                Label("No Roadmap Yet", systemImage: "square.grid.3x3")
+                Label(CupThreadStrings.tr("cupthread.roadmap.no_columns_title"), systemImage: "square.grid.3x3")
             } description: {
-                Text("The team hasn't published any roadmap columns.")
+                Text(CupThreadStrings.tr("cupthread.roadmap.no_columns_description"))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -389,7 +389,7 @@ private struct ColumnChip: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Column \(name), \(count) items")
+        .accessibilityLabel(CupThreadStrings.columnAccessibilityLabel(name: name, count: count))
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
@@ -409,7 +409,7 @@ private struct ColumnCard: View {
             )
 
             if group.requests.isEmpty {
-                Text("Nothing here yet.")
+                Text(CupThreadStrings.tr("cupthread.roadmap.empty_card"))
                     .font(.footnote)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -424,7 +424,7 @@ private struct ColumnCard: View {
         .frame(width: 300, alignment: .leading)
         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Column \(group.name), \(group.requests.count) items")
+        .accessibilityLabel(CupThreadStrings.columnAccessibilityLabel(name: group.name, count: group.requests.count))
     }
 }
 
@@ -464,7 +464,7 @@ private struct RoadmapCard: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
-                    .accessibilityLabel("Recent commenters")
+                    .accessibilityLabel(CupThreadStrings.tr("cupthread.features.recent_commenters_accessibility"))
                 }
 
                 Spacer(minLength: 8)
@@ -484,10 +484,10 @@ private struct EmptyColumnView: View {
             Image(systemName: "tray")
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(.tertiary)
-            Text("Nothing here yet")
+            Text(CupThreadStrings.tr("cupthread.roadmap.empty_column"))
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text("Items appear here as they move to this stage.")
+            Text(CupThreadStrings.tr("cupthread.roadmap.empty_column_description"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

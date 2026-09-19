@@ -216,7 +216,9 @@ struct ChangelogEntryCard: View {
             HStack(alignment: .firstTextBaseline) {
                 if let version = entry.versionLabel {
                     CapsuleBadge(icon: "tag", text: version, tint: .accentColor)
-                        .accessibilityLabel("Version \(version)")
+                        .accessibilityLabel(
+                            CupThreadStrings.tr("cupthread.whatsnew.version_accessibility", version)
+                        )
                 }
                 Spacer(minLength: 8)
                 if let date = entry.publishedAtDate {
@@ -235,7 +237,12 @@ struct ChangelogEntryCard: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Shipped requests: \(entry.linkedRequests.map(\.title).joined(separator: ", "))")
+        .accessibilityLabel(
+            CupThreadStrings.tr(
+                "cupthread.whatsnew.shipped_requests_accessibility",
+                entry.linkedRequests.map(\.title).joined(separator: ", ")
+            )
+        )
     }
 }
 
@@ -255,17 +262,19 @@ private struct SubscribeFooterCard: View {
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 2) {
                     if let subscribedEmail {
-                        Text("Update Emails On")
+                        Text(CupThreadStrings.tr("cupthread.whatsnew.emails_on"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                        Text("Notifications go to \(subscribedEmail).")
+                        Text(CupThreadStrings.tr(
+                            "cupthread.whatsnew.emails_on_destination", subscribedEmail
+                        ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        Text("Get Update Emails")
+                        Text(CupThreadStrings.tr("cupthread.whatsnew.get_emails"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                        Text("Be notified when a new version ships.")
+                        Text(CupThreadStrings.tr("cupthread.whatsnew.get_emails_caption"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -276,8 +285,8 @@ private struct SubscribeFooterCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(subscribedEmail == nil
-            ? "Subscribe to update emails"
-            : "Update emails are on for \(subscribedEmail ?? "")")
+            ? CupThreadStrings.tr("cupthread.whatsnew.subscribe_accessibility")
+            : CupThreadStrings.tr("cupthread.whatsnew.emails_on_accessibility", subscribedEmail ?? ""))
     }
 }
 
