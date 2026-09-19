@@ -152,6 +152,9 @@ public struct UserProfileView: View {
         do {
             profile = try await client.fetchUserProfile(userId: userId)
         } catch {
+            // A cancelled load (dismissal mid-fetch) never reached a verdict
+            // — keep whatever profile state was rendered before.
+            guard !error.isSdkCancellation else { return }
             loadError = FriendlyError.message(for: error)
         }
         isLoading = false

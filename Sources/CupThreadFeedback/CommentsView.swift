@@ -316,6 +316,9 @@ public struct CommentsView: View {
         do {
             comments = try await client.fetchComments(featureRequestId: featureRequestId)
         } catch {
+            // A cancelled load (dismissal, restart for another request) never
+            // reached a verdict — keep the currently rendered comments.
+            guard !error.isSdkCancellation else { return }
             loadError = FriendlyError.message(for: error)
         }
         isLoading = false

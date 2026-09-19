@@ -114,6 +114,25 @@ actor SearchRequestThrottle {
     }
 }
 
+// MARK: - Cancellation classification
+
+extension Error {
+    /// Whether this error is task cancellation rather than a failure.
+    ///
+    /// SwiftUI restarts (and therefore cancels) `.task(id:)` work on every
+    /// search keystroke and cancels it when the view disappears, and
+    /// `URLSession` surfaces that cancellation as `URLError(.cancelled)` (or
+    /// the request itself is torn down the same way). A cancelled load never
+    /// reached a verdict, so surfaces must treat it as "nothing happened" —
+    /// keep the rendered content and every state flag — instead of
+    /// presenting an error the user cannot act on.
+    var isSdkCancellation: Bool {
+        if self is CancellationError { return true }
+        if let urlError = self as? URLError { return urlError.code == .cancelled }
+        return false
+    }
+}
+
 // MARK: - Reload failure presentation
 
 /// How a failed list or board reload should be presented.
@@ -124,6 +143,10 @@ actor SearchRequestThrottle {
 /// When results are on screen the failure becomes a transient inline notice
 /// instead; only a failure with nothing to show fills the surface with the
 /// full-screen error view.
+///
+/// Cancellation is not a failure: ``outcome(for:hasExistingContent:)``
+/// returns `nil` for it and the caller must leave the surface's content and
+/// state flags untouched.
 enum SearchReloadOutcome: Equatable {
     /// Previous results stay visible; show this message as a transient notice.
     case inlineNotice(String)
@@ -133,7 +156,11 @@ enum SearchReloadOutcome: Equatable {
     /// - Parameters:
     ///   - error: The error the reload threw.
     ///   - hasExistingContent: Whether the surface already shows results.
-    static func outcome(for error: Error, hasExistingContent: Bool) -> SearchReloadOutcome {
+    /// - Returns: `nil` when `error` is task cancellation
+    ///   (``Error/isSdkCancellation``) — the reload was superseded or the
+    ///   surface dismissed, and no failure state may be written.
+    static func outcome(for error: Error, hasExistingContent: Bool) -> SearchReloadOutcome? {
+        guard !error.isSdkCancellation else { return nil }
         let message: String
         if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
             message = CupThreadStrings.tr("cupthread.search.rate_limited")

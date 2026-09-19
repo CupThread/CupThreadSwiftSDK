@@ -341,11 +341,13 @@ public struct FeatureRequestsView: View {
             guard !Task.isCancelled else { return }
             listState.applyPage(result, replacesExisting: true)
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled,
+                  let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty)
+            else { return }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()
             }
-            switch SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty) {
+            switch outcome {
             case .inlineNotice(let message):
                 reloadNotice = message
             case .fullScreenError(let message):
@@ -373,7 +375,7 @@ public struct FeatureRequestsView: View {
             pageError = nil
             listState.applyPage(result, replacesExisting: false)
         } catch {
-            guard loadGeneration == generationAtStart else { return }
+            guard loadGeneration == generationAtStart, !error.isSdkCancellation else { return }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()
             }

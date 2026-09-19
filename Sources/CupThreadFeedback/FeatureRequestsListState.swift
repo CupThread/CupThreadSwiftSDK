@@ -160,8 +160,7 @@ enum VoteFailureNotice: Equatable {
 
     /// Maps a thrown vote error to its presentation.
     static func notice(for error: Error) -> VoteFailureNotice {
-        if error is CancellationError { return .silent }
-        if let urlError = error as? URLError, urlError.code == .cancelled { return .silent }
+        if error.isSdkCancellation { return .silent }
         if let clientError = error as? FeedbackClientError {
             switch clientError {
             case .rateLimited:

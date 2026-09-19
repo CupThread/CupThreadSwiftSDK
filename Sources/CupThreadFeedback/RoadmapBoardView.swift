@@ -90,15 +90,13 @@ public struct RoadmapBoardView: View {
         .task(id: trimmedSearchText) {
             guard isRoadmapPermitted else { return }
             guard !trimmedSearchText.isEmpty else {
-                // Plain listing: the backend does not rate-limit it, so no
-                // debounce or throttle admission is needed.
+                // Plain listing: unrate-limited, so no debounce/throttle.
                 await load()
                 return
             }
             // Debounce keystrokes: each change restarts this task, cancelling
-            // the previous sleep before it triggers a server call. The shared
-            // throttle then spaces query-bearing fetches below the server's
-            // 30/min per-IP search budget and skips duplicate queries.
+            // the previous sleep; the shared throttle spaces query-bearing
+            // fetches below the 30/min per-IP budget and skips duplicates.
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
             guard await client.searchThrottle.waitForAdmission(key: "roadmap|\(trimmedSearchText)") else { return }
@@ -344,10 +342,12 @@ public struct RoadmapBoardView: View {
                 groups = loaded
             }
         } catch {
+            // A cancelled load (keystroke restart, dismissal) never reached a verdict: keep the board.
+            guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) else { return }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()
             }
-            switch SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) {
+            switch outcome {
             case .inlineNotice(let message):
                 reloadNotice = message
             case .fullScreenError(let message):

@@ -175,4 +175,23 @@ struct SearchReloadOutcomeTests {
             SearchReloadOutcome.outcome(for: error, hasExistingContent: false) == .fullScreenError(error.localizedDescription)
         )
     }
+
+    /// #31: a cancelled reload never reached a verdict — with or without
+    /// rendered content, the outcome must direct the caller to leave the
+    /// surface's state untouched instead of showing an error.
+    @Test func cancellationIsSuppressedRegardlessOfExistingContent() {
+        #expect(SearchReloadOutcome.outcome(for: CancellationError(), hasExistingContent: true) == nil)
+        #expect(SearchReloadOutcome.outcome(for: CancellationError(), hasExistingContent: false) == nil)
+        #expect(SearchReloadOutcome.outcome(for: URLError(.cancelled), hasExistingContent: true) == nil)
+        #expect(SearchReloadOutcome.outcome(for: URLError(.cancelled), hasExistingContent: false) == nil)
+    }
+
+    /// Only cancellation is suppressed — genuine transport failures still
+    /// follow the inline-notice / full-screen policy.
+    @Test func networkFailureIsNeverSuppressed() {
+        let error = URLError(.notConnectedToInternet)
+        let message = FriendlyError.message(for: error)
+        #expect(SearchReloadOutcome.outcome(for: error, hasExistingContent: true) == .inlineNotice(message))
+        #expect(SearchReloadOutcome.outcome(for: error, hasExistingContent: false) == .fullScreenError(message))
+    }
 }

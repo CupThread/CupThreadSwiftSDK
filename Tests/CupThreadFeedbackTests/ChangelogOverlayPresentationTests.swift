@@ -173,8 +173,8 @@ struct ChangelogOverlayPresentationTests {
 
         let content = await ChangelogOverlayView.fetchSelfLoadedContent(in: client)
 
-        guard case .featureDisabled(let appearance) = content else {
-            Issue.record("Expected .featureDisabled, got \(content)")
+        guard case .featureDisabled(let appearance)? = content else {
+            Issue.record("Expected .featureDisabled, got \(String(describing: content))")
             return
         }
         // The console appearance is still applied so the sheet chrome (title,
@@ -191,8 +191,8 @@ struct ChangelogOverlayPresentationTests {
 
         let content = await ChangelogOverlayView.fetchSelfLoadedContent(in: client)
 
-        guard case .entries(let loaded, let appearance) = content else {
-            Issue.record("Expected .entries, got \(content)")
+        guard case .entries(let loaded, let appearance)? = content else {
+            Issue.record("Expected .entries, got \(String(describing: content))")
             return
         }
         #expect(loaded.map(\.id) == ["e_presentation_1"])

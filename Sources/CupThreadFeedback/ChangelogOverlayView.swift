@@ -193,7 +193,12 @@ public struct ChangelogOverlayView: View {
     /// Enforces the console's `sdk.features.changelog` switch the same way
     /// ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)`` does: when
     /// the surface is off the changelog request is never made.
-    static func fetchSelfLoadedContent(in client: FeedbackClient) async -> SelfLoadedContent {
+    ///
+    /// Returns `nil` when the fetch was cancelled (the overlay closed or the
+    /// presenting task was superseded mid-load) — a cancelled load never
+    /// reached a verdict, so callers must keep their current state instead
+    /// of reporting a failure.
+    static func fetchSelfLoadedContent(in client: FeedbackClient) async -> SelfLoadedContent? {
         do {
             let config = try await client.cachedAppConfig()
             guard config.sdk.features.isEnabled(.changelog) else {
@@ -205,6 +210,7 @@ public struct ChangelogOverlayView: View {
                 appearance: config.sdk
             )
         } catch {
+            guard !error.isSdkCancellation else { return nil }
             return .failed(FriendlyError.message(for: error))
         }
     }
@@ -290,6 +296,9 @@ public struct ChangelogOverlayView: View {
                 featureDisabled = true
             case .failed(let message):
                 loadError = message
+            case nil:
+                // Cancelled mid-fetch: leave the prepared state alone.
+                break
             }
         }
     }
