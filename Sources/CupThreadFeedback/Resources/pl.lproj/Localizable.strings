@@ -110,6 +110,8 @@
 "cupthread.error.http_server_busy" = "Serwer ma teraz problemy. Spróbuj ponownie później.";
 "cupthread.error.offline" = "Wygląda na to, że jesteś offline. Sprawdź połączenie i spróbuj ponownie.";
 "cupthread.error.timed_out" = "Żądanie trwało zbyt długo. Spróbuj ponownie.";
+/* Issue #53: Turnstile-gated intake — typed error copy */
+"cupthread.error.turnstile_required" = "Wysyłanie zostało zablokowane przez weryfikację człowieka. Spróbuj ponownie później.";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "Aktualizacje e-mail";

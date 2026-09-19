@@ -110,6 +110,8 @@
 "cupthread.error.http_server_busy" = "伺服器目前出現問題，請稍後再試。";
 "cupthread.error.offline" = "目前似乎沒有網絡連線，請檢查網絡後再試一次。";
 "cupthread.error.timed_out" = "請求耗時過長，請再試一次。";
+/* Issue #53: Turnstile-gated intake — typed error copy */
+"cupthread.error.turnstile_required" = "傳送已被人機驗證攔截，請稍後再試。";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "電郵更新";

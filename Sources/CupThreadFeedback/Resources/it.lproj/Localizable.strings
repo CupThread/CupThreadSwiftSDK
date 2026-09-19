@@ -110,6 +110,8 @@
 "cupthread.error.http_server_busy" = "Il server sta avendo problemi in questo momento. Riprova più tardi.";
 "cupthread.error.offline" = "Sembri essere offline. Controlla la connessione e riprova.";
 "cupthread.error.timed_out" = "La richiesta ha impiegato troppo tempo. Riprova.";
+/* Issue #53: Turnstile-gated intake — typed error copy */
+"cupthread.error.turnstile_required" = "L'invio è stato bloccato dalla verifica umana. Riprova più tardi.";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "Aggiornamenti via email";

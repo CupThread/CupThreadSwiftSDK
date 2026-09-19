@@ -49,6 +49,12 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// accepted. Submissions succeed again once the workspace's subscription
     /// is reactivated.
     case subscriptionInactive(message: String?, requestId: String?)
+    /// The server's Cloudflare Turnstile human-verification gate rejected the
+    /// submission (HTTP 403) and no fresh token could be presented. Create
+    /// the client with a `turnstileTokenProvider` — or arrange a server-side
+    /// exemption with the app's operator — so intake can succeed; retrying
+    /// the submission unchanged will not.
+    case turnstileRequired(message: String?, requestId: String?)
     /// The requested user profile could not be found (HTTP 404). `message`
     /// carries the raw response body for diagnostics — see ``responseBody``;
     /// it is never shown to end users.
@@ -76,7 +82,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
              .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
-             .subscriptionInactive:
+             .subscriptionInactive, .turnstileRequired:
             return nil
         }
     }
@@ -117,6 +123,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .subscriptionInactive(_, let requestId):
             return requestId
+        case .turnstileRequired(_, let requestId):
+            return requestId
         case .forbidden(_, let requestId):
             return requestId
         case .unexpectedStatus(_, _, let requestId):
@@ -139,6 +147,9 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             // can read the associated `message` programmatically.
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return CupThreadStrings.tr("cupthread.error.forbidden") + suffix
+        case .turnstileRequired(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return CupThreadStrings.tr("cupthread.error.turnstile_required") + suffix
         case .scanRejected(let message, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -222,5 +233,10 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``forbidden(message:requestId:)`` with no request id.
     static func forbidden(message: String? = nil) -> FeedbackClientError {
         .forbidden(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``turnstileRequired(message:requestId:)`` with no details.
+    static func turnstileRequired() -> FeedbackClientError {
+        .turnstileRequired(message: nil, requestId: nil)
     }
 }

@@ -134,6 +134,12 @@ extension FeedbackClient {
         case (402, "subscription_inactive"):
             // The app's workspace subscription is inactive or canceled.
             return .subscriptionInactive(message: envelopeMessage, requestId: requestId)
+        case (403, let turnstileCode) where isTurnstileRejection(code: turnstileCode, message: envelopeMessage):
+            // The Turnstile human-verification gate (#53): the uploads
+            // sessions route rejects with a machine-readable code; the intake
+            // endpoints return only the human message until their Phase 0
+            // code ships, so the message matches as a fallback.
+            return .turnstileRequired(message: envelopeMessage, requestId: requestId)
         case (400, "uploader_identity_required"):
             return .uploaderIdentityRequired(message: envelopeMessage, requestId: requestId)
         case (400, "uploader_mismatch"):
@@ -141,6 +147,104 @@ extension FeedbackClient {
         default:
             return nil
         }
+    }
+
+    /// Resolves an anonymous identity for requests that require one.
+    /// Falls back to this client's app-key-scoped token store when the caller
+    /// did not pass one, so identities never bleed across app keys.
+    func resolvedIdentity(_ userToken: String?) -> String? {
+        userToken?.nilIfEmpty ?? tokenStore.token
+    }
+
+    /// Resolves the identity to send on feedback submissions.
+    ///
+    /// When `userToken` is `nil` and the submission contains attachments with upload IDs,
+    /// falls back to this client's app-key-scoped store so the submitter matches the
+    /// uploader identity.
+    /// When there are no attachments and `userToken` is `nil`, the header is omitted.
+    func resolvedSubmitUserToken(_ userToken: String?, hasAttachments: Bool) -> String? {
+        if let token = userToken?.nilIfEmpty {
+            return token
+        }
+        return hasAttachments ? resolvedIdentity(userToken) : nil
+    }
+
+    /// Sets the `X-User-Token` header when a token is present.
+    func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
+        if let userToken = userToken?.nilIfEmpty {
+            request.setValue(userToken, forHTTPHeaderField: "X-User-Token")
+        }
+    }
+}
+
+// MARK: - Shared trimming helpers
+
+extension String {
+    /// The string trimmed of surrounding whitespace, or `nil` when empty.
+    var nilIfEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+extension Array where Element == String {
+    /// The array itself, or `nil` when empty.
+    var nilIfEmpty: [String]? {
+        isEmpty ? nil : self
+    }
+}
+
+// MARK: - Feedback submission plumbing
+
+/// Wire payload of `POST /api/v1/feedback`. `turnstileToken` is only present
+/// when the client can present one (#53).
+struct FeedbackSubmissionPayload: Codable, Sendable {
+    let appKey: String
+    let title: String
+    let description: String
+    let reporterName: String?
+    let reporterEmail: String?
+    let platform: FeedbackPlatform
+    let appVersion: String?
+    let buildNumber: String?
+    let metadata: [String: String]
+    let uploadIds: [String]?
+    let turnstileToken: String?
+}
+
+extension FeedbackClient {
+    /// Assembles the `POST /api/v1/feedback` wire payload from a draft:
+    /// trims titles/descriptions, drops empty optionals, applies the
+    /// metadata redaction contract, and attaches the attempt's Turnstile
+    /// token when one was resolved.
+    func submissionPayload(
+        for draft: FeedbackDraft,
+        uploadIds: [String]?,
+        turnstileToken: String?
+    ) -> FeedbackSubmissionPayload {
+        FeedbackSubmissionPayload(
+            appKey: configuration.appKey,
+            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+            reporterName: draft.reporterName.nilIfEmpty,
+            reporterEmail: draft.reporterEmail.nilIfEmpty,
+            platform: draft.platform,
+            appVersion: draft.appVersion.nilIfEmpty,
+            buildNumber: draft.buildNumber.nilIfEmpty,
+            metadata: sanitizedMetadata(from: draft),
+            uploadIds: uploadIds,
+            turnstileToken: turnstileToken
+        )
+    }
+
+    private func sanitizedMetadata(from draft: FeedbackDraft) -> [String: String] {
+        let reserved = [
+            "sdk": Self.sdkIdentifier,
+            "sdkVersion": Self.sdkVersion,
+            "platform": draft.platform.rawValue,
+            "submittedAt": ISO8601DateFormatter().string(from: .now)
+        ]
+        return FeedbackMetadataSanitizer.sanitize(draft.metadata, reserved: reserved)
     }
 }
 

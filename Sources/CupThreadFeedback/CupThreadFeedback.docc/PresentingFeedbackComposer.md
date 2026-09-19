@@ -97,6 +97,32 @@ let attachment = try await client.uploadAttachment(
 )
 ```
 
+## Human verification (Turnstile)
+
+The CupThread API gates feedback and feature-request submissions behind
+Cloudflare Turnstile, so a submission can only succeed when a verification
+token is presented. Create the client with a `turnstileTokenProvider` to
+supply one — the SDK sends it as `turnstileToken` on submissions and
+attachment upload sessions, and when the server still rejects the submission
+with the verification gate (HTTP 403), it asks the provider for a fresh
+token and retries exactly once before surfacing the typed
+``FeedbackClientError/turnstileRequired(message:requestId:)`` error:
+
+```swift
+let client = FeedbackClient(
+    configuration: configuration,
+    turnstileTokenProvider: {
+        // Mint a fresh token with your own verification flow — e.g. a
+        // server-side arrangement with the app's operator or an embedded
+        // challenge you host yourself.
+        await MyVerificationCoordinator.currentToken()
+    }
+)
+```
+
+Without a provider, a gated submission fails after a single attempt with a
+localized, user-safe message instead of the raw server response.
+
 ## Attachment upload lifecycle
 
 Attachment uploads are deliberately independent of the composer's view lifecycle:

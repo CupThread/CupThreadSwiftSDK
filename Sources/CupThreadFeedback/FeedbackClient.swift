@@ -77,19 +77,6 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     }
 }
 
-private struct FeedbackSubmissionPayload: Codable, Sendable {
-    let appKey: String
-    let title: String
-    let description: String
-    let reporterName: String?
-    let reporterEmail: String?
-    let platform: FeedbackPlatform
-    let appVersion: String?
-    let buildNumber: String?
-    let metadata: [String: String]
-    let uploadIds: [String]?
-}
-
 /// The HTTP client for the CupThread feedback API.
 ///
 /// One client serves every SDK surface — feedback, feature requests, roadmap,
@@ -132,22 +119,21 @@ public struct FeedbackClient: Sendable {
     /// Shared short-TTL cache for the app configuration; every config reader
     /// (theme, surface gating, composer, changelog overlay) goes through it.
     let configStore: AppConfigStore
+    /// Optional provider the SDK consults for a Cloudflare Turnstile token on
+    /// the human-verification-gated intake calls (feedback and feature-request
+    /// submission, upload-session creation). Production intake is gated, so
+    /// submissions cannot succeed without a token: hosts with their own
+    /// verification flow — or a server-side exemption arrangement — supply it
+    /// here. Called once per attempt (including the automatic single retry
+    /// after a turnstile rejection), so it can mint a fresh token each time.
+    /// When `nil` (the default), gated submissions throw
+    /// ``FeedbackClientError/turnstileRequired(message:requestId:)`` after a
+    /// single attempt.
+    let turnstileTokenProvider: (@Sendable () async -> String?)?
     /// Resolves the signed-in end user's bearer token on demand.
     let authenticationProvider: (@Sendable () async -> String?)?
 
     /// Creates a client for a CupThread app.
-    /// - Parameters:
-    ///   - configuration: API root, app key, and default reported platform.
-    ///   - session: The URL session requests run in. Override to install a
-    ///     custom `URLProtocol` (tests) or custom timeouts; defaults to `.shared`.
-    public init(
-        configuration: FeedbackClientConfiguration,
-        session: URLSession = .shared
-    ) {
-        self.init(configuration: configuration, session: session, overlayPresenter: nil)
-    }
-
-    /// Creates a client that can act on behalf of a signed-in end user.
     ///
     /// Some actions are signed-in-only on the server — posting comments on
     /// feature requests requires a Clerk session and fails with
@@ -163,18 +149,24 @@ public struct FeedbackClient: Sendable {
     ///   - configuration: API root, app key, and default reported platform.
     ///   - session: The URL session requests run in. Override to install a
     ///     custom `URLProtocol` (tests) or custom timeouts; defaults to `.shared`.
+    ///   - turnstileTokenProvider: Async closure resolving a Cloudflare
+    ///     Turnstile token for gated intake calls, `nil` when none is
+    ///     available. Called once per submission attempt, so it can mint a
+    ///     fresh token each time.
     ///   - authenticationProvider: Async closure resolving the signed-in
     ///     user's bearer token, `nil` when signed out. Called once per
     ///     authenticated request, so it can refresh an expiring token.
     public init(
         configuration: FeedbackClientConfiguration,
         session: URLSession = .shared,
+        turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) {
         self.init(
             configuration: configuration,
             session: session,
             overlayPresenter: nil,
+            turnstileTokenProvider: turnstileTokenProvider,
             authenticationProvider: authenticationProvider
         )
     }
@@ -185,6 +177,7 @@ public struct FeedbackClient: Sendable {
         overlayPresenter: (any ChangelogOverlayPresenter)? = nil,
         tokenStore: UserTokenStore? = nil,
         configStore: AppConfigStore? = nil,
+        turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) {
         self.configuration = configuration
@@ -198,6 +191,7 @@ public struct FeedbackClient: Sendable {
         self.configStore = configStore ?? AppConfigStore(
             lastGood: SdkConfigCache(appKey: configuration.appKey)
         )
+        self.turnstileTokenProvider = turnstileTokenProvider
     }
 
     /// Submits a feedback draft.
@@ -215,6 +209,12 @@ public struct FeedbackClient: Sendable {
     /// apply the server's metadata redaction contract locally (credential-looking
     /// keys are redacted, values truncated, oversized payloads shrunk). Every
     /// request also carries the SDK's version in the `X-SDK-Version` header.
+    ///
+    /// When the client was created with a `turnstileTokenProvider`, its token
+    /// is sent as `turnstileToken`. Production intake is gated behind
+    /// Cloudflare Turnstile: if the server rejects the submission with the
+    /// human-verification gate (HTTP 403), the SDK asks the provider for a
+    /// fresh token and retries exactly once before throwing.
     ///
     /// ```swift
     /// var draft = FeedbackDraft.autofilled()
@@ -236,6 +236,9 @@ public struct FeedbackClient: Sendable {
     ///   workspace has reached its monthly submission quota (HTTP 402 `tier_limit_submissions`),
     ///   ``FeedbackClientError/subscriptionInactive(message:)`` when the workspace
     ///   subscription is inactive or canceled (HTTP 402 `subscription_inactive`),
+    ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when the
+    ///   server's Turnstile gate rejects the submission and no fresh token could
+    ///   be presented (HTTP 403),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
@@ -249,72 +252,23 @@ public struct FeedbackClient: Sendable {
         userToken: String? = nil
     ) async throws -> FeedbackSubmissionResult {
         let uploadIds = draft.attachments.compactMap(\.uploadId).nilIfEmpty
-        let payload = FeedbackSubmissionPayload(
-            appKey: configuration.appKey,
-            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
-            reporterName: draft.reporterName.nilIfEmpty,
-            reporterEmail: draft.reporterEmail.nilIfEmpty,
-            platform: draft.platform,
-            appVersion: draft.appVersion.nilIfEmpty,
-            buildNumber: draft.buildNumber.nilIfEmpty,
-            metadata: sanitizedMetadata(from: draft),
-            uploadIds: uploadIds
-        )
-
-        var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feedback"))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let effectiveUserToken = resolvedSubmitUserToken(userToken, hasAttachments: uploadIds != nil)
-        applyCorrelationHeaders(userToken: effectiveUserToken, requestID: nextRequestID(), to: &request)
-        request.httpBody = try encoder.encode(payload)
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw FeedbackClientError.invalidResponse
+        let data = try await sendWithTurnstileRetry(accepted: Self.acceptedSubmitStatuses) { token, requestID in
+            var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feedback"))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            self.applyCorrelationHeaders(userToken: effectiveUserToken, requestID: requestID, to: &request)
+            request.httpBody = try self.encoder.encode(self.submissionPayload(
+                for: draft,
+                uploadIds: uploadIds,
+                turnstileToken: token
+            ))
+            return request
         }
-
-        try validateResponse(
-            httpResponse,
-            data: data,
-            accepted: Self.acceptedSubmitStatuses,
-            mapsPermissionErrors: true
-        )
-
         return try decoder.decode(FeedbackSubmissionResult.self, from: data)
     }
 
-    private func sanitizedMetadata(from draft: FeedbackDraft) -> [String: String] {
-        let reserved = [
-            "sdk": Self.sdkIdentifier,
-            "sdkVersion": Self.sdkVersion,
-            "platform": draft.platform.rawValue,
-            "submittedAt": ISO8601DateFormatter().string(from: .now)
-        ]
-        return FeedbackMetadataSanitizer.sanitize(draft.metadata, reserved: reserved)
-    }
-
     private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]
-
-    /// Resolves an anonymous identity for requests that require one.
-    /// Falls back to this client's app-key-scoped token store when the caller
-    /// did not pass one, so identities never bleed across app keys.
-    func resolvedIdentity(_ userToken: String?) -> String? {
-        userToken?.nilIfEmpty ?? tokenStore.token
-    }
-
-    /// Resolves the identity to send on feedback submissions.
-    ///
-    /// When `userToken` is `nil` and the submission contains attachments with upload IDs,
-    /// falls back to this client's app-key-scoped store so the submitter matches the
-    /// uploader identity.
-    /// When there are no attachments and `userToken` is `nil`, the header is omitted.
-    func resolvedSubmitUserToken(_ userToken: String?, hasAttachments: Bool) -> String? {
-        if let token = userToken?.nilIfEmpty {
-            return token
-        }
-        return hasAttachments ? resolvedIdentity(userToken) : nil
-    }
 
     /// Whether this client can act on behalf of a signed-in end user —
     /// i.e. it was created with an `authenticationProvider`. Signed-in-only
@@ -334,26 +288,5 @@ public struct FeedbackClient: Sendable {
         if let bearer = await authenticationProvider()?.nilIfEmpty {
             request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         }
-    }
-
-    /// Sets the `X-User-Token` header when a token is present.
-    func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
-        if let userToken = userToken?.nilIfEmpty {
-            request.setValue(userToken, forHTTPHeaderField: "X-User-Token")
-        }
-    }
-}
-
-extension String {
-    /// The string trimmed of surrounding whitespace, or `nil` when empty.
-    var nilIfEmpty: String? {
-        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-}
-
-private extension Array where Element == String {
-    var nilIfEmpty: [String]? {
-        isEmpty ? nil : self
     }
 }

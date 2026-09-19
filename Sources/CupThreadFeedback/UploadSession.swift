@@ -88,6 +88,9 @@ extension FeedbackClient {
     ///   - files: One specification per file to pre-allocate (1–8).
     ///   - userToken: Anonymous end-user token sent as `X-User-Token`.
     ///   - turnstileToken: Optional Turnstile token for apps that require one.
+    ///     When `nil`, the client's `turnstileTokenProvider` is consulted as a
+    ///     fallback, so one provider configuration covers attachments and
+    ///     submission alike.
     /// - Returns: The session, including bearer token and pre-allocated slots.
     /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
     ///   identity could be presented, ``FeedbackClientError/rateLimited`` on
@@ -113,10 +116,14 @@ extension FeedbackClient {
             requestID: nextRequestID(),
             to: &request
         )
+        var effectiveTurnstileToken = turnstileToken?.nilIfEmpty
+        if effectiveTurnstileToken == nil {
+            effectiveTurnstileToken = await resolvedTurnstileToken()
+        }
         request.httpBody = try encoder.encode(CreateSessionPayload(
             appKey: configuration.appKey,
             purpose: "feedback_attachment",
-            turnstileToken: turnstileToken?.nilIfEmpty,
+            turnstileToken: effectiveTurnstileToken,
             files: files
         ))
 

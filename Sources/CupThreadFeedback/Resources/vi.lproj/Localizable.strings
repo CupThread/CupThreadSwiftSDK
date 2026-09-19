@@ -110,6 +110,8 @@
 "cupthread.error.http_server_busy" = "Máy chủ đang gặp sự cố. Vui lòng thử lại sau.";
 "cupthread.error.offline" = "Có vẻ bạn đang ngoại tuyến. Vui lòng kiểm tra kết nối và thử lại.";
 "cupthread.error.timed_out" = "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.";
+/* Issue #53: Turnstile-gated intake — typed error copy */
+"cupthread.error.turnstile_required" = "Việc gửi đã bị chặn bởi xác minh con người. Vui lòng thử lại sau.";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "Cập nhật qua email";

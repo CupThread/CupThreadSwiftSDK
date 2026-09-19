@@ -8,6 +8,7 @@ private struct FeatureRequestSubmitPayload: Encodable, Sendable {
     let description: String
     let requesterName: String?
     let requesterToken: String
+    let turnstileToken: String?
 }
 
 private struct VotePayload: Encodable, Sendable {
@@ -101,34 +102,37 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/subscriptionInactive(message:)`` when the
     ///   workspace subscription is inactive or canceled (HTTP 402
     ///   `subscription_inactive`),
+    ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when the
+    ///   server's Turnstile gate rejects the submission and no fresh token
+    ///   could be presented (HTTP 403),
     ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
     ///   feedback is disabled for the app (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
+    ///
+    /// When the client was created with a `turnstileTokenProvider`, its token
+    /// is sent as `turnstileToken`; a Turnstile rejection (HTTP 403) asks the
+    /// provider for a fresh token and retries exactly once before throwing.
     public func submitFeatureRequest(
         _ draft: FeatureRequestDraft,
         userToken: String
     ) async throws -> FeatureRequestSubmissionResult {
-        let payload = FeatureRequestSubmitPayload(
-            appKey: configuration.appKey,
-            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
-            requesterName: draft.requesterName.nilIfEmpty,
-            requesterToken: userToken
-        )
-
-        var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feature-requests"))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
-        request.httpBody = try encoder.encode(payload)
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw FeedbackClientError.invalidResponse
+        let data = try await sendWithTurnstileRetry(accepted: [200, 201]) { token, requestID in
+            var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests"))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
+            request.httpBody = try self.encoder.encode(FeatureRequestSubmitPayload(
+                appKey: self.configuration.appKey,
+                title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+                requesterName: draft.requesterName.nilIfEmpty,
+                requesterToken: userToken,
+                turnstileToken: token
+            ))
+            return request
         }
-        try validateResponse(httpResponse, data: data, accepted: [200, 201], mapsPermissionErrors: true)
         return try decoder.decode(FeatureRequestSubmissionResult.self, from: data)
     }
 

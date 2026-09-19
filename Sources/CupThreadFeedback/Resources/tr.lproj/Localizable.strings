@@ -110,6 +110,8 @@
 "cupthread.error.http_server_busy" = "Sunucuda şu anda sorun var. Lütfen daha sonra tekrar deneyin.";
 "cupthread.error.offline" = "Çevrimdışı görünüyorsunuz. Bağlantınızı kontrol edip tekrar deneyin.";
 "cupthread.error.timed_out" = "İstek çok uzun sürdü. Lütfen tekrar deneyin.";
+/* Issue #53: Turnstile-gated intake — typed error copy */
+"cupthread.error.turnstile_required" = "Gönderim, insan doğrulaması nedeniyle engellendi. Lütfen daha sonra tekrar deneyin.";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "E-posta Güncellemeleri";
