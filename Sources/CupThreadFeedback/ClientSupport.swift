@@ -50,10 +50,18 @@ extension FeedbackClient {
     ///   - httpResponse: The received response.
     ///   - data: The raw response body, for the error envelope and message.
     ///   - accepted: Status codes that mean success for this endpoint.
+    ///   - mapsPermissionErrors: When `true`, `401`/`403` map to
+    ///     ``FeedbackClientError/authenticationRequired`` /
+    ///     ``FeedbackClientError/forbidden(message:requestId:)`` instead of
+    ///     `.unexpectedStatus`. Set by the anonymous intake endpoints (vote,
+    ///     feedback, feature-request submit, roadmap columns/list) whose
+    ///     `401`/`403` mean the console disabled the action for anonymous
+    ///     users, so surfaces can render a semantic permission state (#34).
     func validateResponse(
         _ httpResponse: HTTPURLResponse,
         data: Data,
-        accepted: Set<Int>
+        accepted: Set<Int>,
+        mapsPermissionErrors: Bool = false
     ) throws {
         let statusCode = httpResponse.statusCode
         guard !accepted.contains(statusCode) else { return }
@@ -68,6 +76,21 @@ extension FeedbackClient {
             requestId: requestId
         ) {
             throw typed
+        }
+
+        if mapsPermissionErrors {
+            switch statusCode {
+            case 401:
+                // The endpoint requires an identity the anonymous SDK user
+                // cannot present (e.g. anonymous voting disabled).
+                throw FeedbackClientError.authenticationRequired
+            case 403:
+                // The server's permission policy rejected the action (e.g.
+                // anonymous feedback disabled, platform not allow-listed).
+                throw FeedbackClientError.forbidden(message: envelope?.error, requestId: requestId)
+            default:
+                break
+            }
         }
 
         switch statusCode {

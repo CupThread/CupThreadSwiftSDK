@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "The server is having trouble right now. Please try again later.";
 "cupthread.error.offline" = "You appear to be offline. Check your connection and try again.";
 "cupthread.error.timed_out" = "The request took too long. Please try again.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Anonymous voting is turned off for this app.";
+"cupthread.permission.feedback_title" = "Can't Send Feedback";
+"cupthread.permission.feedback_description" = "Anonymous feedback is turned off in the CupThread console.";
+"cupthread.permission.platform_title" = "Platform Not Allowed";
+"cupthread.permission.platform_description" = "This app doesn't accept feedback from this platform.";
+"cupthread.permission.roadmap_title" = "Can't Open Roadmap";
+"cupthread.permission.roadmap_description" = "Anonymous access to the roadmap is turned off in the CupThread console.";
+"cupthread.permission.requests_title" = "Can't Submit Requests";
+"cupthread.permission.requests_description" = "Anonymous feature requests are turned off in the CupThread console.";
+"cupthread.error.forbidden" = "This action isn't available for this app.";

@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
 "cupthread.error.offline" = "오프라인 상태인 것 같습니다. 연결을 확인하고 다시 시도해 주세요.";
 "cupthread.error.timed_out" = "요청 시간이 초과되었습니다. 다시 시도해 주세요.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "이 앱에서는 익명 투표가 꺼져 있습니다.";
+"cupthread.permission.feedback_title" = "피드백을 보낼 수 없음";
+"cupthread.permission.feedback_description" = "CupThread 콘솔에서 익명 피드백이 꺼져 있습니다.";
+"cupthread.permission.platform_title" = "지원하지 않는 플랫폼";
+"cupthread.permission.platform_description" = "이 앱은 현재 플랫폼의 피드백을 받지 않습니다.";
+"cupthread.permission.roadmap_title" = "로드맵을 열 수 없음";
+"cupthread.permission.roadmap_description" = "CupThread 콘솔에서 익명 로드맵 접근이 꺼져 있습니다.";
+"cupthread.permission.requests_title" = "요청을 제출할 수 없음";
+"cupthread.permission.requests_description" = "CupThread 콘솔에서 익명 기능 요청이 꺼져 있습니다.";
+"cupthread.error.forbidden" = "이 앱에서는 해당 작업을 사용할 수 없습니다.";

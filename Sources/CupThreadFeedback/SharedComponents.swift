@@ -133,6 +133,10 @@ struct VotePill: View {
     /// and haptic. Starts at 0, so the initial render fires neither.
     var successPulse: Int = 0
     var isDisabled = false
+    /// Accessibility hint used when ``isDisabled`` is true. Defaults to the
+    /// own-request copy; callers that disable the pill for console permission
+    /// flags pass ``cupthread.permission.vote_hint``.
+    var disabledHintKey: String = "cupthread.features.vote_own_hint"
     let action: () -> Void
 
     var body: some View {
@@ -173,7 +177,7 @@ struct VotePill: View {
         )
         .accessibilityHint(
             isDisabled
-                ? CupThreadStrings.tr("cupthread.features.vote_own_hint")
+                ? CupThreadStrings.tr(disabledHintKey)
                 : CupThreadStrings.tr("cupthread.features.vote_toggle_hint")
         )
     }

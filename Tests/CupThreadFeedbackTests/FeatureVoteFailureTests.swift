@@ -28,6 +28,11 @@ struct FeatureVoteFailureTests {
                 for: FeedbackClientError.unexpectedStatus(code: 403, message: "voting disabled", requestId: nil)
             ) == .generic
         )
+        #expect(VoteFailureNotice.notice(for: FeedbackClientError.authenticationRequired) == .permissionDenied)
+        #expect(
+            VoteFailureNotice.notice(for: FeedbackClientError.forbidden(message: "anonymous voting disabled"))
+                == .permissionDenied
+        )
         #expect(VoteFailureNotice.notice(for: FeedbackClientError.invalidResponse) == .generic)
     }
 
@@ -40,6 +45,10 @@ struct FeatureVoteFailureTests {
         #expect(
             VoteFailureNotice.generic.message
                 == CupThreadStrings.tr("cupthread.features.vote_failed")
+        )
+        #expect(
+            VoteFailureNotice.permissionDenied.message
+                == CupThreadStrings.tr("cupthread.error.forbidden")
         )
     }
 

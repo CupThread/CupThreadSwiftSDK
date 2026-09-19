@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "Serveren har problemer i øjeblikket. Prøv igen senere.";
 "cupthread.error.offline" = "Du ser ud til at være offline. Tjek din forbindelse, og prøv igen.";
 "cupthread.error.timed_out" = "Anmodningen tog for lang tid. Prøv igen.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Anonym afstemning er slået fra i denne app.";
+"cupthread.permission.feedback_title" = "Kan ikke sende feedback";
+"cupthread.permission.feedback_description" = "Anonym feedback er slået fra i CupThread-konsollen.";
+"cupthread.permission.platform_title" = "Platform ikke tilladt";
+"cupthread.permission.platform_description" = "Denne app accepterer ikke feedback fra denne platform.";
+"cupthread.permission.roadmap_title" = "Kan ikke åbne køreplanen";
+"cupthread.permission.roadmap_description" = "Anonym adgang til køreplanen er slået fra i CupThread-konsollen.";
+"cupthread.permission.requests_title" = "Kan ikke sende ønsker";
+"cupthread.permission.requests_description" = "Anonyme funktionsønsker er slået fra i CupThread-konsollen.";
+"cupthread.error.forbidden" = "Denne handling er ikke tilgængelig for denne app.";

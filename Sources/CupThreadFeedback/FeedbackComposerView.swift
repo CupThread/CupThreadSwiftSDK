@@ -39,6 +39,11 @@ public struct FeedbackComposerView: View {
     @State private var attachmentState: FeedbackAttachmentStateMachine
     @State private var errorMessage: String?
     @State private var result: FeedbackSubmissionResult?
+    @Environment(\.sdkAppConfig) private var sdkAppConfig
+
+    private var submissionDenial: SdkSubmissionDenial {
+        SdkSubmissionDenial.forFeedback(config: sdkAppConfig, platform: draft.platform)
+    }
 
     #if canImport(PhotosUI) && !os(tvOS)
     @State private var selectionCoordinator = PhotoSelectionUploadCoordinator<PhotosPickerItem>()
@@ -108,6 +113,8 @@ public struct FeedbackComposerView: View {
                         self.resetForm()
                     }
                 }
+            } else if submissionDenial != .none {
+                submissionDenial.placeholder
             } else {
                 composer
             }
@@ -428,6 +435,7 @@ public struct FeedbackComposerView: View {
 
     @MainActor
     private func submitDraft() async {
+        guard submissionDenial == .none else { return }
         guard canSubmit && !isSubmitting else { return }
         isSubmitting = true
         errorMessage = nil
