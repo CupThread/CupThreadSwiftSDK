@@ -43,14 +43,16 @@ struct ChangelogSubscribeView: View {
                     resultView(
                         icon: "envelope.badge.checkmark.fill",
                         tint: .green,
-                        title: "Check Your Inbox",
-                        message: "We sent a confirmation link to \(model.trimmedEmail). Confirm it to start receiving update emails."
+                        title: CupThreadStrings.tr("cupthread.subscribe.check_inbox_title"),
+                        message: CupThreadStrings.tr(
+                            "cupthread.subscribe.check_inbox_message", model.trimmedEmail
+                        )
                     )
                 case .manage:
                     manageView
                 }
             }
-            .navigationTitle("Updates by Email")
+            .navigationTitle(CupThreadStrings.tr("cupthread.subscribe.title"))
             #if os(iOS) || os(visionOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -63,7 +65,7 @@ struct ChangelogSubscribeView: View {
                     // close affordance, so no second dismissal control is
                     // rendered.
                     if model.phase == .form {
-                        Button("Cancel") { dismiss() }
+                        Button(CupThreadStrings.tr("cupthread.common.cancel")) { dismiss() }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -81,16 +83,18 @@ struct ChangelogSubscribeView: View {
     private var form: some View {
         Form {
             Section {
-                TextField("you@example.com", text: $model.email)
+                TextField(
+                    CupThreadStrings.tr("cupthread.subscribe.email_placeholder"),
+                    text: $model.email
+                )
                     #if canImport(UIKit)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
                     #endif
             } header: {
-                Text("Email")
+                Text(CupThreadStrings.tr("cupthread.subscribe.email_header"))
             } footer: {
-                Text("We'll email you a confirmation link; only confirmed addresses receive updates. "
-                    + "You can unsubscribe anytime using the link in any update email.")
+                Text(CupThreadStrings.tr("cupthread.subscribe.email_footer"))
             }
 
             if let errorMessage {
@@ -115,16 +119,17 @@ struct ChangelogSubscribeView: View {
                 .foregroundStyle(.green)
                 .accessibilityHidden(true)
 
-            Text("You're Subscribed")
+            Text(CupThreadStrings.tr("cupthread.subscribe.manage_title"))
                 .font(.title3.weight(.semibold))
 
-            Text("Update emails will go to \(model.rememberedEmail). To change the address or unsubscribe, "
-                + "use the link in any update email.")
+            Text(CupThreadStrings.tr(
+                "cupthread.subscribe.manage_message", model.rememberedEmail
+            ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button("Use a Different Email") {
+            Button(CupThreadStrings.tr("cupthread.subscribe.use_different_email")) {
                 model.startNewEmailEntry()
                 errorMessage = nil
             }

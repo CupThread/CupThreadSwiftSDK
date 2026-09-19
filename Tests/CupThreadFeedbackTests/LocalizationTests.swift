@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 111, "Expected 111 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 158, "Expected 158 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -105,5 +105,105 @@ struct LocalizationTests {
                 )
             }
         }
+    }
+    // MARK: - Plural families
+
+    private static let pluralFamilyBases = [
+        "cupthread.roadmap.column_items",
+        "cupthread.features.vote_count_accessibility",
+        "cupthread.features.vote_add_accessibility",
+        "cupthread.features.vote_remove_accessibility"
+    ]
+
+    /// Every plural family ships all four category keys in every locale, so
+    /// `CupThreadStrings.trPlural` never has to fall back to a bare key
+    /// (issue #9).
+    @Test func pluralFamiliesShipAllCategoriesInEveryLocale() throws {
+        for lang in Self.targetLanguages {
+            let strings = try loadStrings(for: lang)
+            for base in Self.pluralFamilyBases {
+                for category in ["one", "few", "many", "other"] {
+                    let key = "\(base).\(category)"
+                    let value = try #require(strings[key], "\(lang) is missing \(key)")
+                    #expect(value.contains("lld"), "\(key) is missing its count specifier: \(value)")
+                }
+            }
+        }
+    }
+
+    /// The vote-count family composes a suffix after the count phrase, so it
+    /// must carry the positional argument specifiers in every category.
+    @Test func voteCountFamilyKeepsSuffixPlaceholder() throws {
+        for lang in Self.targetLanguages {
+            let strings = try loadStrings(for: lang)
+            for category in ["one", "few", "many", "other"] {
+                let value = try #require(
+                    strings["cupthread.features.vote_count_accessibility.\(category)"],
+                    "\(lang) vote_count family is missing \(category)"
+                )
+                #expect(value.contains("%2$@"), "\(lang) vote_count \(category) lost the suffix: \(value)")
+                #expect(
+                    !value.replacingOccurrences(of: "%2$@", with: "").contains("%@"),
+                    "\(lang) vote_count \(category) mixes positional and non-positional specifiers: \(value)"
+                )
+            }
+        }
+    }
+
+    /// CLDR integer category selection for every shipped language (issue #9).
+    @Test func pluralCategorySelectionMatchesCLDR() {
+        let oneOnly = ["en", "da", "de", "de-CH", "es", "it", "nb", "no", "pt", "tr"]
+        for language in oneOnly {
+            #expect(CupThreadStrings.pluralCategory(for: 1, language: language) == "one", "\(language)")
+            #expect(CupThreadStrings.pluralCategory(for: 2, language: language) == "other", "\(language)")
+            #expect(CupThreadStrings.pluralCategory(for: 0, language: language) == "other", "\(language)")
+        }
+        // French treats zero as singular.
+        #expect(CupThreadStrings.pluralCategory(for: 0, language: "fr") == "one")
+        #expect(CupThreadStrings.pluralCategory(for: 1, language: "fr") == "one")
+        #expect(CupThreadStrings.pluralCategory(for: 2, language: "fr") == "other")
+        // Polish one/few/many.
+        #expect(CupThreadStrings.pluralCategory(for: 1, language: "pl") == "one")
+        #expect(CupThreadStrings.pluralCategory(for: 2, language: "pl") == "few")
+        #expect(CupThreadStrings.pluralCategory(for: 5, language: "pl") == "many")
+        #expect(CupThreadStrings.pluralCategory(for: 22, language: "pl") == "few")
+        #expect(CupThreadStrings.pluralCategory(for: 112, language: "pl") == "many")
+        #expect(CupThreadStrings.pluralCategory(for: 0, language: "pl") == "many")
+        // Category-less languages always resolve to other.
+        for language in ["zh-Hans", "zh-Hant", "zh-HK", "zh-TW", "ja", "ko", "vi"] {
+            #expect(CupThreadStrings.pluralCategory(for: 1, language: language) == "other", "\(language)")
+            #expect(CupThreadStrings.pluralCategory(for: 2, language: language) == "other", "\(language)")
+        }
+        // Unknown languages degrade to other instead of crashing.
+        #expect(CupThreadStrings.pluralCategory(for: 1, language: "xx") == "other")
+    }
+
+    /// Behavioral check that `trPlural` resolves the family keys end to end.
+    /// The exact English assertions only run when the test process runs in
+    /// English (CI); otherwise the no-leak assertions still prove resolution.
+    @Test func trPluralResolvesLocalizedCategories() {
+        let singular = CupThreadStrings.trPlural("cupthread.roadmap.column_items", count: 1)
+        let plural = CupThreadStrings.trPlural("cupthread.roadmap.column_items", count: 2)
+        for output in [singular, plural] {
+            #expect(!output.contains("lld"), "Format specifier leaked: \(output)")
+            #expect(!output.contains("column_items"), "Raw key leaked: \(output)")
+        }
+        #expect(singular != plural, "Category selection did not change the phrase")
+
+        guard Locale.current.language.languageCode?.identifier == "en" else { return }
+        #expect(singular == "1 item", "Unexpected singular output: \(singular)")
+        #expect(plural == "2 items", "Unexpected plural output: \(plural)")
+        #expect(
+            CupThreadStrings.trPlural(
+                "cupthread.features.vote_count_accessibility", count: 5, ", including yours"
+            ) == "5 votes, including yours",
+            "Vote count composition rendered wrong"
+        )
+        #expect(
+            CupThreadStrings.trPlural(
+                "cupthread.features.vote_count_accessibility", count: 1, ", including yours"
+            ) == "1 vote, including yours",
+            "Vote count singular composition rendered wrong"
+        )
     }
 }

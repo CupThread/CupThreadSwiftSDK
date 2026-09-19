@@ -26,7 +26,9 @@ struct FeatureRequestCard: View {
 
                 HStack(spacing: 6) {
                     CapsuleBadge(icon: stageStyle.icon, text: item.stageName, tint: stageStyle.tint)
-                        .accessibilityLabel("Stage: \(item.stageName)")
+                        .accessibilityLabel(
+                            CupThreadStrings.tr("cupthread.features.stage_accessibility", item.stageName)
+                        )
 
                     if item.isOwnRequest && !item.approved {
                         CapsuleBadge(icon: "clock", text: CupThreadStrings.tr("cupthread.features.pending_review"), tint: .orange)
@@ -151,6 +153,6 @@ struct FeatureRequestCard: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .accessibilityLabel("Recent commenters")
+        .accessibilityLabel(CupThreadStrings.tr("cupthread.features.recent_commenters_accessibility"))
     }
 }
