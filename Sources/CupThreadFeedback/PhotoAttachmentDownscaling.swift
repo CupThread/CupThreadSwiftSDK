@@ -67,6 +67,15 @@ extension PhotoAttachmentHelper {
     /// unrecognized containers are transcoded to JPEG, and the final bytes
     /// are validated against `limit`.
     ///
+    /// The function is nonisolated async, so under Swift 6 executor semantics
+    /// the CPU-bound ImageIO decode and encode passes run on the global
+    /// concurrent executor even when awaited from the MainActor — selecting a
+    /// photo never blocks the UI thread (#79).
+    ///
+    /// A fresh re-encode (downscale or JPEG transcode) drops all embedded
+    /// metadata by construction, so when one runs the separate strip pass is
+    /// skipped and the photo pays a single decode+encode instead of two.
+    ///
     /// Under-limit images in formats the upload API accepts as-is pass
     /// through byte-identical when `stripSensitiveMetadata` is `false`.
     ///
@@ -75,17 +84,17 @@ extension PhotoAttachmentHelper {
     ///   - limit: Maximum allowed upload size in bytes.
     ///   - stripSensitiveMetadata: Whether to re-encode and strip EXIF/GPS metadata.
     /// - Returns: The prepared photo ready for upload.
-    /// - Throws: ``AttachmentValidationError/unsupportedType`` for SVG or
-    ///   undecodable HEIC/HEIF-like containers,
+    /// - Throws: ``AttachmentValidationError/unsupportedType`` for SVG or,
+    ///   when `stripSensitiveMetadata` is `false`, for undecodable bytes;
     ///   ``AttachmentValidationError/oversized(size:limit:)`` when no
-    ///   downscale can fit the bytes under `limit`, and
-    ///   ``AttachmentValidationError/unprocessableImage`` when metadata
-    ///   stripping fails.
-    static func prepareForUpload(
+    ///   downscale can fit the bytes under `limit`; and
+    ///   ``AttachmentValidationError/unprocessableImage`` when stripping is
+    ///   enabled and the bytes cannot be decoded or re-encoded.
+    nonisolated static func prepareForUpload(
         _ data: Data,
         limit: Int,
         stripSensitiveMetadata: Bool
-    ) throws -> PreparedPhoto {
+    ) async throws -> PreparedPhoto {
         var data = data
 
         if looksLikeSVG(data) {
@@ -95,26 +104,38 @@ extension PhotoAttachmentHelper {
         // Oversized photos get one automatic downscale/re-encode attempt (#52)
         // before the hard size limit turns them away; under-limit bytes are
         // never recompressed here.
+        var reencoded = false
         if data.count > limit {
             guard let downscaled = downscaledImageData(data, limit: limit) else {
                 throw AttachmentValidationError.oversized(size: data.count, limit: limit)
             }
             data = downscaled
+            reencoded = true
         }
 
-        if stripSensitiveMetadata {
+        // The upload API verifies magic bytes and accepts PNG, JPEG, WebP,
+        // and GIF only — transcode HEIC/HEIF (the iPhone photo default) and
+        // anything it cannot verify.
+        let needsTranscode = requiresJPEGTranscode(data)
+
+        // Skip the strip pass when a fresh re-encode runs anyway: the
+        // downscale or JPEG transcode output carries no metadata, so
+        // stripping first would pay a second full decode+encode for nothing (#79).
+        if stripSensitiveMetadata && !reencoded && !needsTranscode {
             guard let sanitized = strippingSensitiveMetadata(from: data) else {
                 throw AttachmentValidationError.unprocessableImage
             }
             data = sanitized
         }
 
-        // The upload API verifies magic bytes and accepts PNG, JPEG, WebP,
-        // and GIF only — transcode HEIC/HEIF (the iPhone photo default) and
-        // anything it cannot verify.
-        if requiresJPEGTranscode(data) {
+        if needsTranscode {
             guard let jpeg = jpegRepresentationResampled(from: data) else {
-                throw AttachmentValidationError.unsupportedType
+                // Undecodable bytes: keep the pre-#79 error mapping, where
+                // the strip pass surfaced `unprocessableImage` when stripping
+                // was enabled and the transcode `unsupportedType` when not.
+                throw stripSensitiveMetadata
+                    ? AttachmentValidationError.unprocessableImage
+                    : AttachmentValidationError.unsupportedType
             }
             data = jpeg
         }
