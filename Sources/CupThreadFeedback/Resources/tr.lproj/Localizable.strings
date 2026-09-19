@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "@%@ kullanıcısına yanıt veriliyor";
 "cupthread.comments.compose_prompt" = "Bir yorum yazın…";
 "cupthread.comments.removed_by_moderator" = "Bu yorum bir moderatör tarafından kaldırıldı.";
+"cupthread.comments.sign_in_required" = "Sohbete katılmak için giriş yapın.";
 
 "cupthread.profile.title" = "Kullanıcı Profili";
 "cupthread.profile.apps" = "Uygulamalar";

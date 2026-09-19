@@ -73,6 +73,23 @@ The list loads the first page of matching requests and fetches further pages aut
 - **iOS, iPadOS, macOS, visionOS**: Card-based layout with interactive vote badges and markdown-rendered descriptions.
 - **tvOS**: A focus-friendly list optimized for Siri Remote navigation.
 
+## Comments and sign-in
+
+Feature request threads support flat comments with @replies through ``CommentsView``. Comment creation is signed-in-only on the CupThread API: anonymous callers receive `401 authentication_required`, mapped to ``FeedbackClientError/authenticationRequired``.
+
+Provide an authentication provider when creating the client so signed-in users can contribute. The provider resolves the signed-in user's current bearer token on every authenticated call — refresh it there when it is about to expire — and the SDK presents it as `Authorization: Bearer …`. The anonymous `X-User-Token` correlation header is still sent:
+
+```swift
+let client = FeedbackClient(
+    configuration: configuration,
+    authenticationProvider: {
+        await authController.currentBearerToken()
+    }
+)
+```
+
+When the provider resolves `nil` (signed out) or the client has none, ``CommentsView`` shows a deliberate signed-out notice instead of a composer that could never succeed, and direct ``FeedbackClient/postComment(featureRequestId:draft:userToken:)`` calls throw the typed error. The author's display name and avatar always resolve server-side from the signed-in profile.
+
 ## See also
 
 - ``FeatureRequestsView``

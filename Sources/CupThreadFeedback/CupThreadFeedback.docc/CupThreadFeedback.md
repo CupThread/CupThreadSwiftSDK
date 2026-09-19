@@ -44,9 +44,11 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 
 ## Comments & @replies
 
+Comment creation is signed-in-only on the CupThread API — create the client with an ``FeedbackClient/init(configuration:session:authenticationProvider:)`` provider so signed-in users can contribute.
+
 - ``FeatureRequestComment``: A public comment on a feature request.
 - ``CommentDraft``: A new comment before submission.
-- ``CommentsView``: Flat comment thread with @author replies.
+- ``CommentsView``: Flat comment thread with @author replies and a deliberate signed-out state.
 - ``FeedbackClient/fetchComments(featureRequestId:)``, ``FeedbackClient/postComment(featureRequestId:draft:userToken:)``
 
 ## User profiles

@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "Đang trả lời @%@";
 "cupthread.comments.compose_prompt" = "Viết bình luận…";
 "cupthread.comments.removed_by_moderator" = "Bình luận này đã bị người kiểm duyệt xóa.";
+"cupthread.comments.sign_in_required" = "Đăng nhập để tham gia cuộc trò chuyện.";
 
 "cupthread.profile.title" = "Hồ sơ người dùng";
 "cupthread.profile.apps" = "Ứng dụng";
