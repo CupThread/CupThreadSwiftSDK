@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "Serveren har problemer akkurat nå. Prøv igjen senere.";
 "cupthread.error.offline" = "Du ser ut til å være frakoblet. Sjekk tilkoblingen og prøv igjen.";
 "cupthread.error.timed_out" = "Forespørselen tok for lang tid. Prøv igjen.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Anonym stemming er slått av for denne appen.";
+"cupthread.permission.feedback_title" = "Kan ikke sende tilbakemelding";
+"cupthread.permission.feedback_description" = "Anonym tilbakemelding er slått av i CupThread-konsollen.";
+"cupthread.permission.platform_title" = "Plattform ikke tillatt";
+"cupthread.permission.platform_description" = "Denne appen tar ikke imot tilbakemelding fra denne plattformen.";
+"cupthread.permission.roadmap_title" = "Kan ikke åpne veikartet";
+"cupthread.permission.roadmap_description" = "Anonym tilgang til veikartet er slått av i CupThread-konsollen.";
+"cupthread.permission.requests_title" = "Kan ikke sende ønsker";
+"cupthread.permission.requests_description" = "Anonyme funksjonsønsker er slått av i CupThread-konsollen.";
+"cupthread.error.forbidden" = "Denne handlingen er ikke tilgjengelig for denne appen.";

@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "Máy chủ đang gặp sự cố. Vui lòng thử lại sau.";
 "cupthread.error.offline" = "Có vẻ bạn đang ngoại tuyến. Vui lòng kiểm tra kết nối và thử lại.";
 "cupthread.error.timed_out" = "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Bình chọn ẩn danh đã bị tắt cho ứng dụng này.";
+"cupthread.permission.feedback_title" = "Không thể gửi phản hồi";
+"cupthread.permission.feedback_description" = "Phản hồi ẩn danh đã bị tắt trong bảng điều khiển CupThread.";
+"cupthread.permission.platform_title" = "Nền tảng không được phép";
+"cupthread.permission.platform_description" = "Ứng dụng này không nhận phản hồi từ nền tảng này.";
+"cupthread.permission.roadmap_title" = "Không thể mở lộ trình";
+"cupthread.permission.roadmap_description" = "Truy cập ẩn danh vào lộ trình đã bị tắt trong bảng điều khiển CupThread.";
+"cupthread.permission.requests_title" = "Không thể gửi yêu cầu";
+"cupthread.permission.requests_description" = "Yêu cầu tính năng ẩn danh đã bị tắt trong bảng điều khiển CupThread.";
+"cupthread.error.forbidden" = "Thao tác này không khả dụng với ứng dụng này.";

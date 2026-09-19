@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "伺服器目前發生問題，請稍後再試。";
 "cupthread.error.offline" = "目前似乎沒有網路連線，請檢查網路後再試一次。";
 "cupthread.error.timed_out" = "請求耗時過長，請再試一次。";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "此應用已關閉匿名投票。";
+"cupthread.permission.feedback_title" = "無法傳送回饋";
+"cupthread.permission.feedback_description" = "CupThread 主控台已關閉匿名回饋。";
+"cupthread.permission.platform_title" = "不支援目前平台";
+"cupthread.permission.platform_description" = "此應用不接受來自目前平台的回饋。";
+"cupthread.permission.roadmap_title" = "無法開啟路線圖";
+"cupthread.permission.roadmap_description" = "CupThread 主控台已關閉匿名路線圖存取。";
+"cupthread.permission.requests_title" = "無法提交需求";
+"cupthread.permission.requests_description" = "CupThread 主控台已關閉匿名功能請求。";
+"cupthread.error.forbidden" = "此應用目前不允許該操作。";

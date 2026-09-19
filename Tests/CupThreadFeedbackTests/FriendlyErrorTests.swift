@@ -149,6 +149,7 @@ struct FriendlyErrorTests {
         #expect(FeedbackClientError.invalidResponse.responseBody == nil)
         #expect(FeedbackClientError.unreadableUploadResponse.responseBody == nil)
         #expect(FeedbackClientError.authenticationRequired.responseBody == nil)
+        #expect(FeedbackClientError.forbidden(message: "<html>nope</html>", requestId: "r").responseBody == nil)
         #expect(FeedbackClientError.scanRejected(message: "reason", requestId: nil).responseBody == nil)
         #expect(FeedbackClientError.rateLimited(message: "slow down", requestId: nil).responseBody == nil)
         #expect(FeedbackClientError.unsupportedMediaType(message: nil, requestId: nil).responseBody == nil)

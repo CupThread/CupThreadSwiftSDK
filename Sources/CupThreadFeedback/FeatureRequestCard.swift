@@ -11,6 +11,9 @@ struct FeatureRequestCard: View {
     var successPulse: Int = 0
     var onSelectCard: (() -> Void)?
     var onSelectUser: ((String) -> Void)?
+    /// Console configuration used to preflight-disable the vote pill when
+    /// anonymous voting is off. `nil` fails open (own-request still disables).
+    var appConfig: PublicAppConfig?
     let vote: () -> Void
 
     var body: some View {
@@ -62,7 +65,14 @@ struct FeatureRequestCard: View {
                 hasVoted: item.hasVoted,
                 isInFlight: isVoteInFlight,
                 successPulse: successPulse,
-                isDisabled: item.isOwnRequest
+                isDisabled: FeatureVoteGate.isActionDisabled(
+                    isOwnRequest: item.isOwnRequest,
+                    config: appConfig
+                ),
+                disabledHintKey: FeatureVoteGate.hintKey(
+                    isOwnRequest: item.isOwnRequest,
+                    config: appConfig
+                )
             ) {
                 vote()
             }

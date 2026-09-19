@@ -69,6 +69,18 @@ public final class SdkConfigLoader: ObservableObject {
     /// surfaces never flash back to a placeholder between fetches.
     @Published public private(set) var status: SdkConfigStatus = .loading
 
+    /// The full public configuration from the last successful fetch, or `nil`
+    /// when no fetch has succeeded in this session.
+    ///
+    /// SDK surfaces read the permission switches
+    /// (``PublicAppConfig/allowsAnonymousVote`` and friends) from here for UX
+    /// preflight gating. The on-disk last-good cache stores appearance only,
+    /// so a failed refresh that falls back to that cache leaves this `nil` —
+    /// surfaces then fail open and rely on the server's semantic 401/403
+    /// responses, because client permission gating is a preflight, not
+    /// access control.
+    @Published public private(set) var config: PublicAppConfig?
+
     private let client: FeedbackClient
     private let store: AppConfigStore
 
@@ -85,6 +97,7 @@ public final class SdkConfigLoader: ObservableObject {
         // A synchronous TTL hit resolves the gate before the first body
         // evaluation — no waiting placeholder on a warm cache.
         if let cached = store.cachedConfig() {
+            config = cached
             status = .ready(cached.sdk)
         }
     }
@@ -105,8 +118,9 @@ public final class SdkConfigLoader: ObservableObject {
     public func load() async {
         let client = self.client
         do {
-            let config = try await store.config { try await client.fetchAppConfig() }
-            status = .ready(config.sdk)
+            let appConfig = try await store.config { try await client.fetchAppConfig() }
+            config = appConfig
+            status = .ready(appConfig.sdk)
         } catch is CancellationError {
             // The surrounding task was cancelled (e.g. the view disappeared);
             // keep whatever was resolved before.
@@ -127,8 +141,9 @@ public final class SdkConfigLoader: ObservableObject {
     public func refresh() async {
         let client = self.client
         do {
-            let config = try await store.forceRefresh { try await client.fetchAppConfig() }
-            status = .ready(config.sdk)
+            let appConfig = try await store.forceRefresh { try await client.fetchAppConfig() }
+            config = appConfig
+            status = .ready(appConfig.sdk)
         } catch is CancellationError {
             // The surrounding task was cancelled; keep whatever was resolved.
         } catch let error as URLError where error.code == .cancelled {
