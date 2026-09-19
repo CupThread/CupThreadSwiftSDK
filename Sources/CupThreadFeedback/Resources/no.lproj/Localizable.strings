@@ -78,6 +78,7 @@
 "cupthread.comments.replying_to" = "Svarer til @%@";
 "cupthread.comments.compose_prompt" = "Skriv en kommentar…";
 "cupthread.comments.removed_by_moderator" = "Denne kommentaren ble fjernet av en moderator.";
+"cupthread.comments.sign_in_required" = "Logg inn for å bli med i samtalen.";
 
 "cupthread.profile.title" = "Brukerprofil";
 "cupthread.profile.apps" = "Apper";
@@ -161,3 +162,14 @@
 "cupthread.features.vote_remove_accessibility.few" = "Fjern stemme fra dette ønsket. Nåværende stemmer: %lld.";
 "cupthread.features.vote_remove_accessibility.many" = "Fjern stemme fra dette ønsket. Nåværende stemmer: %lld.";
 "cupthread.features.vote_remove_accessibility.other" = "Fjern stemme fra dette ønsket. Nåværende stemmer: %lld.";
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Anonym stemming er slått av for denne appen.";
+"cupthread.permission.feedback_title" = "Kan ikke sende tilbakemelding";
+"cupthread.permission.feedback_description" = "Anonym tilbakemelding er slått av i CupThread-konsollen.";
+"cupthread.permission.platform_title" = "Plattform ikke tillatt";
+"cupthread.permission.platform_description" = "Denne appen tar ikke imot tilbakemelding fra denne plattformen.";
+"cupthread.permission.roadmap_title" = "Kan ikke åpne veikartet";
+"cupthread.permission.roadmap_description" = "Anonym tilgang til veikartet er slått av i CupThread-konsollen.";
+"cupthread.permission.requests_title" = "Kan ikke sende ønsker";
+"cupthread.permission.requests_description" = "Anonyme funksjonsønsker er slått av i CupThread-konsollen.";
+"cupthread.error.forbidden" = "Denne handlingen er ikke tilgjengelig for denne appen.";

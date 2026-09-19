@@ -124,3 +124,51 @@ struct SubmittedBanner: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+// MARK: Empty state + compose toolbar (permission-aware)
+
+struct FeatureRequestsEmptyState: View {
+    let searchText: String
+    let allowsAnonymousFeedback: Bool
+    let onCompose: () -> Void
+
+    var body: some View {
+        if searchText.isEmpty {
+            ContentUnavailableView {
+                Label(CupThreadStrings.tr("cupthread.features.empty_title"), systemImage: "lightbulb")
+            } description: {
+                Text(CupThreadStrings.tr("cupthread.features.empty_description"))
+            } actions: {
+                if allowsAnonymousFeedback {
+                    Button(CupThreadStrings.tr("cupthread.features.request_a_feature"), action: onCompose)
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+        } else {
+            ContentUnavailableView.search(text: searchText)
+        }
+    }
+}
+
+func featureRequestsEmptyStateText(searchText: String) -> String {
+    if !searchText.isEmpty {
+        return CupThreadStrings.tr("cupthread.features.empty_with_query", searchText)
+    }
+    return CupThreadStrings.tr("cupthread.features.empty_no_requests")
+}
+
+@ToolbarContentBuilder
+func featureRequestsComposeToolbar(
+    allowsAnonymousFeedback: Bool,
+    onCompose: @escaping () -> Void
+) -> some ToolbarContent {
+    if allowsAnonymousFeedback {
+        ToolbarItem(placement: .primaryAction) {
+            Button(action: onCompose) {
+                Label(CupThreadStrings.tr("cupthread.features.request_a_feature"), systemImage: "plus")
+            }
+            .accessibilityHint(CupThreadStrings.tr("cupthread.features.request_a_feature_hint"))
+            .accessibilityIdentifier("cupthread.features.compose")
+        }
+    }
+}

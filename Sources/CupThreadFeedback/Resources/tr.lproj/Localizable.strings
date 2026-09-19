@@ -78,6 +78,7 @@
 "cupthread.comments.replying_to" = "@%@ kullanıcısına yanıt veriliyor";
 "cupthread.comments.compose_prompt" = "Bir yorum yazın…";
 "cupthread.comments.removed_by_moderator" = "Bu yorum bir moderatör tarafından kaldırıldı.";
+"cupthread.comments.sign_in_required" = "Sohbete katılmak için giriş yapın.";
 
 "cupthread.profile.title" = "Kullanıcı Profili";
 "cupthread.profile.apps" = "Uygulamalar";
@@ -161,3 +162,14 @@
 "cupthread.features.vote_remove_accessibility.few" = "Bu talepten oyunu kaldır. Şu anda %lld oy.";
 "cupthread.features.vote_remove_accessibility.many" = "Bu talepten oyunu kaldır. Şu anda %lld oy.";
 "cupthread.features.vote_remove_accessibility.other" = "Bu talepten oyunu kaldır. Şu anda %lld oy.";
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Bu uygulamada anonim oylama kapalı.";
+"cupthread.permission.feedback_title" = "Geri bildirim gönderilemiyor";
+"cupthread.permission.feedback_description" = "CupThread konsolunda anonim geri bildirim kapatıldı.";
+"cupthread.permission.platform_title" = "Platforma izin verilmiyor";
+"cupthread.permission.platform_description" = "Bu uygulama bu platformdan geri bildirim kabul etmiyor.";
+"cupthread.permission.roadmap_title" = "Yol haritası açılamıyor";
+"cupthread.permission.roadmap_description" = "CupThread konsolunda yol haritasına anonim erişim kapatıldı.";
+"cupthread.permission.requests_title" = "İstek gönderilemiyor";
+"cupthread.permission.requests_description" = "CupThread konsolunda anonim özellik istekleri kapatıldı.";
+"cupthread.error.forbidden" = "Bu işlem bu uygulama için kullanılamıyor.";

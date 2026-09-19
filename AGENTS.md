@@ -32,8 +32,10 @@
 ## Development & Testing
 - Run test suite: `swift test`
 - Run linter: `swiftlint lint --strict` (config in `.swiftlint.yml`; installed via `brew install swiftlint`, never as an SPM plugin — same zero-dependency rule as the doc pipeline)
-- Release SDK: `node scripts/release.mjs --version <semver>`
+- Release SDK: `node scripts/release.mjs --version <semver>` (preflighted, draft-release-first publication — see the runbook)
+- Release runbook (preflight checks, publication order, per-stage failure recovery, rerun semantics): `docs/release-runbook.md`
 - Release dry-run verification: `node scripts/release.mjs --version <semver> --dry-run`
+- Release smoke test (after publishing a release): run the `Release Smoke Test` workflow (manual dispatch or automatic on release publish) — it proves the published tag resolves as a source package and the CDN artifact imports as a binary target with the advertised checksum
 - Build docs site: `scripts/build-docs.sh docs-site` (DocC source of truth lives in `Sources/CupThreadFeedback/CupThreadFeedback.docc/`)
 - Simulator testing: Use the `Demo/` project (`Demo/CupThreadDemo.xcodeproj`). Use the `axe` CLI for simulator automation.
 
@@ -45,7 +47,7 @@ Test locally before pushing; let CI do only what a Mac cannot. The repo is publi
    - Large or cross-cutting change, and anything touching release scripts/packaging: full `swift test`.
 2. **Platform scope**: iOS is the primary target; the other platforms only need to compile. Note that local `swift test` compiles for macOS only — it does **not** prove tvOS/visionOS slices compile. Cross-platform compile safety (`#if os(...)` branches, API availability) is CI's job (see CI layers below); don't assume a green local build covers it.
 3. **CI layers** (`.github/workflows/ci.yml`):
-   - Pull requests: `lint` + `swift test` + a single iOS archive slice (`build-ios`). Keep PRs under this cheap gate.
+   - Pull requests: `lint` + `swift test` + a single iOS archive slice (`build-ios`), whose job also compiles a Release iOS build with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` as the Swift 6 diagnostics gate (a plain build, not the archive — see the note in `ci.yml`). Keep PRs under this cheap gate.
    - Push to `main`: full 7-platform archive matrix (`build-platforms`) + the Demo interactive UI test (`ui-tests`) + `release-dry-run`. This is the only place cross-platform compile regressions are caught, immediately after merge; the UI test is the safety net for first-render and navigation regressions in the SDK's SwiftUI surfaces. Run the same UI flow locally before pushing view changes: `xcodebuild test -project Demo/CupThreadDemo.xcodeproj -scheme CupThreadDemo -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:CupThreadDemoUITests/CupThreadDemoUITests/testInteractiveNavigationAndVotingFlow`.
 4. **Before cutting a release**: run the full `swift test` locally, then confirm the latest `main` CI run (matrix + dry-run) is green before invoking `scripts/release.mjs`.
 

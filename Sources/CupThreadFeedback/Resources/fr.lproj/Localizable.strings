@@ -78,6 +78,7 @@
 "cupthread.comments.replying_to" = "En réponse à @%@";
 "cupthread.comments.compose_prompt" = "Écrire un commentaire…";
 "cupthread.comments.removed_by_moderator" = "Ce commentaire a été supprimé par un modérateur.";
+"cupthread.comments.sign_in_required" = "Connectez-vous pour rejoindre la discussion.";
 
 "cupthread.profile.title" = "Profil utilisateur";
 "cupthread.profile.apps" = "Applications";
@@ -161,3 +162,14 @@
 "cupthread.features.vote_remove_accessibility.few" = "Retirer votre vote pour cette demande. Actuellement %lld votes.";
 "cupthread.features.vote_remove_accessibility.many" = "Retirer votre vote pour cette demande. Actuellement %lld votes.";
 "cupthread.features.vote_remove_accessibility.other" = "Retirer votre vote pour cette demande. Actuellement %lld votes.";
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Le vote anonyme est désactivé pour cette app.";
+"cupthread.permission.feedback_title" = "Impossible d’envoyer un avis";
+"cupthread.permission.feedback_description" = "Les avis anonymes sont désactivés dans la console CupThread.";
+"cupthread.permission.platform_title" = "Plateforme non autorisée";
+"cupthread.permission.platform_description" = "Cette app n’accepte pas les avis depuis cette plateforme.";
+"cupthread.permission.roadmap_title" = "Impossible d’ouvrir la feuille de route";
+"cupthread.permission.roadmap_description" = "L’accès anonyme à la feuille de route est désactivé dans la console CupThread.";
+"cupthread.permission.requests_title" = "Impossible d’envoyer une demande";
+"cupthread.permission.requests_description" = "Les demandes de fonctionnalités anonymes sont désactivées dans la console CupThread.";
+"cupthread.error.forbidden" = "Cette action n’est pas disponible pour cette app.";

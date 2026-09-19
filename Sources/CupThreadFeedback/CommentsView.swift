@@ -4,6 +4,12 @@ import SwiftUI
 ///
 /// Displays comments in a flat list with @reply indicators and
 /// author avatars. Users can post new comments and reply to existing ones.
+///
+/// Posting is signed-in-only on the server: create the client with an
+/// authentication provider (``FeedbackClient/init(configuration:session:authenticationProvider:)``)
+/// so signed-in users can contribute. When the client cannot present a
+/// signed-in identity, the composer is replaced by a deliberate
+/// signed-out notice and the reply actions are hidden.
 public struct CommentsView: View {
     public let client: FeedbackClient
     public let userToken: String
@@ -109,7 +115,7 @@ public struct CommentsView: View {
                     .foregroundStyle(display.isModerated ? .secondary : .primary)
                     .italic(display.isModerated)
 
-                if display.canReply {
+                if display.canReply, client.supportsAuthentication {
                     replyButton(for: comment)
                 }
             }
@@ -226,57 +232,77 @@ public struct CommentsView: View {
         .padding(.top, 4)
     }
 
+    @ViewBuilder
     private var composeArea: some View {
-        VStack(spacing: 8) {
-            if let submitError {
-                ErrorBanner(message: submitError)
-            }
+        // Comment creation is signed-in-only on the server. When this client
+        // has no way to present a signed-in identity, show a deliberate
+        // signed-out notice instead of a composer that can never succeed.
+        if client.supportsAuthentication {
+            VStack(spacing: 8) {
+                if let submitError {
+                    ErrorBanner(message: submitError)
+                }
 
-            if let replyTo = draft.replyToAuthorName {
-                HStack {
-                    Text(CupThreadStrings.tr("cupthread.comments.replying_to", replyTo))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button {
-                        draft.parentId = nil
-                        draft.replyToAuthorName = nil
-                        draft.replyToClerkId = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.tertiary)
+                if let replyTo = draft.replyToAuthorName {
+                    HStack {
+                        Text(CupThreadStrings.tr("cupthread.comments.replying_to", replyTo))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            draft.parentId = nil
+                            draft.replyToAuthorName = nil
+                            draft.replyToClerkId = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
                     }
+                }
+
+                HStack(alignment: .bottom, spacing: 12) {
+                    #if os(tvOS)
+                    TextField(CupThreadStrings.tr("cupthread.comments.compose_prompt"), text: $draft.body, axis: .vertical)
+                        .lineLimit(1...5)
+                    #else
+                    TextField(CupThreadStrings.tr("cupthread.comments.compose_prompt"), text: $draft.body, axis: .vertical)
+                        .lineLimit(1...5)
+                        .textFieldStyle(.roundedBorder)
+                    #endif
+
+                    Button {
+                        Task { await submitComment() }
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 28))
+                    }
+                    #if os(tvOS)
+                    .buttonStyle(.borderedProminent)
+                    #else
                     .buttonStyle(.plain)
+                    .foregroundStyle(canSubmit ? Color.accentColor : Color.secondary.opacity(0.3))
+                    #endif
+                    .disabled(!canSubmit || isSubmitting)
                 }
             }
-
-            HStack(alignment: .bottom, spacing: 12) {
-                #if os(tvOS)
-                TextField(CupThreadStrings.tr("cupthread.comments.compose_prompt"), text: $draft.body, axis: .vertical)
-                    .lineLimit(1...5)
-                #else
-                TextField(CupThreadStrings.tr("cupthread.comments.compose_prompt"), text: $draft.body, axis: .vertical)
-                    .lineLimit(1...5)
-                    .textFieldStyle(.roundedBorder)
-                #endif
-
-                Button {
-                    Task { await submitComment() }
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 28))
-                }
-                #if os(tvOS)
-                .buttonStyle(.borderedProminent)
-                #else
-                .buttonStyle(.plain)
-                .foregroundStyle(canSubmit ? Color.accentColor : Color.secondary.opacity(0.3))
-                #endif
-                .disabled(!canSubmit || isSubmitting)
+            .padding(16)
+            .background(.background)
+        } else {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text(CupThreadStrings.tr("cupthread.comments.sign_in_required"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer()
             }
+            .padding(16)
+            .background(.background)
+            .accessibilityElement(children: .combine)
         }
-        .padding(16)
-        .background(.background)
     }
 
     private var canSubmit: Bool {

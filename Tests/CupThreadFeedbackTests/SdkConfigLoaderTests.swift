@@ -114,6 +114,9 @@ struct SdkConfigLoaderTests {
         #expect(appearance.theme == .ocean)
         #expect(appearance.features.featureRequests == false)
         #expect(appearance.features.feedback == true)
+        let appConfig = try #require(loader.config)
+        #expect(appConfig.appKey == "app_cache_success")
+        #expect(appConfig.allowAnonymousVote == false)
 
         // The last-good cache received the same appearance for this app key.
         #expect(makeCache(appKey: "app_cache_success").cachedAppearance() == appearance)

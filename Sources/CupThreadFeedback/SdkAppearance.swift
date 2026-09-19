@@ -263,6 +263,10 @@ private struct SdkConfigLoaderKey: EnvironmentKey {
     static let defaultValue: SdkConfigLoader? = nil
 }
 
+private struct SdkAppConfigKey: EnvironmentKey {
+    static let defaultValue: PublicAppConfig? = nil
+}
+
 extension EnvironmentValues {
     var sdkAppearance: SdkAppearance? {
         get { self[SdkAppearanceKey.self] }
@@ -277,6 +281,16 @@ extension EnvironmentValues {
     var sdkConfigLoader: SdkConfigLoader? {
         get { self[SdkConfigLoaderKey.self] }
         set { self[SdkConfigLoaderKey.self] = newValue }
+    }
+
+    /// The full public app configuration from the last successful config
+    /// fetch, or `nil` when none has resolved in this session. Surfaces read
+    /// the permission switches (`allowsAnonymousVote` and friends) from here
+    /// for UX preflight gating; `nil` means unknown, which surfaces treat as
+    /// unrestricted and leave enforcement to the server.
+    var sdkAppConfig: PublicAppConfig? {
+        get { self[SdkAppConfigKey.self] }
+        set { self[SdkAppConfigKey.self] = newValue }
     }
 }
 
@@ -387,6 +401,7 @@ private struct ThemedRoot<Content: View>: View {
             .environment(\.sdkAppearance, appearance)
             .environment(\.sdkConfigStatus, loader.status)
             .environment(\.sdkConfigLoader, loader)
+            .environment(\.sdkAppConfig, loader.config)
             .safeWebOpenURL()
             .task { await loader.load() }
     }
@@ -397,6 +412,7 @@ struct SdkSurfaceModifier: ViewModifier {
 
     @Environment(\.sdkConfigStatus) private var injectedStatus
     @Environment(\.sdkConfigLoader) private var injectedLoader
+    @Environment(\.sdkAppConfig) private var injectedConfig
     @StateObject private var loader: SdkConfigLoader
 
     init(client: FeedbackClient, feature: SdkFeature) {
@@ -428,6 +444,7 @@ struct SdkSurfaceModifier: ViewModifier {
             .tint(appearance.theme.accentColor)
             .preferredColorScheme(appearance.theme.preferredColorScheme)
             .environment(\.sdkAppearance, appearance)
+            .environment(\.sdkAppConfig, injectedConfig ?? loader.config)
         case .waiting:
             SdkConfigWaitingView()
         case .unavailable:

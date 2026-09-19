@@ -71,36 +71,36 @@ struct PhotoAttachmentPreparationTests {
 
     // MARK: - prepareForUpload pipeline (#52)
 
-    @Test func prepareForUploadDownscalesOversizedPhotoToFitLimit() throws {
+    @Test func prepareForUploadDownscalesOversizedPhotoToFitLimit() async throws {
         // Random-pixel noise stays above the limit until the quality floor,
         // exercising the full downscale/step path deterministically.
         let image = try #require(createTestImage(width: 2_000, height: 1_200, noise: true))
         let oversized = try #require(createJPEGFixture(cgImage: image, quality: 0.8))
         #expect(oversized.count > 1_500_000)
 
-        let prepared = try PhotoAttachmentHelper.prepareForUpload(oversized, limit: 1_500_000, stripSensitiveMetadata: false)
+        let prepared = try await PhotoAttachmentHelper.prepareForUpload(oversized, limit: 1_500_000, stripSensitiveMetadata: false)
 
         #expect(prepared.data.count <= 1_500_000)
         #expect(prepared.mimeType == "image/jpeg")
         #expect(prepared.fileExtension == "jpg")
     }
 
-    @Test func prepareForUploadPassesUnderLimitBytesThroughByteIdentical() throws {
+    @Test func prepareForUploadPassesUnderLimitBytesThroughByteIdentical() async throws {
         let image = try #require(createTestImage(width: 50, height: 30))
         let png = try #require(createPNGFixture(cgImage: image))
 
-        let prepared = try PhotoAttachmentHelper.prepareForUpload(png, limit: 20_000_000, stripSensitiveMetadata: false)
+        let prepared = try await PhotoAttachmentHelper.prepareForUpload(png, limit: 20_000_000, stripSensitiveMetadata: false)
 
         #expect(prepared.data == png)
         #expect(prepared.mimeType == "image/png")
         #expect(prepared.fileExtension == "png")
     }
 
-    @Test func prepareForUploadSurfacesOversizedForUndecodableOversizedBytes() throws {
+    @Test func prepareForUploadSurfacesOversizedForUndecodableOversizedBytes() async throws {
         let garbage = Data(repeating: 0x42, count: 2_000_000)
 
         do {
-            _ = try PhotoAttachmentHelper.prepareForUpload(garbage, limit: 1_000_000, stripSensitiveMetadata: false)
+            _ = try await PhotoAttachmentHelper.prepareForUpload(garbage, limit: 1_000_000, stripSensitiveMetadata: false)
             Issue.record("Expected oversized failure for undecodable oversized bytes")
         } catch let error as AttachmentValidationError {
             #expect(error == .oversized(size: garbage.count, limit: 1_000_000))
@@ -109,12 +109,12 @@ struct PhotoAttachmentPreparationTests {
         }
     }
 
-    @Test func prepareForUploadSurfacesOversizedWhenDownscaleCannotFitLimit() throws {
+    @Test func prepareForUploadSurfacesOversizedWhenDownscaleCannotFitLimit() async throws {
         let image = try #require(createTestImage(width: 800, height: 600))
         let decodable = try #require(createJPEGFixture(cgImage: image))
 
         do {
-            _ = try PhotoAttachmentHelper.prepareForUpload(decodable, limit: 200, stripSensitiveMetadata: false)
+            _ = try await PhotoAttachmentHelper.prepareForUpload(decodable, limit: 200, stripSensitiveMetadata: false)
             Issue.record("Expected oversized failure when no quality fits the limit")
         } catch let error as AttachmentValidationError {
             #expect(error == .oversized(size: decodable.count, limit: 200))
@@ -123,11 +123,11 @@ struct PhotoAttachmentPreparationTests {
         }
     }
 
-    @Test func prepareForUploadRejectsSVGBeforeSizeHandling() {
+    @Test func prepareForUploadRejectsSVGBeforeSizeHandling() async {
         let svg = Data("<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".utf8)
 
         do {
-            _ = try PhotoAttachmentHelper.prepareForUpload(svg, limit: 20_000_000, stripSensitiveMetadata: false)
+            _ = try await PhotoAttachmentHelper.prepareForUpload(svg, limit: 20_000_000, stripSensitiveMetadata: false)
             Issue.record("Expected unsupportedType for SVG markup")
         } catch let error as AttachmentValidationError {
             #expect(error == .unsupportedType)
@@ -136,21 +136,21 @@ struct PhotoAttachmentPreparationTests {
         }
     }
 
-    @Test func prepareForUploadAppliesMetadataStrippingWhenConfigured() throws {
+    @Test func prepareForUploadAppliesMetadataStrippingWhenConfigured() async throws {
         let image = try #require(createTestImage(width: 600, height: 400))
         let withGPS = try #require(createJPEGFixture(
             cgImage: image,
             gps: [kCGImagePropertyGPSLatitude: 37.33, kCGImagePropertyGPSLongitude: -122.03]
         ))
 
-        let prepared = try PhotoAttachmentHelper.prepareForUpload(withGPS, limit: 20_000_000, stripSensitiveMetadata: true)
+        let prepared = try await PhotoAttachmentHelper.prepareForUpload(withGPS, limit: 20_000_000, stripSensitiveMetadata: true)
 
         let properties = try #require(imageProperties(of: prepared.data))
         #expect(properties[kCGImagePropertyGPSDictionary] == nil)
         #expect(prepared.mimeType == "image/jpeg")
     }
 
-    @Test func prepareForUploadTranscodesUnderLimitHEICToJPEGIfSupported() throws {
+    @Test func prepareForUploadTranscodesUnderLimitHEICToJPEGIfSupported() async throws {
         // Skip quietly when the host cannot encode HEIC (older Linux-style CI images
         // or restricted encoders); the transcode path is covered by unit tests elsewhere.
         guard let image = createTestImage(width: 60, height: 40),
@@ -158,10 +158,50 @@ struct PhotoAttachmentPreparationTests {
             return
         }
 
-        let prepared = try PhotoAttachmentHelper.prepareForUpload(heic, limit: 20_000_000, stripSensitiveMetadata: false)
+        let prepared = try await PhotoAttachmentHelper.prepareForUpload(heic, limit: 20_000_000, stripSensitiveMetadata: false)
 
         #expect(prepared.mimeType == "image/jpeg")
         #expect(prepared.fileExtension == "jpg")
+    }
+
+    // MARK: - single re-encode pass (#79)
+
+    @Test func prepareForUploadStripsHEICMetadataThroughTheSingleTranscodePass() async throws {
+        // The JPEG transcode is itself a sanitizer, so a HEIC photo with
+        // stripping enabled must come out as the single-transcode JPEG with
+        // no GPS/EXIF, without paying a separate strip re-encode first (#79).
+        guard let image = createTestImage(width: 60, height: 40),
+              let heic = createHEICFixture(
+                  cgImage: image,
+                  gps: [kCGImagePropertyGPSLatitude: 37.33, kCGImagePropertyGPSLongitude: -122.03]
+              ) else {
+            return
+        }
+
+        let prepared = try await PhotoAttachmentHelper.prepareForUpload(heic, limit: 20_000_000, stripSensitiveMetadata: true)
+
+        #expect(prepared.data.starts(with: [0xFF, 0xD8, 0xFF]))
+        let properties = try #require(imageProperties(of: prepared.data))
+        #expect(properties[kCGImagePropertyGPSDictionary] == nil)
+        #expect(prepared.mimeType == "image/jpeg")
+    }
+
+    @Test func prepareForUploadDownscaleAloneSatisfiesStrippingForOversizedPhotos() async throws {
+        // The downscale re-encode drops metadata by construction, so an
+        // oversized photo must not run a second strip pass either (#79).
+        let image = try #require(createTestImage(width: 2_000, height: 1_200, noise: true))
+        let oversized = try #require(createJPEGFixture(
+            cgImage: image,
+            quality: 0.8,
+            gps: [kCGImagePropertyGPSLatitude: 37.33, kCGImagePropertyGPSLongitude: -122.03]
+        ))
+
+        let prepared = try await PhotoAttachmentHelper.prepareForUpload(oversized, limit: 1_500_000, stripSensitiveMetadata: true)
+
+        #expect(prepared.data.count <= 1_500_000)
+        let properties = try #require(imageProperties(of: prepared.data))
+        #expect(properties[kCGImagePropertyGPSDictionary] == nil)
+        #expect(prepared.mimeType == "image/jpeg")
     }
 
     // MARK: - Test Fixture Helpers
@@ -238,7 +278,7 @@ struct PhotoAttachmentPreparationTests {
         return mutableData as Data
     }
 
-    private func createHEICFixture(cgImage: CGImage) -> Data? {
+    private func createHEICFixture(cgImage: CGImage, gps: [CFString: Any]? = nil) -> Data? {
         let supportedTypes = Set((CGImageDestinationCopyTypeIdentifiers() as? [String]) ?? [])
         guard supportedTypes.contains("public.heic") else { return nil }
         let mutableData = NSMutableData()
@@ -250,7 +290,11 @@ struct PhotoAttachmentPreparationTests {
         ) else {
             return nil
         }
-        CGImageDestinationAddImage(dest, cgImage, nil)
+        var properties: [CFString: Any] = [:]
+        if let gps {
+            properties[kCGImagePropertyGPSDictionary] = gps
+        }
+        CGImageDestinationAddImage(dest, cgImage, properties.isEmpty ? nil : properties as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { return nil }
         return mutableData as Data
     }

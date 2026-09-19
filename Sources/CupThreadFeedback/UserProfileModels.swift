@@ -137,7 +137,10 @@ public struct UserProfileComment: Codable, Equatable, Identifiable, Sendable {
 /// profile the server returns an empty profile (`displayName` is `null`,
 /// `publicApps` and `recentComments` are empty), and unknown identifiers
 /// yield a `404` (surfaced as
-/// ``FeedbackClientError/userProfileNotFound(message:)``).
+/// ``FeedbackClientError/userProfileNotFound(message:)``). The endpoint is
+/// rate-limited per client IP; a spent budget yields a `429` (surfaced as
+/// ``FeedbackClientError/rateLimited(message:requestId:)`` — back off and
+/// retry).
 public struct PublicUserProfileResponse: Codable, Equatable, Sendable {
     /// The user's public profile.
     public let profile: UserProfile

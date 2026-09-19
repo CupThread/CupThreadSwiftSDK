@@ -78,6 +78,7 @@
 "cupthread.comments.replying_to" = "Respondendo a @%@";
 "cupthread.comments.compose_prompt" = "Escreva um comentário…";
 "cupthread.comments.removed_by_moderator" = "Este comentário foi removido por um moderador.";
+"cupthread.comments.sign_in_required" = "Entre para participar da conversa.";
 
 "cupthread.profile.title" = "Perfil de usuário";
 "cupthread.profile.apps" = "Aplicativos";
@@ -161,3 +162,14 @@
 "cupthread.features.vote_remove_accessibility.few" = "Remover voto desta sugestão. Atualmente %lld votos.";
 "cupthread.features.vote_remove_accessibility.many" = "Remover voto desta sugestão. Atualmente %lld votos.";
 "cupthread.features.vote_remove_accessibility.other" = "Remover voto desta sugestão. Atualmente %lld votos.";
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "A votação anónima está desativada nesta app.";
+"cupthread.permission.feedback_title" = "Não é possível enviar feedback";
+"cupthread.permission.feedback_description" = "O feedback anónimo está desativado na consola CupThread.";
+"cupthread.permission.platform_title" = "Plataforma não permitida";
+"cupthread.permission.platform_description" = "Esta app não aceita feedback desta plataforma.";
+"cupthread.permission.roadmap_title" = "Não é possível abrir o roadmap";
+"cupthread.permission.roadmap_description" = "O acesso anónimo ao roadmap está desativado na consola CupThread.";
+"cupthread.permission.requests_title" = "Não é possível enviar pedidos";
+"cupthread.permission.requests_description" = "Os pedidos de funcionalidades anónimos estão desativados na consola CupThread.";
+"cupthread.error.forbidden" = "Esta ação não está disponível nesta app.";

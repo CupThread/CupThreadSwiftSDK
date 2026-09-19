@@ -2,7 +2,8 @@ name: CI
 
 # Layered on purpose (see AGENTS.md → Testing Policy):
 # - Pull requests run the cheap gate only: lint + swift test + one iOS
-#   archive slice, so feedback stays fast.
+#   archive slice plus a Release warnings-as-errors build (the Swift 6
+#   diagnostics gate), so feedback stays fast.
 # - Pushes to main run the full 7-platform archive matrix, the Demo UI test
 #   suite, and the release dry-run — the cross-platform compile and render
 #   safety nets live here, after merge.
@@ -26,6 +27,8 @@ jobs:
           HOMEBREW_NO_INSTALL_CLEANUP: "1"
       - name: Run SwiftLint
         run: swiftlint lint --strict
+      - name: Verify license consistency
+        run: node scripts/check-license.mjs
   test:
     runs-on: macos-26
     steps:
@@ -50,6 +53,19 @@ jobs:
             -archivePath "/tmp/iOS.xcarchive" \
             SKIP_INSTALL=NO \
             BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            -quiet
+      # Swift 6 diagnostics gate: SDK sources must also compile with warnings
+      # treated as errors. A plain build on purpose — the archive step enables
+      # BUILD_LIBRARY_FOR_DISTRIBUTION, and escalating warnings there would
+      # also escalate a scoped-import warning inside SwiftPM's generated
+      # resource_bundle_accessor swiftinterface, which SDK sources cannot fix.
+      - name: Build iOS Release with warnings as errors
+        run: |
+          xcodebuild build \
+            -scheme CupThreadFeedback \
+            -destination "generic/platform=iOS Simulator" \
+            -configuration Release \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
             -quiet
   build-platforms:
     name: Build (${{ matrix.name }})

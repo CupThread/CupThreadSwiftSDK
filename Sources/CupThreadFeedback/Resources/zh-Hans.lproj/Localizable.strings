@@ -78,6 +78,7 @@
 "cupthread.comments.replying_to" = "回复 @%@";
 "cupthread.comments.compose_prompt" = "写下您的想法…";
 "cupthread.comments.removed_by_moderator" = "此留言已被版主移除。";
+"cupthread.comments.sign_in_required" = "登录后即可参与讨论。";
 
 "cupthread.profile.title" = "用户资料";
 "cupthread.profile.apps" = "应用列表";
@@ -161,3 +162,14 @@
 "cupthread.features.vote_remove_accessibility.few" = "取消对该需求的投票。当前共有 %lld 票。";
 "cupthread.features.vote_remove_accessibility.many" = "取消对该需求的投票。当前共有 %lld 票。";
 "cupthread.features.vote_remove_accessibility.other" = "取消对该需求的投票。当前共有 %lld 票。";
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "此应用已关闭匿名投票。";
+"cupthread.permission.feedback_title" = "无法发送反馈";
+"cupthread.permission.feedback_description" = "CupThread 控制台已关闭匿名反馈。";
+"cupthread.permission.platform_title" = "不支持当前平台";
+"cupthread.permission.platform_description" = "此应用不接受来自当前平台的反馈。";
+"cupthread.permission.roadmap_title" = "无法打开路线图";
+"cupthread.permission.roadmap_description" = "CupThread 控制台已关闭匿名路线图访问。";
+"cupthread.permission.requests_title" = "无法提交需求";
+"cupthread.permission.requests_description" = "CupThread 控制台已关闭匿名功能请求。";
+"cupthread.error.forbidden" = "此应用当前不允许该操作。";

@@ -25,6 +25,11 @@ public struct RoadmapBoardView: View {
     /// Transient notice for a failed reload whose groups stay on screen
     /// (a reload failure never wipes already-rendered content).
     @State private var reloadNotice: String?
+    @Environment(\.sdkAppConfig) private var sdkAppConfig
+
+    private var isRoadmapPermitted: Bool {
+        roadmapLoadPlan(config: sdkAppConfig) == .load
+    }
 
     /// The query actually sent to the server, trimmed to match the throttle's
     /// duplicate detection.
@@ -50,6 +55,12 @@ public struct RoadmapBoardView: View {
 
     public var body: some View {
         Group {
+            if !isRoadmapPermitted {
+                SdkPermissionDeniedView(
+                    titleKey: "cupthread.permission.roadmap_title",
+                    descriptionKey: "cupthread.permission.roadmap_description"
+                )
+            } else {
             #if os(tvOS)
             boardList
             #elseif os(iOS)
@@ -61,6 +72,7 @@ public struct RoadmapBoardView: View {
             #else
             boardScroll
             #endif
+            }
         }
         .navigationTitle(CupThreadStrings.tr("cupthread.roadmap.title"))
         #if os(iOS) || os(visionOS)
@@ -76,6 +88,7 @@ public struct RoadmapBoardView: View {
             }
         }
         .task(id: trimmedSearchText) {
+            guard isRoadmapPermitted else { return }
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: the backend does not rate-limit it, so no
                 // debounce or throttle admission is needed.
@@ -307,6 +320,7 @@ public struct RoadmapBoardView: View {
 
     @MainActor
     private func load() async {
+        guard isRoadmapPermitted else { return }
         isLoading = true
         loadError = nil
         reloadNotice = nil
@@ -320,19 +334,15 @@ public struct RoadmapBoardView: View {
             // server's page size — so page through with a wide page size and
             // let ``collectAllRequests`` stop at the real end of the result
             // set. Columns load independently and concurrently.
-            async let columns = client.fetchColumns()
-            let boardClient = client
-            let boardUserToken = userToken
             let query = trimmedSearchText.isEmpty ? nil : trimmedSearchText
-            let requests = try await collectAllRequests { cursor in
-                try await boardClient.fetchFeatureRequests(
-                    userToken: boardUserToken,
-                    limit: 200,
-                    query: query,
-                    cursor: cursor
-                )
+            if let loaded = try await loadRoadmapGroups(
+                client: client,
+                userToken: userToken,
+                query: query,
+                config: sdkAppConfig
+            ) {
+                groups = loaded
             }
-            groups = makeGroups(columns: try await columns, requests: requests)
         } catch {
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()

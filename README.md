@@ -206,4 +206,5 @@ node scripts/release.mjs --version 0.1.1
 ```
 
 ## License
-MIT
+
+MIT — see [LICENSE](LICENSE) for the full license text. Binary consumers receive the same license inside the released XCFramework zip; host apps should include it in their acknowledgements if their compliance process requires it.
