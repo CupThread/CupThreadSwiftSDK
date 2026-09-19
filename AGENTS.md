@@ -32,8 +32,10 @@
 ## Development & Testing
 - Run test suite: `swift test`
 - Run linter: `swiftlint lint --strict` (config in `.swiftlint.yml`; installed via `brew install swiftlint`, never as an SPM plugin — same zero-dependency rule as the doc pipeline)
-- Release SDK: `node scripts/release.mjs --version <semver>`
+- Release SDK: `node scripts/release.mjs --version <semver>` (preflighted, draft-release-first publication — see the runbook)
+- Release runbook (preflight checks, publication order, per-stage failure recovery, rerun semantics): `docs/release-runbook.md`
 - Release dry-run verification: `node scripts/release.mjs --version <semver> --dry-run`
+- Release smoke test (after publishing a release): run the `Release Smoke Test` workflow (manual dispatch or automatic on release publish) — it proves the published tag resolves as a source package and the CDN artifact imports as a binary target with the advertised checksum
 - Build docs site: `scripts/build-docs.sh docs-site` (DocC source of truth lives in `Sources/CupThreadFeedback/CupThreadFeedback.docc/`)
 - Simulator testing: Use the `Demo/` project (`Demo/CupThreadDemo.xcodeproj`). Use the `axe` CLI for simulator automation.
 

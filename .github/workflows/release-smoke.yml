@@ -1,0 +1,130 @@
+name: Release Smoke Test
+
+# Post-publication smoke test (issue #11): proves a released version actually
+# resolves for consumers — the source package via the Git tag and the binary
+# target via the published CDN artifact + the checksum advertised in the
+# release notes. Runs automatically when a release is published, and can be
+# dispatched manually for any past release. Requires the release to exist;
+# it never runs as part of the PR gate.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Released SDK version to smoke-test (e.g. 0.1.1)'
+        required: true
+  release:
+    types: [published]
+
+jobs:
+  smoke:
+    name: Smoke-test release
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Resolve version
+        run: |
+          VERSION="${{ inputs.version || github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          if [ -z "$VERSION" ]; then
+            echo "No version provided (workflow_dispatch input or release tag)."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Read the published checksum from the release notes
+        run: |
+          BODY="$(gh release view "v$VERSION" --json body --jq .body)"
+          CHECKSUM="$(printf '%s' "$BODY" | grep -oE '[0-9a-f]{64}' | head -1)"
+          if [ -z "$CHECKSUM" ]; then
+            echo "Release notes for v$VERSION contain no sha256 checksum."
+            exit 1
+          fi
+          echo "CHECKSUM=$CHECKSUM" >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Source package resolves from the published tag
+        run: |
+          mkdir -p /tmp/source-smoke/Sources/SourceSmoke
+          cat > /tmp/source-smoke/Package.swift <<EOF
+          // swift-tools-version: 6.0
+          import PackageDescription
+
+          let package = Package(
+              name: "SourceSmoke",
+              platforms: [.macOS(.v14)],
+              dependencies: [
+                  .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", from: "$VERSION")
+              ],
+              targets: [
+                  .executableTarget(
+                      name: "SourceSmoke",
+                      dependencies: [.product(name: "CupThreadFeedback", package: "CupThreadSwiftSDK")]
+                  )
+              ]
+          )
+          EOF
+          cat > /tmp/source-smoke/Sources/SourceSmoke/main.swift <<EOF
+          import Foundation
+          import CupThreadFeedback
+
+          let configuration = FeedbackClientConfiguration(
+              baseURL: URL(string: "https://api.cupthread.com")!,
+              appKey: "app_release_smoke"
+          )
+          let client = FeedbackClient(configuration: configuration)
+          print("smoke:", client.configuration.appKey, FeedbackClient.sdkVersion)
+          EOF
+          cd /tmp/source-smoke
+          swift build
+          OUTPUT="$(swift run 2>/dev/null)"
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -q "smoke: app_release_smoke $VERSION" || {
+            echo "Source package from tag v$VERSION reports a different sdkVersion."
+            exit 1
+          }
+
+      - name: Binary target imports the published CDN artifact
+        run: |
+          mkdir -p /tmp/binary-smoke/Sources/BinarySmoke
+          cat > /tmp/binary-smoke/Package.swift <<EOF
+          // swift-tools-version: 6.0
+          import PackageDescription
+
+          let package = Package(
+              name: "BinarySmoke",
+              platforms: [.macOS(.v14)],
+              targets: [
+                  .binaryTarget(
+                      name: "CupThreadFeedback",
+                      url: "https://cdn.cupthread.com/sdks/apple/CupThreadFeedback-$VERSION.xcframework.zip",
+                      checksum: "$CHECKSUM"
+                  ),
+                  .executableTarget(name: "BinarySmoke", dependencies: ["CupThreadFeedback"])
+              ]
+          )
+          EOF
+          cat > /tmp/binary-smoke/Sources/BinarySmoke/main.swift <<EOF
+          import Foundation
+          import CupThreadFeedback
+
+          let configuration = FeedbackClientConfiguration(
+              baseURL: URL(string: "https://api.cupthread.com")!,
+              appKey: "app_release_smoke"
+          )
+          let client = FeedbackClient(configuration: configuration)
+          print("smoke:", client.configuration.appKey, FeedbackClient.sdkVersion)
+          EOF
+          cd /tmp/binary-smoke
+          swift build
+          OUTPUT="$(.build/debug/BinarySmoke)"
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -q "smoke: app_release_smoke $VERSION" || {
+            echo "Published CDN artifact reports a different sdkVersion."
+            exit 1
+          }
