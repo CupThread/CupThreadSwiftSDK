@@ -31,17 +31,28 @@ public struct ChangelogOverlayView: View {
 
     /// Creates the overlay sheet.
     ///
-    /// Pass `entries` and `appearance` only when you already fetched them via
-    /// ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``; otherwise the view loads
-    /// both on first appearance. The self-loading path enforces the console's
-    /// `sdk.features.changelog` switch: when the surface is off, no changelog
-    /// request is made and the sheet shows an "unavailable" placeholder.
+    /// With no pre-fetched content the view loads everything on first
+    /// appearance: it fetches the console configuration and newest entries
+    /// itself and enforces the console's `sdk.features.changelog` switch —
+    /// when the surface is off, no changelog request is made and the sheet
+    /// shows an "unavailable" placeholder.
+    ///
+    /// When you already fetched content via
+    /// ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``, prefer
+    /// ``init(client:prepared:autoMarkSeen:onPrimary:onClose:)``, which keeps
+    /// entries and appearance paired. Passing `entries` and `appearance`
+    /// together renders the sheet without any network request. Passing
+    /// `entries` without `appearance` — easy to do when destructuring the
+    /// prepare result — still honors the console: the view fetches the
+    /// configuration for theming before revealing the content, so the title,
+    /// buttons, and theme keep matching the console.
     /// - Parameters:
     ///   - client: The shared ``FeedbackClient``.
     ///   - entries: Pre-fetched changelog entries; `nil` makes the view fetch
     ///     them itself.
     ///   - appearance: Pre-fetched console appearance; `nil` makes the view
-    ///     fetch it itself.
+    ///     resolve it from the console configuration (falling back to
+    ///     ``SdkAppearance/defaults`` when that fails).
     ///   - autoMarkSeen: Automatically marks the displayed version as seen on dismissal.
     ///   - onPrimary: Called when the user taps the console-configured primary
     ///     button; the sheet dismisses afterwards.
@@ -61,6 +72,32 @@ public struct ChangelogOverlayView: View {
         self.autoMarkSeen = autoMarkSeen
         self.onPrimary = onPrimary
         self.onClose = onClose
+    }
+
+    /// Creates the overlay sheet from a
+    /// ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)`` result.
+    ///
+    /// Equivalent to passing `prepared?.entries` and `prepared?.appearance`
+    /// to ``init(client:entries:appearance:autoMarkSeen:onPrimary:onClose:)``,
+    /// but the pairing cannot be lost by destructuring the tuple — the
+    /// console theme and copy always apply to the prepared entries. Passing
+    /// `nil` (including a `nil` prepare result, which means the overlay
+    /// should stay hidden) makes the view load everything itself.
+    public init(
+        client: FeedbackClient,
+        prepared: (entries: [ChangelogEntry], appearance: SdkAppearance)?,
+        autoMarkSeen: Bool = true,
+        onPrimary: @escaping () -> Void = {},
+        onClose: @escaping () -> Void = {}
+    ) {
+        self.init(
+            client: client,
+            entries: prepared?.entries,
+            appearance: prepared?.appearance,
+            autoMarkSeen: autoMarkSeen,
+            onPrimary: onPrimary,
+            onClose: onClose
+        )
     }
 
     private var overlay: ChangelogOverlayConfig { appearance.changelogOverlay }
@@ -178,32 +215,91 @@ public struct ChangelogOverlayView: View {
         }
     }
 
+    /// How the load path resolves content from the init-time prepared values.
+    ///
+    /// Truth table (`entries`, `appearance`) → plan:
+    /// `(set, set)` → `.showPrepared(needsConfigFetch: false)`;
+    /// `(set, nil)` → `.showPrepared(needsConfigFetch: true)`;
+    /// `(nil, anything)` → `.fetchRemote`.
+    enum LoadPlan: Equatable {
+        /// Pre-fetched entries are shown directly. When `needsConfigFetch` is
+        /// `true`, the host passed `entries` without `appearance`, so the load
+        /// path still resolves the console appearance (falling back to the
+        /// last-good cache, then ``SdkAppearance/defaults``) before revealing
+        /// the content.
+        case showPrepared(needsConfigFetch: Bool)
+        /// No prepared entries; the view fetches config and entries itself
+        /// via ``fetchSelfLoadedContent(in:)``.
+        case fetchRemote
+    }
+
+    /// Decides the load plan for the given prepared values: entries without
+    /// an appearance still honor the console configuration; without prepared
+    /// entries the view self-loads.
+    static func loadPlan(
+        entries: [ChangelogEntry]?,
+        appearance: SdkAppearance?
+    ) -> LoadPlan {
+        guard entries != nil else { return .fetchRemote }
+        return .showPrepared(needsConfigFetch: appearance == nil)
+    }
+
+    /// The plan this view's `load()` follows for its init-time values.
+    var preparedLoadPlan: LoadPlan {
+        Self.loadPlan(entries: preparedEntries, appearance: preparedAppearance)
+    }
+
+    /// Resolves the console appearance for hosts that passed `entries`
+    /// without `appearance`.
+    ///
+    /// Mirrors the SDK's shared configuration semantics (``CupThreadTheme``):
+    /// the fetched appearance on success, the last-good cached appearance
+    /// when the fetch fails, and ``SdkAppearance/defaults`` when there is no
+    /// cached value either.
+    static func resolveFallbackAppearance(in client: FeedbackClient) async -> SdkAppearance {
+        guard let config = try? await client.cachedAppConfig() else {
+            return client.configStore.lastGoodAppearance() ?? .defaults
+        }
+        return config.sdk
+    }
+
     @MainActor
     private func load() async {
         if let preparedAppearance {
             appearance = preparedAppearance
         }
-        if let preparedEntries {
-            entries = preparedEntries
-            isLoading = false
-            return
-        }
-
-        isLoading = true
-        loadError = nil
-        featureDisabled = false
-        defer { isLoading = false }
-        switch await Self.fetchSelfLoadedContent(in: client) {
-        case .entries(let loaded, let loadedAppearance):
-            appearance = loadedAppearance
-            entries = loaded
-        case .featureDisabled(let loadedAppearance):
-            appearance = loadedAppearance
-            featureDisabled = true
-        case .failed(let message):
-            loadError = message
-        case nil:
-            break
+        switch preparedLoadPlan {
+        case .showPrepared(let needsConfigFetch):
+            if let preparedEntries {
+                entries = preparedEntries
+            }
+            if needsConfigFetch {
+                // Entries were pre-fetched without an appearance: honor the
+                // console theme and copy before revealing the sheet. The
+                // spinner from the initial state stays up until this resolves.
+                defer { isLoading = false }
+                appearance = await Self.resolveFallbackAppearance(in: client)
+            } else {
+                isLoading = false
+            }
+        case .fetchRemote:
+            isLoading = true
+            loadError = nil
+            featureDisabled = false
+            defer { isLoading = false }
+            switch await Self.fetchSelfLoadedContent(in: client) {
+            case .entries(let loaded, let loadedAppearance):
+                appearance = loadedAppearance
+                entries = loaded
+            case .featureDisabled(let loadedAppearance):
+                appearance = loadedAppearance
+                featureDisabled = true
+            case .failed(let message):
+                loadError = message
+            case nil:
+                // Cancelled mid-fetch: leave the prepared state alone.
+                break
+            }
         }
     }
 
@@ -334,9 +430,11 @@ extension FeedbackClient {
     ///
     /// ```swift
     /// if let prepared = try await client.prepareChangelogOverlay(onlyIfUnseen: true) {
-    ///     overlayEntries = prepared.entries
+    ///     preparedOverlay = prepared
     ///     showSheet = true
     /// }
+    /// // …in the sheet content, entries and appearance stay paired:
+    /// ChangelogOverlayView(client: client, prepared: preparedOverlay)
     /// ```
     ///
     /// - Parameter onlyIfUnseen: When `true`, returns `nil` if the newest entry

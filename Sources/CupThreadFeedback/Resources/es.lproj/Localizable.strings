@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "El servidor tiene problemas en este momento. Inténtalo de nuevo más tarde.";
 "cupthread.error.offline" = "Parece que estás sin conexión. Comprueba tu conexión e inténtalo de nuevo.";
 "cupthread.error.timed_out" = "La solicitud tardó demasiado. Inténtalo de nuevo.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "La votación anónima está desactivada en esta app.";
+"cupthread.permission.feedback_title" = "No se puede enviar comentarios";
+"cupthread.permission.feedback_description" = "Los comentarios anónimos están desactivados en la consola de CupThread.";
+"cupthread.permission.platform_title" = "Plataforma no permitida";
+"cupthread.permission.platform_description" = "Esta app no acepta comentarios desde esta plataforma.";
+"cupthread.permission.roadmap_title" = "No se puede abrir la hoja de ruta";
+"cupthread.permission.roadmap_description" = "El acceso anónimo a la hoja de ruta está desactivado en la consola de CupThread.";
+"cupthread.permission.requests_title" = "No se pueden enviar solicitudes";
+"cupthread.permission.requests_description" = "Las solicitudes de funciones anónimas están desactivadas en la consola de CupThread.";
+"cupthread.error.forbidden" = "Esta acción no está disponible para esta app.";

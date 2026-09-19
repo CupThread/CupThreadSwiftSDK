@@ -237,6 +237,10 @@ public struct FeedbackClient: Sendable {
     ///   ``FeedbackClientError/subscriptionInactive(message:)`` when the workspace
     ///   subscription is inactive or canceled (HTTP 402 `subscription_inactive`),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
+    ///   feedback is disabled or the platform is outside the console's
+    ///   allow-list (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for other
     ///   server rejections (successful submissions accept HTTP 200, 201, and 202), or
     ///   ``FeedbackClientError/invalidResponse`` when the response cannot be interpreted.
@@ -270,7 +274,12 @@ public struct FeedbackClient: Sendable {
             throw FeedbackClientError.invalidResponse
         }
 
-        try validateResponse(httpResponse, data: data, accepted: Self.acceptedSubmitStatuses)
+        try validateResponse(
+            httpResponse,
+            data: data,
+            accepted: Self.acceptedSubmitStatuses,
+            mapsPermissionErrors: true
+        )
 
         return try decoder.decode(FeedbackSubmissionResult.self, from: data)
     }

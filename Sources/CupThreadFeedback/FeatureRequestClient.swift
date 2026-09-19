@@ -38,7 +38,10 @@ extension FeedbackClient {
     ///     deeply; takes the place of large `offset` values.
     /// - Returns: The matching requests, the unpaginated `total`, and cursor
     ///   paging fields.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
+    ///   access is disabled for the app (HTTP 401/403),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchFeatureRequests(
         userToken: String,
@@ -78,7 +81,7 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(ListFeatureRequestsResult.self, from: data)
     }
 
@@ -98,6 +101,9 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/subscriptionInactive(message:)`` when the
     ///   workspace subscription is inactive or canceled (HTTP 402
     ///   `subscription_inactive`),
+    ///   ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
+    ///   feedback is disabled for the app (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func submitFeatureRequest(
@@ -122,7 +128,7 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [200, 201])
+        try validateResponse(httpResponse, data: data, accepted: [200, 201], mapsPermissionErrors: true)
         return try decoder.decode(FeatureRequestSubmissionResult.self, from: data)
     }
 
@@ -141,6 +147,9 @@ extension FeedbackClient {
     ///   - userToken: A stable UUID string identifying this user.
     /// - Returns: The new vote state and the request's authoritative vote count.
     /// - Throws: ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
+    ///   voting is disabled for the app (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func toggleVote(
@@ -161,7 +170,7 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(VoteResult.self, from: data)
     }
 }

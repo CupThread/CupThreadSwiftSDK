@@ -10,6 +10,14 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// The endpoint requires a signed-in user — e.g. the app's changelog
     /// is restricted and anonymous access is disabled (`401 authentication_required`).
     case authenticationRequired
+    /// The server's permission policy rejected the action (HTTP 403) — e.g.
+    /// anonymous feedback or voting is disabled for the app in the CupThread
+    /// console, or the reporting platform is outside the console's platform
+    /// allow-list. The console switch, not the network, is the cause; SDK
+    /// surfaces preflight-gate so this mostly appears when UI races a
+    /// console change. `message` is the raw server text for diagnostics and
+    /// is never shown to end users.
+    case forbidden(message: String?, requestId: String?)
     /// An attachment referenced in the feedback submission was rejected by server-side content inspection
     /// (e.g. prohibited file types or malware signatures, HTTP `422 scan_rejected`).
     case scanRejected(message: String, requestId: String?)
@@ -66,7 +74,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .userProfileNotFound(let message):
             return message
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
-             .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
+             .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
              .subscriptionInactive:
             return nil
@@ -109,6 +117,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .subscriptionInactive(_, let requestId):
             return requestId
+        case .forbidden(_, let requestId):
+            return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound:
@@ -124,6 +134,11 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return "The feedback server returned an unreadable upload response."
         case .authenticationRequired:
             return "This action is only available to signed-in users."
+        case .forbidden(_, let requestId):
+            // Raw server body stays off the user-facing copy (#30); callers
+            // can read the associated `message` programmatically.
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return CupThreadStrings.tr("cupthread.error.forbidden") + suffix
         case .scanRejected(let message, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -202,5 +217,10 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``subscriptionInactive(message:requestId:)`` with no request id.
     static func subscriptionInactive(message: String? = nil) -> FeedbackClientError {
         .subscriptionInactive(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``forbidden(message:requestId:)`` with no request id.
+    static func forbidden(message: String? = nil) -> FeedbackClientError {
+        .forbidden(message: message, requestId: nil)
     }
 }

@@ -297,10 +297,16 @@ extension FeedbackClient {
 
     /// Fetches the visible roadmap board columns, ordered by position.
     /// - Returns: The board's visible columns, sorted by ``BoardColumn/position``.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
+    ///   roadmap access is disabled for the app (HTTP 401/403),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchColumns() async throws -> [BoardColumn] {
-        let response: ListColumnsResponse = try await get("/api/v1/public/columns/\(configuration.appKey)")
+        let response: ListColumnsResponse = try await get(
+            "/api/v1/public/columns/\(configuration.appKey)",
+            mapsPermissionErrors: true
+        )
         return response.columns.sorted { $0.position < $1.position }
     }
 
@@ -313,7 +319,10 @@ extension FeedbackClient {
         return response.versions.sorted { $0.position < $1.position }
     }
 
-    private func get<T: Decodable>(_ path: String) async throws -> T {
+    private func get<T: Decodable>(
+        _ path: String,
+        mapsPermissionErrors: Bool = false
+    ) async throws -> T {
         var request = URLRequest(url: configuration.baseURL.appending(path: path))
         request.httpMethod = "GET"
         applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
@@ -322,7 +331,51 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        try validateResponse(
+            httpResponse,
+            data: data,
+            accepted: [200],
+            mapsPermissionErrors: mapsPermissionErrors
+        )
         return try decoder.decode(T.self, from: data)
+    }
+}
+
+// MARK: - Permission gating predicates (issue #34)
+
+public extension PublicAppConfig {
+    /// Whether an anonymous SDK user may browse the roadmap board.
+    ///
+    /// Combines ``allowPublic`` (the public pages are hidden entirely) with
+    /// ``allowAnonymousRoadmap``. Client gating is UX preflight — the server
+    /// stays authoritative.
+    var allowsAnonymousRoadmap: Bool {
+        allowPublic && allowAnonymousRoadmap
+    }
+
+    /// Whether an anonymous SDK user may vote on feature requests
+    /// (console switch `allowAnonymousVote`).
+    var allowsAnonymousVote: Bool {
+        allowAnonymousVote
+    }
+
+    /// Whether an anonymous SDK user may submit feedback or feature requests
+    /// (console switch `allowAnonymousFeedback`).
+    var allowsAnonymousFeedback: Bool {
+        allowAnonymousFeedback
+    }
+
+    /// Whether submissions reported from `platform` pass the console's
+    /// platform allow-list. An empty allow-list means unrestricted.
+    /// - Parameter platform: The platform a submission would report.
+    /// - Returns: `false` only when the allow-list is non-empty and omits
+    ///   `platform`. A raw list whose platforms are all unknown to this SDK
+    ///   version counts as non-empty, so the gate stays closed — matching
+    ///   the server, which would reject the submission.
+    func allows(platform: FeedbackPlatform) -> Bool {
+        if allowedPlatformValues.isEmpty {
+            return true
+        }
+        return allowedPlatforms.contains(platform)
     }
 }

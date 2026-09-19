@@ -9,9 +9,13 @@ struct FeatureRequestComposeView: View {
     @State private var draft = FeatureRequestDraft()
     @State private var isSubmitting = false
     @State private var submitError: String?
+    @Environment(\.sdkAppConfig) private var sdkAppConfig
 
     var body: some View {
         NavigationStack {
+            if SdkSubmissionDenial.forFeatureRequest(config: sdkAppConfig) != .none {
+                SdkSubmissionDenial.anonymousFeedbackDisabled.featureRequestPlaceholder
+            } else {
             Form {
                 Section {
                     TextField(
@@ -68,6 +72,7 @@ struct FeatureRequestComposeView: View {
                 isSubmitting: isSubmitting,
                 discardTitleKey: "cupthread.features.compose_discard_title"
             )
+            }
         }
     }
 
@@ -78,6 +83,7 @@ struct FeatureRequestComposeView: View {
 
     @MainActor
     private func submit() async {
+        guard SdkSubmissionDenial.forFeatureRequest(config: sdkAppConfig) == .none else { return }
         isSubmitting = true
         submitError = nil
         defer { isSubmitting = false }

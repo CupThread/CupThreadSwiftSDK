@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "Le serveur rencontre un problème. Veuillez réessayer plus tard.";
 "cupthread.error.offline" = "Vous semblez être hors ligne. Vérifiez votre connexion puis réessayez.";
 "cupthread.error.timed_out" = "La demande a pris trop de temps. Veuillez réessayer.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Le vote anonyme est désactivé pour cette app.";
+"cupthread.permission.feedback_title" = "Impossible d’envoyer un avis";
+"cupthread.permission.feedback_description" = "Les avis anonymes sont désactivés dans la console CupThread.";
+"cupthread.permission.platform_title" = "Plateforme non autorisée";
+"cupthread.permission.platform_description" = "Cette app n’accepte pas les avis depuis cette plateforme.";
+"cupthread.permission.roadmap_title" = "Impossible d’ouvrir la feuille de route";
+"cupthread.permission.roadmap_description" = "L’accès anonyme à la feuille de route est désactivé dans la console CupThread.";
+"cupthread.permission.requests_title" = "Impossible d’envoyer une demande";
+"cupthread.permission.requests_description" = "Les demandes de fonctionnalités anonymes sont désactivées dans la console CupThread.";
+"cupthread.error.forbidden" = "Cette action n’est pas disponible pour cette app.";

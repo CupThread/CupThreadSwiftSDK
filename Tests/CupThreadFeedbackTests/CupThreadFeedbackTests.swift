@@ -429,6 +429,8 @@ struct FeedbackClientErrorTests {
         #expect(FeedbackClientError.invalidResponse.requestId == nil)
         #expect(FeedbackClientError.unreadableUploadResponse.requestId == nil)
         #expect(FeedbackClientError.authenticationRequired.requestId == nil)
+        #expect(FeedbackClientError.forbidden(message: "nope", requestId: reqId).requestId == reqId)
+        #expect(FeedbackClientError.forbidden(message: "nope").requestId == nil)
         #expect(FeedbackClientError.userProfileNotFound(message: "missing").requestId == nil)
     }
 

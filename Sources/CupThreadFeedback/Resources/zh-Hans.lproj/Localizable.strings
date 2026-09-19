@@ -113,3 +113,15 @@
 "cupthread.error.http_server_busy" = "服务器暂时出现问题，请稍后再试。";
 "cupthread.error.offline" = "当前似乎没有网络连接，请检查网络后再试一次。";
 "cupthread.error.timed_out" = "请求耗时过长，请重试。";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "此应用已关闭匿名投票。";
+"cupthread.permission.feedback_title" = "无法发送反馈";
+"cupthread.permission.feedback_description" = "CupThread 控制台已关闭匿名反馈。";
+"cupthread.permission.platform_title" = "不支持当前平台";
+"cupthread.permission.platform_description" = "此应用不接受来自当前平台的反馈。";
+"cupthread.permission.roadmap_title" = "无法打开路线图";
+"cupthread.permission.roadmap_description" = "CupThread 控制台已关闭匿名路线图访问。";
+"cupthread.permission.requests_title" = "无法提交需求";
+"cupthread.permission.requests_description" = "CupThread 控制台已关闭匿名功能请求。";
+"cupthread.error.forbidden" = "此应用当前不允许该操作。";

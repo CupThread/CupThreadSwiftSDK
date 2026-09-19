@@ -153,14 +153,23 @@ enum VoteFailureNotice: Equatable {
     case silent
     /// HTTP 429: the vote endpoint's per-client-IP budget was hit.
     case rateLimited
-    /// Any other failure (offline, 5xx, voting disabled): generic copy.
+    /// Console permission rejected the vote (anonymous voting disabled).
+    case permissionDenied
+    /// Any other failure (offline, 5xx): generic copy.
     case generic
 
     /// Maps a thrown vote error to its presentation.
     static func notice(for error: Error) -> VoteFailureNotice {
         if error.isSdkCancellation { return .silent }
-        if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
-            return .rateLimited
+        if let clientError = error as? FeedbackClientError {
+            switch clientError {
+            case .rateLimited:
+                return .rateLimited
+            case .authenticationRequired, .forbidden:
+                return .permissionDenied
+            default:
+                break
+            }
         }
         return .generic
     }
@@ -172,6 +181,8 @@ enum VoteFailureNotice: Equatable {
             return ""
         case .rateLimited:
             return CupThreadStrings.tr("cupthread.features.vote_rate_limited")
+        case .permissionDenied:
+            return CupThreadStrings.tr("cupthread.error.forbidden")
         case .generic:
             return CupThreadStrings.tr("cupthread.features.vote_failed")
         }
