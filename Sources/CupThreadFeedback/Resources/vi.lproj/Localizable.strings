@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "Đang trả lời @%@";
 "cupthread.comments.compose_prompt" = "Viết bình luận…";
 "cupthread.comments.removed_by_moderator" = "Bình luận này đã bị người kiểm duyệt xóa.";
+"cupthread.comments.sign_in_required" = "Đăng nhập để tham gia cuộc trò chuyện.";
 
 "cupthread.profile.title" = "Hồ sơ người dùng";
 "cupthread.profile.apps" = "Ứng dụng";
@@ -114,3 +115,15 @@
 "cupthread.error.timed_out" = "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "Việc gửi đã bị chặn bởi xác minh con người. Vui lòng thử lại sau.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Bình chọn ẩn danh đã bị tắt cho ứng dụng này.";
+"cupthread.permission.feedback_title" = "Không thể gửi phản hồi";
+"cupthread.permission.feedback_description" = "Phản hồi ẩn danh đã bị tắt trong bảng điều khiển CupThread.";
+"cupthread.permission.platform_title" = "Nền tảng không được phép";
+"cupthread.permission.platform_description" = "Ứng dụng này không nhận phản hồi từ nền tảng này.";
+"cupthread.permission.roadmap_title" = "Không thể mở lộ trình";
+"cupthread.permission.roadmap_description" = "Truy cập ẩn danh vào lộ trình đã bị tắt trong bảng điều khiển CupThread.";
+"cupthread.permission.requests_title" = "Không thể gửi yêu cầu";
+"cupthread.permission.requests_description" = "Yêu cầu tính năng ẩn danh đã bị tắt trong bảng điều khiển CupThread.";
+"cupthread.error.forbidden" = "Thao tác này không khả dụng với ứng dụng này.";

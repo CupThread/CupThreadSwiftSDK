@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "Svarer til @%@";
 "cupthread.comments.compose_prompt" = "Skriv en kommentar…";
 "cupthread.comments.removed_by_moderator" = "Denne kommentar blev fjernet af en moderator.";
+"cupthread.comments.sign_in_required" = "Log ind for at deltage i samtalen.";
 
 "cupthread.profile.title" = "Brugerprofil";
 "cupthread.profile.apps" = "Apps";
@@ -114,3 +115,15 @@
 "cupthread.error.timed_out" = "Anmodningen tog for lang tid. Prøv igen.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "Afsendelsen blev blokeret af menneskelig verifikation. Prøv igen senere.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Anonym afstemning er slået fra i denne app.";
+"cupthread.permission.feedback_title" = "Kan ikke sende feedback";
+"cupthread.permission.feedback_description" = "Anonym feedback er slået fra i CupThread-konsollen.";
+"cupthread.permission.platform_title" = "Platform ikke tilladt";
+"cupthread.permission.platform_description" = "Denne app accepterer ikke feedback fra denne platform.";
+"cupthread.permission.roadmap_title" = "Kan ikke åbne køreplanen";
+"cupthread.permission.roadmap_description" = "Anonym adgang til køreplanen er slået fra i CupThread-konsollen.";
+"cupthread.permission.requests_title" = "Kan ikke sende ønsker";
+"cupthread.permission.requests_description" = "Anonyme funktionsønsker er slået fra i CupThread-konsollen.";
+"cupthread.error.forbidden" = "Denne handling er ikke tilgængelig for denne app.";

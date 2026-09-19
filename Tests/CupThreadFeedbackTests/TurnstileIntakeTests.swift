@@ -246,7 +246,7 @@ struct TurnstileIntakeTests {
         }
     }
 
-    @Test func other403RejectionStaysUnexpectedStatus() async throws {
+    @Test func other403RejectionMapsToForbidden() async throws {
         MockURLProtocol.setHandler(forHost: Self.host) { _ in
             try Self.turnstileRejection(code: "workspace_forbidden", message: "Not allowed here")
         }
@@ -256,11 +256,12 @@ struct TurnstileIntakeTests {
             _ = try await client.submit(FeedbackDraft(title: "Title", description: "Description", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            guard case .unexpectedStatus(let code, let message, _) = error else {
+            // Intake endpoints map permission errors (#34): a 403 that is not
+            // a Turnstile rejection is the console forbidding the action.
+            guard case .forbidden(let message, _) = error else {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }
-            #expect(code == 403)
             #expect(message == "Not allowed here")
         }
     }

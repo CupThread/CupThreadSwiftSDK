@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "Replying to @%@";
 "cupthread.comments.compose_prompt" = "Write a comment…";
 "cupthread.comments.removed_by_moderator" = "This comment was removed by a moderator.";
+"cupthread.comments.sign_in_required" = "Sign in to join the conversation.";
 
 "cupthread.profile.title" = "User Profile";
 "cupthread.profile.apps" = "Apps";
@@ -114,3 +115,15 @@
 "cupthread.error.timed_out" = "The request took too long. Please try again.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "Sending was blocked by human verification. Please try again later.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Anonymous voting is turned off for this app.";
+"cupthread.permission.feedback_title" = "Can't Send Feedback";
+"cupthread.permission.feedback_description" = "Anonymous feedback is turned off in the CupThread console.";
+"cupthread.permission.platform_title" = "Platform Not Allowed";
+"cupthread.permission.platform_description" = "This app doesn't accept feedback from this platform.";
+"cupthread.permission.roadmap_title" = "Can't Open Roadmap";
+"cupthread.permission.roadmap_description" = "Anonymous access to the roadmap is turned off in the CupThread console.";
+"cupthread.permission.requests_title" = "Can't Submit Requests";
+"cupthread.permission.requests_description" = "Anonymous feature requests are turned off in the CupThread console.";
+"cupthread.error.forbidden" = "This action isn't available for this app.";

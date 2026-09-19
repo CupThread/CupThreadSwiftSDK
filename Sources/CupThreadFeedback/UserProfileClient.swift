@@ -8,17 +8,35 @@ extension FeedbackClient {
     /// - Parameter userId: App-scoped pseudonymous user identifier (as found
     ///   in `authorClerkId`, `replyToClerkId`, `requesterClerkId`, and
     ///   `recentCommenters[].clerkUserId` on public payloads); raw user IDs
-    ///   are accepted as well. Profiles are opt-in: callers should expect
+    ///   are accepted as well. App-scoped ids (`u_…`) are looked up within
+    ///   the configuration's app, so the request carries the `appKey` query
+    ///   parameter the server requires for them. Profiles are opt-in:
+    ///   callers should expect
     ///   ``FeedbackClientError/userProfileNotFound(message:)`` for unknown
     ///   identifiers and an empty profile for users without a public profile.
     /// - Returns: The user's public profile data.
     /// - Throws: ``FeedbackClientError/userProfileNotFound(message:)``,
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the
+    ///   per-client-IP rate limit is spent (HTTP 429 — back off and retry),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchUserProfile(userId: String) async throws -> PublicUserProfileResponse {
-        var request = URLRequest(
-            url: configuration.baseURL.appending(path: "/api/v1/users/\(userId)/profile")
-        )
+        var profileURL = configuration.baseURL.appending(path: "/api/v1/users/\(userId)/profile")
+        // App-scoped public ids (`u_<32-hex>`) from board/comment payloads are
+        // app-keyed on the server: without `appKey` an existing user answers
+        // 404 "User profile not found". Raw Clerk ids (`user_*`, from /u/
+        // bookmarks) remain accepted without it.
+        if userId.hasPrefix("u_") {
+            var components = URLComponents(
+                url: profileURL,
+                resolvingAgainstBaseURL: false
+            )
+            components?.queryItems = [URLQueryItem(name: "appKey", value: configuration.appKey)]
+            if let keyedURL = components?.url {
+                profileURL = keyedURL
+            }
+        }
+        var request = URLRequest(url: profileURL)
         request.httpMethod = "GET"
         applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
 

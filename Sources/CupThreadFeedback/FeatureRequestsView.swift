@@ -47,6 +47,14 @@ public struct FeatureRequestsView: View {
     /// (failed) vote never fires success cues.
     @State private var voteSuccessPulses: [String: Int] = [:]
 
+    @Environment(\.sdkAppConfig) private var sdkAppConfig
+
+    /// Console permission: anonymous feature-request submission is allowed.
+    /// `nil` config fails open so a missing environment never hides compose.
+    private var allowsAnonymousFeedback: Bool {
+        sdkAppConfig?.allowsAnonymousFeedback ?? true
+    }
+
     private var items: [FeatureRequestItem] {
         listState.items
     }
@@ -108,12 +116,18 @@ public struct FeatureRequestsView: View {
             composeToolbarItem
         }
         .sheet(isPresented: $isComposePresented) {
-            FeatureRequestComposeView(client: client, userToken: userToken) {
-                isComposePresented = false
-                withAnimation(.snappy(duration: 0.3)) {
-                    showSubmittedBanner = true
+            if allowsAnonymousFeedback {
+                FeatureRequestComposeView(client: client, userToken: userToken) {
+                    isComposePresented = false
+                    withAnimation(.snappy(duration: 0.3)) {
+                        showSubmittedBanner = true
+                    }
+                    Task { await loadFeatureRequests() }
                 }
-                Task { await loadFeatureRequests() }
+            } else {
+                NavigationStack {
+                    SdkSubmissionDenial.anonymousFeedbackDisabled.featureRequestPlaceholder
+                }
             }
         }
         .sheet(item: $selectedItemForComments) { item in
@@ -202,7 +216,8 @@ public struct FeatureRequestsView: View {
                             isVoteInFlight: votingIds.contains(item.id),
                             successPulse: voteSuccessPulses[item.id, default: 0],
                             onSelectCard: { selectedItemForComments = item },
-                            onSelectUser: { selectedUserIdForProfile = $0 }
+                            onSelectUser: { selectedUserIdForProfile = $0 },
+                            appConfig: sdkAppConfig
                         ) {
                             Task { await toggleVoteOptimistic(for: item) }
                         }
@@ -249,7 +264,8 @@ public struct FeatureRequestsView: View {
                         isVoteInFlight: votingIds.contains(item.id),
                         successPulse: voteSuccessPulses[item.id, default: 0],
                         onSelectCard: { selectedItemForComments = item },
-                        onSelectUser: { selectedUserIdForProfile = $0 }
+                        onSelectUser: { selectedUserIdForProfile = $0 },
+                        appConfig: sdkAppConfig
                     ) {
                         Task { await toggleVoteOptimistic(for: item) }
                     }
@@ -271,29 +287,17 @@ public struct FeatureRequestsView: View {
         .refreshable { await loadFeatureRequests() }
     }
 
-    @ViewBuilder
     private var emptyState: some View {
-        if searchText.isEmpty {
-            ContentUnavailableView {
-                Label(CupThreadStrings.tr("cupthread.features.empty_title"), systemImage: "lightbulb")
-            } description: {
-                Text(CupThreadStrings.tr("cupthread.features.empty_description"))
-            } actions: {
-                Button(CupThreadStrings.tr("cupthread.features.request_a_feature")) {
-                    isComposePresented = true
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        } else {
-            ContentUnavailableView.search(text: searchText)
+        FeatureRequestsEmptyState(
+            searchText: searchText,
+            allowsAnonymousFeedback: allowsAnonymousFeedback
+        ) {
+            isComposePresented = true
         }
     }
 
     private var emptyStateText: String {
-        if !searchText.isEmpty {
-            return CupThreadStrings.tr("cupthread.features.empty_with_query", searchText)
-        }
-        return CupThreadStrings.tr("cupthread.features.empty_no_requests")
+        featureRequestsEmptyStateText(searchText: searchText)
     }
 
     // MARK: Toolbar
@@ -305,15 +309,8 @@ public struct FeatureRequestsView: View {
     }
 
     private var composeToolbarItem: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                isComposePresented = true
-            } label: {
-                Label(CupThreadStrings.tr("cupthread.features.request_a_feature"), systemImage: "plus")
-            }
-            .accessibilityHint(CupThreadStrings.tr("cupthread.features.request_a_feature_hint"))
-            // Stable hook for host and Demo UI tests.
-            .accessibilityIdentifier("cupthread.features.compose")
+        featureRequestsComposeToolbar(allowsAnonymousFeedback: allowsAnonymousFeedback) {
+            isComposePresented = true
         }
     }
 
@@ -396,6 +393,9 @@ public struct FeatureRequestsView: View {
 
     @MainActor
     private func toggleVoteOptimistic(for item: FeatureRequestItem) async {
+        guard !FeatureVoteGate.isActionDisabled(isOwnRequest: item.isOwnRequest, config: sdkAppConfig) else {
+            return
+        }
         guard let (originalVoted, originalCount) = listState.applyOptimisticVote(for: item.id) else {
             return
         }

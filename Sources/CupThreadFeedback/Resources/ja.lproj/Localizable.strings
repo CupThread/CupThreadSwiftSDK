@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "@%@ に返信";
 "cupthread.comments.compose_prompt" = "コメントを入力…";
 "cupthread.comments.removed_by_moderator" = "このコメントはモデレーターによって削除されました。";
+"cupthread.comments.sign_in_required" = "サインインしてディスカッションに参加しましょう。";
 
 "cupthread.profile.title" = "ユーザープロフィール";
 "cupthread.profile.apps" = "アプリ";
@@ -114,3 +115,15 @@
 "cupthread.error.timed_out" = "リクエストがタイムアウトしました。もう一度お試しください。";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "ボット対策の確認により送信がブロックされました。しばらくしてからもう一度お試しください。";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "このアプリでは匿名投票がオフになっています。";
+"cupthread.permission.feedback_title" = "フィードバックを送信できません";
+"cupthread.permission.feedback_description" = "CupThreadコンソールで匿名フィードバックがオフになっています。";
+"cupthread.permission.platform_title" = "このプラットフォームは対象外です";
+"cupthread.permission.platform_description" = "このアプリはこのプラットフォームからのフィードバックを受け付けていません。";
+"cupthread.permission.roadmap_title" = "ロードマップを開けません";
+"cupthread.permission.roadmap_description" = "CupThreadコンソールで匿名のロードマップ閲覧がオフになっています。";
+"cupthread.permission.requests_title" = "リクエストを送信できません";
+"cupthread.permission.requests_description" = "CupThreadコンソールで匿名の機能リクエストがオフになっています。";
+"cupthread.error.forbidden" = "このアプリではその操作を利用できません。";

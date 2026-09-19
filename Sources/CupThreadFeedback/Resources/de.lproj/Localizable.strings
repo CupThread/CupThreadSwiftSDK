@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "Antwort an @%@";
 "cupthread.comments.compose_prompt" = "Einen Kommentar schreiben…";
 "cupthread.comments.removed_by_moderator" = "Dieser Kommentar wurde von einem Moderator entfernt.";
+"cupthread.comments.sign_in_required" = "Melde dich an, um an der Diskussion teilzunehmen.";
 
 "cupthread.profile.title" = "Benutzerprofil";
 "cupthread.profile.apps" = "Apps";
@@ -114,3 +115,15 @@
 "cupthread.error.timed_out" = "Die Anfrage hat zu lange gedauert. Bitte versuche es erneut.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "Das Senden wurde durch die menschliche Verifizierung blockiert. Bitte versuche es später erneut.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Anonymes Abstimmen ist für diese App deaktiviert.";
+"cupthread.permission.feedback_title" = "Feedback kann nicht gesendet werden";
+"cupthread.permission.feedback_description" = "Anonymes Feedback ist in der CupThread-Konsole deaktiviert.";
+"cupthread.permission.platform_title" = "Plattform nicht erlaubt";
+"cupthread.permission.platform_description" = "Diese App akzeptiert kein Feedback von dieser Plattform.";
+"cupthread.permission.roadmap_title" = "Roadmap kann nicht geöffnet werden";
+"cupthread.permission.roadmap_description" = "Anonymer Zugriff auf die Roadmap ist in der CupThread-Konsole deaktiviert.";
+"cupthread.permission.requests_title" = "Anfragen können nicht gesendet werden";
+"cupthread.permission.requests_description" = "Anonyme Feature-Anfragen sind in der CupThread-Konsole deaktiviert.";
+"cupthread.error.forbidden" = "Diese Aktion ist für diese App nicht verfügbar.";

@@ -41,7 +41,7 @@ try await client.presentLatestChangelog()
 
 The method returns `false` (without throwing) when there is nothing to show — for example when the console hid the changelog, no entries are published, the latest version was already seen (when `onlyIfUnseen: true`), or no window is available to present from. Network failures throw so you can log them.
 
-For full control over when the sheet appears, split the two halves yourself: ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)`` fetches the data and returns `nil` when the overlay should stay hidden, and ``ChangelogOverlayView`` renders it wherever you like.
+For full control over when the sheet appears, split the two halves yourself: ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)`` fetches the data and returns `nil` when the overlay should stay hidden, and ``ChangelogOverlayView`` renders it wherever you like. Pass the whole prepare result to ``ChangelogOverlayView/init(client:prepared:autoMarkSeen:onPrimary:onClose:)`` so the entries and the console appearance stay paired — the sheet then renders with the exact title, buttons, and theme you configured in the console.
 
 Seen versions are persisted in a thread-safe store scoped to each app key, bounded to the newest 64 releases. Older entries beyond the cap are automatically pruned.
 

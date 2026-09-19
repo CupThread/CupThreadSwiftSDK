@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "W odpowiedzi do @%@";
 "cupthread.comments.compose_prompt" = "Napisz komentarz…";
 "cupthread.comments.removed_by_moderator" = "Ten komentarz został usunięty przez moderatora.";
+"cupthread.comments.sign_in_required" = "Zaloguj się, aby dołączyć do rozmowy.";
 
 "cupthread.profile.title" = "Profil użytkownika";
 "cupthread.profile.apps" = "Aplikacje";
@@ -114,3 +115,15 @@
 "cupthread.error.timed_out" = "Żądanie trwało zbyt długo. Spróbuj ponownie.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "Wysyłanie zostało zablokowane przez weryfikację człowieka. Spróbuj ponownie później.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "Anonimowe głosowanie jest wyłączone w tej aplikacji.";
+"cupthread.permission.feedback_title" = "Nie można wysłać opinii";
+"cupthread.permission.feedback_description" = "Anonimowe opinie są wyłączone w konsoli CupThread.";
+"cupthread.permission.platform_title" = "Platforma niedozwolona";
+"cupthread.permission.platform_description" = "Ta aplikacja nie przyjmuje opinii z tej platformy.";
+"cupthread.permission.roadmap_title" = "Nie można otworzyć planu rozwoju";
+"cupthread.permission.roadmap_description" = "Anonimowy dostęp do planu rozwoju jest wyłączony w konsoli CupThread.";
+"cupthread.permission.requests_title" = "Nie można zgłaszać próśb";
+"cupthread.permission.requests_description" = "Anonimowe prośby o funkcje są wyłączone w konsoli CupThread.";
+"cupthread.error.forbidden" = "Ta czynność jest niedostępna w tej aplikacji.";

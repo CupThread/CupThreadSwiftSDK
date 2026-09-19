@@ -66,7 +66,15 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: accepted)
+        // Every Turnstile-gated endpoint is an anonymous intake endpoint, so
+        // console-permission rejections (401/403) map to their typed errors;
+        // Turnstile-shaped 403s are handled earlier by `typedError`.
+        try validateResponse(
+            httpResponse,
+            data: data,
+            accepted: accepted,
+            mapsPermissionErrors: true
+        )
         return data
     }
 

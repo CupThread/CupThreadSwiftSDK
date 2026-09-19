@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "回覆 @%@";
 "cupthread.comments.compose_prompt" = "寫低你嘅諗法…";
 "cupthread.comments.removed_by_moderator" = "此留言已被版主移除。";
+"cupthread.comments.sign_in_required" = "登入後即可參與討論。";
 
 "cupthread.profile.title" = "用戶資料";
 "cupthread.profile.apps" = "應用程式列表";
@@ -114,3 +115,15 @@
 "cupthread.error.timed_out" = "請求耗時過長，請再試一次。";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "傳送已被人機驗證攔截，請稍後再試。";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "此應用已關閉匿名投票。";
+"cupthread.permission.feedback_title" = "無法傳送意見";
+"cupthread.permission.feedback_description" = "CupThread 控制台已關閉匿名意見。";
+"cupthread.permission.platform_title" = "不支援目前平台";
+"cupthread.permission.platform_description" = "此應用不接受來自目前平台的意見。";
+"cupthread.permission.roadmap_title" = "無法開啟路線圖";
+"cupthread.permission.roadmap_description" = "CupThread 控制台已關閉匿名路線圖存取。";
+"cupthread.permission.requests_title" = "無法提交請求";
+"cupthread.permission.requests_description" = "CupThread 控制台已關閉匿名功能請求。";
+"cupthread.error.forbidden" = "此應用目前不允許該操作。";

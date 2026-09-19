@@ -81,6 +81,7 @@
 "cupthread.comments.replying_to" = "@%@ 님에게 답글 작성 중";
 "cupthread.comments.compose_prompt" = "댓글을 입력하세요…";
 "cupthread.comments.removed_by_moderator" = "이 댓글은 관리자에 의해 삭제되었습니다.";
+"cupthread.comments.sign_in_required" = "로그인하여 대화에 참여하세요.";
 
 "cupthread.profile.title" = "사용자 프로필";
 "cupthread.profile.apps" = "앱";
@@ -114,3 +115,15 @@
 "cupthread.error.timed_out" = "요청 시간이 초과되었습니다. 다시 시도해 주세요.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "사람임 확인 검사 때문에 전송이 차단되었습니다. 잠시 후 다시 시도해 주세요.";
+
+/* Issue #34: console permission flags — anonymous vote/feedback/roadmap + platform allow-list */
+"cupthread.permission.vote_hint" = "이 앱에서는 익명 투표가 꺼져 있습니다.";
+"cupthread.permission.feedback_title" = "피드백을 보낼 수 없음";
+"cupthread.permission.feedback_description" = "CupThread 콘솔에서 익명 피드백이 꺼져 있습니다.";
+"cupthread.permission.platform_title" = "지원하지 않는 플랫폼";
+"cupthread.permission.platform_description" = "이 앱은 현재 플랫폼의 피드백을 받지 않습니다.";
+"cupthread.permission.roadmap_title" = "로드맵을 열 수 없음";
+"cupthread.permission.roadmap_description" = "CupThread 콘솔에서 익명 로드맵 접근이 꺼져 있습니다.";
+"cupthread.permission.requests_title" = "요청을 제출할 수 없음";
+"cupthread.permission.requests_description" = "CupThread 콘솔에서 익명 기능 요청이 꺼져 있습니다.";
+"cupthread.error.forbidden" = "이 앱에서는 해당 작업을 사용할 수 없습니다.";

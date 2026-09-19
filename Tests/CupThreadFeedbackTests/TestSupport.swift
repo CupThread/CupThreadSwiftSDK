@@ -77,7 +77,8 @@ func makeClient(
     overlayPresenter: (any ChangelogOverlayPresenter)? = nil,
     signingSecret: String? = nil,
     tokenStore: UserTokenStore? = nil,
-    configStore: AppConfigStore? = nil
+    configStore: AppConfigStore? = nil,
+    authenticationProvider: (@Sendable () async -> String?)? = nil
 ) -> FeedbackClient {
     let config = FeedbackClientConfiguration(
         baseURL: baseURL,
@@ -90,7 +91,8 @@ func makeClient(
         session: makeMockSession(),
         overlayPresenter: overlayPresenter,
         tokenStore: tokenStore,
-        configStore: configStore
+        configStore: configStore,
+        authenticationProvider: authenticationProvider
     )
 }
 
