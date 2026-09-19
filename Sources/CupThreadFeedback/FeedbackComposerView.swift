@@ -10,7 +10,10 @@ import PhotosUI
 /// automatically and shown to the user before submitting. Photo attachments
 /// selected via the photo picker are stripped of sensitive metadata (EXIF GPS
 /// coordinates, camera details, timestamps) before upload by default to
-/// protect user privacy. On success the view shows an acknowledgment (and
+/// protect user privacy. Photo preparation (decoding, metadata stripping,
+/// transcoding) runs off the main actor, so the UI stays responsive while
+/// even large photos are readied for upload. On success the view shows an
+/// acknowledgment (and
 /// calls `onSubmit` for host apps that need the result).
 ///
 /// Attachment uploads are independent of the view's lifecycle: transient
@@ -343,11 +346,17 @@ public struct FeedbackComposerView: View {
     /// policy: oversized photos are downscaled to fit the configured byte
     /// limit, SVG is rejected locally, HEIC/HEIF photos and unrecognized
     /// containers are transcoded to JPEG, and metadata is stripped.
+    ///
+    /// The decode/strip/transcode passes are CPU-bound ImageIO work and run
+    /// inside the nonisolated async preparation helper on the global
+    /// concurrent executor, so awaiting it from the MainActor never blocks
+    /// the UI — only the state mutations after the await resume on the
+    /// main thread (#79).
     private func loadAndPreparePhotoData(from item: PhotosPickerItem) async throws -> PhotoAttachmentHelper.PreparedPhoto {
         guard let data = try await item.loadTransferable(type: Data.self) else {
             throw NSError(domain: "CupThread", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not load photo data"])
         }
-        return try PhotoAttachmentHelper.prepareForUpload(
+        return try await PhotoAttachmentHelper.prepareForUpload(
             data,
             limit: attachmentState.maxAttachmentBytes,
             stripSensitiveMetadata: stripSensitiveMetadata
