@@ -354,6 +354,13 @@ data types the SDK transmits (anonymous user ID, optional name/email, user
 content). No manual action is needed; mirror the declarations in your own
 privacy labels if your app reports them.
 
+## License
+
+CupThreadFeedback is released under the MIT license; the \`LICENSE\` file in
+this folder carries the full grant text. If your app displays third-party
+acknowledgements, include that text with the CupThreadFeedback entry when
+your compliance process requires it.
+
 ## Xcode
 
 1. Drag \`CupThreadFeedback.xcframework\` into your app target's
@@ -523,6 +530,7 @@ async function main() {
   mkdirSync(releaseDir, { recursive: true });
   run("cp", ["-R", xcframework, path.join(releaseDir, "CupThreadFeedback.xcframework")]);
   run("cp", ["-R", findBuiltResourceBundle(path.join(work, "derived-data", "ios"), "ios"), path.join(releaseDir, RESOURCE_BUNDLE_NAME)]);
+  run("cp", [path.join(ROOT, "LICENSE"), path.join(releaseDir, "LICENSE")]);
   writeFileSync(path.join(releaseDir, "INSTALL.md"), installInstructionsMarkdown(version));
   verifyResourceBundle(path.join(releaseDir, RESOURCE_BUNDLE_NAME), sourceLprojs);
 

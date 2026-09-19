@@ -27,6 +27,8 @@ jobs:
           HOMEBREW_NO_INSTALL_CLEANUP: "1"
       - name: Run SwiftLint
         run: swiftlint lint --strict
+      - name: Verify license consistency
+        run: node scripts/check-license.mjs
   test:
     runs-on: macos-26
     steps:
