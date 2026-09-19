@@ -337,14 +337,14 @@ struct AppConfigStoreTests {
 
         #expect(counter.configRequests == 1, "Two overlay presentations must cost one config GET")
         #expect(counter.changelogRequests == 2)
-        guard case .entries(let entries, let appearance) = first else {
-            Issue.record("Expected entries, got \(first)")
+        guard case .entries(let entries, let appearance)? = first else {
+            Issue.record("Expected entries, got \(String(describing: first))")
             return
         }
         #expect(entries.count == 1)
         #expect(appearance.theme == .ocean)
-        guard case .entries = second else {
-            Issue.record("Expected entries on the second pass, got \(second)")
+        guard case .entries? = second else {
+            Issue.record("Expected entries on the second pass, got \(String(describing: second))")
             return
         }
     }

@@ -179,6 +179,9 @@ public struct WhatsNewView: View {
         do {
             entries = try await client.fetchChangelog()
         } catch {
+            // A cancelled load (dismissal, superseded restart) never reached
+            // a verdict — keep the currently rendered entries.
+            guard !error.isSdkCancellation else { return }
             loadError = FriendlyError.message(for: error)
         }
     }

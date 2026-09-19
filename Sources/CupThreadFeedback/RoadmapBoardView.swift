@@ -334,10 +334,14 @@ public struct RoadmapBoardView: View {
             }
             groups = makeGroups(columns: try await columns, requests: requests)
         } catch {
+            // A cancelled load (search keystroke restart, dismissal) never
+            // reached a verdict — leave the board as it stands.
+            guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty)
+            else { return }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()
             }
-            switch SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) {
+            switch outcome {
             case .inlineNotice(let message):
                 reloadNotice = message
             case .fullScreenError(let message):
