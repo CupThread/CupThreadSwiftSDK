@@ -267,7 +267,7 @@ enum FeedbackMetadataSanitizer {
     static let redactedValue = "[redacted]"
 
     /// Reserved metadata keys added by the SDK that must survive key-count eviction.
-    static let reservedKeyNames: Set<String> = ["sdk", "platform", "submittedAt"]
+    static let reservedKeyNames: Set<String> = ["sdk", "sdkVersion", "platform", "submittedAt"]
 
     /// Sensitive keyword patterns mirroring the server's PRIV-01 word list.
     static let credentialKeyWords: [String] = [
@@ -298,7 +298,7 @@ enum FeedbackMetadataSanitizer {
     /// Evaluation is deterministic: keys are considered in sorted order, so
     /// which entries survive the count and size caps does not depend on
     /// dictionary iteration order. Host metadata is capped so that reserved
-    /// keys (`sdk`, `platform`, `submittedAt`) always survive.
+    /// keys (`sdk`, `sdkVersion`, `platform`, `submittedAt`) always survive.
     ///
     /// - Parameters:
     ///   - metadata: Host-provided metadata key-value pairs.

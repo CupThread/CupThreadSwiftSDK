@@ -147,4 +147,49 @@ struct FeedbackMetadataSanitizerSuite {
         #expect(sanitized["platform"] == "ios")
         #expect(sanitized["submittedAt"] == "2026-09-15T00:00:00Z")
     }
+
+    @Test func reservedKeyNamesIncludesAllFourReservedKeys() {
+        #expect(FeedbackMetadataSanitizer.reservedKeyNames.contains("sdk"))
+        #expect(FeedbackMetadataSanitizer.reservedKeyNames.contains("sdkVersion"))
+        #expect(FeedbackMetadataSanitizer.reservedKeyNames.contains("platform"))
+        #expect(FeedbackMetadataSanitizer.reservedKeyNames.contains("submittedAt"))
+        #expect(FeedbackMetadataSanitizer.reservedKeyNames.count == 4)
+    }
+
+    @Test func sanitizerProtectsSdkVersionUnderKeyCountEvictionWithoutExplicitReservedDict() {
+        var metadata: [String: String] = [
+            "sdkVersion": "0.1.0",
+            "sdk": "cupthread-apple",
+            "platform": "ios",
+            "submittedAt": "2026-09-26T00:00:00Z"
+        ]
+        for index in 0..<30 {
+            metadata[String(format: "customKey%02d", index)] = "val_\(index)"
+        }
+        let sanitized = FeedbackMetadataSanitizer.sanitize(metadata)
+        #expect(sanitized["sdkVersion"] == "0.1.0")
+        #expect(sanitized["sdk"] == "cupthread-apple")
+        #expect(sanitized["platform"] == "ios")
+        #expect(sanitized["submittedAt"] == "2026-09-26T00:00:00Z")
+        #expect(sanitized.count == FeedbackMetadataSanitizer.maxKeys)
+    }
+
+    @Test func sanitizerProtectsSdkVersionUnderByteBudgetEvictionWithoutExplicitReservedDict() {
+        var metadata: [String: String] = [
+            "sdkVersion": "0.1.0",
+            "sdk": "cupthread-apple",
+            "platform": "ios",
+            "submittedAt": "2026-09-26T00:00:00Z"
+        ]
+        for index in 0..<24 {
+            metadata[String(format: "customKey%02d", index)] = String(repeating: "w", count: 400)
+        }
+        let sanitized = FeedbackMetadataSanitizer.sanitize(metadata)
+        let serialized = try? JSONEncoder().encode(sanitized)
+        #expect((serialized?.count ?? .max) <= FeedbackMetadataSanitizer.maxTotalBytes)
+        #expect(sanitized["sdkVersion"] == "0.1.0")
+        #expect(sanitized["sdk"] == "cupthread-apple")
+        #expect(sanitized["platform"] == "ios")
+        #expect(sanitized["submittedAt"] == "2026-09-26T00:00:00Z")
+    }
 }
