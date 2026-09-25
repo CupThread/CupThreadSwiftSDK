@@ -163,3 +163,68 @@ struct MarkdownTextSanitizationTests {
         ])
     }
 }
+
+// MARK: - Remote Image URL Validation
+
+@Suite("RemoteImageURLValidation")
+struct RemoteImageURLValidationTests {
+    @Test func remoteImageURLAcceptsValidHttpAndHttpsURLs() throws {
+        let valid = [
+            "https://cdn.example.com/avatar.png",
+            "http://images.example.org/user/123.jpg",
+            "https://sub.domain.org/path/icon.webp?size=small#hash",
+            "  https://cdn.example.com/trimmed.png  "
+        ]
+
+        for item in valid {
+            let url = try #require(remoteImageURL(from: item), "Expected \(item) to be accepted")
+            #expect(isAllowedWebURL(url) == true)
+        }
+    }
+
+    @Test func remoteImageURLRejectsDisallowedSchemes() {
+        let disallowed = [
+            "file:///etc/passwd",
+            "file:///Users/lex/avatar.png",
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY44YAAAAASUVORK5CYII=",
+            "javascript:alert(1)",
+            "shortcuts://run-shortcut",
+            "myapp://open-view",
+            "tel:1234567890",
+            "mailto:user@example.com",
+            "ftp://ftp.example.com/avatar.png",
+            "sms:123456"
+        ]
+
+        for item in disallowed {
+            #expect(remoteImageURL(from: item) == nil, "Expected \(item) to be rejected by remoteImageURL")
+        }
+    }
+
+    @Test func remoteImageURLRejectsNilEmptyWhitespaceAndMissingHost() {
+        #expect(remoteImageURL(from: nil) == nil)
+        #expect(remoteImageURL(from: "") == nil)
+        #expect(remoteImageURL(from: "   ") == nil)
+        #expect(remoteImageURL(from: "https://") == nil)
+        #expect(remoteImageURL(from: "http://") == nil)
+        #expect(remoteImageURL(from: "example.com/avatar.png") == nil)
+        #expect(remoteImageURL(from: "//example.com/avatar.png") == nil)
+    }
+
+    @Test func avatarViewResolvedURLFiltersDisallowedSchemes() {
+        let maliciousAvatar = AvatarView(url: "file:///etc/passwd")
+        #expect(maliciousAvatar.resolvedURL == nil)
+
+        let dataAvatar = AvatarView(url: "data:image/png;base64,abc")
+        #expect(dataAvatar.resolvedURL == nil)
+
+        let scriptAvatar = AvatarView(url: "javascript:alert(1)")
+        #expect(scriptAvatar.resolvedURL == nil)
+
+        let safeAvatar = AvatarView(url: "https://cdn.example.com/user.png")
+        #expect(safeAvatar.resolvedURL == URL(string: "https://cdn.example.com/user.png"))
+
+        let nilAvatar = AvatarView(url: nil)
+        #expect(nilAvatar.resolvedURL == nil)
+    }
+}

@@ -49,7 +49,14 @@ final class RemoteImageLoader {
 
     /// Returns the decoded image for `url`, downloading it at most once per
     /// cache lifetime. Concurrent callers for the same URL share one download.
+    ///
+    /// URLs are validated against `isAllowedWebURL(_:)`; disallowed schemes
+    /// (`file:`, `data:`, `javascript:`, etc.) immediately throw `URLError(.badURL)`
+    /// without contacting the network or consulting the cache.
     func image(for url: URL) async throws -> PlatformImage {
+        guard isAllowedWebURL(url) else {
+            throw URLError(.badURL)
+        }
         if let cached = cache.object(forKey: url as NSURL) {
             return cached
         }
@@ -108,7 +115,8 @@ extension Image {
 
 /// Drop-in replacement for `AsyncImage` backed by `RemoteImageLoader`: same
 /// phase contract, but repeat appearances resolve from cache instantly and
-/// concurrent subscribers for one URL share a single download.
+/// concurrent subscribers for one URL share a single download. Disallowed URL
+/// schemes collapse immediately to `.failure` without downloading.
 struct CachedRemoteImage<Content: View>: View {
     let url: URL
     @ViewBuilder let content: (RemoteImagePhase) -> Content
@@ -118,6 +126,10 @@ struct CachedRemoteImage<Content: View>: View {
     var body: some View {
         content(phase)
             .task(id: url) {
+                guard isAllowedWebURL(url) else {
+                    phase = .failure
+                    return
+                }
                 do {
                     phase = .success(
                         Image(platformImage: try await RemoteImageLoader.shared.image(for: url))
