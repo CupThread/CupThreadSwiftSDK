@@ -147,7 +147,8 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `fetchFeatureRequests(userToken:limit:offset:versionId:query:)` | `GET /api/v1/feature-requests` |
 | `submitFeatureRequest(_:userToken:)` | `POST /api/v1/feature-requests` |
 | `toggleVote(featureRequestId:userToken:)` | `POST /api/v1/feature-requests/{id}/vote` |
-| `fetchComments(featureRequestId:)` | `GET /api/v1/feature-requests/{id}/comments` |
+| `fetchComments(featureRequestId:)` | `GET /api/v1/feature-requests/{id}/comments` (walks keyset pages; `total` is the visible thread size) |
+| `fetchComments(featureRequestId:limit:cursor:)` | `GET /api/v1/feature-requests/{id}/comments` (`limit` 1–200, opaque `cursor`) |
 | `postComment(featureRequestId:draft:userToken:)` | `POST /api/v1/feature-requests/{id}/comments` |
 | `fetchUserProfile(userId:)` | `GET /api/v1/users/{userId}/profile` |
 | `fetchColumns()` | `GET /api/v1/public/columns/{appKey}` |

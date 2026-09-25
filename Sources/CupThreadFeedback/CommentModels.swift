@@ -127,9 +127,52 @@ public struct CommentDraft: Equatable, Sendable {
 
 // MARK: - Server responses
 
-/// Response wrapper for `GET /api/v1/feature-requests/{id}/comments`.
-struct ListCommentsResponse: Codable, Sendable {
-    let comments: [FeatureRequestComment]
+/// One page of `GET /api/v1/feature-requests/{id}/comments`.
+///
+/// The endpoint pages oldest-first with an opaque keyset cursor over
+/// `(createdAt, id)`. Pass ``nextCursor`` back as the `cursor` parameter of
+/// ``FeedbackClient/fetchComments(featureRequestId:limit:cursor:)`` to fetch
+/// the following page. ``total`` is the visible thread size — hidden and
+/// deleted comments are excluded — and is not the length of ``comments``
+/// on this page. Bodies published before pagination shipped (no `total` /
+/// `hasMore` / `nextCursor` keys) decode as a single complete page.
+public struct ListCommentsResult: Decodable, Equatable, Sendable {
+    /// The page's comments, oldest first.
+    public let comments: [FeatureRequestComment]
+    /// Visible thread size. Hidden and deleted comments are excluded, so
+    /// this is independent of how many rows ``comments`` holds. `0` when
+    /// the server omits the field.
+    public let total: Int
+    /// Whether another page exists beyond this one.
+    public let hasMore: Bool
+    /// Opaque keyset cursor for the next page; `nil` on the last page.
+    public let nextCursor: String?
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        comments = try container.decode([FeatureRequestComment].self, forKey: .comments)
+        // Pagination metadata is additive: responses predating it decode as
+        // a complete page (matching the server's former single-payload shape).
+        total = try container.decodeIfPresent(Int.self, forKey: .total) ?? 0
+        hasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore) ?? false
+        nextCursor = try container.decodeIfPresent(String.self, forKey: .nextCursor)
+    }
+
+    init(
+        comments: [FeatureRequestComment],
+        total: Int = 0,
+        hasMore: Bool = false,
+        nextCursor: String? = nil
+    ) {
+        self.comments = comments
+        self.total = total
+        self.hasMore = hasMore
+        self.nextCursor = nextCursor
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case comments, total, hasMore, nextCursor
+    }
 }
 
 // MARK: - Comment display model
