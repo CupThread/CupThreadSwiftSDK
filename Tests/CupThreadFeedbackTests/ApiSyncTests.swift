@@ -475,7 +475,7 @@ struct PseudonymousUserIdentifiersTests {
         }
         """.utf8)
 
-        let comments = try JSONDecoder().decode(ListCommentsResponse.self, from: json).comments
+        let comments = try JSONDecoder().decode(ListCommentsResult.self, from: json).comments
         let displayModels = comments.map(\.displayModel)
         #expect(displayModels[0].authorClerkId == "u_ab12cd34ef56")
         #expect(displayModels[0].canOpenAuthorProfile == true)

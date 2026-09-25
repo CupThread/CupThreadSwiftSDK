@@ -47,9 +47,10 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 Comment creation is signed-in-only on the CupThread API — create the client with an ``FeedbackClient/init(configuration:session:authenticationProvider:)`` provider so signed-in users can contribute.
 
 - ``FeatureRequestComment``: A public comment on a feature request.
+- ``ListCommentsResult``: One cursor-paged batch of comments. ``ListCommentsResult/total`` is the visible thread size, not the page length.
 - ``CommentDraft``: A new comment before submission.
-- ``CommentsView``: Flat comment thread with @author replies and a deliberate signed-out state.
-- ``FeedbackClient/fetchComments(featureRequestId:)``, ``FeedbackClient/postComment(featureRequestId:draft:userToken:)``
+- ``CommentsView``: Flat comment thread with @author replies and a deliberate signed-out state. The thread loads every page.
+- ``FeedbackClient/fetchComments(featureRequestId:)``, ``FeedbackClient/fetchComments(featureRequestId:limit:cursor:)``, ``FeedbackClient/postComment(featureRequestId:draft:userToken:)``
 
 ## User profiles
 

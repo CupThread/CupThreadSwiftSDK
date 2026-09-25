@@ -221,6 +221,15 @@ struct CommentClientTests {
 
         let url = try #require(capture.value)
         #expect(url.path == "/api/v1/feature-requests/fr-123/comments")
+        // The full-thread read always asks for the server's max page (200)
+        // and only sends `cursor` on follow-up pages.
+        let query = Dictionary(
+            (URLComponents(url: url, resolvingAgainstBaseURL: true)?.queryItems ?? [])
+                .map { ($0.name, $0.value ?? "") },
+            uniquingKeysWith: { _, last in last }
+        )
+        #expect(query["limit"] == "200")
+        #expect(query["cursor"] == nil)
     }
 
     @Test func fetchCommentsDecodesResponse() async throws {
