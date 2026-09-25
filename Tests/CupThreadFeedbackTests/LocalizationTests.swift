@@ -206,4 +206,29 @@ struct LocalizationTests {
             "Vote count singular composition rendered wrong"
         )
     }
+
+    /// `WhatsNewView`'s toolbar action displays the localized string for `cupthread.whatsnew.emails_on`
+    /// rather than a hardcoded English literal like "Manage Emails" (issue #188).
+    @Test func whatsNewSubscribedEntryTitleIsLocalizedAcrossTargetLanguages() throws {
+        for lang in Self.targetLanguages {
+            let strings = try loadStrings(for: lang)
+            let localized = try #require(
+                strings["cupthread.whatsnew.emails_on"],
+                "\(lang) is missing cupthread.whatsnew.emails_on"
+            )
+            #expect(!localized.isEmpty, "\(lang) has empty cupthread.whatsnew.emails_on")
+            #expect(localized != "Manage Emails", "\(lang) must not have unlocalized 'Manage Emails'")
+        }
+    }
+
+    @MainActor
+    @Test func whatsNewSubscribeEntryTitleHelperResolvesCorrectKeys() {
+        let unconfirmed = WhatsNewView.subscribeEntryTitle(subscribedEmail: nil)
+        #expect(unconfirmed == CupThreadStrings.tr("cupthread.whatsnew.subscribe_button"))
+        #expect(unconfirmed != "Manage Emails")
+
+        let confirmed = WhatsNewView.subscribeEntryTitle(subscribedEmail: "alex@example.com")
+        #expect(confirmed == CupThreadStrings.tr("cupthread.whatsnew.emails_on"))
+        #expect(confirmed != "Manage Emails")
+    }
 }
