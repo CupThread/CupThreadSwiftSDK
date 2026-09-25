@@ -116,6 +116,35 @@ func loadRoadmapGroups(
     return makeGroups(columns: try await columns, requests: requests)
 }
 
+// MARK: - Changelog load plan
+
+/// Whether changelog surfaces should issue their entries fetch.
+enum ChangelogLoadPlan: Equatable, Sendable {
+    /// Fetch changelog entries.
+    case load
+    /// Anonymous changelog access is off — skip the network and show a
+    /// permission placeholder instead.
+    case skip
+}
+
+/// Decides whether ``WhatsNewView`` and ``ChangelogOverlayView`` should hit the network.
+///
+/// A `nil` config fails open (the server stays authoritative). A resolved
+/// config with ``PublicAppConfig/allowsAnonymousChangelog`` `false` skips.
+func changelogLoadPlan(config: PublicAppConfig?) -> ChangelogLoadPlan {
+    (config?.allowsAnonymousChangelog ?? true) ? .load : .skip
+}
+
+/// Fetches changelog entries, or returns `nil` without issuing requests when
+/// the console disallows anonymous changelog access.
+func loadChangelogEntries(
+    client: FeedbackClient,
+    config: PublicAppConfig?
+) async throws -> [ChangelogEntry]? {
+    guard changelogLoadPlan(config: config) == .load else { return nil }
+    return try await client.fetchChangelog()
+}
+
 // MARK: - Permission placeholder
 
 /// Full-surface placeholder for the console's *permission* switches (issue

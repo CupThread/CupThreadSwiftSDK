@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "Anonym tilgang til veikartet er slått av i CupThread-konsollen.";
 "cupthread.permission.requests_title" = "Kan ikke sende ønsker";
 "cupthread.permission.requests_description" = "Anonyme funksjonsønsker er slått av i CupThread-konsollen.";
+"cupthread.permission.changelog_title" = "Kan ikke vise endringsloggen";
+"cupthread.permission.changelog_description" = "Anonym tilgang til endringsloggen er slått av i CupThread-konsollen.";
 "cupthread.error.forbidden" = "Denne handlingen er ikke tilgjengelig for denne appen.";

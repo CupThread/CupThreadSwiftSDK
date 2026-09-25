@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "Anonymer Zugriff auf die Roadmap ist in der CupThread-Konsole deaktiviert.";
 "cupthread.permission.requests_title" = "Anfragen können nicht gesendet werden";
 "cupthread.permission.requests_description" = "Anonyme Feature-Anfragen sind in der CupThread-Konsole deaktiviert.";
+"cupthread.permission.changelog_title" = "Änderungsprotokoll kann nicht angezeigt werden";
+"cupthread.permission.changelog_description" = "Anonymer Zugriff auf das Änderungsprotokoll ist in der CupThread-Konsole deaktiviert.";
 "cupthread.error.forbidden" = "Diese Aktion ist für diese App nicht verfügbar.";

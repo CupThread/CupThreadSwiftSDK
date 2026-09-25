@@ -10,7 +10,8 @@ private func makePermissionConfig(
     allowedPlatformValues: [String] = [],
     allowAnonymousRoadmap: Bool = true,
     allowAnonymousVote: Bool = true,
-    allowAnonymousFeedback: Bool = true
+    allowAnonymousFeedback: Bool = true,
+    allowAnonymousChangelog: Bool = true
 ) -> PublicAppConfig {
     PublicAppConfig(
         appId: "app-1",
@@ -22,7 +23,8 @@ private func makePermissionConfig(
         allowedPlatformValues: allowedPlatformValues,
         allowAnonymousRoadmap: allowAnonymousRoadmap,
         allowAnonymousVote: allowAnonymousVote,
-        allowAnonymousFeedback: allowAnonymousFeedback
+        allowAnonymousFeedback: allowAnonymousFeedback,
+        allowAnonymousChangelog: allowAnonymousChangelog
     )
 }
 
@@ -41,6 +43,13 @@ struct PermissionPredicateTests {
     func allowsAnonymousFeedbackMirrorsFlag(enabled: Bool) {
         let config = makePermissionConfig(allowAnonymousFeedback: enabled)
         #expect(config.allowsAnonymousFeedback == enabled)
+    }
+
+    @Test(arguments: [true, false])
+    func allowsAnonymousChangelogMirrorsFlag(enabled: Bool) {
+        let config = makePermissionConfig(allowAnonymousChangelog: enabled)
+        #expect(config.allowsAnonymousChangelog == enabled)
+        #expect(config.allowAnonymousChangelog == enabled)
     }
 
     @Test func allowsAnonymousRoadmapRequiresPublicAndAnonymous() {
@@ -147,6 +156,12 @@ struct PermissionViewGatingTests {
         #expect(roadmapLoadPlan(config: makePermissionConfig(allowAnonymousRoadmap: true)) == .load)
         #expect(roadmapLoadPlan(config: makePermissionConfig(allowAnonymousRoadmap: false)) == .skip)
         #expect(roadmapLoadPlan(config: makePermissionConfig(allowPublic: false)) == .skip)
+    }
+
+    @Test func changelogLoadPlanSkipsWhenAnonymousChangelogIsOff() {
+        #expect(changelogLoadPlan(config: nil) == .load)
+        #expect(changelogLoadPlan(config: makePermissionConfig(allowAnonymousChangelog: true)) == .load)
+        #expect(changelogLoadPlan(config: makePermissionConfig(allowAnonymousChangelog: false)) == .skip)
     }
 }
 
@@ -332,6 +347,45 @@ struct PermissionErrorMappingTests {
         let paths = counter.recorded
         #expect(paths.contains { $0.contains("/columns/") })
         #expect(paths.contains { $0.contains("/feature-requests") })
+    }
+
+    @Test func disallowedChangelogMakesNoRequests() async throws {
+        let counter = RequestCounter()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            counter.record(request.url?.path ?? "")
+            return (makeHTTPResponse(), Data("{}".utf8))
+        }
+        let result = try await loadChangelogEntries(
+            client: Self.makeAPIClient(),
+            config: makePermissionConfig(allowAnonymousChangelog: false)
+        )
+        #expect(result == nil)
+        #expect(counter.recorded.isEmpty)
+    }
+
+    @Test func allowedChangelogFetchesEntries() async throws {
+        let counter = RequestCounter()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            let path = request.url?.path ?? ""
+            counter.record(path)
+            let entry: [String: Any] = [
+                "id": "e-perm-1",
+                "title": "Version 1.0",
+                "body": "First release",
+                "versionLabel": "1.0.0",
+                "publishedAt": "2026-01-01T00:00:00.000Z",
+                "linkedRequests": []
+            ]
+            return (makeHTTPResponse(), try encodeJSON(["entries": [entry]]))
+        }
+        let result = try await loadChangelogEntries(
+            client: Self.makeAPIClient(),
+            config: makePermissionConfig(allowAnonymousChangelog: true)
+        )
+        let entries = try #require(result)
+        #expect(entries.count == 1)
+        #expect(entries.first?.id == "e-perm-1")
+        #expect(counter.recorded.contains { $0.contains("/changelog") })
     }
 
     @Test func typedAuthenticationRequiredStillWinsOverBare401Mapping() async throws {

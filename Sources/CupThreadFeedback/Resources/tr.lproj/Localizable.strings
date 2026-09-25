@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "CupThread konsolunda yol haritasına anonim erişim kapatıldı.";
 "cupthread.permission.requests_title" = "İstek gönderilemiyor";
 "cupthread.permission.requests_description" = "CupThread konsolunda anonim özellik istekleri kapatıldı.";
+"cupthread.permission.changelog_title" = "Değişiklik günlüğü görüntülenemiyor";
+"cupthread.permission.changelog_description" = "CupThread konsolunda değişiklik günlüğüne anonim erişim kapatıldı.";
 "cupthread.error.forbidden" = "Bu işlem bu uygulama için kullanılamıyor.";

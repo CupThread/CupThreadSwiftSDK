@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "L’accesso anonimo alla roadmap è disattivato nella console CupThread.";
 "cupthread.permission.requests_title" = "Impossibile inviare richieste";
 "cupthread.permission.requests_description" = "Le richieste di funzionalità anonime sono disattivate nella console CupThread.";
+"cupthread.permission.changelog_title" = "Impossibile visualizzare il changelog";
+"cupthread.permission.changelog_description" = "L’accesso anonimo al changelog è disattivato nella console CupThread.";
 "cupthread.error.forbidden" = "Questa azione non è disponibile per questa app.";

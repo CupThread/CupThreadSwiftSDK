@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "Anonimowy dostęp do planu rozwoju jest wyłączony w konsoli CupThread.";
 "cupthread.permission.requests_title" = "Nie można zgłaszać próśb";
 "cupthread.permission.requests_description" = "Anonimowe prośby o funkcje są wyłączone w konsoli CupThread.";
+"cupthread.permission.changelog_title" = "Nie można wyświetlić dziennika zmian";
+"cupthread.permission.changelog_description" = "Anonimowy dostęp do dziennika zmian jest wyłączony w konsoli CupThread.";
 "cupthread.error.forbidden" = "Ta czynność jest niedostępna w tej aplikacji.";

@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "O acesso anónimo ao roadmap está desativado na consola CupThread.";
 "cupthread.permission.requests_title" = "Não é possível enviar pedidos";
 "cupthread.permission.requests_description" = "Os pedidos de funcionalidades anónimos estão desativados na consola CupThread.";
+"cupthread.permission.changelog_title" = "Não é possível ver o registo de alterações";
+"cupthread.permission.changelog_description" = "O acesso anónimo ao registo de alterações está desativado na consola CupThread.";
 "cupthread.error.forbidden" = "Esta ação não está disponível nesta app.";

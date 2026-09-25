@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "Truy cập ẩn danh vào lộ trình đã bị tắt trong bảng điều khiển CupThread.";
 "cupthread.permission.requests_title" = "Không thể gửi yêu cầu";
 "cupthread.permission.requests_description" = "Yêu cầu tính năng ẩn danh đã bị tắt trong bảng điều khiển CupThread.";
+"cupthread.permission.changelog_title" = "Không thể xem nhật ký thay đổi";
+"cupthread.permission.changelog_description" = "Truy cập ẩn danh vào nhật ký thay đổi đã bị tắt trong bảng điều khiển CupThread.";
 "cupthread.error.forbidden" = "Thao tác này không khả dụng với ứng dụng này.";
