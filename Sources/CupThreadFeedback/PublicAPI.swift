@@ -312,7 +312,9 @@ extension FeedbackClient {
 
     /// Fetches the app's versions, ordered by position.
     /// - Returns: Released and planned versions, sorted by ``AppVersion/position``.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
+    ///   access is disabled for the app (HTTP 401 `authentication_required`),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchVersions() async throws -> [AppVersion] {
         let response: ListVersionsResponse = try await get("/api/v1/public/versions/\(configuration.appKey)")

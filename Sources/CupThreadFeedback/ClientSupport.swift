@@ -144,6 +144,8 @@ extension FeedbackClient {
             return .uploaderIdentityRequired(message: envelopeMessage, requestId: requestId)
         case (400, "uploader_mismatch"):
             return .uploaderMismatch(message: envelopeMessage, requestId: requestId)
+        case (403, "email_not_verified"):
+            return .emailNotVerified(message: envelopeMessage, requestId: requestId)
         default:
             return nil
         }

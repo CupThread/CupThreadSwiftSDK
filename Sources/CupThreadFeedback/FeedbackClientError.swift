@@ -59,6 +59,14 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// carries the raw response body for diagnostics — see ``responseBody``;
     /// it is never shown to end users.
     case userProfileNotFound(message: String?)
+    /// Comments are not available for the requested feature request (HTTP 404) —
+    /// e.g. comments are disabled for this item or the thread has not been initialized.
+    /// `message` carries the raw server text for diagnostics; it is never shown to end users.
+    case commentsUnavailable(message: String?, requestId: String?)
+    /// The changelog subscription was rejected because the email address has not
+    /// been verified (HTTP 403 `email_not_verified`). Prompt the user to use their
+    /// signed-in account email.
+    case emailNotVerified(message: String?, requestId: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -82,7 +90,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
              .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
-             .subscriptionInactive, .turnstileRequired:
+             .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified:
             return nil
         }
     }
@@ -126,6 +134,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .turnstileRequired(_, let requestId):
             return requestId
         case .forbidden(_, let requestId):
+            return requestId
+        case .commentsUnavailable(_, let requestId):
+            return requestId
+        case .emailNotVerified(_, let requestId):
             return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
@@ -180,6 +192,12 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return "Submissions are unavailable for this app right now. Please try again later.\(suffix)"
         case .userProfileNotFound:
             return "This user profile is no longer available."
+        case .commentsUnavailable(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "Comments are not available for this feature request.\(suffix)"
+        case .emailNotVerified(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "Please use your signed-in account email address to subscribe.\(suffix)"
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
@@ -238,5 +256,15 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``turnstileRequired(message:requestId:)`` with no details.
     static func turnstileRequired() -> FeedbackClientError {
         .turnstileRequired(message: nil, requestId: nil)
+    }
+
+    /// Convenience constructor for ``commentsUnavailable(message:requestId:)`` with no request id.
+    static func commentsUnavailable(message: String? = nil) -> FeedbackClientError {
+        .commentsUnavailable(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``emailNotVerified(message:requestId:)`` with no request id.
+    static func emailNotVerified(message: String? = nil) -> FeedbackClientError {
+        .emailNotVerified(message: message, requestId: nil)
     }
 }
