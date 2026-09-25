@@ -209,6 +209,7 @@ public struct CommentsView: View {
                         .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Self.viewProfileAccessibilityLabel(authorName: replyTo))
             } else {
                 Text("@\(replyTo)")
                     .font(.caption.weight(.semibold))
@@ -219,10 +220,11 @@ public struct CommentsView: View {
 
     @ViewBuilder
     private func replyButton(for comment: FeatureRequestComment) -> some View {
+        let targetAuthor = comment.authorName ?? CupThreadStrings.tr("cupthread.features.anonymous")
         Button {
             guard !comment.isModerated else { return }
             draft.parentId = comment.id
-            draft.replyToAuthorName = comment.authorName ?? CupThreadStrings.tr("cupthread.features.anonymous")
+            draft.replyToAuthorName = targetAuthor
             draft.replyToClerkId = comment.authorClerkId
         } label: {
             Text(CupThreadStrings.tr("cupthread.comments.reply"))
@@ -231,6 +233,7 @@ public struct CommentsView: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .padding(.top, 4)
+        .accessibilityLabel(Self.replyAccessibilityLabel(targetAuthor: targetAuthor))
     }
 
     @ViewBuilder
@@ -258,6 +261,7 @@ public struct CommentsView: View {
                                 .foregroundStyle(.tertiary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(Self.cancelReplyAccessibilityLabel())
                     }
                 }
 
@@ -284,6 +288,7 @@ public struct CommentsView: View {
                     .foregroundStyle(canSubmit ? Color.accentColor : Color.secondary.opacity(0.3))
                     #endif
                     .disabled(!canSubmit || isSubmitting)
+                    .accessibilityLabel(Self.submitAccessibilityLabel())
                 }
             }
             .padding(16)
@@ -348,5 +353,23 @@ public struct CommentsView: View {
             guard !error.isSdkCancellation else { return }
             submitError = FriendlyError.message(for: error)
         }
+    }
+
+    // MARK: - Accessibility Helpers
+
+    nonisolated static func submitAccessibilityLabel() -> String {
+        CupThreadStrings.tr("cupthread.comments.submit")
+    }
+
+    nonisolated static func cancelReplyAccessibilityLabel() -> String {
+        CupThreadStrings.tr("cupthread.comments.cancel_reply")
+    }
+
+    nonisolated static func replyAccessibilityLabel(targetAuthor: String) -> String {
+        CupThreadStrings.tr("cupthread.comments.reply_to_author", targetAuthor)
+    }
+
+    nonisolated static func viewProfileAccessibilityLabel(authorName: String) -> String {
+        CupThreadStrings.tr("cupthread.comments.view_profile_of", authorName)
     }
 }

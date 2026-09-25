@@ -79,6 +79,10 @@
 "cupthread.comments.compose_prompt" = "写下您的想法…";
 "cupthread.comments.removed_by_moderator" = "此留言已被版主移除。";
 "cupthread.comments.sign_in_required" = "登录后即可参与讨论。";
+"cupthread.comments.submit" = "提交评论";
+"cupthread.comments.cancel_reply" = "取消回复";
+"cupthread.comments.reply_to_author" = "回复 %@";
+"cupthread.comments.view_profile_of" = "查看 @%@ 的个人资料";
 
 "cupthread.profile.title" = "用户资料";
 "cupthread.profile.apps" = "应用列表";
