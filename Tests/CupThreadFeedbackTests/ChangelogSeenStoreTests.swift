@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import CupThreadFeedback
 
-@Suite("ChangelogSeenStore")
+@Suite("ChangelogSeenStore", .serialized)
 struct ChangelogSeenStoreTests {
     private struct IsolatedContext {
         let defaults: UserDefaults
@@ -201,5 +201,53 @@ struct ChangelogSeenStoreTests {
         client.markChangelogSeen(version: "1.0.0")
         #expect(client.hasSeenChangelog(version: "1.0.0") == true)
         #expect(customStore.storedVersions() == ["1.0.0"])
+    }
+
+    @Test func markSeenWithIdAndVersionLabelPerformsSingleWriteAndSinglePruneAtCapacity() throws {
+        let context = makeIsolatedDefaults()
+        defer { context.cleanup() }
+
+        let store = ChangelogSeenStore(appKey: "app_cap_test", userDefaults: context.defaults, maxCapacity: 10)
+        for index in 0..<10 {
+            store.markSeen("version-\(index)")
+        }
+        #expect(store.storedVersions().count == 10)
+        let initialWrites = store.writeCount
+
+        // Atomic mark of entry with both ID and label
+        store.markSeen(id: "entry-new", versionLabel: "v2.0.0")
+
+        // Must perform exactly 1 UserDefaults write
+        #expect(store.writeCount == initialWrites + 1)
+
+        // Total count must be bounded at maxCapacity (10)
+        let stored = store.storedVersions()
+        #expect(stored.count == 10)
+
+        // Both new tokens are marked as seen
+        #expect(store.hasSeen("entry-new") == true)
+        #expect(store.hasSeen("v2.0.0") == true)
+    }
+
+    @Test func clientDelegatesAtomicMarkToChangelogSeenStore() throws {
+        let context = makeIsolatedDefaults()
+        defer { context.cleanup() }
+
+        let appKey = "app_client_delegate_atomic_\(UUID().uuidString)"
+        let customStore = ChangelogSeenStore(appKey: appKey, userDefaults: context.defaults)
+        ChangelogSeenStore.register(customStore, for: appKey)
+        defer { ChangelogSeenStore.resetRegistry() }
+
+        let client = makeClient(appKey: appKey)
+
+        #expect(client.hasSeenChangelog(version: "entry-1") == false)
+        #expect(client.hasSeenChangelog(version: "1.0.0") == false)
+
+        client.markChangelogSeen(id: "entry-1", versionLabel: "1.0.0")
+
+        #expect(client.hasSeenChangelog(version: "entry-1") == true)
+        #expect(client.hasSeenChangelog(version: "1.0.0") == true)
+        #expect(customStore.storedVersions() == ["entry-1", "1.0.0"])
+        #expect(customStore.writeCount == 1)
     }
 }

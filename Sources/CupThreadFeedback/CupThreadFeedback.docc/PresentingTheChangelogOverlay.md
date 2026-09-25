@@ -53,5 +53,6 @@ Seen versions are persisted in a thread-safe store scoped to each app key, bound
 - ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``
 - ``FeedbackClient/hasSeenChangelog(version:)``
 - ``FeedbackClient/markChangelogSeen(version:)``
+- ``FeedbackClient/markChangelogSeen(id:versionLabel:)``
 - <doc:PresentingWhatsNew>
 - <doc:GettingStarted>
