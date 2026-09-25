@@ -56,6 +56,32 @@ func sanitizeMarkdownAttributedString(_ attributedString: AttributedString) -> A
     return sanitized
 }
 
+/// Validates whether a candidate host is allowed for download URLs relative to a base host:
+/// - Same host (case-insensitive)
+/// - Subdomain or parent domain
+/// - Shares the same root domain (e.g. CDN hosts or apex domain)
+func isAllowedDownloadHost(_ candidateHost: String, baseHost: String) -> Bool {
+    if candidateHost == baseHost {
+        return true
+    }
+    let baseParts = baseHost.split(separator: ".")
+    if baseParts.allSatisfy({ Int($0) != nil }) {
+        return false
+    }
+    if candidateHost.hasSuffix("." + baseHost) || baseHost.hasSuffix("." + candidateHost) {
+        return true
+    }
+    let candidateParts = candidateHost.split(separator: ".")
+    if candidateParts.count >= 2 && baseParts.count >= 2 {
+        let candidateRoot = candidateParts.suffix(2).joined(separator: ".")
+        let baseRoot = baseParts.suffix(2).joined(separator: ".")
+        if candidateRoot == baseRoot {
+            return true
+        }
+    }
+    return false
+}
+
 // MARK: - View Modifiers
 
 extension View {

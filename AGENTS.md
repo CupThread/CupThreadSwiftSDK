@@ -24,7 +24,7 @@
   - `POST /api/v1/feature-requests` — Submit new feature request.
   - `POST /api/v1/feature-requests/:id/vote` — Toggle vote on a feature request.
   - `POST /api/v1/feedback` — Submit feedback draft with attachments.
-  - `POST /api/v1/uploads/sessions` → `PUT /api/v1/uploads/{uploadId}` — Create an upload session, then stream attachment bytes into its pre-allocated slots (the legacy `POST /api/v1/uploads/images` / `POST /api/v1/uploads/r2` endpoints were removed in the September 2026 API sync).
+  - `POST /api/v1/uploads/sessions` → `PUT /api/v1/uploads/{uploadId}` — Create an upload session, then stream attachment bytes into its pre-allocated slots (the legacy `POST /api/v1/uploads/images` / `POST /api/v1/uploads/r2` endpoints were removed in the September 2026 API sync). Upload slot URLs are restricted to same-origin relative paths or same-host absolute `http`/`https` URLs matching `configuration.baseURL.host`; off-origin values are rejected (`FeedbackClientError.invalidResponse`) before any network write occurs. Download URLs in upload responses are similarly verified against the allowed host/domain before propagating to `FeedbackAttachment.url`.
 - **Request Headers & Metadata Correlation**:
   - Every API request carries `X-Request-Id` (session/per-request correlation) and `X-SDK-Version` (semver from `FeedbackClient.sdkVersion`, e.g. `0.1.0`).
   - Feedback submissions on `POST /api/v1/feedback` report `metadata.sdk` (`cupthread-apple/<semver>`) and `metadata.sdkVersion` (`<semver>`), distinct from the host application's own version (`appVersion`).

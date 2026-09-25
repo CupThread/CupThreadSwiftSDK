@@ -59,8 +59,8 @@ public struct FeedbackUploadSession: Decodable, Equatable, Sendable {
         /// Id identifying this upload; passed to feedback submission via
         /// ``FeedbackDraft/attachments``.
         public let uploadId: String
-        /// Upload URL as returned by the server (absolute, or a path to
-        /// resolve against the client's base URL).
+        /// Upload URL as returned by the server (relative path or same-host absolute URL
+        /// matching the client's base URL; absolute off-origin URLs are rejected for security).
         public let uploadUrl: String?
         /// Per-file size limit for this slot, when given.
         public let maxSizeBytes: Int?
@@ -168,7 +168,7 @@ extension FeedbackClient {
             throw FeedbackClientError.payloadTooLarge(message: nil)
         }
 
-        var request = uploadRequest(
+        var request = try uploadRequest(
             slot: slot,
             sessionToken: uploadSession.session.sessionToken,
             contentType: contentType
@@ -228,7 +228,7 @@ extension FeedbackClient {
             throw FeedbackClientError.payloadTooLarge(message: nil)
         }
 
-        let request = uploadRequest(
+        let request = try uploadRequest(
             slot: slot,
             sessionToken: uploadSession.session.sessionToken,
             contentType: contentType
@@ -342,8 +342,8 @@ extension FeedbackClient {
         slot: FeedbackUploadSession.File,
         sessionToken: String,
         contentType: String
-    ) -> URLRequest {
-        var request = URLRequest(url: uploadURL(from: slot.uploadUrl))
+    ) throws -> URLRequest {
+        var request = URLRequest(url: try uploadURL(from: slot.uploadUrl))
         request.httpMethod = "PUT"
         request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
@@ -378,14 +378,15 @@ extension FeedbackClient {
         let uploaded = try? decoder.decode(UploadedFile.self, from: responseData)
         let uploadId = uploaded?.uploadId ?? slot.uploadId
         let mimeType = uploaded?.contentType ?? contentType
-        let resolvedDownloadURL = uploaded?.downloadUrl
-            .flatMap { $0.isEmpty ? nil : URL(string: $0) }
+        let resolvedDownload = resolvedDownloadURL(from: uploaded?.downloadUrl)
+        let defaultUploadURL = (try? uploadURL(from: slot.uploadUrl)) ??
+            configuration.baseURL.appending(path: "/api/v1/uploads")
 
         return FeedbackAttachment(
             kind: mimeType.hasPrefix("image/") ? .image : .r2,
             uploadId: uploadId,
             key: uploadId,
-            url: resolvedDownloadURL ?? uploadURL(from: slot.uploadUrl),
+            url: resolvedDownload ?? defaultUploadURL,
             filename: uploaded?.filename ?? filename ?? slot.clientFileId,
             mimeType: mimeType,
             size: uploaded?.sizeBytes ?? fallbackSize
@@ -397,14 +398,82 @@ extension FeedbackClient {
         return attributes[.size] as? Int ?? 0
     }
 
-    private func uploadURL(from uploadUrl: String?) -> URL {
-        if let uploadUrl, !uploadUrl.isEmpty, let url = URL(string: uploadUrl), url.scheme != nil {
-            return url
-        }
-        let base = configuration.baseURL
+    /// Resolves and validates an upload slot URL against the configured base URL.
+    ///
+    /// Accepts:
+    /// - `nil` or empty string: defaults to `configuration.baseURL.appending(path: "/api/v1/uploads")`.
+    /// - Relative path: resolved against `configuration.baseURL`.
+    /// - Same-host absolute `http`/`https` URL matching `configuration.baseURL.host` (case-insensitive).
+    ///
+    /// Throws ``FeedbackClientError/invalidResponse`` on off-origin absolute URLs,
+    /// protocol-relative URLs (`//`), or disallowed schemes.
+    func uploadURL(from uploadUrl: String?) throws -> URL {
         if let uploadUrl, !uploadUrl.isEmpty {
-            return base.appending(path: uploadUrl)
+            let trimmed = uploadUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                return configuration.baseURL.appending(path: "/api/v1/uploads")
+            }
+            if trimmed.hasPrefix("//") {
+                throw FeedbackClientError.invalidResponse
+            }
+            if let candidate = URL(string: trimmed), candidate.scheme != nil {
+                guard let scheme = candidate.scheme?.lowercased(),
+                      scheme == "http" || scheme == "https" else {
+                    throw FeedbackClientError.invalidResponse
+                }
+                if configuration.baseURL.scheme?.lowercased() == "https", scheme != "https" {
+                    throw FeedbackClientError.invalidResponse
+                }
+                guard let candidateHost = candidate.host?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !candidateHost.isEmpty,
+                      let baseHost = configuration.baseURL.host?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !baseHost.isEmpty,
+                      candidateHost.caseInsensitiveCompare(baseHost) == .orderedSame else {
+                    throw FeedbackClientError.invalidResponse
+                }
+                let basePort = configuration.baseURL.port ??
+                    (configuration.baseURL.scheme?.lowercased() == "http" ? 80 : 443)
+                let candidatePort = candidate.port ?? (scheme == "http" ? 80 : 443)
+                guard basePort == candidatePort else {
+                    throw FeedbackClientError.invalidResponse
+                }
+                return candidate
+            }
+            return configuration.baseURL.appending(path: trimmed)
         }
-        return base.appending(path: "/api/v1/uploads")
+        return configuration.baseURL.appending(path: "/api/v1/uploads")
+    }
+
+    /// Validates an untrusted `downloadUrl` string returned by an upload PUT response:
+    /// - Accepts relative paths resolved against `configuration.baseURL`.
+    /// - Accepts absolute `http`/`https` URLs whose host matches `configuration.baseURL.host`
+    ///   or shares its root domain (e.g. CDN hosts or apex domain).
+    /// - Returns `nil` for off-origin, protocol-relative, or disallowed-scheme URLs.
+    private func resolvedDownloadURL(from downloadUrl: String?) -> URL? {
+        guard let downloadUrl else { return nil }
+        let trimmed = downloadUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("//") else { return nil }
+
+        if let candidate = URL(string: trimmed), candidate.scheme != nil {
+            guard let scheme = candidate.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" else {
+                return nil
+            }
+            if configuration.baseURL.scheme?.lowercased() == "https", scheme != "https" {
+                return nil
+            }
+            guard let candidateHost = candidate.host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                  !candidateHost.isEmpty,
+                  let baseHost = configuration.baseURL.host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                  !baseHost.isEmpty else {
+                return nil
+            }
+            if isAllowedDownloadHost(candidateHost, baseHost: baseHost) {
+                return candidate
+            }
+            return nil
+        }
+
+        return configuration.baseURL.appending(path: trimmed)
     }
 }

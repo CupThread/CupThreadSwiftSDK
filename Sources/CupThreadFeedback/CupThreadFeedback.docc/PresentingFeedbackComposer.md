@@ -152,6 +152,10 @@ struct FeedbackSheet: View {
 }
 ```
 
+### Upload destination origin policy
+
+Upload slot URLs returned by the session endpoint are restricted to same-origin relative paths or same-host absolute `http`/`https` URLs matching `configuration.baseURL.host`. Any absolute off-origin `uploadUrl` is rejected before network transfer begins, throwing ``FeedbackClientError/invalidResponse`` to prevent session token and attachment byte exfiltration. Download URLs in upload responses are similarly validated against the host's domain allowlist before being stored on ``FeedbackAttachment/url``.
+
 ## See also
 
 - ``FeedbackComposerView``
