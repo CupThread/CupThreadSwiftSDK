@@ -53,6 +53,22 @@ public struct RoadmapBoardView: View {
         _searchText = State(initialValue: initialSearchText)
     }
 
+    /// Internal initializer for tests and previews with preloaded groups.
+    init(
+        client: FeedbackClient,
+        userToken: String,
+        initialSearchText: String = "",
+        initialGroups: [RoadmapGroup]?
+    ) {
+        self.client = client
+        self.userToken = userToken
+        _searchText = State(initialValue: initialSearchText)
+        if let initialGroups {
+            _groups = State(initialValue: initialGroups)
+            _hasLoadedOnce = State(initialValue: true)
+        }
+    }
+
     public var body: some View {
         Group {
             if !isRoadmapPermitted {
@@ -234,7 +250,7 @@ public struct RoadmapBoardView: View {
 
     private var boardScroll: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 16) {
+            LazyHStack(alignment: .top, spacing: 16) {
                 switch displayState {
                 case .loading:
                     ForEach(0..<3, id: \.self) { _ in
@@ -354,147 +370,5 @@ public struct RoadmapBoardView: View {
                 loadError = message
             }
         }
-    }
-}
-
-// MARK: - Column chip (iPhone pager selector)
-
-private struct ColumnChip: View {
-    let name: String
-    let count: Int
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Text(name)
-                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                Text(count, format: .number)
-                    .font(.caption.weight(.medium).monospacedDigit())
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-            .background(
-                isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06),
-                in: Capsule()
-            )
-            .overlay {
-                Capsule().strokeBorder(
-                    isSelected ? Color.accentColor.opacity(0.35) : Color.clear,
-                    lineWidth: 1
-                )
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(CupThreadStrings.columnAccessibilityLabel(name: name, count: count))
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-}
-
-// MARK: - Column card (regular-width board layout)
-
-private struct ColumnCard: View {
-    let group: RoadmapGroup
-    var highlightQuery: String = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ColumnHeader(
-                name: group.name,
-                count: group.requests.count,
-                style: StageStyle.forColumn(group.column)
-            )
-
-            if group.requests.isEmpty {
-                Text(CupThreadStrings.tr("cupthread.roadmap.empty_card"))
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 16)
-            } else {
-                ForEach(group.requests) { item in
-                    RoadmapCard(item: item, highlightQuery: highlightQuery)
-                }
-            }
-        }
-        .padding(12)
-        .frame(width: 300, alignment: .leading)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 16))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(CupThreadStrings.columnAccessibilityLabel(name: group.name, count: group.requests.count))
-    }
-}
-
-// MARK: - Roadmap card
-
-private struct RoadmapCard: View {
-    let item: FeatureRequestItem
-    var highlightQuery: String = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HighlightedText(text: item.title, query: highlightQuery)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
-
-            if !item.description.isEmpty {
-                HighlightedText(text: item.description, query: highlightQuery)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-            }
-
-            HStack(spacing: 8) {
-                if let version = item.versionLabel {
-                    CapsuleBadge(icon: "tag", text: version, tint: .secondary)
-                }
-
-                if !item.recentCommenters.isEmpty {
-                    HStack(spacing: -6) {
-                        ForEach(Array(item.recentCommenters.prefix(3).enumerated()), id: \.offset) { index, commenter in
-                            AvatarView(url: commenter.avatarUrl, size: 16)
-                                .zIndex(Double(3 - index))
-                        }
-                        if item.hasMoreCommenters {
-                            Text("···")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .accessibilityLabel(CupThreadStrings.tr("cupthread.features.recent_commenters_accessibility"))
-                }
-
-                Spacer(minLength: 8)
-                VoteCountBadge(count: item.voteCount, hasVoted: item.hasVoted)
-            }
-        }
-        .requestCard()
-        .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - Empty column placeholder
-
-private struct EmptyColumnView: View {
-    var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "tray")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(.tertiary)
-            Text(CupThreadStrings.tr("cupthread.roadmap.empty_column"))
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-            Text(CupThreadStrings.tr("cupthread.roadmap.empty_column_description"))
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .padding(.horizontal, 16)
-        .accessibilityElement(children: .combine)
     }
 }
