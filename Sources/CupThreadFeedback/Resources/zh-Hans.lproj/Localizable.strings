@@ -97,6 +97,7 @@
 
 /* Accidental-dismissal guard for compose surfaces (issue #46) */
 "cupthread.common.cancel" = "取消";
+"cupthread.common.done" = "完成";
 "cupthread.common.discard" = "丢弃";
 "cupthread.common.keep_editing" = "继续编辑";
 "cupthread.feedback.discard_title" = "丢弃这条反馈？";

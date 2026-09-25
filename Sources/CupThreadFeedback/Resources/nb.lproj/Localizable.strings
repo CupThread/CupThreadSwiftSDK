@@ -97,6 +97,7 @@
 
 /* Accidental-dismissal guard for compose surfaces (issue #46) */
 "cupthread.common.cancel" = "Avbryt";
+"cupthread.common.done" = "Ferdig";
 "cupthread.common.discard" = "Forkast";
 "cupthread.common.keep_editing" = "Fortsett å redigere";
 "cupthread.feedback.discard_title" = "Forkaste denne tilbakemeldingen?";
