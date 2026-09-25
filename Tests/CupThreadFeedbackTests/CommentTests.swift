@@ -313,6 +313,58 @@ struct CommentClientTests {
         #expect(json["body"] as? String == "Top-level comment")
     }
 
+    @Test func postCommentOmitsEmptyOrWhitespaceParentIdAndReplyToAuthorName() async throws {
+        let bodyCapture = CaptureBox<Data>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            bodyCapture.value = bodyData(from: request)
+            return (makeHTTPResponse(status: 201), try Self.createdCommentEnvelope())
+        }
+
+        let draft = CommentDraft(
+            body: "Top-level comment with empty fields",
+            parentId: "   ",
+            replyToAuthorName: ""
+        )
+
+        _ = try await Self.makeAPIClient().postComment(
+            featureRequestId: "fr-1",
+            draft: draft,
+            userToken: "token-123"
+        )
+
+        let rawData = try #require(bodyCapture.value)
+        let json = try #require(parseJSONDict(rawData))
+        #expect(json.count == 1)
+        #expect(json["body"] as? String == "Top-level comment with empty fields")
+        #expect(json["parentId"] == nil)
+        #expect(json["replyToAuthorName"] == nil)
+    }
+
+    @Test func postCommentTrimsSurroundingWhitespaceFromParentIdAndReplyToAuthorName() async throws {
+        let bodyCapture = CaptureBox<Data>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            bodyCapture.value = bodyData(from: request)
+            return (makeHTTPResponse(status: 201), try Self.createdCommentEnvelope())
+        }
+
+        let draft = CommentDraft(
+            body: "Reply with whitespace around fields",
+            parentId: "  c-parent-123  ",
+            replyToAuthorName: "  Bob  "
+        )
+
+        _ = try await Self.makeAPIClient().postComment(
+            featureRequestId: "fr-1",
+            draft: draft,
+            userToken: "token-123"
+        )
+
+        let rawData = try #require(bodyCapture.value)
+        let json = try #require(parseJSONDict(rawData))
+        #expect(json["parentId"] as? String == "c-parent-123")
+        #expect(json["replyToAuthorName"] as? String == "Bob")
+    }
+
     @Test func postCommentSetsUserTokenHeader() async throws {
         let capture = CaptureBox<String?>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
