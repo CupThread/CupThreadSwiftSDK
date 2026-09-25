@@ -5,6 +5,26 @@ import SwiftUI
 // Module-internal pieces extracted from FeatureRequestsView.swift to keep the
 // surface file within the library file-size budget.
 
+// MARK: - Active sheet destination
+
+/// Destination modal presented from `FeatureRequestsView`.
+///
+/// Unifies comments and user profile sheets under a single mutually-exclusive
+/// state to prevent dual presentation conflicts when cards are tapped.
+enum FeatureRequestsActiveSheet: Identifiable, Sendable, Equatable {
+    case comments(FeatureRequestItem)
+    case profile(String)
+
+    var id: String {
+        switch self {
+        case .comments(let item):
+            return "comments-\(item.id)"
+        case .profile(let userId):
+            return "profile-\(userId)"
+        }
+    }
+}
+
 // MARK: Transient notice auto-clear
 
 /// Clears a transient inline notice a few seconds after it appears.
