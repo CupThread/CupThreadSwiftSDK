@@ -77,7 +77,9 @@ extension FeedbackClient {
     /// ``ListCommentsResult/nextCursor`` back as `cursor` to move forward.
     /// Malformed cursors are rejected server-side with `400 Bad Request`.
     /// ``ListCommentsResult/total`` is the visible thread size and stays
-    /// independent of this page's row count.
+    /// independent of this page's row count. When the client is created with an
+    /// authentication provider, the signed-in user's bearer token is attached as
+    /// `Authorization: Bearer …` so comments load when `allowAnonymousRoadmap = false`.
     /// - Parameters:
     ///   - featureRequestId: Id of the feature request.
     ///   - limit: Comments per page. The server accepts 1...200 (default 200).
@@ -114,6 +116,7 @@ extension FeedbackClient {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {

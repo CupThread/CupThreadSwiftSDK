@@ -26,7 +26,10 @@ extension FeedbackClient {
     /// already voted (`hasVoted`), which is why the call requires a
     /// `userToken`. The token is sent as the `X-User-Token` header — passing
     /// it in the URL query string is deprecated by the API to keep tokens out
-    /// of access logs and referrers.
+    /// of access logs and referrers. When configured with an authentication
+    /// provider, the signed-in user's bearer token is attached as
+    /// `Authorization: Bearer …` so listing and searching succeed when
+    /// `allowAnonymousRoadmap = false`.
     /// - Parameters:
     ///   - userToken: A stable UUID string identifying this user (for own pending requests and vote state).
     ///   - limit: Maximum number of results to return.
@@ -77,6 +80,7 @@ extension FeedbackClient {
 
         var request = URLRequest(url: url)
         applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {

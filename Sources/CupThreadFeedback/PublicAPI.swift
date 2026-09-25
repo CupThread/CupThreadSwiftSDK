@@ -296,6 +296,9 @@ extension FeedbackClient {
     }
 
     /// Fetches the visible roadmap board columns, ordered by position.
+    /// When configured with an authentication provider, the signed-in user's
+    /// bearer token is attached as `Authorization: Bearer …` so board columns
+    /// load when `allowAnonymousRoadmap = false`.
     /// - Returns: The board's visible columns, sorted by ``BoardColumn/position``.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
@@ -311,6 +314,9 @@ extension FeedbackClient {
     }
 
     /// Fetches the app's versions, ordered by position.
+    /// When configured with an authentication provider, the signed-in user's
+    /// bearer token is attached as `Authorization: Bearer …` so versions
+    /// load when `allowAnonymousRoadmap = false`.
     /// - Returns: Released and planned versions, sorted by ``AppVersion/position``.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
     ///   access is disabled for the app (HTTP 401 `authentication_required`),
@@ -328,6 +334,7 @@ extension FeedbackClient {
         var request = URLRequest(url: configuration.baseURL.appending(path: path))
         request.httpMethod = "GET"
         applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
