@@ -159,4 +159,69 @@ struct FriendlyErrorTests {
         #expect(FeedbackClientError.submissionQuotaExceeded(message: nil, requestId: nil).responseBody == nil)
         #expect(FeedbackClientError.subscriptionInactive(message: nil, requestId: nil).responseBody == nil)
     }
+
+    // MARK: - Composer and Subscribe intake surfaces (issue #160)
+
+    @Test func composerAndSubscribeErrorMappingContracts() {
+        // URLError connectivity mapping: offline and timeout
+        let offlineURLError = URLError(.notConnectedToInternet)
+        #expect(FriendlyError.message(for: offlineURLError) == CupThreadStrings.tr("cupthread.error.offline"))
+        #expect(FriendlyError.message(for: offlineURLError) != offlineURLError.localizedDescription)
+
+        let timedOutURLError = URLError(.timedOut)
+        #expect(FriendlyError.message(for: timedOutURLError) == CupThreadStrings.tr("cupthread.error.timed_out"))
+        #expect(FriendlyError.message(for: timedOutURLError) != timedOutURLError.localizedDescription)
+
+        // FeedbackClientError mapping: status 502 / server errors
+        let serverError = FeedbackClientError.unexpectedStatus(
+            code: 502,
+            message: "<html>Bad Gateway</html>",
+            requestId: nil
+        )
+        #expect(FriendlyError.message(for: serverError) == CupThreadStrings.tr("cupthread.error.http_server_busy"))
+        #expect(!FriendlyError.message(for: serverError).contains("<html>"))
+    }
+
+    @Test func userFacingSurfacesDoNotReadLocalizedDescriptionDirectly() throws {
+        var directory = URL(fileURLWithPath: #filePath)
+        var sourceDir: URL?
+        for _ in 0..<6 {
+            directory.deleteLastPathComponent()
+            let candidate = directory
+                .appendingPathComponent("Sources", isDirectory: true)
+                .appendingPathComponent("CupThreadFeedback", isDirectory: true)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                sourceDir = candidate
+                break
+            }
+        }
+        let sourcesURL = try #require(sourceDir, "Could not locate Sources/CupThreadFeedback")
+        let files = try #require(
+            FileManager.default
+                .enumerator(at: sourcesURL, includingPropertiesForKeys: nil)?
+                .compactMap { $0 as? URL }
+                .filter { $0.pathExtension == "swift" && $0.lastPathComponent != "FriendlyError.swift" },
+            "Failed to enumerate Swift sources under \(sourcesURL)"
+        )
+
+        var violations: [String] = []
+        for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            let lines = source.components(separatedBy: .newlines)
+            for (offset, line) in lines.enumerated() {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("//") || trimmed.hasPrefix("*") || trimmed.hasPrefix("/*") {
+                    continue
+                }
+                if line.contains(".localizedDescription") {
+                    violations.append("\(file.lastPathComponent):\(offset + 1): \(trimmed)")
+                }
+            }
+        }
+
+        #expect(
+            violations.isEmpty,
+            "SDK surfaces must route errors through FriendlyError.message(for:) instead of reading .localizedDescription directly (issue #30, #160). Violations:\n\(violations.joined(separator: "\n"))"
+        )
+    }
 }

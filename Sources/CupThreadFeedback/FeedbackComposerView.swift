@@ -463,7 +463,7 @@ public struct FeedbackComposerView: View {
                 self.resetForm()
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = FriendlyError.message(for: error)
         }
 
         isSubmitting = false
