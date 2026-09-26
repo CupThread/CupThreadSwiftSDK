@@ -10,7 +10,8 @@ import Foundation
 /// would show partial groups and counts. This walks the server's keyset
 /// cursor until the result set is complete:
 ///
-/// - Stops when a page reports no ``ListFeatureRequestsResult/nextCursor``.
+/// - Stops when a page reports ``ListFeatureRequestsResult/hasMore`` is `false`
+///   or no ``ListFeatureRequestsResult/nextCursor``.
 /// - Stops once the collected count reaches the page's unpaginated
 ///   ``ListFeatureRequestsResult/total`` (ignored when the server omits it,
 ///   which decodes as `0`).
@@ -31,7 +32,7 @@ func collectAllRequests(
         let freshItems = page.requests.filter { seenIDs.insert($0.id).inserted }
         collected.append(contentsOf: freshItems)
         let reachedTotal = page.total > 0 && collected.count >= page.total
-        guard let nextCursor = page.nextCursor, !freshItems.isEmpty, !reachedTotal else {
+        guard page.hasMore, let nextCursor = page.nextCursor, !freshItems.isEmpty, !reachedTotal else {
             return collected
         }
         cursor = nextCursor
