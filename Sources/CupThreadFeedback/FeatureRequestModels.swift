@@ -62,8 +62,13 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     /// Whether an admin approved the request; unapproved requests show a
     /// "pending review" badge to their submitter.
     public let approved: Bool
-    /// Current total vote count.
+    /// Current total vote count (in-app votes plus historical votes copied
+    /// from external source providers at import time).
     public let voteCount: Int
+    /// Historical votes copied from an external source provider at import time
+    /// (GitHub issues/discussions, Linear, Notion, Slack), when any. Already
+    /// included in ``voteCount`` (not additive on top of it).
+    public let importedVotes: Int?
     /// Whether the user token of the last fetch has voted on this request.
     public let hasVoted: Bool
     /// Whether the request was submitted with the user token of the last fetch.
@@ -95,7 +100,8 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     ///   - recentCommenters: Recent commenters on this request.
     ///   - hasMoreCommenters: Whether more commenters exist beyond the list.
     ///   - approved: Whether the request passed admin review.
-    ///   - voteCount: Current vote count.
+    ///   - voteCount: Current total vote count (including imported historical votes).
+    ///   - importedVotes: Historical votes copied from a source provider at import time, if any.
     ///   - hasVoted: Whether the requesting user has voted.
     ///   - isOwnRequest: Whether the requesting user submitted this request.
     ///   - createdAt: ISO-8601 creation timestamp.
@@ -119,6 +125,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         hasMoreCommenters: Bool = false,
         approved: Bool,
         voteCount: Int,
+        importedVotes: Int? = nil,
         hasVoted: Bool,
         isOwnRequest: Bool,
         createdAt: String,
@@ -142,6 +149,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.hasMoreCommenters = hasMoreCommenters
         self.approved = approved
         self.voteCount = voteCount
+        self.importedVotes = importedVotes
         self.hasVoted = hasVoted
         self.isOwnRequest = isOwnRequest
         self.createdAt = createdAt
@@ -168,6 +176,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
             hasMoreCommenters: hasMoreCommenters,
             approved: approved,
             voteCount: count,
+            importedVotes: importedVotes,
             hasVoted: voted,
             isOwnRequest: isOwnRequest,
             createdAt: createdAt,
@@ -194,6 +203,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.hasMoreCommenters = try container.decodeIfPresent(Bool.self, forKey: .hasMoreCommenters) ?? false
         self.approved = try container.decodeIfPresent(Bool.self, forKey: .approved) ?? false
         self.voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0
+        self.importedVotes = try container.decodeIfPresent(Int.self, forKey: .importedVotes)
         self.hasVoted = try container.decodeIfPresent(Bool.self, forKey: .hasVoted) ?? false
         self.isOwnRequest = try container.decodeIfPresent(Bool.self, forKey: .isOwnRequest) ?? false
         self.createdAt = try container.decode(String.self, forKey: .createdAt)
@@ -204,7 +214,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         case id, appId, title, description, status
         case columnId, columnSlug, columnName, versionId, versionLabel
         case releasedVersion, requesterName, requesterAvatarUrl, requesterClerkId
-        case recentCommenters, hasMoreCommenters, approved, voteCount
+        case recentCommenters, hasMoreCommenters, approved, voteCount, importedVotes
         case hasVoted, isOwnRequest, createdAt, updatedAt
     }
 }
@@ -256,6 +266,19 @@ public struct VoteResult: Decodable, Equatable, Sendable {
     public let voted: Bool
     /// The request's authoritative vote count after the toggle.
     public let voteCount: Int
+    /// Historical votes copied from an external source provider at import time, when any.
+    public let importedVotes: Int?
+
+    /// Creates a vote result.
+    /// - Parameters:
+    ///   - voted: The user's vote state after the toggle.
+    ///   - voteCount: The request's authoritative vote count after the toggle.
+    ///   - importedVotes: Historical votes copied from an external source provider at import time, if any.
+    public init(voted: Bool, voteCount: Int, importedVotes: Int? = nil) {
+        self.voted = voted
+        self.voteCount = voteCount
+        self.importedVotes = importedVotes
+    }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -265,10 +288,11 @@ public struct VoteResult: Decodable, Equatable, Sendable {
             ?? container.decodeIfPresent(Bool.self, forKey: .hasVoted)
             ?? false
         voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0
+        importedVotes = try container.decodeIfPresent(Int.self, forKey: .importedVotes)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case voted, hasVoted, voteCount
+        case voted, hasVoted, voteCount, importedVotes
     }
 }
 

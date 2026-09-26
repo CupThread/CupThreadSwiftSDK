@@ -272,6 +272,7 @@ struct PublicAPITests {
         #expect(item.recentCommenters.count == 1)
         #expect(item.recentCommenters[0].authorName == "Bob")
         #expect(item.hasMoreCommenters == true)
+        #expect(item.importedVotes == nil)
     }
 
     @Test func featureRequestItemDecodesBackwardCompat() throws {
@@ -303,6 +304,7 @@ struct PublicAPITests {
         #expect(item.requesterClerkId == nil)
         #expect(item.recentCommenters.isEmpty)
         #expect(item.hasMoreCommenters == false)
+        #expect(item.importedVotes == nil)
     }
 
     @Test func featureRequestItemDecodesCustomStatusWithoutColumn() throws {
@@ -351,6 +353,7 @@ struct PublicAPITests {
             hasMoreCommenters: true,
             approved: true,
             voteCount: 3,
+            importedVotes: 2,
             hasVoted: false,
             isOwnRequest: false,
             createdAt: "2026-01-01T00:00:00.000Z",
@@ -361,6 +364,7 @@ struct PublicAPITests {
 
         #expect(updated.voteCount == 4)
         #expect(updated.hasVoted == true)
+        #expect(updated.importedVotes == 2)
         #expect(updated.title == base.title)
         #expect(updated.columnName == base.columnName)
         #expect(updated.requesterAvatarUrl == base.requesterAvatarUrl)
