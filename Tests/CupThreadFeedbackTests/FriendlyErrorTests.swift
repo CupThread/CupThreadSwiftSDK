@@ -279,4 +279,26 @@ struct FriendlyErrorTests {
             "SDK surfaces must route errors through FriendlyError.message(for:) instead of reading .localizedDescription directly (issue #30, #160). Violations:\n\(violations.joined(separator: "\n"))"
         )
     }
+
+    // MARK: - Success-path warning guarantees (issue #198)
+
+    @Test func submissionWarningHTMLBodyNeverReachesRenderedUIOrMapper() throws {
+        let rawWarning = "<html><body><h1>502 Bad Gateway</h1><pre>Traceback /internal/api.py</pre></body></html>"
+        let result = FeedbackSubmissionResult(
+            submissionId: "sub-html-warn",
+            warning: rawWarning,
+            warningCode: "attachment_signing_unconfigured"
+        )
+
+        // Raw warning is preserved on the model for host logging/diagnostics (#198 requirement 3)
+        #expect(result.warning == rawWarning)
+
+        // Mapped message is strictly curated and localized (#198 requirement 2)
+        let displayMessage = try #require(FeedbackSubmissionWarning.message(for: result))
+        #expect(!displayMessage.contains("<"))
+        #expect(!displayMessage.contains("<html>"))
+        #expect(!displayMessage.contains("Traceback"))
+        #expect(!displayMessage.contains("502"))
+        #expect(displayMessage == CupThreadStrings.tr("cupthread.feedback.warning_attachment_signing_unconfigured"))
+    }
 }

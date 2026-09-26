@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "Sender…";
 "cupthread.feedback.thanks_title" = "Mange tak!";
 "cupthread.feedback.thanks_subtitle" = "Din feedback er sendt til teamet.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "Din feedback blev sendt, men vedhæftede filer kunne ikke gemmes.";
+"cupthread.feedback.warning_generic" = "Din feedback blev sendt, men visse elementer kunne ikke behandles.";
 "cupthread.feedback.send_more" = "Send mere feedback";
 "cupthread.feedback.accessibility_sent" = "Feedback blev sendt.";
 

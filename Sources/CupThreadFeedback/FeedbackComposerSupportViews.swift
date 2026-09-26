@@ -29,10 +29,27 @@ struct FeedbackSentView: View {
 
     init(
         warning: String? = nil,
+        warningCode: String? = nil,
         onDismiss: (() -> Void)? = nil,
         onSendMore: @escaping () -> Void
     ) {
-        self.warning = warning
+        if warningCode != nil {
+            self.warning = FeedbackSubmissionWarning.message(code: warningCode, warning: warning)
+        } else if let warning {
+            self.warning = FeedbackSubmissionWarning.message(code: nil, warning: warning)
+        } else {
+            self.warning = nil
+        }
+        self.onDismiss = onDismiss
+        self.onSendMore = onSendMore
+    }
+
+    init(
+        warningMessage: String?,
+        onDismiss: (() -> Void)? = nil,
+        onSendMore: @escaping () -> Void
+    ) {
+        self.warning = warningMessage
         self.onDismiss = onDismiss
         self.onSendMore = onSendMore
     }

@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "보내는 중…";
 "cupthread.feedback.thanks_title" = "감사합니다!";
 "cupthread.feedback.thanks_subtitle" = "피드백이 팀에 성공적으로 전달되었습니다.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "피드백이 전송되었지만 첨부 파일을 저장하지 못했습니다.";
+"cupthread.feedback.warning_generic" = "피드백이 전송되었지만 일부 항목을 처리하지 못했습니다.";
 "cupthread.feedback.send_more" = "피드백 더 보내기";
 "cupthread.feedback.accessibility_sent" = "피드백이 성공적으로 전송되었습니다.";
 

@@ -115,6 +115,9 @@ public struct FeedbackComposerView: View {
     ///   - onDismiss: Optional dismissal action callback.
     ///   - onSubmit: Called with the server's receipt after a successful
     ///     submission — use it to log, show a toast, or deep-link elsewhere.
+    ///     Inspect ``FeedbackSubmissionResult/warningCode`` to branch on structured
+    ///     server warnings; ``FeedbackSubmissionResult/warning`` contains the raw
+    ///     server-provided diagnostic string and should not be displayed directly to users.
     public init(
         client: FeedbackClient,
         initialDraft: FeedbackDraft? = nil,
@@ -142,7 +145,11 @@ public struct FeedbackComposerView: View {
     public var body: some View {
         Group {
             if let result {
-                FeedbackSentView(warning: result.warning, onDismiss: onDismiss ?? { dismiss() }) {
+                FeedbackSentView(
+                    warning: result.warning,
+                    warningCode: result.warningCode,
+                    onDismiss: onDismiss ?? { dismiss() }
+                ) {
                     withAnimation(.snappy(duration: 0.3)) {
                         self.result = nil
                         self.resetForm()
