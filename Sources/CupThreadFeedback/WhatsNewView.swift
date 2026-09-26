@@ -178,10 +178,14 @@ public struct WhatsNewView: View {
 
     // MARK: Entry-point labels
 
-    private var subscribeEntryTitle: String {
+    nonisolated static func subscribeEntryTitle(subscribedEmail: String?) -> String {
         subscribedEmail == nil
             ? CupThreadStrings.tr("cupthread.whatsnew.subscribe_button")
-            : "Manage Emails"
+            : CupThreadStrings.tr("cupthread.whatsnew.emails_on")
+    }
+
+    var subscribeEntryTitle: String {
+        Self.subscribeEntryTitle(subscribedEmail: subscribedEmail)
     }
 
     private var subscribeEntryIcon: String {

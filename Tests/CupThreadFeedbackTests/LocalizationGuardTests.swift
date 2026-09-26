@@ -23,7 +23,8 @@ struct LocalizationGuardTests {
             ("view text", #"\b(?:Text|Label|Button|Toggle|TextField|ProgressView)\("([^"]*)""#),
             ("accessibility", #"\.accessibility(?:Label|Value|Hint)\("([^"]*)""#),
             ("navigation title", #"\.navigationTitle\("([^"]*)""#),
-            ("error message", #"NSLocalizedDescriptionKey:\s*"([^"]*)""#)
+            ("error message", #"NSLocalizedDescriptionKey:\s*"([^"]*)""#),
+            ("ternary branch", #"^\s*(?:\?|:)\s*"([^"]+)""#)
         ]
         return specs.compactMap { name, pattern in
             guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
