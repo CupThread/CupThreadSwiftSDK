@@ -355,14 +355,22 @@ public extension PublicAppConfig {
 
     /// Whether an anonymous SDK user may vote on feature requests
     /// (console switch `allowAnonymousVote`).
+    ///
+    /// Combines ``allowPublic`` (the public pages are hidden entirely) with
+    /// ``allowAnonymousVote``. Client gating is UX preflight — the server
+    /// stays authoritative.
     var allowsAnonymousVote: Bool {
-        allowAnonymousVote
+        allowPublic && allowAnonymousVote
     }
 
     /// Whether an anonymous SDK user may submit feedback or feature requests
     /// (console switch `allowAnonymousFeedback`).
+    ///
+    /// Combines ``allowPublic`` (the public pages are hidden entirely) with
+    /// ``allowAnonymousFeedback``. Client gating is UX preflight — the server
+    /// stays authoritative.
     var allowsAnonymousFeedback: Bool {
-        allowAnonymousFeedback
+        allowPublic && allowAnonymousFeedback
     }
 
     /// Whether submissions reported from `platform` pass the console's
