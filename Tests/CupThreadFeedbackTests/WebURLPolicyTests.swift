@@ -168,22 +168,26 @@ struct MarkdownTextSanitizationTests {
 
 @Suite("RemoteImageURLValidation")
 struct RemoteImageURLValidationTests {
-    @Test func remoteImageURLAcceptsValidHttpAndHttpsURLs() throws {
+    @Test func remoteImageURLAcceptsValidHttpsURLs() throws {
         let valid = [
             "https://cdn.example.com/avatar.png",
-            "http://images.example.org/user/123.jpg",
             "https://sub.domain.org/path/icon.webp?size=small#hash",
-            "  https://cdn.example.com/trimmed.png  "
+            "  https://cdn.example.com/trimmed.png  ",
+            "https://images.example.com:8443/user/123.jpg"
         ]
 
         for item in valid {
             let url = try #require(remoteImageURL(from: item), "Expected \(item) to be accepted")
-            #expect(isAllowedWebURL(url) == true)
+            #expect(url.scheme == "https")
+            #expect(isAllowedSecureImageURL(url) == true)
         }
     }
 
-    @Test func remoteImageURLRejectsDisallowedSchemes() {
+    @Test func remoteImageURLRejectsNonHttpsAndDisallowedSchemes() {
         let disallowed = [
+            "http://images.example.org/user/123.jpg",
+            "http://example.com/avatar.png",
+            "http://localhost:3000/avatar.png",
             "file:///etc/passwd",
             "file:///Users/lex/avatar.png",
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY44YAAAAASUVORK5CYII=",
@@ -211,7 +215,10 @@ struct RemoteImageURLValidationTests {
         #expect(remoteImageURL(from: "//example.com/avatar.png") == nil)
     }
 
-    @Test func avatarViewResolvedURLFiltersDisallowedSchemes() {
+    @Test func avatarViewResolvedURLFallsBackToNilForNonHttpsOrDisallowedSchemes() {
+        let httpAvatar = AvatarView(url: "http://insecure.example.com/avatar.png")
+        #expect(httpAvatar.resolvedURL == nil, "Non-HTTPS URL must resolve to nil and fall back to placeholder")
+
         let maliciousAvatar = AvatarView(url: "file:///etc/passwd")
         #expect(maliciousAvatar.resolvedURL == nil)
 
@@ -226,5 +233,8 @@ struct RemoteImageURLValidationTests {
 
         let nilAvatar = AvatarView(url: nil)
         #expect(nilAvatar.resolvedURL == nil)
+
+        let emptyAvatar = AvatarView(url: "   ")
+        #expect(emptyAvatar.resolvedURL == nil)
     }
 }
