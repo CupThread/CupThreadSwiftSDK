@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "L’accès anonyme à la feuille de route est désactivé dans la console CupThread.";
 "cupthread.permission.requests_title" = "Impossible d’envoyer une demande";
 "cupthread.permission.requests_description" = "Les demandes de fonctionnalités anonymes sont désactivées dans la console CupThread.";
+"cupthread.permission.changelog_title" = "Impossible d’afficher le journal des modifications";
+"cupthread.permission.changelog_description" = "L’accès anonyme au journal des modifications est désactivé dans la console CupThread.";
 "cupthread.error.forbidden" = "Cette action n’est pas disponible pour cette app.";

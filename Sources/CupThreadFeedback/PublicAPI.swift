@@ -365,6 +365,12 @@ public extension PublicAppConfig {
         allowAnonymousFeedback
     }
 
+    /// Whether an anonymous SDK user may read the changelog
+    /// (console switch `allowAnonymousChangelog`).
+    var allowsAnonymousChangelog: Bool {
+        allowAnonymousChangelog
+    }
+
     /// Whether submissions reported from `platform` pass the console's
     /// platform allow-list. An empty allow-list means unrestricted.
     /// - Parameter platform: The platform a submission would report.

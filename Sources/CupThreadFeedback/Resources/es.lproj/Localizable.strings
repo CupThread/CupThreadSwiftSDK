@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "El acceso anónimo a la hoja de ruta está desactivado en la consola de CupThread.";
 "cupthread.permission.requests_title" = "No se pueden enviar solicitudes";
 "cupthread.permission.requests_description" = "Las solicitudes de funciones anónimas están desactivadas en la consola de CupThread.";
+"cupthread.permission.changelog_title" = "No se puede ver el registro de cambios";
+"cupthread.permission.changelog_description" = "El acceso anónimo al registro de cambios está desactivado en la consola de CupThread.";
 "cupthread.error.forbidden" = "Esta acción no está disponible para esta app.";

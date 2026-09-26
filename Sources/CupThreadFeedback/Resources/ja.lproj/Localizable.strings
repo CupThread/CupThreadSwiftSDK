@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "CupThreadコンソールで匿名のロードマップ閲覧がオフになっています。";
 "cupthread.permission.requests_title" = "リクエストを送信できません";
 "cupthread.permission.requests_description" = "CupThreadコンソールで匿名の機能リクエストがオフになっています。";
+"cupthread.permission.changelog_title" = "更新履歴を表示できません";
+"cupthread.permission.changelog_description" = "CupThreadコンソールで匿名の更新履歴閲覧がオフになっています。";
 "cupthread.error.forbidden" = "このアプリではその操作を利用できません。";

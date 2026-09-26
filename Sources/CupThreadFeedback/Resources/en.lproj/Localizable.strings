@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "Anonymous access to the roadmap is turned off in the CupThread console.";
 "cupthread.permission.requests_title" = "Can't Submit Requests";
 "cupthread.permission.requests_description" = "Anonymous feature requests are turned off in the CupThread console.";
+"cupthread.permission.changelog_title" = "Can't View Changelog";
+"cupthread.permission.changelog_description" = "Anonymous access to the changelog is turned off in the CupThread console.";
 "cupthread.error.forbidden" = "This action isn't available for this app.";

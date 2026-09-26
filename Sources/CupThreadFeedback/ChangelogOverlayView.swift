@@ -27,6 +27,7 @@ public struct ChangelogOverlayView: View {
     @State private var isLoading = true
     @State private var loadError: String?
     @State private var featureDisabled = false
+    @State private var permissionDenied = false
     @State private var hasMarkedSeen = false
 
     /// Creates the overlay sheet.
@@ -114,6 +115,11 @@ public struct ChangelogOverlayView: View {
                     }
                 } else if featureDisabled {
                     FeatureDisabledView(feature: .changelog)
+                } else if permissionDenied {
+                    SdkPermissionDeniedView(
+                        titleKey: "cupthread.permission.changelog_title",
+                        descriptionKey: "cupthread.permission.changelog_description"
+                    )
                 } else {
                     content
                 }
@@ -128,7 +134,7 @@ public struct ChangelogOverlayView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if !isLoading && loadError == nil && !featureDisabled {
+                if !isLoading && loadError == nil && !featureDisabled && !permissionDenied {
                     Button(overlay.primaryButton) { primary() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
@@ -181,6 +187,9 @@ public struct ChangelogOverlayView: View {
         /// The console turned the changelog surface off; no entries were
         /// fetched and the overlay shows the shared disabled placeholder.
         case featureDisabled(SdkAppearance)
+        /// The console turned anonymous changelog reading off; no entries
+        /// were fetched and the overlay shows the permission-denied placeholder.
+        case permissionDenied(SdkAppearance)
         /// Newest entries capped by the console's entry count, plus the
         /// console appearance.
         case entries([ChangelogEntry], appearance: SdkAppearance)
@@ -203,6 +212,9 @@ public struct ChangelogOverlayView: View {
             let config = try await client.cachedAppConfig()
             guard config.sdk.features.isEnabled(.changelog) else {
                 return .featureDisabled(config.sdk)
+            }
+            guard changelogLoadPlan(config: config) == .load else {
+                return .permissionDenied(config.sdk)
             }
             let all = try await client.fetchChangelog()
             return .entries(
@@ -286,6 +298,7 @@ public struct ChangelogOverlayView: View {
             isLoading = true
             loadError = nil
             featureDisabled = false
+            permissionDenied = false
             defer { isLoading = false }
             switch await Self.fetchSelfLoadedContent(in: client) {
             case .entries(let loaded, let loadedAppearance):
@@ -294,6 +307,9 @@ public struct ChangelogOverlayView: View {
             case .featureDisabled(let loadedAppearance):
                 appearance = loadedAppearance
                 featureDisabled = true
+            case .permissionDenied(let loadedAppearance):
+                appearance = loadedAppearance
+                permissionDenied = true
             case .failed(let message):
                 loadError = message
             case nil:
@@ -448,6 +464,7 @@ extension FeedbackClient {
     ) async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
         let config = try await cachedAppConfig()
         guard config.sdk.features.isEnabled(.changelog) else { return nil }
+        guard changelogLoadPlan(config: config) == .load else { return nil }
         let all = try await fetchChangelog()
         let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
         guard let latest = entries.first else { return nil }

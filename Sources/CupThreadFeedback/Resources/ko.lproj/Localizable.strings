@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "CupThread 콘솔에서 익명 로드맵 접근이 꺼져 있습니다.";
 "cupthread.permission.requests_title" = "요청을 제출할 수 없음";
 "cupthread.permission.requests_description" = "CupThread 콘솔에서 익명 기능 요청이 꺼져 있습니다.";
+"cupthread.permission.changelog_title" = "변경 내역을 볼 수 없음";
+"cupthread.permission.changelog_description" = "CupThread 콘솔에서 익명 변경 내역 접근이 꺼져 있습니다.";
 "cupthread.error.forbidden" = "이 앱에서는 해당 작업을 사용할 수 없습니다.";

@@ -19,9 +19,11 @@ struct ChangelogOverlayPresentationTests {
     @discardableResult
     private func mockChangelogAPI(
         changelogEnabled: Bool = true,
+        allowAnonymousChangelog: Bool = true,
         entries: [[String: Any]] = [makeDefaultEntry()]
     ) -> CaptureBox<[String]> {
         var payload = makeConfigJSON()
+        payload["allowAnonymousChangelog"] = allowAnonymousChangelog
         payload["sdk"] = [
             "theme": "system",
             "features": ["changelog": changelogEnabled],
@@ -200,6 +202,49 @@ struct ChangelogOverlayPresentationTests {
         let paths = requests.value ?? []
         #expect(paths.contains { $0.contains("/config/") })
         #expect(paths.contains { $0.contains("/changelog") })
+    }
+
+    @Test func selfLoadedOverlaySkipsChangelogFetchWhenAnonymousChangelogDisabled() async throws {
+        let requests = mockChangelogAPI(changelogEnabled: true, allowAnonymousChangelog: false)
+        let client = Self.makeChangelogClient()
+
+        let content = await ChangelogOverlayView.fetchSelfLoadedContent(in: client)
+
+        guard case .permissionDenied(let appearance)? = content else {
+            Issue.record("Expected .permissionDenied, got \(String(describing: content))")
+            return
+        }
+        #expect(appearance.changelogOverlay.title == "What's New")
+        let paths = requests.value ?? []
+        #expect(paths.contains { $0.contains("/config/") })
+        #expect(!paths.contains { $0.contains("/changelog") })
+    }
+
+    @Test func selfLoadedOverlayFeatureDisabledWinsOverPermissionDenied() async throws {
+        let requests = mockChangelogAPI(changelogEnabled: false, allowAnonymousChangelog: false)
+        let client = Self.makeChangelogClient()
+
+        let content = await ChangelogOverlayView.fetchSelfLoadedContent(in: client)
+
+        guard case .featureDisabled(let appearance)? = content else {
+            Issue.record("Expected .featureDisabled, got \(String(describing: content))")
+            return
+        }
+        #expect(appearance.changelogOverlay.title == "What's New")
+        let paths = requests.value ?? []
+        #expect(paths.contains { $0.contains("/config/") })
+        #expect(!paths.contains { $0.contains("/changelog") })
+    }
+
+    @Test func prepareChangelogOverlayReturnsNilWhenAnonymousChangelogDisabled() async throws {
+        let requests = mockChangelogAPI(changelogEnabled: true, allowAnonymousChangelog: false)
+        let client = Self.makeChangelogClient()
+
+        let result = try await client.prepareChangelogOverlay()
+        #expect(result == nil)
+        let paths = requests.value ?? []
+        #expect(paths.contains { $0.contains("/config/") })
+        #expect(!paths.contains { $0.contains("/changelog") })
     }
 }
 

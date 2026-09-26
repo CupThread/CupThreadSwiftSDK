@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "CupThread 控制台已关闭匿名路线图访问。";
 "cupthread.permission.requests_title" = "无法提交需求";
 "cupthread.permission.requests_description" = "CupThread 控制台已关闭匿名功能请求。";
+"cupthread.permission.changelog_title" = "无法查看更新日志";
+"cupthread.permission.changelog_description" = "CupThread 控制台已关闭匿名更新日志访问。";
 "cupthread.error.forbidden" = "此应用当前不允许该操作。";

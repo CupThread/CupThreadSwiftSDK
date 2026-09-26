@@ -23,6 +23,11 @@ public struct WhatsNewView: View {
     @State private var isSubscribePresented = false
     /// The remembered subscription email; drives the entry-point copy.
     @State private var subscribedEmail: String?
+    @Environment(\.sdkAppConfig) private var sdkAppConfig
+
+    private var isChangelogPermitted: Bool {
+        changelogLoadPlan(config: sdkAppConfig) == .load
+    }
 
     private var subscriptionStore: ChangelogSubscriptionStore {
         ChangelogSubscriptionStore(appKey: client.configuration.appKey)
@@ -40,18 +45,27 @@ public struct WhatsNewView: View {
 
     public var body: some View {
         Group {
-            #if os(tvOS)
-            tvList
-            #else
-            cardScroll
-            #endif
+            if !isChangelogPermitted {
+                SdkPermissionDeniedView(
+                    titleKey: "cupthread.permission.changelog_title",
+                    descriptionKey: "cupthread.permission.changelog_description"
+                )
+            } else {
+                #if os(tvOS)
+                tvList
+                #else
+                cardScroll
+                #endif
+            }
         }
         .navigationTitle(CupThreadStrings.tr("cupthread.whatsnew.title"))
         #if os(iOS) || os(visionOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            subscribeToolbarItem
+            if isChangelogPermitted {
+                subscribeToolbarItem
+            }
         }
         .sheet(isPresented: $isSubscribePresented) {
             ChangelogSubscribeView(client: client, userToken: userToken)
@@ -63,8 +77,16 @@ public struct WhatsNewView: View {
                 subscribedEmail = subscriptionStore.subscribedEmail()
             }
         }
-        .refreshable { await loadEntries() }
+        .refreshable {
+            guard isChangelogPermitted else { return }
+            await loadEntries()
+        }
         .task {
+            guard isChangelogPermitted else {
+                isLoading = false
+                hasLoadedOnce = true
+                return
+            }
             subscribedEmail = subscriptionStore.subscribedEmail()
             await loadEntries()
         }
@@ -170,6 +192,11 @@ public struct WhatsNewView: View {
 
     @MainActor
     private func loadEntries() async {
+        guard changelogLoadPlan(config: sdkAppConfig) == .load else {
+            isLoading = false
+            hasLoadedOnce = true
+            return
+        }
         isLoading = true
         loadError = nil
         defer {
@@ -177,7 +204,10 @@ public struct WhatsNewView: View {
             hasLoadedOnce = true
         }
         do {
-            entries = try await client.fetchChangelog()
+            guard let fetched = try await loadChangelogEntries(client: client, config: sdkAppConfig) else {
+                return
+            }
+            entries = fetched
         } catch {
             // A cancelled load (dismissal, superseded restart) never reached
             // a verdict — keep the currently rendered entries.

@@ -174,4 +174,6 @@
 "cupthread.permission.roadmap_description" = "Anonym adgang til køreplanen er slået fra i CupThread-konsollen.";
 "cupthread.permission.requests_title" = "Kan ikke sende ønsker";
 "cupthread.permission.requests_description" = "Anonyme funktionsønsker er slået fra i CupThread-konsollen.";
+"cupthread.permission.changelog_title" = "Kan ikke vise ændringsloggen";
+"cupthread.permission.changelog_description" = "Anonym adgang til ændringsloggen er slått fra i CupThread-konsollen.";
 "cupthread.error.forbidden" = "Denne handling er ikke tilgængelig for denne app.";
