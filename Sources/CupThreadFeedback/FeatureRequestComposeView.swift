@@ -1,5 +1,17 @@
 import SwiftUI
 
+/// What dismissal affordance the feature request composer sheet exposes in the navigation bar.
+enum FeatureRequestComposeDismissalAffordance: Equatable, Sendable {
+    /// The compose sheet shows the permission-denied placeholder with a direct Close button.
+    case close
+    /// The compose sheet shows the form guarded against accidental discard.
+    case guardedCancel
+
+    static func resolve(config: PublicAppConfig?) -> FeatureRequestComposeDismissalAffordance {
+        SdkSubmissionDenial.forFeatureRequest(config: config) != .none ? .close : .guardedCancel
+    }
+}
+
 /// Compose sheet for submitting a new feature request proposal.
 struct FeatureRequestComposeView: View {
     let client: FeedbackClient
@@ -10,42 +22,42 @@ struct FeatureRequestComposeView: View {
     @State private var isSubmitting = false
     @State private var submitError: String?
     @Environment(\.sdkAppConfig) private var sdkAppConfig
+    @Environment(\.dismiss) private var dismiss
+
+    private let configOverride: PublicAppConfig?
+
+    init(
+        client: FeedbackClient,
+        userToken: String,
+        config: PublicAppConfig? = nil,
+        onSubmitted: @escaping () -> Void
+    ) {
+        self.client = client
+        self.userToken = userToken
+        self.configOverride = config
+        self.onSubmitted = onSubmitted
+    }
+
+    private var activeConfig: PublicAppConfig? {
+        configOverride ?? sdkAppConfig
+    }
+
+    var dismissalAffordance: FeatureRequestComposeDismissalAffordance {
+        FeatureRequestComposeDismissalAffordance.resolve(config: activeConfig)
+    }
 
     var body: some View {
         NavigationStack {
-            if SdkSubmissionDenial.forFeatureRequest(config: sdkAppConfig) != .none {
-                SdkSubmissionDenial.anonymousFeedbackDisabled.featureRequestPlaceholder
-            } else {
-            Form {
-                Section {
-                    TextField(
-                        CupThreadStrings.tr("cupthread.feedback.title_label"),
-                        text: $draft.title,
-                        prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary"))
-                    )
-                    TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
-                        .lineLimit(5...10)
-                        .padding(.top, 2)
-                } header: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
-                } footer: {
-                    Text(CupThreadStrings.tr("cupthread.features.compose_desc_prompt"))
-                }
-
-                Section {
-                    TextField(CupThreadStrings.tr("cupthread.features.compose_name_prompt"), text: $draft.requesterName)
-                } header: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
-                } footer: {
-                    Text(CupThreadStrings.tr("cupthread.feedback.section_contact_footer"))
-                }
-
-                if let submitError {
-                    Section {
-                        ErrorBanner(message: submitError)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .listRowBackground(Color.clear)
-                    }
+            Group {
+                if dismissalAffordance == .close {
+                    SdkSubmissionDenial.anonymousFeedbackDisabled.featureRequestPlaceholder
+                } else {
+                    formContent
+                        .composerDismissGuard(
+                            hasContent: draft.hasContent,
+                            isSubmitting: isSubmitting,
+                            discardTitleKey: "cupthread.features.compose_discard_title"
+                        )
                 }
             }
             .navigationTitle(CupThreadStrings.tr("cupthread.features.compose_title"))
@@ -56,22 +68,60 @@ struct FeatureRequestComposeView: View {
             .frame(minWidth: 460, minHeight: 420)
             #endif
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(
-                        isSubmitting
-                            ? CupThreadStrings.tr("cupthread.features.compose_sending")
-                            : CupThreadStrings.tr("cupthread.features.compose_submit")
-                    ) {
-                        Task { await submit() }
+                if dismissalAffordance == .close {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(CupThreadStrings.tr("cupthread.whatsnew.close_button")) {
+                            dismiss()
+                        }
                     }
-                    .disabled(isSubmitting || !canSubmit)
                 }
             }
-            .composerDismissGuard(
-                hasContent: draft.hasContent,
-                isSubmitting: isSubmitting,
-                discardTitleKey: "cupthread.features.compose_discard_title"
-            )
+        }
+    }
+
+    private var formContent: some View {
+        Form {
+            Section {
+                TextField(
+                    CupThreadStrings.tr("cupthread.feedback.title_label"),
+                    text: $draft.title,
+                    prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary"))
+                )
+                TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
+                    .lineLimit(5...10)
+                    .padding(.top, 2)
+            } header: {
+                Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
+            } footer: {
+                Text(CupThreadStrings.tr("cupthread.features.compose_desc_prompt"))
+            }
+
+            Section {
+                TextField(CupThreadStrings.tr("cupthread.features.compose_name_prompt"), text: $draft.requesterName)
+            } header: {
+                Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
+            } footer: {
+                Text(CupThreadStrings.tr("cupthread.feedback.section_contact_footer"))
+            }
+
+            if let submitError {
+                Section {
+                    ErrorBanner(message: submitError)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button(
+                    isSubmitting
+                        ? CupThreadStrings.tr("cupthread.features.compose_sending")
+                        : CupThreadStrings.tr("cupthread.features.compose_submit")
+                ) {
+                    Task { await submit() }
+                }
+                .disabled(isSubmitting || !canSubmit)
             }
         }
     }
@@ -83,7 +133,7 @@ struct FeatureRequestComposeView: View {
 
     @MainActor
     private func submit() async {
-        guard SdkSubmissionDenial.forFeatureRequest(config: sdkAppConfig) == .none else { return }
+        guard SdkSubmissionDenial.forFeatureRequest(config: activeConfig) == .none else { return }
         isSubmitting = true
         submitError = nil
         defer { isSubmitting = false }

@@ -125,8 +125,8 @@ public struct FeatureRequestsView: View {
                     Task { await loadFeatureRequests() }
                 }
             } else {
-                NavigationStack {
-                    SdkSubmissionDenial.anonymousFeedbackDisabled.featureRequestPlaceholder
+                FeatureRequestDenialSheet {
+                    isComposePresented = false
                 }
             }
         }

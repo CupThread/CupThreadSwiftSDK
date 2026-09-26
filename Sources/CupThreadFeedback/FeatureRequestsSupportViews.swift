@@ -172,3 +172,26 @@ func featureRequestsComposeToolbar(
         }
     }
 }
+
+/// Denial placeholder sheet presented when anonymous feature request proposals are disabled.
+struct FeatureRequestDenialSheet: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            SdkSubmissionDenial.anonymousFeedbackDisabled.featureRequestPlaceholder
+                .navigationTitle(CupThreadStrings.tr("cupthread.features.compose_title"))
+                #if os(iOS) || os(visionOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                #if os(macOS)
+                .frame(minWidth: 460, minHeight: 420)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(CupThreadStrings.tr("cupthread.whatsnew.close_button"), action: onDismiss)
+                    }
+                }
+        }
+    }
+}
