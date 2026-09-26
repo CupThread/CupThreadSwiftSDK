@@ -10,7 +10,8 @@ extension FeedbackClient {
     /// always bound to an uploader identity, and feedback submission must
     /// later present the same identity. When `userToken` is `nil`, the SDK
     /// falls back to the client's app-key-scoped store so anonymous flows keep a
-    /// stable identity.
+    /// stable identity. Authenticated callers attach the client's bearer token
+    /// via the configured `authenticationProvider`.
     ///
     /// - Parameters:
     ///   - files: One specification per file to pre-allocate (1–8).
@@ -48,6 +49,7 @@ extension FeedbackClient {
         if effectiveTurnstileToken == nil {
             effectiveTurnstileToken = await resolvedTurnstileToken()
         }
+        await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(CreateSessionPayload(
             appKey: configuration.appKey,
             purpose: "feedback_attachment",

@@ -329,6 +329,99 @@ struct FeedbackUploadStreamingTests {
         #expect(putRequest.url?.path == "/api/v1/uploads/stream-custom-rel")
         #expect(attachment.uploadId == "upl-stream-1")
     }
+
+    @Test func createUploadSessionAppliesBearerTokenWhenConfigured() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: host) { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 201), try encodeJSON(self.makeSessionJSON()))
+        }
+
+        let client = makeClient(baseURL: baseURL, authenticationProvider: { "secret_user_jwt" })
+        _ = try await client.createUploadSession(
+            files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
+            userToken: "tok"
+        )
+
+        let req = try #require(capture.value)
+        #expect(req.value(forHTTPHeaderField: "Authorization") == "Bearer secret_user_jwt")
+    }
+
+    @Test func createUploadSessionOmitsAuthorizationHeaderWhenProviderReturnsNilOrEmpty() async throws {
+        let captureNil = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: host) { request in
+            captureNil.value = request
+            return (makeHTTPResponse(status: 201), try encodeJSON(self.makeSessionJSON()))
+        }
+
+        let clientWithNil = makeClient(baseURL: baseURL, authenticationProvider: { nil })
+        _ = try await clientWithNil.createUploadSession(
+            files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
+            userToken: "tok"
+        )
+        let reqNil = try #require(captureNil.value)
+        #expect(reqNil.value(forHTTPHeaderField: "Authorization") == nil)
+
+        let captureEmpty = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: host) { request in
+            captureEmpty.value = request
+            return (makeHTTPResponse(status: 201), try encodeJSON(self.makeSessionJSON()))
+        }
+
+        let clientWithEmpty = makeClient(baseURL: baseURL, authenticationProvider: { "   " })
+        _ = try await clientWithEmpty.createUploadSession(
+            files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
+            userToken: "tok"
+        )
+        let reqEmpty = try #require(captureEmpty.value)
+        #expect(reqEmpty.value(forHTTPHeaderField: "Authorization") == nil)
+    }
+
+    @Test func createUploadSessionWithoutProviderOmitsAuthorizationHeader() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: host) { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 201), try encodeJSON(self.makeSessionJSON()))
+        }
+
+        let client = makeClient(baseURL: baseURL)
+        _ = try await client.createUploadSession(
+            files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
+            userToken: "tok"
+        )
+
+        let req = try #require(capture.value)
+        #expect(req.value(forHTTPHeaderField: "Authorization") == nil)
+    }
+
+    @Test func uploadAttachmentFileStreamSendsUserBearerOnSessionCreateAndSessionTokenOnSlotPut() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.setHandler(forHost: host, makeSessionFlowHandler(
+            requests: requests, sessionJSON: makeSessionJSON()
+        ))
+
+        let fixtureURL = try makeTempFixtureFile(Data("sample".utf8))
+        defer { try? FileManager.default.removeItem(at: fixtureURL) }
+
+        let client = makeClient(baseURL: baseURL, authenticationProvider: { "user_jwt_456" })
+        _ = try await client.uploadAttachment(
+            fileURL: fixtureURL,
+            filename: "sample.txt",
+            mimeType: "text/plain",
+            userToken: "tok"
+        )
+
+        let captured = try #require(requests.value)
+        #expect(captured.count == 2)
+        let sessionPost = captured[0]
+        let slotPut = captured[1]
+
+        #expect(sessionPost.httpMethod == "POST")
+        #expect(sessionPost.value(forHTTPHeaderField: "Authorization") == "Bearer user_jwt_456")
+
+        #expect(slotPut.httpMethod == "PUT")
+        #expect(slotPut.value(forHTTPHeaderField: "Authorization") == "Bearer stok-stream")
+    }
 }
 
 private extension Array {
