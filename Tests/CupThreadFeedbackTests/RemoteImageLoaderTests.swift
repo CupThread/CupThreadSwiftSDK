@@ -144,4 +144,49 @@ struct RemoteImageLoaderTests {
 
         #expect(counter.requestCount == 2)
     }
+
+    @Test func disallowedSchemeThrowsBadURLWithoutHittingNetwork() async throws {
+        let counter = RequestCounter()
+        MockURLProtocol.setHandler(forHost: Self.host) { _ in
+            counter.record()
+            return (self.makeImageResponse(self.makeImageURL("/fallback.png")), self.makePNGData())
+        }
+        let loader = RemoteImageLoader(session: makeMockSession())
+
+        let disallowedURLStrings = [
+            "file:///etc/passwd",
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY44YAAAAASUVORK5CYII=",
+            "javascript:alert(1)",
+            "myapp://custom-scheme/image.png",
+            "tel:1234567890"
+        ]
+
+        for string in disallowedURLStrings {
+            let url = try #require(URL(string: string))
+            do {
+                _ = try await loader.image(for: url)
+                Issue.record("Expected URLError(.badURL) for \(string)")
+            } catch let urlError as URLError {
+                #expect(urlError.code == .badURL)
+            } catch {
+                Issue.record("Expected URLError, got \(error)")
+            }
+        }
+
+        #expect(counter.requestCount == 0, "Disallowed schemes must never trigger network requests")
+    }
+
+    @Test func validHttpsAvatarLoadProceedsAndHitsNetwork() async throws {
+        let counter = RequestCounter()
+        let png = makePNGData()
+        let imageURL = makeImageURL("/avatar-happy-path.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            counter.record()
+            return (self.makeImageResponse(request.url ?? imageURL), png)
+        }
+        let loader = RemoteImageLoader(session: makeMockSession())
+
+        _ = try await loader.image(for: imageURL)
+        #expect(counter.requestCount == 1)
+    }
 }

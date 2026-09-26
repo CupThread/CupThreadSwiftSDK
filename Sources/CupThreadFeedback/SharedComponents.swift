@@ -74,14 +74,22 @@ struct CapsuleBadge: View {
 // MARK: - Avatar
 
 /// Circular avatar image, falling back to a person.circle.fill SF Symbol.
+///
+/// Avatar and app-icon URLs from the API are treated as untrusted and filtered
+/// by `WebURLPolicy` (`remoteImageURL(from:)`) so disallowed schemes (`file:`, `data:`,
+/// `javascript:`, etc.) never trigger outbound network or sandbox fetches.
 struct AvatarView: View {
     let url: String?
     var size: CGFloat = 20
 
+    var resolvedURL: URL? {
+        remoteImageURL(from: url)
+    }
+
     var body: some View {
         Group {
-            if let url, let imageURL = URL(string: url) {
-                CachedRemoteImage(url: imageURL) { phase in
+            if let resolvedURL {
+                CachedRemoteImage(url: resolvedURL) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable()
