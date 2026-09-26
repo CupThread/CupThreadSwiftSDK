@@ -14,16 +14,17 @@ public struct WhatsNewView: View {
     public let client: FeedbackClient
     public let userToken: String
 
-    @State private var entries: [ChangelogEntry] = []
-    @State private var isLoading = true
-    /// True once the first load finished. Later reloads keep showing content
-    /// instead of flashing skeletons.
-    @State private var hasLoadedOnce = false
-    @State private var loadError: String?
+    @State private var state: WhatsNewViewState
     @State private var isSubscribePresented = false
     /// The remembered subscription email; drives the entry-point copy.
     @State private var subscribedEmail: String?
     @Environment(\.sdkAppConfig) private var sdkAppConfig
+
+    var entries: [ChangelogEntry] { state.entries }
+    var isLoading: Bool { state.isLoading }
+    var hasLoadedOnce: Bool { state.hasLoadedOnce }
+    var loadError: String? { state.loadError }
+    var loadGeneration: Int { state.loadGeneration }
 
     private var isChangelogPermitted: Bool {
         changelogLoadPlan(config: sdkAppConfig) == .load
@@ -41,6 +42,14 @@ public struct WhatsNewView: View {
     public init(client: FeedbackClient, userToken: String) {
         self.client = client
         self.userToken = userToken
+        self._state = State(initialValue: WhatsNewViewState())
+    }
+
+    /// Internal initializer for tests with custom initial state.
+    init(client: FeedbackClient, userToken: String, state: WhatsNewViewState) {
+        self.client = client
+        self.userToken = userToken
+        self._state = State(initialValue: state)
     }
 
     public var body: some View {
@@ -83,8 +92,7 @@ public struct WhatsNewView: View {
         }
         .task {
             guard isChangelogPermitted else {
-                isLoading = false
-                hasLoadedOnce = true
+                state.handlePermissionDenied()
                 return
             }
             subscribedEmail = subscriptionStore.subscribedEmail()
@@ -195,28 +203,24 @@ public struct WhatsNewView: View {
     // MARK: Actions
 
     @MainActor
-    private func loadEntries() async {
+    func loadEntries() async {
         guard changelogLoadPlan(config: sdkAppConfig) == .load else {
-            isLoading = false
-            hasLoadedOnce = true
+            state.handlePermissionDenied()
             return
         }
-        isLoading = true
-        loadError = nil
+        let generationAtStart = state.startLoading()
         defer {
-            isLoading = false
-            hasLoadedOnce = true
+            state.finishLoading(generation: generationAtStart)
         }
         do {
             guard let fetched = try await loadChangelogEntries(client: client, config: sdkAppConfig) else {
                 return
             }
-            entries = fetched
+            state.handleSuccess(entries: fetched, generation: generationAtStart)
         } catch {
             // A cancelled load (dismissal, superseded restart) never reached
             // a verdict — keep the currently rendered entries.
-            guard !error.isSdkCancellation else { return }
-            loadError = FriendlyError.message(for: error)
+            state.handleFailure(error: error, generation: generationAtStart)
         }
     }
 }
