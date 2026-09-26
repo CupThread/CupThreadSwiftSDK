@@ -200,6 +200,8 @@ public struct CommentDisplayModel: Equatable, Identifiable, Sendable {
     public let replyToAuthorName: String?
     /// App-scoped pseudonymous id of the author being replied to, when applicable.
     public let replyToClerkId: String?
+    /// Whether users can tap through to the profile of the author being replied to.
+    public let canOpenReplyToProfile: Bool
     /// Parsed creation date.
     public let createdAtDate: Date?
 
@@ -218,6 +220,7 @@ public struct CommentDisplayModel: Equatable, Identifiable, Sendable {
             self.authorClerkId = nil
             self.canReply = false
             self.canOpenAuthorProfile = false
+            self.canOpenReplyToProfile = false
         } else {
             self.displayBody = comment.body
             self.authorName = comment.authorName ?? CupThreadStrings.tr("cupthread.features.anonymous")
@@ -225,6 +228,7 @@ public struct CommentDisplayModel: Equatable, Identifiable, Sendable {
             self.authorClerkId = comment.authorClerkId
             self.canReply = true
             self.canOpenAuthorProfile = comment.authorClerkId != nil
+            self.canOpenReplyToProfile = comment.replyToClerkId != nil
         }
     }
 }
