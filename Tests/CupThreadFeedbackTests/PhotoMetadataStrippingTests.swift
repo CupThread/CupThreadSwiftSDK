@@ -362,6 +362,137 @@ struct PhotoMetadataStrippingTests {
         #expect(format?.fileExtension == "webp")
     }
 
+    @Test func strippingSensitiveMetadataRemovesGPSFromMultiFrameContainer() {
+        guard let frame1 = createTestImage(width: 80, height: 60, red: 0.8, green: 0.2, blue: 0.2),
+              let frame2 = createTestImage(width: 80, height: 60, red: 0.2, green: 0.8, blue: 0.2) else {
+            Issue.record("Failed to create test images")
+            return
+        }
+
+        let gpsData: [CFString: Any] = [
+            kCGImagePropertyGPSLatitude: 37.7749,
+            kCGImagePropertyGPSLongitude: -122.4194
+        ]
+        let exifData: [CFString: Any] = [
+            kCGImagePropertyExifDateTimeOriginal: "2026:09:26 12:00:00"
+        ]
+
+        guard let multiFrameFixture = createMultiFrameTIFFFixture(
+            frames: [frame1, frame2],
+            gps: gpsData,
+            exif: exifData
+        ) else {
+            Issue.record("Failed to create multi-frame TIFF fixture")
+            return
+        }
+
+        guard let inputSource = CGImageSourceCreateWithData(multiFrameFixture as CFData, nil) else {
+            Issue.record("Failed to create image source from fixture")
+            return
+        }
+        #expect(CGImageSourceGetCount(inputSource) == 2)
+
+        guard let stripped = PhotoAttachmentHelper.strippingSensitiveMetadata(from: multiFrameFixture) else {
+            Issue.record("strippingSensitiveMetadata returned nil for multi-frame fixture")
+            return
+        }
+
+        guard let outputSource = CGImageSourceCreateWithData(stripped as CFData, nil) else {
+            Issue.record("Failed to create image source from stripped multi-frame fixture")
+            return
+        }
+
+        // Multi-frame non-animated containers must be sanitized to a single frame
+        #expect(CGImageSourceGetCount(outputSource) == 1)
+
+        let properties = CGImageSourceCopyPropertiesAtIndex(outputSource, 0, nil) as? [CFString: Any]
+        #expect(properties?[kCGImagePropertyGPSDictionary] == nil)
+        #expect(properties?[kCGImagePropertyIPTCDictionary] == nil)
+        let exif = properties?[kCGImagePropertyExifDictionary] as? [CFString: Any]
+        #expect(exif?[kCGImagePropertyExifDateTimeOriginal] == nil)
+    }
+
+    @Test func strippingSensitiveMetadataRemovesGPSFromMultiFrameHEIC() {
+        guard let frame1 = createTestImage(width: 80, height: 60, red: 0.8, green: 0.2, blue: 0.2),
+              let frame2 = createTestImage(width: 80, height: 60, red: 0.2, green: 0.8, blue: 0.2) else {
+            Issue.record("Failed to create test images")
+            return
+        }
+
+        let gpsData: [CFString: Any] = [
+            kCGImagePropertyGPSLatitude: 37.7749,
+            kCGImagePropertyGPSLongitude: -122.4194
+        ]
+
+        guard let multiFrameHEIC = createMultiFrameHEICFixture(
+            frames: [frame1, frame2],
+            gps: gpsData
+        ) else {
+            // HEIC encoding may not be available on all platforms
+            return
+        }
+
+        guard let inputSource = CGImageSourceCreateWithData(multiFrameHEIC as CFData, nil) else {
+            Issue.record("Failed to create image source from HEIC fixture")
+            return
+        }
+        #expect(CGImageSourceGetCount(inputSource) == 2)
+
+        guard let stripped = PhotoAttachmentHelper.strippingSensitiveMetadata(from: multiFrameHEIC) else {
+            Issue.record("strippingSensitiveMetadata returned nil for multi-frame HEIC")
+            return
+        }
+
+        guard let outputSource = CGImageSourceCreateWithData(stripped as CFData, nil) else {
+            Issue.record("Failed to create image source from stripped HEIC")
+            return
+        }
+
+        #expect(CGImageSourceGetCount(outputSource) == 1)
+        let properties = CGImageSourceCopyPropertiesAtIndex(outputSource, 0, nil) as? [CFString: Any]
+        #expect(properties?[kCGImagePropertyGPSDictionary] == nil)
+    }
+
+    @Test func isAnimatedImageContainerIdentifiesAnimatedFormats() {
+        guard let frame1 = createTestImage(width: 40, height: 40),
+              let frame2 = createTestImage(width: 40, height: 40) else {
+            Issue.record("Failed to create test images")
+            return
+        }
+
+        // Animated GIF
+        guard let gifData = createGIFFixture(frames: [frame1, frame2]),
+              let gifSource = CGImageSourceCreateWithData(gifData as CFData, nil) else {
+            Issue.record("Failed to create GIF fixture")
+            return
+        }
+        #expect(PhotoAttachmentHelper.isAnimatedImageContainer(source: gifSource, data: gifData))
+
+        // Animated WebP
+        let webpData = createAnimatedWebPFixture()
+        guard let webpSource = CGImageSourceCreateWithData(webpData as CFData, nil) else {
+            Issue.record("Failed to create WebP fixture")
+            return
+        }
+        #expect(PhotoAttachmentHelper.isAnimatedImageContainer(source: webpSource, data: webpData))
+
+        // Non-animated single-frame JPEG
+        guard let jpegData = createJPEGFixture(cgImage: frame1),
+              let jpegSource = CGImageSourceCreateWithData(jpegData as CFData, nil) else {
+            Issue.record("Failed to create JPEG fixture")
+            return
+        }
+        #expect(!PhotoAttachmentHelper.isAnimatedImageContainer(source: jpegSource, data: jpegData))
+
+        // Non-animated multi-frame TIFF
+        guard let tiffData = createMultiFrameTIFFFixture(frames: [frame1, frame2]),
+              let tiffSource = CGImageSourceCreateWithData(tiffData as CFData, nil) else {
+            Issue.record("Failed to create TIFF fixture")
+            return
+        }
+        #expect(!PhotoAttachmentHelper.isAnimatedImageContainer(source: tiffSource, data: tiffData))
+    }
+
     // MARK: - Test Fixture Helpers
 
     private func createTestImage(
@@ -503,6 +634,63 @@ struct PhotoMetadataStrippingTests {
             properties[kCGImagePropertyOrientation] = orientation
         }
         CGImageDestinationAddImage(dest, cgImage, properties as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return mutableData as Data
+    }
+
+    private func createMultiFrameTIFFFixture(
+        frames: [CGImage],
+        gps: [CFString: Any]? = nil,
+        exif: [CFString: Any]? = nil
+    ) -> Data? {
+        guard !frames.isEmpty else { return nil }
+        let mutableData = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(
+            mutableData as CFMutableData,
+            "public.tiff" as CFString,
+            frames.count,
+            nil
+        ) else {
+            return nil
+        }
+        for (index, frame) in frames.enumerated() {
+            var properties: [CFString: Any] = [:]
+            if index == 0 {
+                if let gps { properties[kCGImagePropertyGPSDictionary] = gps }
+                if let exif { properties[kCGImagePropertyExifDictionary] = exif }
+            }
+            CGImageDestinationAddImage(dest, frame, properties as CFDictionary)
+        }
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return mutableData as Data
+    }
+
+    private func createMultiFrameHEICFixture(
+        frames: [CGImage],
+        gps: [CFString: Any]? = nil,
+        exif: [CFString: Any]? = nil
+    ) -> Data? {
+        let supportedTypes = Set((CGImageDestinationCopyTypeIdentifiers() as? [String]) ?? [])
+        guard supportedTypes.contains("public.heic"), !frames.isEmpty else {
+            return nil
+        }
+        let mutableData = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(
+            mutableData as CFMutableData,
+            "public.heic" as CFString,
+            frames.count,
+            nil
+        ) else {
+            return nil
+        }
+        for (index, frame) in frames.enumerated() {
+            var properties: [CFString: Any] = [:]
+            if index == 0 {
+                if let gps { properties[kCGImagePropertyGPSDictionary] = gps }
+                if let exif { properties[kCGImagePropertyExifDictionary] = exif }
+            }
+            CGImageDestinationAddImage(dest, frame, properties as CFDictionary)
+        }
         guard CGImageDestinationFinalize(dest) else { return nil }
         return mutableData as Data
     }
