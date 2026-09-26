@@ -189,7 +189,8 @@ struct FeedbackSubmissionResultTests {
             "forwardedToGithub": true,
             "githubDiscussionId": "D_abc",
             "githubDiscussionUrl": "https://github.com/owner/repo/discussions/42",
-            "warning": null
+            "warning": null,
+            "warningCode": "attachment_signing_unconfigured"
         }
         """.utf8)
 
@@ -199,6 +200,7 @@ struct FeedbackSubmissionResultTests {
         #expect(result.githubDiscussionId == "D_abc")
         #expect(result.githubDiscussionUrl == URL(string: "https://github.com/owner/repo/discussions/42"))
         #expect(result.warning == nil)
+        #expect(result.warningCode == "attachment_signing_unconfigured")
     }
 
     @Test func decodesWithRequiredFieldsOnly() throws {
@@ -215,6 +217,7 @@ struct FeedbackSubmissionResultTests {
         #expect(result.githubDiscussionId == nil)
         #expect(result.githubDiscussionUrl == nil)
         #expect(result.warning == nil)
+        #expect(result.warningCode == nil)
     }
 
     @Test func decodesWarningField() throws {
@@ -228,15 +231,59 @@ struct FeedbackSubmissionResultTests {
 
         let result = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
         #expect(result.warning == "Submission stored but forwarding failed.")
+        #expect(result.warningCode == nil)
+    }
+
+    @Test func decodesWarningAndWarningCode() throws {
+        let json = Data("""
+        {
+            "submissionId": "sub-800",
+            "forwardedToGithub": false,
+            "warning": "Attachment signing unconfigured on server",
+            "warningCode": "attachment_signing_unconfigured"
+        }
+        """.utf8)
+
+        let result = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
+        #expect(result.submissionId == "sub-800")
+        #expect(result.forwardedToGithub == false)
+        #expect(result.warning == "Attachment signing unconfigured on server")
+        #expect(result.warningCode == "attachment_signing_unconfigured")
+    }
+
+    @Test func memberwiseInitializerSetsProperties() {
+        let url = URL(string: "https://github.com/owner/repo/discussions/42")
+        let result = FeedbackSubmissionResult(
+            submissionId: "sub-manual",
+            forwardedToGithub: true,
+            githubDiscussionId: "D_xyz",
+            githubDiscussionUrl: url,
+            warning: "warn",
+            warningCode: "warn_code"
+        )
+        #expect(result.submissionId == "sub-manual")
+        #expect(result.forwardedToGithub == true)
+        #expect(result.githubDiscussionId == "D_xyz")
+        #expect(result.githubDiscussionUrl == url)
+        #expect(result.warning == "warn")
+        #expect(result.warningCode == "warn_code")
     }
 
     @Test func equatableWhenSameValues() throws {
         let json = Data("""
-        {"submissionId":"s","forwardedToGithub":true}
+        {"submissionId":"s","forwardedToGithub":true,"warningCode":"wc"}
         """.utf8)
-        let a = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
-        let b = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
-        #expect(a == b)
+        let first = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
+        let second = try JSONDecoder().decode(FeedbackSubmissionResult.self, from: json)
+        #expect(first == second)
+    }
+
+    @Test func equatableDifferentiatesWarningCode() {
+        let first = FeedbackSubmissionResult(submissionId: "s", warningCode: "code_a")
+        let second = FeedbackSubmissionResult(submissionId: "s", warningCode: "code_b")
+        let withoutWarningCode = FeedbackSubmissionResult(submissionId: "s", warningCode: nil)
+        #expect(first != second)
+        #expect(first != withoutWarningCode)
     }
 }
 
@@ -921,6 +968,25 @@ struct FeedbackClientSubmitTests {
         #expect(result.submissionId == "sub-202")
         #expect(result.forwardedToGithub == false)
         #expect(result.warning == "Stored but not forwarded yet")
+    }
+
+    @Test func status200DecodesWarningAndWarningCode() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            let body: [String: Any] = [
+                "submissionId": "sub-warn",
+                "forwardedToGithub": false,
+                "warning": "Attachment signing unconfigured on server",
+                "warningCode": "attachment_signing_unconfigured"
+            ]
+            return (makeHTTPResponse(status: 200), try encodeJSON(body))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        let result = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        #expect(result.submissionId == "sub-warn")
+        #expect(result.forwardedToGithub == false)
+        #expect(result.warning == "Attachment signing unconfigured on server")
+        #expect(result.warningCode == "attachment_signing_unconfigured")
     }
 
     @Test func unsupportedStatusThrowsUnexpectedStatus() async throws {

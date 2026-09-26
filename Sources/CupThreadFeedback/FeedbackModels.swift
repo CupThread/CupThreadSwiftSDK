@@ -230,6 +230,32 @@ public struct FeedbackSubmissionResult: Decodable, Equatable, Sendable {
     public let githubDiscussionUrl: URL?
     /// Non-fatal warning from the server, shown to the user when present.
     public let warning: String?
+    /// Machine-readable warning code from the server (e.g. `attachment_signing_unconfigured`), when present.
+    public let warningCode: String?
+
+    /// Creates a feedback submission receipt.
+    /// - Parameters:
+    ///   - submissionId: Server-assigned id for the submission.
+    ///   - forwardedToGithub: Whether the backend mirrored the submission to its GitHub tracker.
+    ///   - githubDiscussionId: GitHub discussion id, when mirrored.
+    ///   - githubDiscussionUrl: GitHub discussion URL, when mirrored.
+    ///   - warning: Non-fatal warning message from the server, when present.
+    ///   - warningCode: Machine-readable warning code from the server, when present.
+    public init(
+        submissionId: String,
+        forwardedToGithub: Bool = false,
+        githubDiscussionId: String? = nil,
+        githubDiscussionUrl: URL? = nil,
+        warning: String? = nil,
+        warningCode: String? = nil
+    ) {
+        self.submissionId = submissionId
+        self.forwardedToGithub = forwardedToGithub
+        self.githubDiscussionId = githubDiscussionId
+        self.githubDiscussionUrl = githubDiscussionUrl
+        self.warning = warning
+        self.warningCode = warningCode
+    }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -240,10 +266,11 @@ public struct FeedbackSubmissionResult: Decodable, Equatable, Sendable {
         githubDiscussionId = try container.decodeIfPresent(String.self, forKey: .githubDiscussionId)
         githubDiscussionUrl = try container.decodeIfPresent(URL.self, forKey: .githubDiscussionUrl)
         warning = try container.decodeIfPresent(String.self, forKey: .warning)
+        warningCode = try container.decodeIfPresent(String.self, forKey: .warningCode)
     }
 
     private enum CodingKeys: String, CodingKey {
         case submissionId, id, forwardedToGithub
-        case githubDiscussionId, githubDiscussionUrl, warning
+        case githubDiscussionId, githubDiscussionUrl, warning, warningCode
     }
 }

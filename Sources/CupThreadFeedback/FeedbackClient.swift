@@ -229,7 +229,7 @@ public struct FeedbackClient: Sendable {
     ///     When `userToken` is `nil` and the draft contains attachments with upload IDs,
     ///     the SDK falls back to this client's app-key-scoped store so anonymous flows keep a stable
     ///     identity across session creation and feedback submission.
-    /// - Returns: The server's receipt, including the submission id and any warning.
+    /// - Returns: The server's receipt, including the submission id, any warning, and any warning code.
     /// - Throws: ``FeedbackClientError/scanRejected(message:requestId:)`` when an attachment
     ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
     ///   ``FeedbackClientError/submissionQuotaExceeded(message:)`` when the app's
