@@ -231,7 +231,8 @@ public struct FeedbackClient: Sendable {
     ///     sent as `X-User-Token` so the backend can link the submission to an end-user identity.
     ///     When `userToken` is `nil` and the draft contains attachments with upload IDs,
     ///     the SDK falls back to this client's app-key-scoped store so anonymous flows keep a stable
-    ///     identity across session creation and feedback submission.
+    ///     identity across session creation and feedback submission. Authenticated callers attach
+    ///     the client's bearer token via the configured `authenticationProvider`.
     /// - Returns: The server's receipt, including the submission id, any warning, and any warning code.
     /// - Throws: ``FeedbackClientError/scanRejected(message:requestId:)`` when an attachment
     ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
@@ -261,6 +262,7 @@ public struct FeedbackClient: Sendable {
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             self.applyCorrelationHeaders(userToken: effectiveUserToken, requestID: requestID, to: &request)
+            await self.applyBearerToken(to: &request)
             request.httpBody = try self.encoder.encode(self.submissionPayload(
                 for: draft,
                 uploadIds: uploadIds,
@@ -275,9 +277,10 @@ public struct FeedbackClient: Sendable {
 
     /// Whether this client can act on behalf of a signed-in end user —
     /// i.e. it was created with an `authenticationProvider`. Signed-in-only
-    /// actions (posting comments, or accessing roadmap and changelog surfaces
-    /// when anonymous access is disabled) require it; SDK surfaces use this
-    /// to show a deliberate signed-out state instead of requests that cannot succeed.
+    /// actions (posting comments, authenticated intake, voting, or accessing
+    /// roadmap and changelog surfaces when anonymous access is disabled)
+    /// require it; SDK surfaces use this to show a deliberate signed-out state
+    /// instead of requests that cannot succeed.
     public var supportsAuthentication: Bool {
         authenticationProvider != nil
     }

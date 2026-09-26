@@ -95,7 +95,8 @@ extension FeedbackClient {
     /// Titles and descriptions are trimmed; an empty `requesterName` is sent
     /// as anonymous. The submitting user is recorded via `userToken`, which
     /// is also how the console recognizes "own" requests (those can't be
-    /// self-voted).
+    /// self-voted). Authenticated callers attach the client's bearer token
+    /// via the configured `authenticationProvider`.
     /// - Parameters:
     ///   - draft: Title, description, and optional requester name.
     ///   - userToken: A stable UUID string identifying this user.
@@ -127,6 +128,7 @@ extension FeedbackClient {
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
+            await self.applyBearerToken(to: &request)
             request.httpBody = try self.encoder.encode(FeatureRequestSubmitPayload(
                 appKey: self.configuration.appKey,
                 title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -144,7 +146,8 @@ extension FeedbackClient {
     ///
     /// Calling this on a request the user already voted on removes the vote.
     /// ``FeatureRequestsView`` applies the flip optimistically and reconciles
-    /// with the returned server state.
+    /// with the returned server state. Authenticated callers attach the
+    /// client's bearer token via the configured `authenticationProvider`.
     ///
     /// The vote endpoints are rate limited per client IP (20 requests/minute);
     /// exceeding the limit throws ``FeedbackClientError/rateLimited``, which
@@ -172,6 +175,7 @@ extension FeedbackClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(payload)
 
         let (data, response) = try await session.data(for: request)
