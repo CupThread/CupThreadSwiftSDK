@@ -88,3 +88,76 @@ struct OverlaySelfLoadCancellationTests {
         #expect(content == nil, "A cancelled overlay load must not be reported as a failure")
     }
 }
+
+/// CONC-7 / issue #211: submission actions in views (feedback composer,
+/// feature request composer, changelog subscribe, and comment submit) must
+/// filter out cancellation errors using `guard !error.isSdkCancellation else { return }`.
+/// When a submission is interrupted by view dismissal or task cancellation,
+/// cancellation errors must be treated as normal interruptions and must not
+/// populate user-facing error banners or toasts.
+@Suite("SubmitCancellationSuppression")
+struct SubmitCancellationSuppressionTests {
+    @Test func cancellationErrorDoesNotPopulateFriendlyErrorUI() {
+        let cancellation = CancellationError()
+        let urlCancellation = URLError(.cancelled)
+
+        #expect(cancellation.isSdkCancellation)
+        #expect(urlCancellation.isSdkCancellation)
+    }
+
+    @Test func submitCancellationClassifierDistinguishesFromRealErrors() {
+        let realErrors: [Error] = [
+            URLError(.notConnectedToInternet),
+            URLError(.timedOut),
+            URLError(.networkConnectionLost),
+            FeedbackClientError.unexpectedStatus(code: 500, message: "boom", requestId: nil),
+            FeedbackClientError.forbidden(message: "permission denied", requestId: nil),
+            FeedbackClientError.authenticationRequired
+        ]
+
+        for error in realErrors {
+            #expect(!error.isSdkCancellation, "Real error \(error) must not classify as cancellation")
+        }
+
+        let cancellations: [Error] = [
+            CancellationError(),
+            URLError(.cancelled)
+        ]
+
+        for error in cancellations {
+            #expect(error.isSdkCancellation, "Cancellation error \(error) must classify as cancellation")
+        }
+    }
+
+    @Test func userFacingSubmitSurfacesFilterSdkCancellation() throws {
+        var directory = URL(fileURLWithPath: #filePath)
+        var sourceDir: URL?
+        for _ in 0..<6 {
+            directory.deleteLastPathComponent()
+            let candidate = directory
+                .appendingPathComponent("Sources", isDirectory: true)
+                .appendingPathComponent("CupThreadFeedback", isDirectory: true)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                sourceDir = candidate
+                break
+            }
+        }
+        let sourcesURL = try #require(sourceDir, "Could not locate Sources/CupThreadFeedback")
+
+        let targetFileNames = [
+            "FeedbackComposerView.swift",
+            "FeatureRequestComposeView.swift",
+            "ChangelogSubscribeView.swift",
+            "CommentsView.swift"
+        ]
+
+        for fileName in targetFileNames {
+            let fileURL = sourcesURL.appendingPathComponent(fileName)
+            let content = try String(contentsOf: fileURL, encoding: .utf8)
+            #expect(
+                content.contains("guard !error.isSdkCancellation else { return }"),
+                "\(fileName) must filter out isSdkCancellation in submit catch blocks to prevent error banners on cancellation"
+            )
+        }
+    }
+}

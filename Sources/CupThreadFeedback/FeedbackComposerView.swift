@@ -451,6 +451,7 @@ public struct FeedbackComposerView: View {
         guard submissionDenial == .none else { return }
         guard canSubmit && !isSubmitting else { return }
         isSubmitting = true
+        defer { isSubmitting = false }
         errorMessage = nil
         let currentDraft = draft
         let currentClient = client
@@ -463,10 +464,9 @@ public struct FeedbackComposerView: View {
                 self.resetForm()
             }
         } catch {
+            guard !error.isSdkCancellation else { return }
             errorMessage = FriendlyError.message(for: error)
         }
-
-        isSubmitting = false
     }
 
     /// Cancels the in-flight upload at an explicit, user-intent-bearing
