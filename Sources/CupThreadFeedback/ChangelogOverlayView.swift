@@ -322,10 +322,7 @@ public struct ChangelogOverlayView: View {
     private func markSeenIfEnabled() {
         guard autoMarkSeen, !hasMarkedSeen, let first = entries.first else { return }
         hasMarkedSeen = true
-        client.markChangelogSeen(version: first.id)
-        if let versionLabel = first.versionLabel {
-            client.markChangelogSeen(version: versionLabel)
-        }
+        client.markChangelogSeen(id: first.id, versionLabel: first.versionLabel)
     }
 
     private func close() {
@@ -411,6 +408,18 @@ extension FeedbackClient {
     /// - Parameter version: The version label or entry ID to record.
     public func markChangelogSeen(version: String) {
         ChangelogSeenStore.shared(for: configuration.appKey).markSeen(version)
+    }
+
+    /// Marks both a changelog entry ID and an optional version label as seen in a single atomic pass.
+    ///
+    /// Persists the tokens in a thread-safe store scoped to this app key, executing capacity
+    /// truncation and persistence in a single disk write.
+    ///
+    /// - Parameters:
+    ///   - id: The entry ID to record.
+    ///   - versionLabel: An optional version label (e.g. `"1.2.0"`) to record.
+    public func markChangelogSeen(id: String, versionLabel: String?) {
+        ChangelogSeenStore.shared(for: configuration.appKey).markSeen(id: id, versionLabel: versionLabel)
     }
 
     /// Presents the latest changelog overlay using copy and limits from the console.
