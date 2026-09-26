@@ -135,6 +135,22 @@ struct RoadmapPaginationTests {
         #expect(script.requestedCursors == [nil, "c1"])
     }
 
+    @Test func stopsWhenPageReportsHasMoreFalseEvenWithNextCursor() async throws {
+        // Many backends echo a cursor on the final page; hasMore: false
+        // must stop the loop without initiating a redundant network fetch.
+        let script = PageScript([
+            makePage(["req-1", "req-2"], total: 0, hasMore: false, nextCursor: "cur_end"),
+            makePage(["req-3"], total: 0, hasMore: false, nextCursor: nil)
+        ])
+
+        let collected = try await collectAllRequests { cursor in
+            try script.next(cursor)
+        }
+
+        #expect(collected.map(\.id) == ["req-1", "req-2"])
+        #expect(script.requestedCursors == [nil], "Must not request next page when hasMore is false")
+    }
+
     // MARK: Dedupe and termination safety
 
     @Test func skipsDuplicateIDsAcrossOverlappingPages() async throws {
