@@ -259,6 +259,76 @@ struct FeedbackUploadStreamingTests {
         #expect(try Data(contentsOf: firstURL) == bytes)
         #expect(try Data(contentsOf: secondURL) == bytes)
     }
+
+    @Test func streamingFileUploadRejectsOffOriginSlotUploadURLBeforeStreaming() async throws {
+        let evilHost = "evil.example"
+        let evilRequests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.setHandler(forHost: evilHost) { request in
+            evilRequests.value = (evilRequests.value ?? []) + [request]
+            return (makeHTTPResponse(status: 200), Data())
+        }
+        defer { MockURLProtocol.setHandler(forHost: evilHost, nil) }
+
+        var maliciousSession = makeSessionJSON()
+        maliciousSession["files"] = [[
+            "clientFileId": "file-1",
+            "uploadId": "upl-stream-1",
+            "uploadUrl": "https://evil.example/stream-collect",
+            "maxSizeBytes": 20_000_000
+        ]]
+
+        let fixtureURL = try makeTempFixtureFile(Data("sensitive-stream".utf8))
+        defer { try? FileManager.default.removeItem(at: fixtureURL) }
+
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.setHandler(forHost: host, makeSessionFlowHandler(
+            requests: requests, sessionJSON: maliciousSession
+        ))
+
+        let client = makeClient(baseURL: baseURL)
+        do {
+            _ = try await client.uploadAttachment(
+                fileURL: fixtureURL, filename: "leak.bin", mimeType: "application/octet-stream", userToken: "tok"
+            )
+            Issue.record("Expected off-origin slot uploadUrl to throw invalidResponse")
+        } catch let error as FeedbackClientError {
+            #expect(error == .invalidResponse)
+        }
+
+        #expect(evilRequests.value == nil || evilRequests.value?.isEmpty == true,
+                "Zero streaming requests must reach the foreign host")
+    }
+
+    @Test func streamingFileUploadWithRelativeSlotUrlPUTsToConfiguredBaseURL() async throws {
+        var relativeSession = makeSessionJSON()
+        relativeSession["files"] = [[
+            "clientFileId": "file-1",
+            "uploadId": "upl-stream-1",
+            "uploadUrl": "/api/v1/uploads/stream-custom-rel",
+            "maxSizeBytes": 20_000_000
+        ]]
+
+        let fixtureURL = try makeTempFixtureFile(Data("stream bytes".utf8))
+        defer { try? FileManager.default.removeItem(at: fixtureURL) }
+
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.setHandler(forHost: host, makeSessionFlowHandler(
+            requests: requests, sessionJSON: relativeSession
+        ))
+
+        let client = makeClient(baseURL: baseURL)
+        let attachment = try await client.uploadAttachment(
+            fileURL: fixtureURL, filename: "stream.bin", mimeType: "application/octet-stream", userToken: "tok"
+        )
+
+        let captured = try #require(requests.value)
+        #expect(captured.count == 2)
+        let putRequest = captured[1]
+        #expect(putRequest.httpMethod == "PUT")
+        #expect(putRequest.url?.host == host)
+        #expect(putRequest.url?.path == "/api/v1/uploads/stream-custom-rel")
+        #expect(attachment.uploadId == "upl-stream-1")
+    }
 }
 
 private extension Array {

@@ -261,4 +261,209 @@ struct FeedbackUploadCompletionContractTests {
         #expect(machine.currentErrorMessage == nil)
         #expect(draft.attachments.isEmpty)
     }
+
+    @Test func offOriginSlotUploadURLThrowsAndRecordsZeroRequestsToForeignHost() async throws {
+        let evilHost = "evil.example"
+        let evilRequests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.setHandler(forHost: evilHost) { request in
+            evilRequests.value = (evilRequests.value ?? []) + [request]
+            return (makeHTTPResponse(status: 200), Data())
+        }
+        defer { MockURLProtocol.setHandler(forHost: evilHost, nil) }
+
+        var maliciousSession = sessionJSON
+        maliciousSession["files"] = [[
+            "clientFileId": "file-1",
+            "uploadId": "upl-1",
+            "uploadUrl": "https://evil.example/malicious-target",
+            "maxSizeBytes": 20_000_000
+        ]]
+
+        MockURLProtocol.setHandler(forHost: host) { [maliciousSession] request in
+            if request.url?.path == "/api/v1/uploads/sessions" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(maliciousSession))
+            }
+            return (makeHTTPResponse(status: 200), Data())
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(host)")!)
+        do {
+            _ = try await client.uploadAttachment(
+                data: Data("sensitive bytes".utf8),
+                filename: "f.png",
+                mimeType: "image/png",
+                userToken: nil
+            )
+            Issue.record("Expected off-origin slot uploadUrl to throw invalidResponse")
+        } catch let error as FeedbackClientError {
+            #expect(error == .invalidResponse)
+        }
+
+        #expect(evilRequests.value == nil || evilRequests.value?.isEmpty == true,
+                "Zero requests must be dispatched to foreign hosts")
+    }
+
+    @Test func relativeSlotUploadURLPUTsToConfiguredBaseURL() async throws {
+        var relativeSession = sessionJSON
+        relativeSession["files"] = [[
+            "clientFileId": "file-1",
+            "uploadId": "upl-1",
+            "uploadUrl": "/api/v1/uploads/relative-slot-123",
+            "maxSizeBytes": 20_000_000
+        ]]
+
+        let capturedRequests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.setHandler(forHost: host) { [relativeSession, uploadedJSON] request in
+            capturedRequests.value = (capturedRequests.value ?? []) + [request]
+            if request.url?.path == "/api/v1/uploads/sessions" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(relativeSession))
+            }
+            return (makeHTTPResponse(status: 200), try encodeJSON(uploadedJSON))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(host)")!)
+        let attachment = try await client.uploadAttachment(
+            data: Data("hello".utf8), filename: "f.png", mimeType: "image/png", userToken: nil
+        )
+
+        let requests = try #require(capturedRequests.value)
+        #expect(requests.count == 2)
+        let putRequest = requests[1]
+        #expect(putRequest.httpMethod == "PUT")
+        #expect(putRequest.url?.host == host)
+        #expect(putRequest.url?.path == "/api/v1/uploads/relative-slot-123")
+        #expect(attachment.uploadId == "upl-1")
+    }
+
+    @Test func foreignDownloadURLDoesNotPropagateToAttachmentURL() async throws {
+        var foreignUploadedJSON = uploadedJSON
+        foreignUploadedJSON["downloadUrl"] = "https://evil.example/uploaded.png"
+
+        MockURLProtocol.setHandler(forHost: host) { [sessionJSON, foreignUploadedJSON] request in
+            if request.url?.path == "/api/v1/uploads/sessions" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(sessionJSON))
+            }
+            return (makeHTTPResponse(status: 200), try encodeJSON(foreignUploadedJSON))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(host)")!)
+        let attachment = try await client.uploadAttachment(
+            data: Data("hello".utf8), filename: "f.png", mimeType: "image/png", userToken: nil
+        )
+
+        #expect(attachment.url != URL(string: "https://evil.example/uploaded.png"))
+        #expect(attachment.url.host == host)
+    }
+}
+
+// MARK: - Direct uploadURL security policy
+
+@Suite("FeedbackUploadOriginSecurity")
+struct FeedbackUploadOriginSecurityTests {
+    private let baseURL = URL(string: "https://api.example.com")!
+
+    @Test func uploadURLResolvesRelativePaths() throws {
+        let client = makeClient(baseURL: baseURL)
+        let leadingSlash = try client.uploadURL(from: "/api/v1/uploads/slot-1")
+        #expect(leadingSlash == URL(string: "https://api.example.com/api/v1/uploads/slot-1"))
+
+        let barePath = try client.uploadURL(from: "api/v1/uploads/slot-2")
+        #expect(barePath == URL(string: "https://api.example.com/api/v1/uploads/slot-2"))
+    }
+
+    @Test func uploadURLAcceptsSameHostAbsoluteURLCaseInsensitively() throws {
+        let client = makeClient(baseURL: baseURL)
+        let sameHost = try client.uploadURL(from: "https://api.example.com/api/v1/uploads/slot-1")
+        #expect(sameHost == URL(string: "https://api.example.com/api/v1/uploads/slot-1"))
+
+        let upperCase = try client.uploadURL(from: "HTTPS://API.EXAMPLE.COM/api/v1/uploads/slot-2")
+        #expect(upperCase.host?.lowercased() == "api.example.com")
+        #expect(upperCase.path == "/api/v1/uploads/slot-2")
+    }
+
+    @Test func uploadURLFallsBackToDefaultWhenNilOrEmpty() throws {
+        let client = makeClient(baseURL: baseURL)
+        let nilURL = try client.uploadURL(from: nil)
+        #expect(nilURL == URL(string: "https://api.example.com/api/v1/uploads"))
+
+        let emptyURL = try client.uploadURL(from: "")
+        #expect(emptyURL == URL(string: "https://api.example.com/api/v1/uploads"))
+
+        let whitespaceURL = try client.uploadURL(from: "   ")
+        #expect(whitespaceURL == URL(string: "https://api.example.com/api/v1/uploads"))
+    }
+
+    @Test func uploadURLRejectsOffOriginHosts() {
+        let client = makeClient(baseURL: baseURL)
+        let offOriginURLs = [
+            "https://evil.example/uploads",
+            "https://attacker.com/collect",
+            "https://sub.api.example.com/uploads",
+            "https://example.com/uploads",
+            "https://api.example.com.evil.com/uploads",
+            "https://notapi.example.com/uploads"
+        ]
+
+        for offOrigin in offOriginURLs {
+            do {
+                _ = try client.uploadURL(from: offOrigin)
+                Issue.record("Expected \(offOrigin) to be rejected by uploadURL")
+            } catch let error as FeedbackClientError {
+                #expect(error == .invalidResponse, "Expected invalidResponse for \(offOrigin)")
+            } catch {
+                Issue.record("Expected FeedbackClientError, got \(error)")
+            }
+        }
+    }
+
+    @Test func uploadURLRejectsProtocolRelativeAndDisallowedSchemes() {
+        let client = makeClient(baseURL: baseURL)
+        let disallowed = [
+            "//evil.example/uploads",
+            "//api.example.com/uploads",
+            "ftp://api.example.com/uploads",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "data:text/plain,abc",
+            "tel:123456"
+        ]
+
+        for item in disallowed {
+            do {
+                _ = try client.uploadURL(from: item)
+                Issue.record("Expected \(item) to be rejected by uploadURL")
+            } catch let error as FeedbackClientError {
+                #expect(error == .invalidResponse, "Expected invalidResponse for \(item)")
+            } catch {
+                Issue.record("Expected FeedbackClientError, got \(error)")
+            }
+        }
+    }
+
+    @Test func uploadURLRejectsSchemeDowngrade() {
+        let client = makeClient(baseURL: baseURL)
+        do {
+            _ = try client.uploadURL(from: "http://api.example.com/api/v1/uploads/slot-1")
+            Issue.record("Expected http URL to be rejected when baseURL is https")
+        } catch let error as FeedbackClientError {
+            #expect(error == .invalidResponse)
+        } catch {
+            Issue.record("Expected FeedbackClientError, got \(error)")
+        }
+    }
+
+    @Test func uploadURLRejectsPortMismatch() {
+        let client = makeClient(baseURL: URL(string: "http://localhost:8080")!)
+        do {
+            _ = try client.uploadURL(from: "http://localhost:9000/api/v1/uploads")
+            Issue.record("Expected port mismatch to be rejected")
+        } catch let error as FeedbackClientError {
+            #expect(error == .invalidResponse)
+        } catch {
+            Issue.record("Expected FeedbackClientError, got \(error)")
+        }
+
+        let matching = try? client.uploadURL(from: "http://localhost:8080/api/v1/uploads")
+        #expect(matching == URL(string: "http://localhost:8080/api/v1/uploads"))
+    }
 }
