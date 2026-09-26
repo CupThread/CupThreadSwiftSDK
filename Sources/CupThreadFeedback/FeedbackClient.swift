@@ -137,8 +137,11 @@ public struct FeedbackClient: Sendable {
     ///
     /// Some actions are signed-in-only on the server — posting comments on
     /// feature requests requires a Clerk session and fails with
-    /// `401 authentication_required` for anonymous callers. Pass an
-    /// authentication provider that returns the signed-in user's current
+    /// `401 authentication_required` for anonymous callers, as do reading
+    /// comments, feature requests, roadmap columns, versions, or changelog
+    /// entries and subscribing when the app's console settings disable
+    /// anonymous access (`allowAnonymousRoadmap`, `allowAnonymousChangelog`).
+    /// Pass an authentication provider that returns the signed-in user's current
     /// bearer token (or `nil` while signed out); the SDK sends it as
     /// `Authorization: Bearer …` on those requests and keeps the anonymous
     /// `X-User-Token` correlation header. Return `nil` when the user is
@@ -272,8 +275,9 @@ public struct FeedbackClient: Sendable {
 
     /// Whether this client can act on behalf of a signed-in end user —
     /// i.e. it was created with an `authenticationProvider`. Signed-in-only
-    /// actions (posting comments) require it; SDK surfaces use this to show
-    /// a deliberate signed-out state instead of requests that cannot succeed.
+    /// actions (posting comments, or accessing roadmap and changelog surfaces
+    /// when anonymous access is disabled) require it; SDK surfaces use this
+    /// to show a deliberate signed-out state instead of requests that cannot succeed.
     public var supportsAuthentication: Bool {
         authenticationProvider != nil
     }

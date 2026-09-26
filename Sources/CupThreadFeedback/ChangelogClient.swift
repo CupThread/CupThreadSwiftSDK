@@ -178,6 +178,9 @@ extension FeedbackClient {
     /// opaque keyset cursor: pass a previous page's
     /// ``ListChangelogResult/nextCursor`` back as `cursor` to move forward.
     /// Malformed cursors are rejected server-side with `400 Bad Request`.
+    /// When configured with an authentication provider, the signed-in user's
+    /// bearer token is attached as `Authorization: Bearer …` so changelog
+    /// reads succeed when `allowAnonymousChangelog = false`.
     /// - Parameters:
     ///   - limit: Entries per page. The server accepts 1...100 (default 50).
     ///   - cursor: Opaque keyset cursor from a previous page's
@@ -210,6 +213,7 @@ extension FeedbackClient {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -233,6 +237,9 @@ extension FeedbackClient {
     /// non-destructive and confirms nothing (see
     /// ``ChangelogSubscriptionResult``). The response is uniform — the
     /// API no longer reports whether the address was already subscribed.
+    /// When configured with an authentication provider, the signed-in user's
+    /// bearer token is attached as `Authorization: Bearer …` so subscription
+    /// succeeds when `allowAnonymousChangelog = false`.
     /// - Parameters:
     ///   - email: The address to notify. Trimmed before sending.
     ///   - userToken: Anonymous user token sent as `X-User-Token`, linking the
@@ -426,6 +433,7 @@ extension FeedbackClient {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(body)
 
         let (data, response) = try await session.data(for: request)
