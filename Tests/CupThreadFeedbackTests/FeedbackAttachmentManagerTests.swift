@@ -1,4 +1,6 @@
+import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
 #if canImport(UniformTypeIdentifiers)
 import UniformTypeIdentifiers
@@ -366,5 +368,59 @@ struct FeedbackAttachmentManagerTests {
 
         // Second validation using the snapshotted limit remains consistent
         try PhotoAttachmentHelper.validateAttachmentSize(15_000_000, limit: snapshottedLimit)
+    }
+
+    // MARK: - Multi-frame metadata stripping (#205)
+
+    @Test func strippingMetadataRemovesGPSFromMultiFrameJPEG() throws {
+        let testData = try makeJPEGDataWithGPS(latitude: 37.7749, longitude: -122.4194)
+        guard let sanitized = PhotoAttachmentHelper.strippingSensitiveMetadata(from: testData) else {
+            Issue.record("Expected sanitized data")
+            return
+        }
+
+        guard let source = CGImageSourceCreateWithData(sanitized as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
+            Issue.record("Failed to read sanitized properties")
+            return
+        }
+
+        #expect(properties[kCGImagePropertyGPSDictionary] == nil)
+    }
+
+    private func makeJPEGDataWithGPS(latitude: Double, longitude: Double) throws -> Data {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)
+        guard let context = CGContext(
+            data: nil,
+            width: 40,
+            height: 40,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo.rawValue
+        ), let image = context.makeImage() else {
+            throw AttachmentValidationError.unprocessableImage
+        }
+
+        let mutableData = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(
+            mutableData as CFMutableData,
+            "public.jpeg" as CFString,
+            1,
+            nil
+        ) else {
+            throw AttachmentValidationError.unprocessableImage
+        }
+
+        let gps: [CFString: Any] = [
+            kCGImagePropertyGPSLatitude: latitude,
+            kCGImagePropertyGPSLongitude: longitude
+        ]
+        CGImageDestinationAddImage(dest, image, [kCGImagePropertyGPSDictionary: gps] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else {
+            throw AttachmentValidationError.unprocessableImage
+        }
+        return mutableData as Data
     }
 }
