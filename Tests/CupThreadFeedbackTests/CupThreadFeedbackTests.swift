@@ -1622,6 +1622,43 @@ struct FeedbackClientUploadTests {
         }
     }
 
+    @Test func oversizedSessionLimitThrowsBeforeUploadWhenSlotLimitOmitted() async throws {
+        var session = self.sessionJSON
+        session["session"] = [
+            "sessionId": "sess-1",
+            "sessionToken": "stok-abc",
+            "expiresAt": "2026-09-13T12:00:00Z",
+            "maxFileSizeBytes": 2,
+            "maxFiles": 8
+        ]
+        session["files"] = [[
+            "clientFileId": "file-1",
+            "uploadId": "upl-1",
+            "uploadUrl": "https://test.example.com/api/v1/uploads/upl-1"
+        ]]
+
+        let putReached = CaptureBox<Bool>()
+        MockURLProtocol.requestHandler = { request in
+            if request.httpMethod == "POST" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(session))
+            }
+            putReached.value = true
+            return (makeHTTPResponse(), try encodeJSON(self.uploadedJSON))
+        }
+
+        let client = makeClient(baseURL: baseURL, appKey: appKey)
+        do {
+            _ = try await client.uploadAttachment(
+                data: Data("toolarge".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch FeedbackClientError.payloadTooLarge {
+            #expect(putReached.value != true)
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
     @Test func createUploadSessionDecodesDocumentedResponseShape() async throws {
         MockURLProtocol.requestHandler = { _ in
             return (makeHTTPResponse(status: 201), try encodeJSON(self.sessionJSON))

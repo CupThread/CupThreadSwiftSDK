@@ -72,6 +72,30 @@ public struct FeedbackUploadSession: Decodable, Equatable, Sendable {
     public let files: [File]
 }
 
+extension FeedbackUploadSession {
+    /// Returns the effective maximum upload size in bytes for a slot by
+    /// taking the minimum of the slot's limit and the session-wide limit,
+    /// or whichever limit is specified if only one is present.
+    ///
+    /// - Parameter slot: The slot whose limits to evaluate. When `nil`, defaults
+    ///   to the session's first slot.
+    /// - Returns: The effective upper bound in bytes, or `nil` if neither
+    ///   the slot nor the session specifies a limit.
+    public func effectiveMaxSizeBytes(for slot: File? = nil) -> Int? {
+        let resolvedSlot = slot ?? files.first
+        switch (resolvedSlot?.maxSizeBytes, session.maxFileSizeBytes) {
+        case let (.some(slotLimit), .some(sessionLimit)):
+            return min(slotLimit, sessionLimit)
+        case let (.some(slotLimit), .none):
+            return slotLimit
+        case let (.none, .some(sessionLimit)):
+            return sessionLimit
+        case (.none, .none):
+            return nil
+        }
+    }
+}
+
 // MARK: - FeedbackClient upload-session extension
 
 extension FeedbackClient {
@@ -164,7 +188,7 @@ extension FeedbackClient {
         guard let slot = slot ?? uploadSession.files.first else {
             throw FeedbackClientError.unreadableUploadResponse
         }
-        if let slotLimit = slot.maxSizeBytes, data.count > slotLimit {
+        if let limit = uploadSession.effectiveMaxSizeBytes(for: slot), data.count > limit {
             throw FeedbackClientError.payloadTooLarge(message: nil)
         }
 
@@ -224,7 +248,7 @@ extension FeedbackClient {
             throw FeedbackClientError.unreadableUploadResponse
         }
         let fileSize = try fileSize(at: fileURL)
-        if let slotLimit = slot.maxSizeBytes, fileSize > slotLimit {
+        if let limit = uploadSession.effectiveMaxSizeBytes(for: slot), fileSize > limit {
             throw FeedbackClientError.payloadTooLarge(message: nil)
         }
 
