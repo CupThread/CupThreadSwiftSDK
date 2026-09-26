@@ -402,12 +402,13 @@ struct FeedbackClientErrorTests {
         #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
     }
 
-    @Test func scanRejectedHasLocalizedDescriptionWithMessage() throws {
+    @Test func scanRejectedHidesRawMessageFromErrorDescription() throws {
         let reason = "Upload object upl_123 was rejected by content scan: malware detected"
         let error = FeedbackClientError.scanRejected(message: reason)
         let desc = try #require(error.errorDescription)
-        #expect(desc.contains("The referenced attachment could not be uploaded due to content inspection rejection"))
-        #expect(desc.contains(reason))
+        #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
+        #expect(!desc.contains(reason))
+        #expect(error.scanDetail == reason)
     }
 
     @Test func scanRejectedEquatable() {
@@ -1059,8 +1060,9 @@ struct FeedbackClientSubmitTests {
             #expect(message.contains("upl_scan_123"))
             #expect(message.contains("malware signature detected"))
             let desc = try #require(error.errorDescription)
-            #expect(desc.contains("The referenced attachment could not be uploaded due to content inspection rejection"))
-            #expect(desc.contains("malware signature detected"))
+            #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
+            #expect(!desc.contains("malware signature detected"))
+            #expect(error.scanDetail == message)
         }
     }
 
@@ -1555,8 +1557,9 @@ struct FeedbackClientUploadTests {
                 #expect(message.contains("upl_bad_file"))
                 #expect(message.contains("prohibited file type"))
                 let desc = try #require(error.errorDescription)
-                #expect(desc.contains("The referenced attachment could not be uploaded due to content inspection rejection"))
-                #expect(desc.contains("prohibited file type"))
+                #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
+                #expect(!desc.contains("prohibited file type"))
+                #expect(error.scanDetail == message)
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }

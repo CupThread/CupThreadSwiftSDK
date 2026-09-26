@@ -27,6 +27,33 @@ struct FriendlyErrorTests {
         #expect(!desc.lowercased().contains("html"))
     }
 
+    @Test func scanRejectedHTMLBodyNeverReachesErrorDescriptionOrFriendlyError() throws {
+        let error = FeedbackClientError.scanRejected(message: htmlBody, requestId: nil)
+        let desc = try #require(error.errorDescription)
+        let expected = "The referenced attachment could not be uploaded due to content inspection rejection."
+        #expect(desc == expected)
+        #expect(!desc.contains("<"))
+        #expect(!desc.lowercased().contains("html"))
+        #expect(!desc.contains("nginx"))
+        #expect(FriendlyError.message(for: error) == expected)
+        #expect(error.scanDetail == htmlBody)
+    }
+
+    @Test func scanRejectedWithRequestIdPreservesSuffixWithoutServerMessage() throws {
+        let error = FeedbackClientError.scanRejected(
+            message: "scanner rule 42: forbidden executable inside archive",
+            requestId: "req-scan-99"
+        )
+        let desc = try #require(error.errorDescription)
+        let expected = "The referenced attachment could not be uploaded due to content inspection rejection. (request id: req-scan-99)"
+        #expect(desc == expected)
+        #expect(!desc.contains("rule 42"))
+        #expect(!desc.contains("forbidden executable"))
+        #expect(FriendlyError.message(for: error) == expected)
+        #expect(error.scanDetail == "scanner rule 42: forbidden executable inside archive")
+        #expect(error.requestId == "req-scan-99")
+    }
+
     @Test func friendlyErrorRoutesClientErrorsThroughErrorDescription() {
         let error = FeedbackClientError.unexpectedStatus(code: 502, message: htmlBody, requestId: nil)
         #expect(FriendlyError.message(for: error) == error.errorDescription)
@@ -158,6 +185,13 @@ struct FriendlyErrorTests {
         #expect(FeedbackClientError.uploaderMismatch(message: nil, requestId: nil).responseBody == nil)
         #expect(FeedbackClientError.submissionQuotaExceeded(message: nil, requestId: nil).responseBody == nil)
         #expect(FeedbackClientError.subscriptionInactive(message: nil, requestId: nil).responseBody == nil)
+    }
+
+    @Test func scanDetailPreservesRawRejectionMessage() {
+        let error = FeedbackClientError.scanRejected(message: htmlBody, requestId: "req-1")
+        #expect(error.scanDetail == htmlBody)
+        #expect(FeedbackClientError.invalidResponse.scanDetail == nil)
+        #expect(FeedbackClientError.forbidden(message: "nope", requestId: nil).scanDetail == nil)
     }
 
     // MARK: - Composer and Subscribe intake surfaces (issue #160)

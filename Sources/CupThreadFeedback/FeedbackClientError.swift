@@ -19,7 +19,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// is never shown to end users.
     case forbidden(message: String?, requestId: String?)
     /// An attachment referenced in the feedback submission was rejected by server-side content inspection
-    /// (e.g. prohibited file types or malware signatures, HTTP `422 scan_rejected`).
+    /// (e.g. prohibited file types or malware signatures, HTTP `422 scan_rejected`). `message` carries the
+    /// raw server rejection detail for diagnostics — see ``scanDetail``; it is never shown to end users.
     case scanRejected(message: String, requestId: String?)
     /// A metered action hit the server's per-client-IP rate limit (HTTP 429) —
     /// e.g. voting too fast, or a burst of uploads. Recoverable: wait for the
@@ -87,6 +88,20 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         }
     }
 
+    /// Raw diagnostic detail returned by server-side content inspection for
+    /// ``scanRejected(message:requestId:)`` (HTTP 422 `scan_rejected`),
+    /// describing why the attachment was refused (e.g. malware signature or
+    /// prohibited file type). Kept for logging and support; never shown in
+    /// user-facing UI copy.
+    public var scanDetail: String? {
+        switch self {
+        case .scanRejected(let message, _):
+            return message
+        default:
+            return nil
+        }
+    }
+
     /// End-user copy for a status the SDK does not map to a typed case —
     /// localized, and free of any server-controlled text.
     private static func friendlyStatusMessage(code: Int) -> String {
@@ -150,13 +165,11 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .turnstileRequired(_, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return CupThreadStrings.tr("cupthread.error.turnstile_required") + suffix
-        case .scanRejected(let message, let requestId):
+        case .scanRejected(_, let requestId):
+            // Raw server scan detail stays off user-facing copy (#30, #154); callers
+            // can read the associated detail via `scanDetail` or pattern matching.
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                return "The referenced attachment could not be uploaded due to content inspection rejection.\(suffix)"
-            }
-            return "The referenced attachment could not be uploaded due to content inspection rejection: \(trimmed)\(suffix)"
+            return "The referenced attachment could not be uploaded due to content inspection rejection.\(suffix)"
         case .rateLimited(_, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return "You're doing that too often. Please try again in a minute.\(suffix)"
