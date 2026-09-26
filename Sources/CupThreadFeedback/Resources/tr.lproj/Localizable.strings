@@ -97,6 +97,7 @@
 
 /* Accidental-dismissal guard for compose surfaces (issue #46) */
 "cupthread.common.cancel" = "İptal";
+"cupthread.common.done" = "Bitti";
 "cupthread.common.discard" = "Sil";
 "cupthread.common.keep_editing" = "Düzenlemeye Devam Et";
 "cupthread.feedback.discard_title" = "Bu geri bildirim silinsin mi?";

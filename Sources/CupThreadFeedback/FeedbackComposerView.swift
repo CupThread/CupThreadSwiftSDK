@@ -37,15 +37,38 @@ public struct FeedbackComposerView: View {
     /// view, e.g. from a sheet's `onDismiss` closure.
     public let uploadHandle: FeedbackUploadHandle?
 
+    private let config: PublicAppConfig?
+    private let onDismiss: (() -> Void)?
+
     @State private var draft: FeedbackDraft
     @State private var isSubmitting = false
     @State private var attachmentState: FeedbackAttachmentStateMachine
     @State private var errorMessage: String?
     @State private var result: FeedbackSubmissionResult?
     @Environment(\.sdkAppConfig) private var sdkAppConfig
+    @Environment(\.dismiss) private var dismiss
+
+    private var activeConfig: PublicAppConfig? {
+        config ?? sdkAppConfig
+    }
 
     private var submissionDenial: SdkSubmissionDenial {
-        SdkSubmissionDenial.forFeedback(config: sdkAppConfig, platform: draft.platform)
+        SdkSubmissionDenial.forFeedback(config: activeConfig, platform: draft.platform)
+    }
+
+    var dismissalAffordance: FeedbackComposerDismissalAffordance {
+        FeedbackComposerDismissalAffordance.resolve(
+            result: result,
+            denial: submissionDenial
+        )
+    }
+
+    private func performDismiss() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
+        }
     }
 
     #if canImport(PhotosUI) && !os(tvOS)
@@ -87,6 +110,9 @@ public struct FeedbackComposerView: View {
     ///     in-flight attachment upload from outside the view — e.g. from a
     ///     sheet's `onDismiss` closure. Uploads are never cancelled by view
     ///     lifecycle events; see ``FeedbackComposerView``.
+    ///   - config: Optional ``PublicAppConfig`` override for previewing or testing permissions.
+    ///   - initialResult: Optional initial submission result for testing the sent confirmation state.
+    ///   - onDismiss: Optional dismissal action callback.
     ///   - onSubmit: Called with the server's receipt after a successful
     ///     submission — use it to log, show a toast, or deep-link elsewhere.
     public init(
@@ -96,21 +122,27 @@ public struct FeedbackComposerView: View {
         maxAttachmentBytes: Int? = nil,
         stripSensitiveMetadata: Bool = true,
         uploadHandle: FeedbackUploadHandle? = nil,
+        config: PublicAppConfig? = nil,
+        initialResult: FeedbackSubmissionResult? = nil,
+        onDismiss: (() -> Void)? = nil,
         onSubmit: @escaping (FeedbackSubmissionResult) -> Void = { _ in }
     ) {
         self.client = client
         self.userToken = userToken
         self.stripSensitiveMetadata = stripSensitiveMetadata
         self.uploadHandle = uploadHandle
+        self.config = config
+        self.onDismiss = onDismiss
         self.onSubmit = onSubmit
         _attachmentState = State(initialValue: FeedbackAttachmentStateMachine(maxAttachmentBytes: maxAttachmentBytes))
         _draft = State(initialValue: initialDraft ?? FeedbackDraft.autofilled(platform: client.configuration.defaultPlatform))
+        _result = State(initialValue: initialResult)
     }
 
     public var body: some View {
         Group {
             if let result {
-                FeedbackSentView(warning: result.warning) {
+                FeedbackSentView(warning: result.warning, onDismiss: onDismiss ?? { dismiss() }) {
                     withAnimation(.snappy(duration: 0.3)) {
                         self.result = nil
                         self.resetForm()
@@ -118,6 +150,13 @@ public struct FeedbackComposerView: View {
                 }
             } else if submissionDenial != .none {
                 submissionDenial.placeholder
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(CupThreadStrings.tr("cupthread.common.cancel")) {
+                                performDismiss()
+                            }
+                        }
+                    }
             } else {
                 composer
             }
@@ -126,12 +165,21 @@ public struct FeedbackComposerView: View {
         #if os(iOS) || os(visionOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        #if os(macOS)
+        .frame(minWidth: 460, minHeight: 420)
+        #endif
         .task {
             // Read through the shared config cache: the surface gate's fetch
             // (and any other surface's) already warmed it, so presenting the
             // composer costs at most one config GET per TTL window.
-            if let config = try? await client.cachedAppConfig() {
-                attachmentState.applyConfigLimit(config.maxAttachmentBytes)
+            let resolvedConfig: PublicAppConfig?
+            if let activeConfig {
+                resolvedConfig = activeConfig
+            } else {
+                resolvedConfig = try? await client.cachedAppConfig()
+            }
+            if let resolvedConfig {
+                attachmentState.applyConfigLimit(resolvedConfig.maxAttachmentBytes)
             }
         }
         .sdkSurface(client: client, feature: .feedback)
@@ -235,29 +283,8 @@ public struct FeedbackComposerView: View {
     }
 
     private func attachmentRow(_ attachment: FeedbackAttachment) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: attachment.kind == .image ? "photo" : "doc")
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(attachment.filename ?? attachment.key)
-                    .font(.subheadline)
-                    .lineLimit(1)
-                if let size = attachment.size {
-                    Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            Spacer()
-            Button {
-                attachmentState.removeAttachment(id: attachment.id, draft: &draft)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.subheadline)
-                    .foregroundStyle(.red)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(CupThreadStrings.tr("cupthread.feedback.remove_attachment"))
+        FeedbackAttachmentRowView(attachment: attachment) {
+            attachmentState.removeAttachment(id: attachment.id, draft: &draft)
         }
     }
 
@@ -288,22 +315,8 @@ public struct FeedbackComposerView: View {
 
     @MainActor @ViewBuilder
     private var uploadingAttachmentRow: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.small)
-            Text(CupThreadStrings.tr("cupthread.feedback.uploading_attachment"))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button {
-                cancelUpload()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(CupThreadStrings.tr("cupthread.feedback.remove_attachment"))
+        FeedbackUploadingAttachmentRowView {
+            cancelUpload()
         }
     }
 
@@ -415,29 +428,12 @@ public struct FeedbackComposerView: View {
     #endif
 
     private var submitBar: some View {
-        Button {
+        FeedbackSubmitBarView(
+            isSubmitting: isSubmitting,
+            canSubmit: canSubmit
+        ) {
             Task { await submitDraft() }
-        } label: {
-            HStack(spacing: 8) {
-                if isSubmitting {
-                    ProgressView()
-                }
-                Text(isSubmitting
-                    ? CupThreadStrings.tr("cupthread.feedback.sending_button")
-                    : CupThreadStrings.tr("cupthread.feedback.send_button"))
-                    .font(.headline)
-            }
-            .frame(maxWidth: .infinity)
-            // 26pt label + 14pt borderedProminent inset = 40pt button
-            .frame(height: 26)
         }
-        .buttonStyle(.borderedProminent)
-        .disabled(isSubmitting || !canSubmit)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        #if !os(tvOS)
-        .background(.bar)
-        #endif
     }
 
     // MARK: Submit

@@ -97,6 +97,7 @@
 
 /* Accidental-dismissal guard for compose surfaces (issue #46) */
 "cupthread.common.cancel" = "Annuler";
+"cupthread.common.done" = "Terminé";
 "cupthread.common.discard" = "Supprimer";
 "cupthread.common.keep_editing" = "Continuer l'édition";
 "cupthread.feedback.discard_title" = "Supprimer ce retour ?";

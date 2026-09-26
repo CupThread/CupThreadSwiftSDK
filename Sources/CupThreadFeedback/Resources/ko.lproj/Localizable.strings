@@ -97,6 +97,7 @@
 
 /* Accidental-dismissal guard for compose surfaces (issue #46) */
 "cupthread.common.cancel" = "취소";
+"cupthread.common.done" = "완료";
 "cupthread.common.discard" = "버리기";
 "cupthread.common.keep_editing" = "계속 편집";
 "cupthread.feedback.discard_title" = "피드백을 버리시겠습니까?";
