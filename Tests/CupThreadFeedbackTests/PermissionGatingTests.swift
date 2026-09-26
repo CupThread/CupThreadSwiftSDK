@@ -59,6 +59,20 @@ struct PermissionPredicateTests {
         #expect(!makePermissionConfig(allowPublic: false, allowAnonymousRoadmap: false).allowsAnonymousRoadmap)
     }
 
+    @Test func allowsAnonymousVoteRequiresPublicAndAnonymous() {
+        #expect(makePermissionConfig(allowPublic: true, allowAnonymousVote: true).allowsAnonymousVote)
+        #expect(!makePermissionConfig(allowPublic: true, allowAnonymousVote: false).allowsAnonymousVote)
+        #expect(!makePermissionConfig(allowPublic: false, allowAnonymousVote: true).allowsAnonymousVote)
+        #expect(!makePermissionConfig(allowPublic: false, allowAnonymousVote: false).allowsAnonymousVote)
+    }
+
+    @Test func allowsAnonymousFeedbackRequiresPublicAndAnonymous() {
+        #expect(makePermissionConfig(allowPublic: true, allowAnonymousFeedback: true).allowsAnonymousFeedback)
+        #expect(!makePermissionConfig(allowPublic: true, allowAnonymousFeedback: false).allowsAnonymousFeedback)
+        #expect(!makePermissionConfig(allowPublic: false, allowAnonymousFeedback: true).allowsAnonymousFeedback)
+        #expect(!makePermissionConfig(allowPublic: false, allowAnonymousFeedback: false).allowsAnonymousFeedback)
+    }
+
     @Test func emptyPlatformAllowListIsUnrestricted() {
         let config = makePermissionConfig(allowedPlatforms: [], allowedPlatformValues: [])
         #expect(config.allows(platform: .ios))
@@ -148,6 +162,23 @@ struct PermissionViewGatingTests {
             SdkSubmissionDenial.forFeatureRequest(
                 config: makePermissionConfig(allowedPlatforms: [.macos])
             ) == .none
+        )
+    }
+
+    @Test func voteActionDisabledWhenAppIsNotPublic() {
+        let privateApp = makePermissionConfig(allowPublic: false, allowAnonymousVote: true)
+        #expect(FeatureVoteGate.isActionDisabled(isOwnRequest: false, config: privateApp))
+        #expect(FeatureVoteGate.isActionDisabled(isOwnRequest: true, config: privateApp))
+        #expect(FeatureVoteGate.hintKey(isOwnRequest: false, config: privateApp) == "cupthread.permission.vote_hint")
+    }
+
+    @Test func feedbackAndFeatureRequestDenialWhenAppIsNotPublic() {
+        let privateApp = makePermissionConfig(allowPublic: false, allowAnonymousFeedback: true)
+        #expect(
+            SdkSubmissionDenial.forFeedback(config: privateApp, platform: .ios) == .anonymousFeedbackDisabled
+        )
+        #expect(
+            SdkSubmissionDenial.forFeatureRequest(config: privateApp) == .anonymousFeedbackDisabled
         )
     }
 
