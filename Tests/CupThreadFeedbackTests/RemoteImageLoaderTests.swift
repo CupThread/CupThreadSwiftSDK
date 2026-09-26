@@ -154,6 +154,8 @@ struct RemoteImageLoaderTests {
         let loader = RemoteImageLoader(session: makeMockSession())
 
         let disallowedURLStrings = [
+            "http://insecure.example.com/avatar.png",
+            "http://localhost:3000/avatar.png",
             "file:///etc/passwd",
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY44YAAAAASUVORK5CYII=",
             "javascript:alert(1)",
