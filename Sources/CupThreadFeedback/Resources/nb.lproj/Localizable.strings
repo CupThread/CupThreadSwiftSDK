@@ -79,6 +79,10 @@
 "cupthread.comments.compose_prompt" = "Skriv en kommentar…";
 "cupthread.comments.removed_by_moderator" = "Denne kommentaren ble fjernet av en moderator.";
 "cupthread.comments.sign_in_required" = "Logg inn for å bli med i samtalen.";
+"cupthread.comments.submit" = "Send inn kommentar";
+"cupthread.comments.cancel_reply" = "Avbryt svar";
+"cupthread.comments.reply_to_author" = "Svar til %@";
+"cupthread.comments.view_profile_of" = "Vis profilen til @%@";
 
 "cupthread.profile.title" = "Brukerprofil";
 "cupthread.profile.apps" = "Apper";

@@ -79,6 +79,10 @@
 "cupthread.comments.compose_prompt" = "댓글을 입력하세요…";
 "cupthread.comments.removed_by_moderator" = "이 댓글은 관리자에 의해 삭제되었습니다.";
 "cupthread.comments.sign_in_required" = "로그인하여 대화에 참여하세요.";
+"cupthread.comments.submit" = "댓글 제출";
+"cupthread.comments.cancel_reply" = "답글 취소";
+"cupthread.comments.reply_to_author" = "%@ 님에게 답글";
+"cupthread.comments.view_profile_of" = "@%@ 님의 프로필 보기";
 
 "cupthread.profile.title" = "사용자 프로필";
 "cupthread.profile.apps" = "앱";

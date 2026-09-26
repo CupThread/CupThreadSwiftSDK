@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 160, "Expected 160 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 164, "Expected 164 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -221,6 +221,27 @@ struct LocalizationTests {
         }
     }
 
+    /// `CommentsView` actions provide localized accessibility labels across all target languages (issue #191).
+    @Test func commentActionAccessibilityStringsAreLocalizedAcrossTargetLanguages() throws {
+        let keys = [
+            "cupthread.comments.submit",
+            "cupthread.comments.cancel_reply",
+            "cupthread.comments.reply_to_author",
+            "cupthread.comments.view_profile_of"
+        ]
+        for lang in Self.targetLanguages {
+            let strings = try loadStrings(for: lang)
+            for key in keys {
+                let localized = try #require(
+                    strings[key],
+                    "\(lang) is missing \(key)"
+                )
+                #expect(!localized.isEmpty, "\(lang) has empty \(key)")
+                #expect(localized != key, "\(lang) has unlocalized raw key for \(key)")
+            }
+        }
+    }
+
     @MainActor
     @Test func whatsNewSubscribeEntryTitleHelperResolvesCorrectKeys() {
         let unconfirmed = WhatsNewView.subscribeEntryTitle(subscribedEmail: nil)
@@ -230,5 +251,26 @@ struct LocalizationTests {
         let confirmed = WhatsNewView.subscribeEntryTitle(subscribedEmail: "alex@example.com")
         #expect(confirmed == CupThreadStrings.tr("cupthread.whatsnew.emails_on"))
         #expect(confirmed != "Manage Emails")
+    }
+
+    @MainActor
+    @Test func commentsViewAccessibilityHelpersResolveExpectedLabels() {
+        let submitLabel = CommentsView.submitAccessibilityLabel()
+        #expect(submitLabel == CupThreadStrings.tr("cupthread.comments.submit"))
+        #expect(submitLabel != "cupthread.comments.submit")
+
+        let cancelReplyLabel = CommentsView.cancelReplyAccessibilityLabel()
+        #expect(cancelReplyLabel == CupThreadStrings.tr("cupthread.comments.cancel_reply"))
+        #expect(cancelReplyLabel != "cupthread.comments.cancel_reply")
+
+        let replyLabel = CommentsView.replyAccessibilityLabel(targetAuthor: "Ada")
+        #expect(replyLabel == CupThreadStrings.tr("cupthread.comments.reply_to_author", "Ada"))
+        #expect(replyLabel.contains("Ada"))
+        #expect(!replyLabel.contains("%@"))
+
+        let viewProfileLabel = CommentsView.viewProfileAccessibilityLabel(authorName: "Ada")
+        #expect(viewProfileLabel == CupThreadStrings.tr("cupthread.comments.view_profile_of", "Ada"))
+        #expect(viewProfileLabel.contains("Ada"))
+        #expect(!viewProfileLabel.contains("%@"))
     }
 }

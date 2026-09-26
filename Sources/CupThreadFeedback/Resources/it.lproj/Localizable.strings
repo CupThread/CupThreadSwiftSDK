@@ -79,6 +79,10 @@
 "cupthread.comments.compose_prompt" = "Scrivi un commento…";
 "cupthread.comments.removed_by_moderator" = "Questo commento è stato rimosso da un moderatore.";
 "cupthread.comments.sign_in_required" = "Accedi per partecipare alla conversazione.";
+"cupthread.comments.submit" = "Invia commento";
+"cupthread.comments.cancel_reply" = "Annulla risposta";
+"cupthread.comments.reply_to_author" = "Rispondi a %@";
+"cupthread.comments.view_profile_of" = "Visualizza il profilo di @%@";
 
 "cupthread.profile.title" = "Profilo utente";
 "cupthread.profile.apps" = "App";

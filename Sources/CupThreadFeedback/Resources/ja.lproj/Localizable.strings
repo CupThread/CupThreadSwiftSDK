@@ -79,6 +79,10 @@
 "cupthread.comments.compose_prompt" = "コメントを入力…";
 "cupthread.comments.removed_by_moderator" = "このコメントはモデレーターによって削除されました。";
 "cupthread.comments.sign_in_required" = "サインインしてディスカッションに参加しましょう。";
+"cupthread.comments.submit" = "コメントを送信";
+"cupthread.comments.cancel_reply" = "返信をキャンセル";
+"cupthread.comments.reply_to_author" = "%@ に返信";
+"cupthread.comments.view_profile_of" = "@%@ のプロフィールを表示";
 
 "cupthread.profile.title" = "ユーザープロフィール";
 "cupthread.profile.apps" = "アプリ";
