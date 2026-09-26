@@ -17,50 +17,18 @@ struct FeatureRequestCard: View {
     let vote: () -> Void
 
     var body: some View {
-        let stageStyle = StageStyle.forRequest(item)
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                HighlightedText(text: item.title, query: highlightQuery)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
-
-                HStack(spacing: 6) {
-                    CapsuleBadge(icon: stageStyle.icon, text: item.stageName, tint: stageStyle.tint)
-                        .accessibilityLabel(
-                            CupThreadStrings.tr("cupthread.features.stage_accessibility", item.stageName)
-                        )
-
-                    if item.isOwnRequest && !item.approved {
-                        CapsuleBadge(icon: "clock", text: CupThreadStrings.tr("cupthread.features.pending_review"), tint: .orange)
+                cardContent
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onSelectCard?()
                     }
-
-                    if let version = item.versionLabel {
-                        CapsuleBadge(icon: "tag", text: version, tint: .secondary)
-                    }
-                }
-
-                if !item.description.isEmpty {
-                    // Searching highlights the raw text so query ranges line up;
-                    // otherwise render inline Markdown.
-                    Group {
-                        if highlightQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            MarkdownText(content: item.description)
-                        } else {
-                            HighlightedText(text: item.description, query: highlightQuery)
-                        }
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                }
 
                 metaRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onSelectCard?()
-            }
 
             VotePill(
                 voteCount: item.voteCount,
@@ -82,8 +50,47 @@ struct FeatureRequestCard: View {
         .requestCard()
     }
 
+    var cardContent: some View {
+        let stageStyle = StageStyle.forRequest(item)
+        return VStack(alignment: .leading, spacing: 6) {
+            HighlightedText(text: item.title, query: highlightQuery)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
+
+            HStack(spacing: 6) {
+                CapsuleBadge(icon: stageStyle.icon, text: item.stageName, tint: stageStyle.tint)
+                    .accessibilityLabel(
+                        CupThreadStrings.tr("cupthread.features.stage_accessibility", item.stageName)
+                    )
+
+                if item.isOwnRequest && !item.approved {
+                    CapsuleBadge(icon: "clock", text: CupThreadStrings.tr("cupthread.features.pending_review"), tint: .orange)
+                }
+
+                if let version = item.versionLabel {
+                    CapsuleBadge(icon: "tag", text: version, tint: .secondary)
+                }
+            }
+
+            if !item.description.isEmpty {
+                // Searching highlights the raw text so query ranges line up;
+                // otherwise render inline Markdown.
+                Group {
+                    if highlightQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        MarkdownText(content: item.description)
+                    } else {
+                        HighlightedText(text: item.description, query: highlightQuery)
+                    }
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+            }
+        }
+    }
+
     @ViewBuilder
-    private var metaRow: some View {
+    var metaRow: some View {
         if let released = item.releasedVersion {
             CapsuleBadge(icon: "checkmark.seal.fill", text: CupThreadStrings.tr("cupthread.features.released_in", released), tint: .green)
         } else {

@@ -22,8 +22,7 @@ public struct FeatureRequestsView: View {
     @State private var loadError: String?
     @State private var isComposePresented = false
     @State private var showSubmittedBanner = false
-    @State private var selectedItemForComments: FeatureRequestItem?
-    @State private var selectedUserIdForProfile: String?
+    @State private var activeSheet: FeatureRequestsActiveSheet?
 
     @State private var searchText = ""
     @State private var versions: [AppVersion] = []
@@ -130,22 +129,17 @@ public struct FeatureRequestsView: View {
                 }
             }
         }
-        .sheet(item: $selectedItemForComments) { item in
+        .sheet(item: $activeSheet) { sheet in
             NavigationStack {
-                CommentsView(
-                    client: client,
-                    userToken: userToken,
-                    featureRequestId: item.id,
-                    featureRequestTitle: item.title
-                )
-            }
-        }
-        .sheet(isPresented: Binding(
-            get: { selectedUserIdForProfile != nil },
-            set: { if !$0 { selectedUserIdForProfile = nil } }
-        )) {
-            if let userId = selectedUserIdForProfile {
-                NavigationStack {
+                switch sheet {
+                case .comments(let item):
+                    CommentsView(
+                        client: client,
+                        userToken: userToken,
+                        featureRequestId: item.id,
+                        featureRequestTitle: item.title
+                    )
+                case .profile(let userId):
                     UserProfileView(client: client, userId: userId)
                 }
             }
@@ -215,8 +209,8 @@ public struct FeatureRequestsView: View {
                             highlightQuery: searchText,
                             isVoteInFlight: votingIds.contains(item.id),
                             successPulse: voteSuccessPulses[item.id, default: 0],
-                            onSelectCard: { selectedItemForComments = item },
-                            onSelectUser: { selectedUserIdForProfile = $0 },
+                            onSelectCard: { activeSheet = .comments(item) },
+                            onSelectUser: { activeSheet = .profile($0) },
                             appConfig: sdkAppConfig
                         ) {
                             Task { await toggleVoteOptimistic(for: item) }
@@ -263,8 +257,8 @@ public struct FeatureRequestsView: View {
                         highlightQuery: searchText,
                         isVoteInFlight: votingIds.contains(item.id),
                         successPulse: voteSuccessPulses[item.id, default: 0],
-                        onSelectCard: { selectedItemForComments = item },
-                        onSelectUser: { selectedUserIdForProfile = $0 },
+                        onSelectCard: { activeSheet = .comments(item) },
+                        onSelectUser: { activeSheet = .profile($0) },
                         appConfig: sdkAppConfig
                     ) {
                         Task { await toggleVoteOptimistic(for: item) }
