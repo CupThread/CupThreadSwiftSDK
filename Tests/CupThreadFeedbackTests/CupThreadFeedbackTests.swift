@@ -1324,6 +1324,7 @@ struct FeedbackClientSubmitTests {
 
         #expect(metadata.count <= 24)
         #expect(metadata["sdk"] == "cupthread-apple/\(FeedbackClient.sdkVersion)")
+        #expect(metadata["sdkVersion"] == FeedbackClient.sdkVersion)
         #expect(metadata["platform"] == "ios")
         #expect(metadata["submittedAt"] != nil)
         #expect(metadata["hostKey00"] == "value0")
