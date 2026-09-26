@@ -160,8 +160,8 @@ extension FeedbackClient {
     ) async throws -> FeatureRequestComment {
         let payload = CommentSubmitPayload(
             body: draft.body.trimmingCharacters(in: .whitespacesAndNewlines),
-            parentId: draft.parentId,
-            replyToAuthorName: draft.replyToAuthorName
+            parentId: draft.parentId?.nilIfEmpty,
+            replyToAuthorName: draft.replyToAuthorName?.nilIfEmpty
         )
 
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(featureRequestId)/comments"))
