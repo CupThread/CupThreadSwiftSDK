@@ -331,6 +331,7 @@ public struct CommentsView: View {
     @MainActor
     private func submitComment() async {
         isSubmitting = true
+        defer { isSubmitting = false }
         submitError = nil
         do {
             let newComment = try await client.postComment(
@@ -344,8 +345,8 @@ public struct CommentsView: View {
             draft.replyToAuthorName = nil
             draft.replyToClerkId = nil
         } catch {
+            guard !error.isSdkCancellation else { return }
             submitError = FriendlyError.message(for: error)
         }
-        isSubmitting = false
     }
 }

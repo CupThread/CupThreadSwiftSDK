@@ -141,6 +141,7 @@ struct FeatureRequestComposeView: View {
             _ = try await client.submitFeatureRequest(draft, userToken: userToken)
             onSubmitted()
         } catch {
+            guard !error.isSdkCancellation else { return }
             submitError = FriendlyError.message(for: error)
         }
     }

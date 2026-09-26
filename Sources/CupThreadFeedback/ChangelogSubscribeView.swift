@@ -190,6 +190,7 @@ struct ChangelogSubscribeView: View {
                 model.didSubscribe()
             }
         } catch {
+            guard !error.isSdkCancellation else { return }
             errorMessage = FriendlyError.message(for: error)
         }
     }
