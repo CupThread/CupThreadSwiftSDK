@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "发送中…";
 "cupthread.feedback.thanks_title" = "感谢反馈！";
 "cupthread.feedback.thanks_subtitle" = "您的反馈已成功送达团队。";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "您的反馈已发送，但附件未能成功保存。";
+"cupthread.feedback.warning_generic" = "您的反馈已发送，但部分内容未能成功处理。";
 "cupthread.feedback.send_more" = "发送更多反馈";
 "cupthread.feedback.accessibility_sent" = "反馈已成功发送。";
 

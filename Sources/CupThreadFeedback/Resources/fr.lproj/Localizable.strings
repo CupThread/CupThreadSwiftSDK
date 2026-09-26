@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "Envoi en cours…";
 "cupthread.feedback.thanks_title" = "Merci !";
 "cupthread.feedback.thanks_subtitle" = "Votre retour a bien été transmis à l'équipe.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "Votre retour a été envoyé, mais les pièces jointes n'ont pas pu être enregistrées.";
+"cupthread.feedback.warning_generic" = "Votre retour a été envoyé, mais certains éléments n'ont pas pu être traités.";
 "cupthread.feedback.send_more" = "Envoyer un autre retour";
 "cupthread.feedback.accessibility_sent" = "Retour envoyé avec succès.";
 
