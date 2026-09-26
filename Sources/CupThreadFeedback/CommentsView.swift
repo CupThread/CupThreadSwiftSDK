@@ -19,6 +19,7 @@ public struct CommentsView: View {
     @State private var comments: [FeatureRequestComment] = []
     @State private var isLoading = true
     @State private var loadError: String?
+    @State private var isCommentsUnavailable = false
     @State private var draft = CommentDraft()
     @State private var isSubmitting = false
     @State private var submitError: String?
@@ -234,10 +235,9 @@ public struct CommentsView: View {
 
     @ViewBuilder
     private var composeArea: some View {
-        // Comment creation is signed-in-only on the server. When this client
-        // has no way to present a signed-in identity, show a deliberate
-        // signed-out notice instead of a composer that can never succeed.
-        if client.supportsAuthentication {
+        if isCommentsUnavailable {
+            EmptyView()
+        } else if client.supportsAuthentication {
             VStack(spacing: 8) {
                 if let submitError {
                     ErrorBanner(message: submitError)
@@ -314,11 +314,15 @@ public struct CommentsView: View {
         isLoading = true
         loadError = nil
         do {
+            isCommentsUnavailable = false
             comments = try await client.fetchComments(featureRequestId: featureRequestId)
         } catch {
             // A cancelled load (dismissal, restart for another request) never
             // reached a verdict — keep the currently rendered comments.
             guard !error.isSdkCancellation else { return }
+            if let clientError = error as? FeedbackClientError, case .commentsUnavailable = clientError {
+                isCommentsUnavailable = true
+            }
             loadError = FriendlyError.message(for: error)
         }
         isLoading = false

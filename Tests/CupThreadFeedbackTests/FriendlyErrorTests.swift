@@ -185,6 +185,27 @@ struct FriendlyErrorTests {
         #expect(FeedbackClientError.uploaderMismatch(message: nil, requestId: nil).responseBody == nil)
         #expect(FeedbackClientError.submissionQuotaExceeded(message: nil, requestId: nil).responseBody == nil)
         #expect(FeedbackClientError.subscriptionInactive(message: nil, requestId: nil).responseBody == nil)
+        #expect(FeedbackClientError.commentsUnavailable(message: "details", requestId: "r").responseBody == nil)
+        #expect(FeedbackClientError.emailNotVerified(message: "details", requestId: "r").responseBody == nil)
+    }
+
+    @Test func commentsUnavailableAndEmailNotVerifiedRenderSafeCopy() {
+        let commentsError = FeedbackClientError.commentsUnavailable(
+            message: "<html>raw server error</html>",
+            requestId: "req-com-1"
+        )
+        #expect(commentsError.errorDescription == "Comments are not available for this feature request. (request id: req-com-1)")
+        #expect(!commentsError.errorDescription!.contains("<html>"))
+        #expect(FriendlyError.message(for: commentsError) == "Comments are not available for this feature request. (request id: req-com-1)")
+
+        let emailError = FeedbackClientError.emailNotVerified(
+            message: "<html>raw verification error</html>",
+            requestId: "req-email-1"
+        )
+        let expectedEmailMessage = "Please use your signed-in account email address to subscribe. (request id: req-email-1)"
+        #expect(emailError.errorDescription == expectedEmailMessage)
+        #expect(!emailError.errorDescription!.contains("<html>"))
+        #expect(FriendlyError.message(for: emailError) == expectedEmailMessage)
     }
 
     @Test func scanDetailPreservesRawRejectionMessage() {

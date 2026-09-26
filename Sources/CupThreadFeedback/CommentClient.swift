@@ -40,7 +40,11 @@ extension FeedbackClient {
     /// ``fetchComments(featureRequestId:limit:cursor:)``.
     /// - Parameter featureRequestId: Id of the feature request.
     /// - Returns: The visible comments, oldest first.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
+    ///   access is disabled for the app (HTTP 401 `authentication_required`),
+    ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
+    ///   comments are not available or disabled (HTTP 404),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor) or
     ///   ``FeedbackClientError/invalidResponse``.
     public func fetchComments(featureRequestId: String) async throws -> [FeatureRequestComment] {
@@ -80,7 +84,11 @@ extension FeedbackClient {
     ///   - cursor: Opaque keyset cursor from a previous page's
     ///     ``ListCommentsResult/nextCursor``; omit for the first page.
     /// - Returns: The page's comments plus `total` / `hasMore` / `nextCursor`.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
+    ///   access is disabled for the app (HTTP 401 `authentication_required`),
+    ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
+    ///   comments are not available or disabled (HTTP 404),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor) or
     ///   ``FeedbackClientError/invalidResponse``.
     public func fetchComments(
@@ -110,6 +118,13 @@ extension FeedbackClient {
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
+        }
+        if httpResponse.statusCode == 404 {
+            let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
+            let rawMessage = envelope?.error ?? String(data: data, encoding: .utf8)
+            let trimmed = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = (trimmed?.isEmpty ?? true) ? nil : trimmed
+            throw FeedbackClientError.commentsUnavailable(message: message, requestId: httpResponse.cupthreadRequestID)
         }
         try validateResponse(httpResponse, data: data, accepted: [200])
         return try decoder.decode(ListCommentsResult.self, from: data)

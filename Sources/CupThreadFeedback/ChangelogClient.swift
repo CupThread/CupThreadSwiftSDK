@@ -238,7 +238,11 @@ extension FeedbackClient {
     ///   - userToken: Anonymous user token sent as `X-User-Token`, linking the
     ///     subscription to the end-user identity.
     /// - Returns: Whether the subscription was recorded (pending confirmation).
-    /// - Throws: ``FeedbackClientError/rateLimited`` on HTTP 429,
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
+    ///   changelog access is disabled (HTTP 401 `authentication_required`),
+    ///   ``FeedbackClientError/emailNotVerified(message:requestId:)`` when the
+    ///   email must be verified from a signed-in account (HTTP 403 `email_not_verified`),
+    ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func subscribeToChangelog(
