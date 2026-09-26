@@ -184,7 +184,6 @@ public struct PublicUserProfileResponse: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(profile, forKey: .profile)
         try container.encode(apps, forKey: .publicApps)
-        try container.encode(apps, forKey: .apps)
         try container.encode(recentComments, forKey: .recentComments)
         try container.encode(hideComments, forKey: .hideComments)
     }

@@ -169,6 +169,37 @@ struct UserProfileModelsTests {
         #expect(response.hideComments == true)
     }
 
+    @Test func publicUserProfileResponseEncodesCanonicalKeyWithoutDuplicateApps() throws {
+        let profile = UserProfile(
+            clerkUserId: "u1",
+            displayName: "Alice",
+            avatarUrl: nil,
+            bio: nil,
+            websiteUrl: nil,
+            hideComments: false
+        )
+        let app = PublicAppSummary(
+            id: "app1",
+            name: "Demo",
+            slug: "demo"
+        )
+        let response = PublicUserProfileResponse(
+            profile: profile,
+            apps: [app],
+            recentComments: [],
+            hideComments: false
+        )
+
+        let data = try JSONEncoder().encode(response)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        #expect(json?["publicApps"] != nil)
+        #expect(json?["apps"] == nil, "Legacy fallback key 'apps' should not be redundantly encoded")
+
+        let decoded = try JSONDecoder().decode(PublicUserProfileResponse.self, from: data)
+        #expect(decoded == response)
+    }
+
     @Test func publicAppSummaryDecodesWithAppSlug() throws {
         let json = Data("""
         {
