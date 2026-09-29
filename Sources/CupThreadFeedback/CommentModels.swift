@@ -123,6 +123,16 @@ public struct CommentDraft: Equatable, Sendable {
     public var hasContent: Bool {
         !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+
+    /// Drops the reply target while keeping the typed body intact — used
+    /// after a successful post, and after an `invalid_parent` rejection
+    /// (``FeedbackClientError/invalidParent(message:requestId:)``) where the
+    /// parent no longer qualifies as a reply target server-side.
+    mutating func clearReplyTarget() {
+        parentId = nil
+        replyToAuthorName = nil
+        replyToClerkId = nil
+    }
 }
 
 // MARK: - Server responses

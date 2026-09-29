@@ -144,6 +144,11 @@ extension FeedbackClient {
             return .uploaderIdentityRequired(message: envelopeMessage, requestId: requestId)
         case (400, "uploader_mismatch"):
             return .uploaderMismatch(message: envelopeMessage, requestId: requestId)
+        case (400, "invalid_parent"):
+            // The reply target is missing, hidden, or not on this feature
+            // request — the composer composed a stale reply (moderation
+            // changed the parent between reply and submit).
+            return .invalidParent(message: envelopeMessage, requestId: requestId)
         case (403, "email_not_verified"):
             return .emailNotVerified(message: envelopeMessage, requestId: requestId)
         default:

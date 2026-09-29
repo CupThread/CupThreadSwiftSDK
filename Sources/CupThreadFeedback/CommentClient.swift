@@ -154,6 +154,9 @@ extension FeedbackClient {
     /// - Returns: The created comment, as echoed by the server.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when the
     ///   caller is not signed in,
+    ///   ``FeedbackClientError/invalidParent(message:requestId:)`` when the
+    ///   reply target is missing, hidden, or not on this feature request
+    ///   (HTTP 400 `invalid_parent`),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse`` otherwise.
     public func postComment(
