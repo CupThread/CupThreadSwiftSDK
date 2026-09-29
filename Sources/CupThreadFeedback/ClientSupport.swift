@@ -378,3 +378,28 @@ enum FeedbackMetadataSanitizer {
         return data.count
     }
 }
+
+extension FeedbackClient {
+    /// Shared JSON request/response plumbing for JSON endpoints.
+    func sendJSON<Response: Decodable>(
+        _ method: String,
+        path: String,
+        body: some Encodable,
+        userToken: String?,
+        acceptedStatuses: Set<Int>
+    ) async throws -> Response {
+        var request = URLRequest(url: configuration.baseURL.appending(path: path))
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
+        request.httpBody = try encoder.encode(body)
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw FeedbackClientError.invalidResponse
+        }
+        try validateResponse(httpResponse, data: data, accepted: acceptedStatuses)
+        return try decoder.decode(Response.self, from: data)
+    }
+}
