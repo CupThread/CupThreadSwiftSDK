@@ -64,6 +64,13 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// e.g. comments are disabled for this item or the thread has not been initialized.
     /// `message` carries the raw server text for diagnostics; it is never shown to end users.
     case commentsUnavailable(message: String?, requestId: String?)
+    /// The reply target no longer qualifies as a parent (HTTP 400
+    /// `invalid_parent`) — the comment being replied to was hidden,
+    /// soft-deleted, or belongs to a different feature request by the time
+    /// the reply was submitted. Clear the composer's reply target and
+    /// submit again to post a top-level comment. `message` carries the raw
+    /// server text for diagnostics; it is never shown to end users.
+    case invalidParent(message: String?, requestId: String?)
     /// The changelog subscription was rejected because the email address has not
     /// been verified (HTTP 403 `email_not_verified`). Prompt the user to use their
     /// signed-in account email.
@@ -91,7 +98,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
              .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
-             .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified:
+             .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified,
+             .invalidParent:
             return nil
         }
     }
@@ -152,6 +160,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .commentsUnavailable(_, let requestId):
             return requestId
+        case .invalidParent(_, let requestId):
+            return requestId
         case .emailNotVerified(_, let requestId):
             return requestId
         case .unexpectedStatus(_, _, let requestId):
@@ -208,6 +218,11 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .commentsUnavailable(_, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return "Comments are not available for this feature request.\(suffix)"
+        case .invalidParent(_, let requestId):
+            // Raw server body stays off the user-facing copy (#30); callers
+            // can read the associated `message` programmatically.
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return CupThreadStrings.tr("cupthread.comments.invalid_parent") + suffix
         case .emailNotVerified(_, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return "Please use your signed-in account email address to subscribe.\(suffix)"
@@ -274,6 +289,11 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``commentsUnavailable(message:requestId:)`` with no request id.
     static func commentsUnavailable(message: String? = nil) -> FeedbackClientError {
         .commentsUnavailable(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``invalidParent(message:requestId:)`` with no request id.
+    static func invalidParent(message: String? = nil) -> FeedbackClientError {
+        .invalidParent(message: message, requestId: nil)
     }
 
     /// Convenience constructor for ``emailNotVerified(message:requestId:)`` with no request id.

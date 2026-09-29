@@ -80,6 +80,7 @@
 "cupthread.comments.replying_to" = "Đang trả lời @%@";
 "cupthread.comments.compose_prompt" = "Viết bình luận…";
 "cupthread.comments.removed_by_moderator" = "Bình luận này đã bị người kiểm duyệt xóa.";
+"cupthread.comments.invalid_parent" = "Bình luận bạn đang trả lời hiện không còn khả dụng.";
 "cupthread.comments.sign_in_required" = "Đăng nhập để tham gia cuộc trò chuyện.";
 "cupthread.comments.submit" = "Gửi bình luận";
 "cupthread.comments.cancel_reply" = "Hủy trả lời";

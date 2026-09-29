@@ -80,6 +80,7 @@
 "cupthread.comments.replying_to" = "Svarer til @%@";
 "cupthread.comments.compose_prompt" = "Skriv en kommentar…";
 "cupthread.comments.removed_by_moderator" = "Denne kommentar blev fjernet af en moderator.";
+"cupthread.comments.invalid_parent" = "Kommentaren, du svarer på, er ikke længere tilgængelig.";
 "cupthread.comments.sign_in_required" = "Log ind for at deltage i samtalen.";
 "cupthread.comments.submit" = "Indsend kommentar";
 "cupthread.comments.cancel_reply" = "Annuller svar";
