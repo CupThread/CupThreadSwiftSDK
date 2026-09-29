@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 165, "Expected 165 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 167, "Expected 167 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -272,5 +272,17 @@ struct LocalizationTests {
         #expect(viewProfileLabel == CupThreadStrings.tr("cupthread.comments.view_profile_of", "Ada"))
         #expect(viewProfileLabel.contains("Ada"))
         #expect(!viewProfileLabel.contains("%@"))
+    }
+
+    @Test func feedbackWarningStringsResolveAcrossAllLanguages() throws {
+        for lang in Self.targetLanguages {
+            let dict = try loadStrings(for: lang)
+            let attachKey = "cupthread.feedback.warning_attachment_signing_unconfigured"
+            let genericKey = "cupthread.feedback.warning_generic"
+            let attachVal = try #require(dict[attachKey], "Missing \(attachKey) for \(lang)")
+            let genericVal = try #require(dict[genericKey], "Missing \(genericKey) for \(lang)")
+            #expect(!attachVal.isEmpty)
+            #expect(!genericVal.isEmpty)
+        }
     }
 }

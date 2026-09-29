@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "Wysyłanie…";
 "cupthread.feedback.thanks_title" = "Dziękujemy!";
 "cupthread.feedback.thanks_subtitle" = "Twoja opinia została przesłana do zespołu.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "Twoja opinia została przesłana, ale załączniki nie mogły zostać zapisane.";
+"cupthread.feedback.warning_generic" = "Twoja opinia została przesłana, ale niektóre elementy nie mogły zostać przetworzone.";
 "cupthread.feedback.send_more" = "Wyślij kolejną opinię";
 "cupthread.feedback.accessibility_sent" = "Opinia została pomyślnie wysłana.";
 

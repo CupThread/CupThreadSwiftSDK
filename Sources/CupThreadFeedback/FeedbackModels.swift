@@ -228,9 +228,16 @@ public struct FeedbackSubmissionResult: Decodable, Equatable, Sendable {
     public let githubDiscussionId: String?
     /// GitHub discussion URL, when the submission was mirrored.
     public let githubDiscussionUrl: URL?
-    /// Non-fatal warning from the server, shown to the user when present.
+    /// Raw diagnostic warning from the server, when present.
+    ///
+    /// For security and localization (#30, #198), this raw server string is
+    /// diagnostics-oriented (intended for logging or `onSubmit` inspections) and
+    /// is never displayed in user-facing SDK UI. To inspect why a warning occurred
+    /// programmatically, prefer branching on ``warningCode``.
     public let warning: String?
     /// Machine-readable warning code from the server (e.g. `attachment_signing_unconfigured`), when present.
+    ///
+    /// Serves as the stable key for branching on server-side warnings or driving host-level UI decisions.
     public let warningCode: String?
 
     /// Creates a feedback submission receipt.
@@ -239,7 +246,7 @@ public struct FeedbackSubmissionResult: Decodable, Equatable, Sendable {
     ///   - forwardedToGithub: Whether the backend mirrored the submission to its GitHub tracker.
     ///   - githubDiscussionId: GitHub discussion id, when mirrored.
     ///   - githubDiscussionUrl: GitHub discussion URL, when mirrored.
-    ///   - warning: Non-fatal warning message from the server, when present.
+    ///   - warning: Diagnostic warning message from the server, when present (for logging/diagnostics, not UI display).
     ///   - warningCode: Machine-readable warning code from the server, when present.
     public init(
         submissionId: String,

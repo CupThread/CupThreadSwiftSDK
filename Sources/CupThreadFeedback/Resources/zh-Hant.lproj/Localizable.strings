@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "傳送中…";
 "cupthread.feedback.thanks_title" = "感謝您的回饋！";
 "cupthread.feedback.thanks_subtitle" = "您的回饋已成功送達團隊。";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "您的回饋已送出，但附件未能成功儲存。";
+"cupthread.feedback.warning_generic" = "您的回饋已送出，但部分內容未能成功處理。";
 "cupthread.feedback.send_more" = "傳送更多回饋";
 "cupthread.feedback.accessibility_sent" = "回饋已成功傳送。";
 

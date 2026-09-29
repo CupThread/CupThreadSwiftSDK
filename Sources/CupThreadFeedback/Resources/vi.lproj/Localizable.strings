@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "Đang gửi…";
 "cupthread.feedback.thanks_title" = "Cảm ơn bạn!";
 "cupthread.feedback.thanks_subtitle" = "Phản hồi của bạn đã được gửi đến đội ngũ phát triển.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "Phản hồi của bạn đã được gửi, nhưng không thể lưu tệp đính kèm.";
+"cupthread.feedback.warning_generic" = "Phản hồi của bạn đã được gửi, nhưng không thể xử lý một số mục.";
 "cupthread.feedback.send_more" = "Gửi thêm phản hồi";
 "cupthread.feedback.accessibility_sent" = "Phản hồi đã được gửi thành công.";
 

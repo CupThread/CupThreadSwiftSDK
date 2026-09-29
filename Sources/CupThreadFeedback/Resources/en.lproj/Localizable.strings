@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "Sending…";
 "cupthread.feedback.thanks_title" = "Thanks!";
 "cupthread.feedback.thanks_subtitle" = "Your feedback was sent to the team.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "Your feedback was sent, but attachments could not be saved.";
+"cupthread.feedback.warning_generic" = "Your feedback was sent, but some items could not be processed.";
 "cupthread.feedback.send_more" = "Send More Feedback";
 "cupthread.feedback.accessibility_sent" = "Feedback sent successfully.";
 

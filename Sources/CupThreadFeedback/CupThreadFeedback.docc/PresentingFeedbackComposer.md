@@ -34,6 +34,9 @@ struct FeedbackSheet: View {
                 userToken: tokenStore.token,
                 onSubmit: { result in
                     print("Feedback submitted: \(result.submissionId)")
+                    if let warningCode = result.warningCode {
+                        print("Submission completed with warning code: \(warningCode)")
+                    }
                     dismiss()
                 }
             )

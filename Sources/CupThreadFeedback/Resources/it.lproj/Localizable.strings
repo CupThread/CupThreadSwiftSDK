@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "Invio in corso…";
 "cupthread.feedback.thanks_title" = "Grazie!";
 "cupthread.feedback.thanks_subtitle" = "Il tuo feedback è stato inviato al team di sviluppo.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "Il tuo feedback è stato inviato, ma non è stato possibile salvare gli allegati.";
+"cupthread.feedback.warning_generic" = "Il tuo feedback è stato inviato, ma non è stato possibile elaborare alcuni elementi.";
 "cupthread.feedback.send_more" = "Invia altro feedback";
 "cupthread.feedback.accessibility_sent" = "Feedback inviato con successo.";
 

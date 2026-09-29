@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "Sender…";
 "cupthread.feedback.thanks_title" = "Tusen takk!";
 "cupthread.feedback.thanks_subtitle" = "Tilbakemeldingen din er sendt til teamet.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "Tilbakemeldingen din ble sendt, men vedleggene kunne ikke lagres.";
+"cupthread.feedback.warning_generic" = "Tilbakemeldingen din ble sendt, men enkelte elementer kunne ikke behandles.";
 "cupthread.feedback.send_more" = "Send mer tilbakemelding";
 "cupthread.feedback.accessibility_sent" = "Tilbakemeldingen ble sendt.";
 

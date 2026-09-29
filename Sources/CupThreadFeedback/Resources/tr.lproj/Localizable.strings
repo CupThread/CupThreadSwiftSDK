@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "Gönderiliyor…";
 "cupthread.feedback.thanks_title" = "Teşekkürler!";
 "cupthread.feedback.thanks_subtitle" = "Geri bildiriminiz ekibe iletildi.";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "Geri bildiriminiz gönderildi, ancak ekler kaydedilemedi.";
+"cupthread.feedback.warning_generic" = "Geri bildiriminiz gönderildi, ancak bazı öğeler işlenemedi.";
 "cupthread.feedback.send_more" = "Daha Fazla Geri Bildirim Gönder";
 "cupthread.feedback.accessibility_sent" = "Geri bildirim başarıyla gönderildi.";
 

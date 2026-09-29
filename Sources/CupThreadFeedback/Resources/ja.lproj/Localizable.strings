@@ -19,6 +19,8 @@
 "cupthread.feedback.sending_button" = "送信中…";
 "cupthread.feedback.thanks_title" = "ありがとうございます！";
 "cupthread.feedback.thanks_subtitle" = "フィードバックがチームに送信されました。";
+"cupthread.feedback.warning_attachment_signing_unconfigured" = "フィードバックは送信されましたが、添付ファイルを保存できませんでした。";
+"cupthread.feedback.warning_generic" = "フィードバックは送信されましたが、一部の項目を処理できませんでした。";
 "cupthread.feedback.send_more" = "さらにフィードバックを送信";
 "cupthread.feedback.accessibility_sent" = "フィードバックが正常に送信されました。";
 
