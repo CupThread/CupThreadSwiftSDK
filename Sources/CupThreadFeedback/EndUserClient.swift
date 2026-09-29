@@ -74,16 +74,33 @@ extension FeedbackClient {
     /// stops working immediately — so this overload calls
     /// ``UserTokenStore/reset()`` when the response reports `erased: true`;
     /// the next ``UserTokenStore/token`` read mints a fresh identity and the
-    /// revoked one is never replayed. When the result is `erased: false`
-    /// (no profile matched the identity), the store is left untouched.
+    /// revoked one is never replayed. The locally remembered changelog
+    /// subscription email (see ``ChangelogSubscriptionStore``) is cleared at
+    /// the same time so no PII survives a confirmed erasure on the device.
+    /// When the result is `erased: false` (no profile matched the identity),
+    /// both stores are left untouched.
     ///
     /// - Parameter store: The store whose identity is erased and reset.
     /// - Returns: Whether a profile was erased.
     /// - Throws: Same errors as ``eraseMyData(userToken:)``.
     public func eraseMyData(store: UserTokenStore) async throws -> DataErasureResult {
+        try await eraseMyData(
+            store: store,
+            subscriptionStore: ChangelogSubscriptionStore(appKey: configuration.appKey)
+        )
+    }
+
+    /// Test seam for ``eraseMyData(store:)``: the same erasure flow with an
+    /// injectable subscription store. `nil` skips the local subscription
+    /// cleanup.
+    func eraseMyData(
+        store: UserTokenStore,
+        subscriptionStore: ChangelogSubscriptionStore?
+    ) async throws -> DataErasureResult {
         let result = try await eraseMyData(userToken: store.token)
         if result.erased {
             store.reset()
+            subscriptionStore?.clear()
         }
         return result
     }
