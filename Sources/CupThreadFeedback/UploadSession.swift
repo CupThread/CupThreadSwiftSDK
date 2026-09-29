@@ -23,7 +23,10 @@ extension FeedbackClient {
     /// - Returns: The session, including bearer token and pre-allocated slots.
     /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
     ///   identity could be presented, ``FeedbackClientError/rateLimited`` on
-    ///   HTTP 429, or ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   HTTP 429, ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
+    ///   disables feedback attachments (HTTP 401/403), or
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   / ``FeedbackClientError/invalidResponse`` for other failures.
     public func createUploadSession(
         files: [FeedbackUploadFileSpec],
@@ -61,7 +64,7 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [201])
+        try validateResponse(httpResponse, data: data, accepted: [201], mapsPermissionErrors: true)
         return try decoder.decode(FeedbackUploadSession.self, from: data)
     }
 
