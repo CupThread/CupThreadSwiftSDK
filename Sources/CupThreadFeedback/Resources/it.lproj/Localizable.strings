@@ -184,3 +184,9 @@
 "cupthread.permission.changelog_title" = "Impossibile visualizzare il changelog";
 "cupthread.permission.changelog_description" = "L’accesso anonimo al changelog è disattivato nella console CupThread.";
 "cupthread.error.forbidden" = "Questa azione non è disponibile per questa app.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "I dati di pagamento non sono stati aggiornati: segnalarli richiede il segreto di firma SDK dell'app.";
+"cupthread.error.signing_secret_not_configured" = "Impossibile segnalare i dati di pagamento: questa app non ha configurato un segreto di firma SDK.";
+"cupthread.error.invalid_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report non è stata verificata. Controlla il segreto di firma SDK dell'app.";
+"cupthread.error.stale_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report è scaduta. Controlla l'orologio del dispositivo e riprova.";
+

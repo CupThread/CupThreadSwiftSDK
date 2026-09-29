@@ -319,10 +319,10 @@ struct UserAttributesSigningTests {
         #expect(json["timestamp"] == nil)
     }
 
-    @Test func updateUserAttributes422SignatureRequiredSurfacesError() async throws {
+    @Test func updateUserAttributes422SignatureRequiredSurfacesTypedError() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
-                makeHTTPResponse(status: 422),
+                makeHTTPResponse(status: 422, headers: ["X-Request-Id": "req-422-sign-req"]),
                 try encodeJSON([
                     "error": "Payment attributes require signature",
                     "code": "payment_attributes_require_signature"
@@ -336,19 +336,56 @@ struct UserAttributesSigningTests {
                 isPaying: true,
                 userToken: "user-uuid-err"
             )
-            Issue.record("Expected unexpectedStatus error")
-        } catch FeedbackClientError.unexpectedStatus(let code, let message, _) {
-            #expect(code == 422)
+            Issue.record("Expected paymentAttributesRequireSignature error")
+        } catch let error as FeedbackClientError {
+            guard case .paymentAttributesRequireSignature(let message, let requestId) = error else {
+                Issue.record("Expected .paymentAttributesRequireSignature, got \(error)")
+                return
+            }
             #expect(message == "Payment attributes require signature")
+            #expect(requestId == "req-422-sign-req")
+            #expect(error.errorDescription?.contains("req-422-sign-req") == true)
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }
     }
 
-    @Test func updateUserAttributes401InvalidSignatureSurfacesError() async throws {
+    @Test func updateUserAttributes422SigningSecretNotConfiguredSurfacesTypedError() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
-                makeHTTPResponse(status: 401),
+                makeHTTPResponse(status: 422, headers: ["X-Request-Id": "req-422-no-secret"]),
+                try encodeJSON([
+                    "error": "SDK signing secret not configured",
+                    "code": "sdk_signing_secret_not_configured"
+                ])
+            )
+        }
+
+        let client = Self.makeSigningClient()
+        do {
+            _ = try await client.updateUserAttributes(
+                isPaying: true,
+                plan: "pro",
+                userToken: "user-uuid-err"
+            )
+            Issue.record("Expected sdkSigningSecretNotConfigured error")
+        } catch let error as FeedbackClientError {
+            guard case .sdkSigningSecretNotConfigured(let message, let requestId) = error else {
+                Issue.record("Expected .sdkSigningSecretNotConfigured, got \(error)")
+                return
+            }
+            #expect(message == "SDK signing secret not configured")
+            #expect(requestId == "req-422-no-secret")
+            #expect(error.errorDescription?.contains("req-422-no-secret") == true)
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test func updateUserAttributes401InvalidSignatureSurfacesTypedError() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401, headers: ["X-Request-Id": "req-401-invalid"]),
                 try encodeJSON([
                     "error": "Invalid signature",
                     "code": "invalid_signature"
@@ -362,10 +399,21 @@ struct UserAttributesSigningTests {
                 isPaying: true,
                 userToken: "user-uuid-err"
             )
-            Issue.record("Expected unexpectedStatus error")
-        } catch FeedbackClientError.unexpectedStatus(let code, let message, _) {
-            #expect(code == 401)
+            Issue.record("Expected invalidSignature error")
+        } catch let error as FeedbackClientError {
+            guard case .invalidSignature(let message, let requestId) = error else {
+                Issue.record("Expected .invalidSignature, got \(error)")
+                return
+            }
             #expect(message == "Invalid signature")
+            #expect(requestId == "req-401-invalid")
+
+            // A signing failure must never render as the signed-in 401 copy (#238).
+            let description = try #require(error.errorDescription)
+            let unauthorized = CupThreadStrings.tr("cupthread.error.http_unauthorized")
+            #expect(description != unauthorized)
+            #expect(!description.hasPrefix(unauthorized))
+            #expect(description.contains("req-401-invalid"))
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }
