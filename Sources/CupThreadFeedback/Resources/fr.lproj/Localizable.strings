@@ -184,3 +184,9 @@
 "cupthread.permission.changelog_title" = "Impossible d’afficher le journal des modifications";
 "cupthread.permission.changelog_description" = "L’accès anonyme au journal des modifications est désactivé dans la console CupThread.";
 "cupthread.error.forbidden" = "Cette action n’est pas disponible pour cette app.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "Les informations de paiement n’ont pas été mises à jour : leur envoi requiert le secret de signature SDK de l’app.";
+"cupthread.error.signing_secret_not_configured" = "Impossible d’envoyer les informations de paiement : cette app n’a pas configuré de secret de signature SDK.";
+"cupthread.error.invalid_signature" = "Les informations de paiement n’ont pas été mises à jour : la signature du rapport n’a pas pu être vérifiée. Vérifiez le secret de signature SDK de l’app.";
+"cupthread.error.stale_signature" = "Les informations de paiement n’ont pas été mises à jour : la signature du rapport a expiré. Vérifiez l’horloge de l’appareil et réessayez.";
+

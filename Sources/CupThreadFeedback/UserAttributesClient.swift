@@ -121,8 +121,13 @@ extension FeedbackClient {
     ///     on ``FeedbackClientConfiguration/signingSecret``.
     /// - Returns: Whether the update was applied and when.
     /// - Throws: ``FeedbackClientError/rateLimited`` when the retry is also
-    ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse``.
+    ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,
+    ///   ``FeedbackClientError/invalidResponse``, or — for payment-attribute
+    ///   reports — the signature failures
+    ///   ``FeedbackClientError/paymentAttributesRequireSignature(message:requestId:)``,
+    ///   ``FeedbackClientError/sdkSigningSecretNotConfigured(message:requestId:)``,
+    ///   ``FeedbackClientError/invalidSignature(message:requestId:)``, and
+    ///   ``FeedbackClientError/staleSignature(message:requestId:)``.
     public func updateUserAttributes(
         isPaying: Bool? = nil,
         plan: String? = nil,
@@ -158,8 +163,13 @@ extension FeedbackClient {
     ///     on ``FeedbackClientConfiguration/signingSecret``.
     /// - Returns: Whether the update was applied and when.
     /// - Throws: ``FeedbackClientError/rateLimited`` when the retry is also
-    ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse``.
+    ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,
+    ///   ``FeedbackClientError/invalidResponse``, or — for payment-attribute
+    ///   reports — the signature failures
+    ///   ``FeedbackClientError/paymentAttributesRequireSignature(message:requestId:)``,
+    ///   ``FeedbackClientError/sdkSigningSecretNotConfigured(message:requestId:)``,
+    ///   ``FeedbackClientError/invalidSignature(message:requestId:)``, and
+    ///   ``FeedbackClientError/staleSignature(message:requestId:)``.
     public func updateUserAttributes(
         isPaying: UserAttributesSigner.Field<Bool> = .unset,
         plan: UserAttributesSigner.Field<String> = .unset,
@@ -187,8 +197,13 @@ extension FeedbackClient {
     ///     on ``FeedbackClientConfiguration/signingSecret``.
     /// - Returns: Whether the update was applied and when.
     /// - Throws: ``FeedbackClientError/rateLimited`` when the retry is also
-    ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse``.
+    ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,
+    ///   ``FeedbackClientError/invalidResponse``, or — for payment-attribute
+    ///   reports — the signature failures
+    ///   ``FeedbackClientError/paymentAttributesRequireSignature(message:requestId:)``,
+    ///   ``FeedbackClientError/sdkSigningSecretNotConfigured(message:requestId:)``,
+    ///   ``FeedbackClientError/invalidSignature(message:requestId:)``, and
+    ///   ``FeedbackClientError/staleSignature(message:requestId:)``.
     public func updateUserAttributes(
         userToken: String,
         signingSecret: String? = nil

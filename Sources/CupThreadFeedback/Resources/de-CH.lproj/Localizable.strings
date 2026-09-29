@@ -184,3 +184,9 @@
 "cupthread.permission.changelog_title" = "Änderungsprotokoll kann nicht angezeigt werden";
 "cupthread.permission.changelog_description" = "Anonymer Zugriff auf das Änderungsprotokoll ist in der CupThread-Konsole deaktiviert.";
 "cupthread.error.forbidden" = "Diese Aktion ist für diese App nicht verfügbar.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "Die Zahlungsinformationen wurden nicht aktualisiert: Zum Melden ist das SDK-Signatur-Geheimnis der App erforderlich.";
+"cupthread.error.signing_secret_not_configured" = "Zahlungsinformationen können nicht gemeldet werden: Für diese App ist kein SDK-Signatur-Geheimnis konfiguriert.";
+"cupthread.error.invalid_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts konnte nicht verifiziert werden. Prüfen Sie das SDK-Signatur-Geheimnis der App.";
+"cupthread.error.stale_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts ist abgelaufen. Prüfen Sie die Geräteuhr und versuchen Sie es erneut.";
+
