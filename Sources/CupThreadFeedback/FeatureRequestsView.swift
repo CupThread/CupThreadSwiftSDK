@@ -48,10 +48,12 @@ public struct FeatureRequestsView: View {
 
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
-    /// Console permission: anonymous feature-request submission is allowed.
-    /// `nil` config fails open so a missing environment never hides compose.
-    private var allowsAnonymousFeedback: Bool {
-        sdkAppConfig?.allowsAnonymousFeedback ?? true
+    /// Whether the compose sheet and toolbar should offer the composer rather
+    /// than the denial placeholder: anonymous submission is allowed by the
+    /// console, or the client can attach a bearer token (`nil` config fails
+    /// open; the server stays authoritative).
+    private var canCompose: Bool {
+        (sdkAppConfig?.allowsAnonymousFeedback ?? true) || client.supportsAuthentication
     }
 
     private var items: [FeatureRequestItem] {
@@ -115,7 +117,7 @@ public struct FeatureRequestsView: View {
             composeToolbarItem
         }
         .sheet(isPresented: $isComposePresented) {
-            if allowsAnonymousFeedback {
+            if canCompose {
                 FeatureRequestComposeView(client: client, userToken: userToken) {
                     isComposePresented = false
                     withAnimation(.snappy(duration: 0.3)) {
@@ -211,7 +213,8 @@ public struct FeatureRequestsView: View {
                             successPulse: voteSuccessPulses[item.id, default: 0],
                             onSelectCard: { activeSheet = .comments(item) },
                             onSelectUser: { activeSheet = .profile($0) },
-                            appConfig: sdkAppConfig
+                            appConfig: sdkAppConfig,
+                            supportsAuthentication: client.supportsAuthentication
                         ) {
                             Task { await toggleVoteOptimistic(for: item) }
                         }
@@ -259,7 +262,8 @@ public struct FeatureRequestsView: View {
                         successPulse: voteSuccessPulses[item.id, default: 0],
                         onSelectCard: { activeSheet = .comments(item) },
                         onSelectUser: { activeSheet = .profile($0) },
-                        appConfig: sdkAppConfig
+                        appConfig: sdkAppConfig,
+                        supportsAuthentication: client.supportsAuthentication
                     ) {
                         Task { await toggleVoteOptimistic(for: item) }
                     }
@@ -284,7 +288,7 @@ public struct FeatureRequestsView: View {
     private var emptyState: some View {
         FeatureRequestsEmptyState(
             searchText: searchText,
-            allowsAnonymousFeedback: allowsAnonymousFeedback
+            canCompose: canCompose
         ) {
             isComposePresented = true
         }
@@ -303,7 +307,7 @@ public struct FeatureRequestsView: View {
     }
 
     private var composeToolbarItem: some ToolbarContent {
-        featureRequestsComposeToolbar(allowsAnonymousFeedback: allowsAnonymousFeedback) {
+        featureRequestsComposeToolbar(canCompose: canCompose) {
             isComposePresented = true
         }
     }
@@ -389,7 +393,11 @@ public struct FeatureRequestsView: View {
 
     @MainActor
     private func toggleVoteOptimistic(for item: FeatureRequestItem) async {
-        guard !FeatureVoteGate.isActionDisabled(isOwnRequest: item.isOwnRequest, config: sdkAppConfig) else {
+        guard !FeatureVoteGate.isActionDisabled(
+            isOwnRequest: item.isOwnRequest,
+            config: sdkAppConfig,
+            supportsAuthentication: client.supportsAuthentication
+        ) else {
             return
         }
         guard let (originalVoted, originalCount) = listState.applyOptimisticVote(for: item.id) else {

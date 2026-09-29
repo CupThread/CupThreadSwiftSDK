@@ -149,7 +149,9 @@ struct SubmittedBanner: View {
 
 struct FeatureRequestsEmptyState: View {
     let searchText: String
-    let allowsAnonymousFeedback: Bool
+    /// Whether the user may open the composer (anonymous submission allowed,
+    /// or the client carries an authentication provider).
+    let canCompose: Bool
     let onCompose: () -> Void
 
     var body: some View {
@@ -159,7 +161,7 @@ struct FeatureRequestsEmptyState: View {
             } description: {
                 Text(CupThreadStrings.tr("cupthread.features.empty_description"))
             } actions: {
-                if allowsAnonymousFeedback {
+                if canCompose {
                     Button(CupThreadStrings.tr("cupthread.features.request_a_feature"), action: onCompose)
                         .buttonStyle(.borderedProminent)
                 }
@@ -179,10 +181,10 @@ func featureRequestsEmptyStateText(searchText: String) -> String {
 
 @ToolbarContentBuilder
 func featureRequestsComposeToolbar(
-    allowsAnonymousFeedback: Bool,
+    canCompose: Bool,
     onCompose: @escaping () -> Void
 ) -> some ToolbarContent {
-    if allowsAnonymousFeedback {
+    if canCompose {
         ToolbarItem(placement: .primaryAction) {
             Button(action: onCompose) {
                 Label(CupThreadStrings.tr("cupthread.features.request_a_feature"), systemImage: "plus")
