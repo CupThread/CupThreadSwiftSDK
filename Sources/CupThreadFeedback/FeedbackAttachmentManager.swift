@@ -236,12 +236,14 @@ public enum PhotoAttachmentHelper {
             return nil
         }
 
-        // Multi-frame / animated inputs (e.g. animated GIF, animated WebP):
+        // Multi-frame animated inputs (e.g. animated GIF, animated WebP):
         // ImageIO exposes no EXIF/GPS/IPTC dictionaries on GIF or animated WebP frames
         // (properties carry only palette, loop count, and frame delay timing data).
         // Returning the original data preserves animation frames and timing intact instead of
         // silently flattening the image to a single static frame (#85).
-        if CGImageSourceGetCount(source) > 1 {
+        // Non-animated multi-frame containers (such as Apple HDR gain-map JPEGs, MPF JPEGs,
+        // or multi-frame HEIC/TIFF) must not bypass stripping (#205).
+        if CGImageSourceGetCount(source) > 1 && isAnimatedImageContainer(source: source, data: data) {
             return data
         }
 
@@ -266,6 +268,20 @@ public enum PhotoAttachmentHelper {
         }
 
         return outputData as Data
+    }
+
+    static func isAnimatedImageContainer(source: CGImageSource, data: Data) -> Bool {
+        if let type = CGImageSourceGetType(source) as String? {
+            #if canImport(UniformTypeIdentifiers)
+            if let utType = UTType(type), utType.conforms(to: .gif) || utType.conforms(to: .webP) { return true }
+            #else
+            if type == "com.compuserve.gif" || type == "org.webmproject.webp" { return true }
+            #endif
+        }
+        if let sniffed = sniffImageFormat(from: data) {
+            return sniffed.mimeType == "image/gif" || sniffed.mimeType == "image/webp"
+        }
+        return false
     }
 
     private static func targetContainerType(for source: CGImageSource, data: Data, image: CGImage) -> CFString {
