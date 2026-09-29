@@ -93,7 +93,7 @@ public struct CommentsView: View {
         .safeWebOpenURL()
     }
 
-    private func commentRow(_ comment: FeatureRequestComment) -> some View {
+    func commentRow(_ comment: FeatureRequestComment) -> some View {
         let display = comment.displayModel
         let row = HStack(alignment: .top, spacing: 12) {
             if display.isModerated {
@@ -104,12 +104,12 @@ public struct CommentsView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 if display.isModerated {
-                    moderatedHeader(for: comment)
+                    moderatedHeader(for: display)
                 } else {
                     authorHeader(for: comment)
                 }
 
-                replyTag(for: comment)
+                replyTag(for: display)
 
                 Text(display.displayBody)
                     .font(.subheadline)
@@ -147,10 +147,10 @@ public struct CommentsView: View {
     }
 
     @ViewBuilder
-    private func moderatedHeader(for comment: FeatureRequestComment) -> some View {
+    private func moderatedHeader(for display: CommentDisplayModel) -> some View {
         HStack {
             Spacer()
-            if let date = comment.createdAtDate {
+            if let date = display.createdAtDate {
                 Text(date, format: .relative(presentation: .named))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -197,24 +197,41 @@ public struct CommentsView: View {
         }
     }
 
+    enum ReplyTagPresentation: Equatable, Sendable {
+        case profileButton(clerkId: String, authorName: String)
+        case label(authorName: String)
+        case none
+    }
+
+    static func replyTagPresentation(for display: CommentDisplayModel) -> ReplyTagPresentation {
+        guard let replyTo = display.replyToAuthorName else {
+            return .none
+        }
+        if let clerkId = display.replyToClerkId, display.canOpenReplyToProfile, !display.isModerated {
+            return .profileButton(clerkId: clerkId, authorName: replyTo)
+        }
+        return .label(authorName: replyTo)
+    }
+
     @ViewBuilder
-    private func replyTag(for comment: FeatureRequestComment) -> some View {
-        if let replyTo = comment.replyToAuthorName {
-            if let clerkId = comment.replyToClerkId {
-                Button {
-                    selectedProfileUserId = clerkId
-                } label: {
-                    Text("@\(replyTo)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Self.viewProfileAccessibilityLabel(authorName: replyTo))
-            } else {
-                Text("@\(replyTo)")
+    func replyTag(for display: CommentDisplayModel) -> some View {
+        switch Self.replyTagPresentation(for: display) {
+        case .profileButton(let clerkId, let authorName):
+            Button {
+                selectedProfileUserId = clerkId
+            } label: {
+                Text("@\(authorName)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Self.viewProfileAccessibilityLabel(authorName: authorName))
+        case .label(let authorName):
+            Text("@\(authorName)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(display.isModerated ? .secondary : Color.accentColor)
+        case .none:
+            EmptyView()
         }
     }
 

@@ -124,6 +124,7 @@ struct CommentModelsTests {
         #expect(display.authorClerkId == nil)
         #expect(display.canReply == false)
         #expect(display.canOpenAuthorProfile == false)
+        #expect(display.canOpenReplyToProfile == false)
         #expect(display.replyToAuthorName == "Alice")
         #expect(display.replyToClerkId == nil)
     }
@@ -153,6 +154,7 @@ struct CommentModelsTests {
         #expect(display.authorClerkId == "clerk_alice")
         #expect(display.canReply == true)
         #expect(display.canOpenAuthorProfile == true)
+        #expect(display.canOpenReplyToProfile == true)
         #expect(display.replyToAuthorName == "Bob")
         #expect(display.replyToClerkId == "clerk_bob")
     }
