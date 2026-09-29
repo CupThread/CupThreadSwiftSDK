@@ -16,10 +16,23 @@ func isAllowedWebURL(_ url: URL) -> Bool {
     return true
 }
 
+/// Checks whether a URL is an allowed secure remote image URL:
+/// - Must have `https` scheme.
+/// - Must have a non-empty, non-whitespace host.
+func isAllowedSecureImageURL(_ url: URL) -> Bool {
+    guard let scheme = url.scheme?.lowercased(),
+          scheme == "https",
+          let host = url.host?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !host.isEmpty else {
+        return false
+    }
+    return true
+}
+
 /// Validates an untrusted remote image URL string (such as avatar or app icon URLs)
-/// against `isAllowedWebURL(_:)`:
+/// against HTTPS-only policy:
 /// - Returns `nil` if the string is nil, empty, or cannot be parsed as a URL.
-/// - Returns `nil` if the scheme is not `http` or `https` (e.g. `file:`, `data:`, `javascript:`, custom schemes).
+/// - Returns `nil` if the scheme is not `https` (e.g. `http:`, `file:`, `data:`, `javascript:`, custom schemes).
 /// - Returns `nil` if the host is missing or whitespace.
 /// - Returns the parsed `URL` only when permitted by `WebURLPolicy`.
 func remoteImageURL(from string: String?) -> URL? {
@@ -27,7 +40,7 @@ func remoteImageURL(from string: String?) -> URL? {
     let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty,
           let candidate = URL(string: trimmed),
-          isAllowedWebURL(candidate) else {
+          isAllowedSecureImageURL(candidate) else {
         return nil
     }
     return candidate

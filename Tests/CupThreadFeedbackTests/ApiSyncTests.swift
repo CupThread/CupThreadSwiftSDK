@@ -606,3 +606,113 @@ struct FeedbackAttachmentDecodeCompatTests {
         #expect(decoded == original)
     }
 }
+
+// MARK: - Avatar URL HTTPS policy sync (SaaS PRIV-19)
+
+@Suite("AvatarURLPolicySync")
+@MainActor
+struct AvatarURLPolicySyncTests {
+    private func makeItem(
+        id: String,
+        requesterAvatarUrl: String? = nil,
+        recentCommenters: [RecentCommenter] = []
+    ) -> FeatureRequestItem {
+        FeatureRequestItem(
+            id: id,
+            appId: "app-1",
+            title: "Test Feature",
+            description: "Details",
+            status: "open",
+            requesterName: "Requester",
+            requesterAvatarUrl: requesterAvatarUrl,
+            recentCommenters: recentCommenters,
+            approved: true,
+            voteCount: 0,
+            hasVoted: false,
+            isOwnRequest: false,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z"
+        )
+    }
+
+    @Test func featureRequestAvatarsFallbackToPlaceholderWhenNullOrNonHttps() {
+        let nilItem = makeItem(
+            id: "fr-1",
+            requesterAvatarUrl: nil,
+            recentCommenters: [
+                RecentCommenter(authorName: "Null Avatar", clerkUserId: "u1", avatarUrl: nil),
+                RecentCommenter(authorName: "Insecure Avatar", clerkUserId: "u2", avatarUrl: "http://insecure.example.com/avatar.png"),
+                RecentCommenter(authorName: "Secure Avatar", clerkUserId: "u3", avatarUrl: "https://cdn.example.com/avatar.png")
+            ]
+        )
+
+        // Null requester avatar falls back to placeholder
+        #expect(AvatarView(url: nilItem.requesterAvatarUrl).resolvedURL == nil)
+
+        // Non-HTTPS requester avatar falls back to placeholder
+        let httpItem = makeItem(
+            id: "fr-2",
+            requesterAvatarUrl: "http://insecure.example.com/req.png"
+        )
+        #expect(AvatarView(url: httpItem.requesterAvatarUrl).resolvedURL == nil)
+
+        // HTTPS requester avatar resolves
+        let httpsItem = makeItem(
+            id: "fr-3",
+            requesterAvatarUrl: "https://cdn.example.com/req.png"
+        )
+        #expect(AvatarView(url: httpsItem.requesterAvatarUrl).resolvedURL == URL(string: "https://cdn.example.com/req.png"))
+
+        // Recent commenters null and http fallback to placeholder, https resolves
+        let commenters = nilItem.recentCommenters
+        #expect(AvatarView(url: commenters[0].avatarUrl).resolvedURL == nil)
+        #expect(AvatarView(url: commenters[1].avatarUrl).resolvedURL == nil)
+        #expect(AvatarView(url: commenters[2].avatarUrl).resolvedURL == URL(string: "https://cdn.example.com/avatar.png"))
+    }
+
+    @Test func commentAuthorAvatarFallbackToPlaceholderWhenNullOrNonHttps() {
+        let nilComment = FeatureRequestComment(
+            id: "c-1",
+            featureRequestId: "fr-1",
+            authorName: "Alice",
+            authorAvatarUrl: nil,
+            body: "Great idea!",
+            createdAt: "2026-01-01T00:00:00Z"
+        )
+        let nilDisplay = CommentDisplayModel(comment: nilComment)
+        #expect(AvatarView(url: nilDisplay.authorAvatarUrl).resolvedURL == nil)
+
+        let httpComment = FeatureRequestComment(
+            id: "c-2",
+            featureRequestId: "fr-1",
+            authorName: "Bob",
+            authorAvatarUrl: "http://insecure.example.com/bob.jpg",
+            body: "Check this out",
+            createdAt: "2026-01-01T00:00:00Z"
+        )
+        let httpDisplay = CommentDisplayModel(comment: httpComment)
+        #expect(AvatarView(url: httpDisplay.authorAvatarUrl).resolvedURL == nil)
+
+        let httpsComment = FeatureRequestComment(
+            id: "c-3",
+            featureRequestId: "fr-1",
+            authorName: "Charlie",
+            authorAvatarUrl: "https://cdn.example.com/charlie.jpg",
+            body: "Approved",
+            createdAt: "2026-01-01T00:00:00Z"
+        )
+        let httpsDisplay = CommentDisplayModel(comment: httpsComment)
+        #expect(AvatarView(url: httpsDisplay.authorAvatarUrl).resolvedURL == URL(string: "https://cdn.example.com/charlie.jpg"))
+    }
+
+    @Test func userProfileAvatarFallbackToPlaceholderWhenNullOrNonHttps() {
+        let nilProfile = UserProfile(clerkUserId: "u_nil", displayName: "No Avatar", avatarUrl: nil)
+        #expect(AvatarView(url: nilProfile.avatarUrl).resolvedURL == nil)
+
+        let httpProfile = UserProfile(clerkUserId: "u_http", displayName: "HTTP Avatar", avatarUrl: "http://insecure.example.com/p.png")
+        #expect(AvatarView(url: httpProfile.avatarUrl).resolvedURL == nil)
+
+        let httpsProfile = UserProfile(clerkUserId: "u_https", displayName: "HTTPS Avatar", avatarUrl: "https://cdn.example.com/p.png")
+        #expect(AvatarView(url: httpsProfile.avatarUrl).resolvedURL == URL(string: "https://cdn.example.com/p.png"))
+    }
+}
