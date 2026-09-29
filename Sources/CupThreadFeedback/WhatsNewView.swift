@@ -27,7 +27,10 @@ public struct WhatsNewView: View {
     var loadGeneration: Int { state.loadGeneration }
 
     private var isChangelogPermitted: Bool {
-        changelogLoadPlan(config: sdkAppConfig) == .load
+        changelogLoadPlan(
+            config: sdkAppConfig,
+            supportsAuthentication: client.supportsAuthentication
+        ) == .load
     }
 
     private var subscriptionStore: ChangelogSubscriptionStore {
@@ -204,7 +207,10 @@ public struct WhatsNewView: View {
 
     @MainActor
     func loadEntries() async {
-        guard changelogLoadPlan(config: sdkAppConfig) == .load else {
+        guard changelogLoadPlan(
+            config: sdkAppConfig,
+            supportsAuthentication: client.supportsAuthentication
+        ) == .load else {
             state.handlePermissionDenied()
             return
         }

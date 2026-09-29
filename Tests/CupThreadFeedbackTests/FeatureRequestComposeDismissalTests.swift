@@ -79,6 +79,20 @@ struct FeatureRequestComposeDismissalTests {
         _ = view.body
     }
 
+    @Test @MainActor func composeViewShowsFormForAuthenticatedClientUnderDeniedConfig() {
+        // An authentication provider satisfies the anonymous-proposal
+        // preflight; the server stays authoritative (issue #233).
+        let client = makeClient(authenticationProvider: { "signed-in-jwt" })
+        let deniedConfig = makeConfig(allowAnonymousFeedback: false)
+        let view = FeatureRequestComposeView(
+            client: client,
+            userToken: "test_token",
+            config: deniedConfig
+        ) {}
+        #expect(view.dismissalAffordance == .guardedCancel)
+        _ = view.body
+    }
+
     @Test @MainActor func denialSheetEvaluatesBodyAndFiresDismissCallback() {
         var didDismiss = false
         let sheet = FeatureRequestDenialSheet {
