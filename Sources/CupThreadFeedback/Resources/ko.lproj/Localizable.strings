@@ -185,3 +185,9 @@
 "cupthread.permission.changelog_title" = "변경 내역을 볼 수 없음";
 "cupthread.permission.changelog_description" = "CupThread 콘솔에서 익명 변경 내역 접근이 꺼져 있습니다.";
 "cupthread.error.forbidden" = "이 앱에서는 해당 작업을 사용할 수 없습니다.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "결제 정보가 업데이트되지 않았습니다: 결제 정보를 보고하려면 앱의 SDK 서명 시크릿이 필요합니다.";
+"cupthread.error.signing_secret_not_configured" = "결제 정보를 보고할 수 없습니다: 이 앱에는 SDK 서명 시크릿이 구성되어 있지 않습니다.";
+"cupthread.error.invalid_signature" = "결제 정보가 업데이트되지 않았습니다: 보고서의 서명을 확인하지 못했습니다. 앱의 SDK 서명 시크릿을 확인해 주세요.";
+"cupthread.error.stale_signature" = "결제 정보가 업데이트되지 않았습니다: 보고서의 서명이 만료되었습니다. 기기의 시계를 확인한 후 다시 시도해 주세요.";
+

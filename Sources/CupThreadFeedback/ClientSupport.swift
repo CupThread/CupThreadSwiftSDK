@@ -152,6 +152,44 @@ extension FeedbackClient {
         case (403, "email_not_verified"):
             return .emailNotVerified(message: envelopeMessage, requestId: requestId)
         default:
+            return signatureTypedError(
+                statusCode: statusCode,
+                code: code,
+                envelopeMessage: envelopeMessage,
+                requestId: requestId
+            )
+        }
+    }
+
+    /// Maps the payment-attribute signature failure envelopes on
+    /// `PUT /api/v1/public/apps/{appKey}/user` (issue #238): each pairing
+    /// gets a typed case so hosts can switch on the machine code and never
+    /// see the signed-in `401` copy for a signing problem. Returns `nil`
+    /// for anything else, leaving the mapping to the caller.
+    private static func signatureTypedError(
+        statusCode: Int,
+        code: String?,
+        envelopeMessage: String?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        switch (statusCode, code) {
+        case (422, "payment_attributes_require_signature"):
+            // A payment-attribute report arrived without the required HMAC
+            // signature — the host must configure the SDK signing secret.
+            return .paymentAttributesRequireSignature(message: envelopeMessage, requestId: requestId)
+        case (422, "sdk_signing_secret_not_configured"):
+            // The app has no SDK signing secret in the console, so signed
+            // payment attributes can never be accepted.
+            return .sdkSigningSecretNotConfigured(message: envelopeMessage, requestId: requestId)
+        case (401, "invalid_signature"):
+            // The signature did not verify — the signing secret the SDK used
+            // does not match the console's.
+            return .invalidSignature(message: envelopeMessage, requestId: requestId)
+        case (401, "stale_signature"):
+            // The signature timestamp fell outside the freshness window —
+            // typically device clock skew.
+            return .staleSignature(message: envelopeMessage, requestId: requestId)
+        default:
             return nil
         }
     }

@@ -185,3 +185,9 @@
 "cupthread.permission.changelog_title" = "Nie można wyświetlić dziennika zmian";
 "cupthread.permission.changelog_description" = "Anonimowy dostęp do dziennika zmian jest wyłączony w konsoli CupThread.";
 "cupthread.error.forbidden" = "Ta czynność jest niedostępna w tej aplikacji.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "Dane płatności nie zostały zaktualizowane: ich zgłaszanie wymaga tajnego klucza podpisu SDK aplikacji.";
+"cupthread.error.signing_secret_not_configured" = "Nie można zgłosić danych płatności: ta aplikacja nie ma skonfigurowanego tajnego klucza podpisu SDK.";
+"cupthread.error.invalid_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia nie przeszedł weryfikacji. Sprawdź tajny klucz podpisu SDK aplikacji.";
+"cupthread.error.stale_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia wygasł. Sprawdź zegar urządzenia i spróbuj ponownie.";
+

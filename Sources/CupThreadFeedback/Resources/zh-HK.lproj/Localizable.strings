@@ -185,3 +185,9 @@
 "cupthread.permission.changelog_title" = "無法查看更新日誌";
 "cupthread.permission.changelog_description" = "CupThread 控制台已關閉匿名更新日誌存取。";
 "cupthread.error.forbidden" = "此應用目前不允許該操作。";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "付款資訊未更新：回報付款資訊需要使用應用程式的 SDK 簽名密鑰簽署。";
+"cupthread.error.signing_secret_not_configured" = "無法回報付款資訊：此應用程式尚未設定 SDK 簽名密鑰。";
+"cupthread.error.invalid_signature" = "付款資訊未更新：報告的簽名驗證未通過，請檢查應用程式的 SDK 簽名密鑰。";
+"cupthread.error.stale_signature" = "付款資訊未更新：報告的簽名已過期，請檢查裝置時間後再試一次。";
+

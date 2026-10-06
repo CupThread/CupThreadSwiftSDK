@@ -185,3 +185,9 @@
 "cupthread.permission.changelog_title" = "更新履歴を表示できません";
 "cupthread.permission.changelog_description" = "CupThreadコンソールで匿名の更新履歴閲覧がオフになっています。";
 "cupthread.error.forbidden" = "このアプリではその操作を利用できません。";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "支払い情報は更新されませんでした：報告にはアプリの SDK 署名シークレットが必要です。";
+"cupthread.error.signing_secret_not_configured" = "支払い情報を報告できません：このアプリでは SDK 署名シークレットが設定されていません。";
+"cupthread.error.invalid_signature" = "支払い情報は更新されませんでした：レポートの署名を検証できませんでした。アプリの SDK 署名シークレットを確認してください。";
+"cupthread.error.stale_signature" = "支払い情報は更新されませんでした：レポートの署名の有効期限が切れています。端末の時刻を確認して、もう一度お試しください。";
+

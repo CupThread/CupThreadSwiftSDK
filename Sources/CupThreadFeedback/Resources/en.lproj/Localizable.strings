@@ -185,3 +185,8 @@
 "cupthread.permission.changelog_title" = "Can't View Changelog";
 "cupthread.permission.changelog_description" = "Anonymous access to the changelog is turned off in the CupThread console.";
 "cupthread.error.forbidden" = "This action isn't available for this app.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "Payment details weren't updated: reporting them requires the app's SDK signing secret.";
+"cupthread.error.signing_secret_not_configured" = "Payment details can't be reported because this app has no SDK signing secret configured.";
+"cupthread.error.invalid_signature" = "Payment details weren't updated: the report's signature didn't verify. Check the app's SDK signing secret.";
+"cupthread.error.stale_signature" = "Payment details weren't updated: the report's signature expired. Check the device clock and try again.";

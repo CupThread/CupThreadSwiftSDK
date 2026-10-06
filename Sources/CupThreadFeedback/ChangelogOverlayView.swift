@@ -213,7 +213,10 @@ public struct ChangelogOverlayView: View {
             guard config.sdk.features.isEnabled(.changelog) else {
                 return .featureDisabled(config.sdk)
             }
-            guard changelogLoadPlan(config: config) == .load else {
+            guard changelogLoadPlan(
+                config: config,
+                supportsAuthentication: client.supportsAuthentication
+            ) == .load else {
                 return .permissionDenied(config.sdk)
             }
             let all = try await client.fetchChangelog()
@@ -473,7 +476,10 @@ extension FeedbackClient {
     ) async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
         let config = try await cachedAppConfig()
         guard config.sdk.features.isEnabled(.changelog) else { return nil }
-        guard changelogLoadPlan(config: config) == .load else { return nil }
+        guard changelogLoadPlan(
+            config: config,
+            supportsAuthentication: supportsAuthentication
+        ) == .load else { return nil }
         let all = try await fetchChangelog()
         let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
         guard let latest = entries.first else { return nil }

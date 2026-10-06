@@ -185,3 +185,9 @@
 "cupthread.permission.changelog_title" = "No se puede ver el registro de cambios";
 "cupthread.permission.changelog_description" = "El acceso anónimo al registro de cambios está desactivado en la consola de CupThread.";
 "cupthread.error.forbidden" = "Esta acción no está disponible para esta app.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "Los datos de pago no se actualizaron: informar de ellos requiere el secreto de firma del SDK de la app.";
+"cupthread.error.signing_secret_not_configured" = "No se pueden informar los datos de pago: esta app no tiene configurado un secreto de firma del SDK.";
+"cupthread.error.invalid_signature" = "Los datos de pago no se actualizaron: la firma del informe no se pudo verificar. Comprueba el secreto de firma del SDK de la app.";
+"cupthread.error.stale_signature" = "Los datos de pago no se actualizaron: la firma del informe ha caducado. Comprueba el reloj del dispositivo e inténtalo de nuevo.";
+

@@ -185,3 +185,9 @@
 "cupthread.permission.changelog_title" = "Kan ikke vise ændringsloggen";
 "cupthread.permission.changelog_description" = "Anonym adgang til ændringsloggen er slått fra i CupThread-konsollen.";
 "cupthread.error.forbidden" = "Denne handling er ikke tilgængelig for denne app.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "Betalingsoplysningerne blev ikke opdateret: rapportering kræver appens SDK-signeringshemmelighed.";
+"cupthread.error.signing_secret_not_configured" = "Kan ikke rapportere betalingsoplysninger: denne app har ikke konfigureret en SDK-signeringshemmelighed.";
+"cupthread.error.invalid_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur kunne ikke verificeres. Tjek appens SDK-signeringshemmelighed.";
+"cupthread.error.stale_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur er udløbet. Tjek enhedens ur, og prøv igen.";
+

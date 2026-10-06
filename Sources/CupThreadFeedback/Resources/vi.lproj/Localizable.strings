@@ -185,3 +185,9 @@
 "cupthread.permission.changelog_title" = "Không thể xem nhật ký thay đổi";
 "cupthread.permission.changelog_description" = "Truy cập ẩn danh vào nhật ký thay đổi đã bị tắt trong bảng điều khiển CupThread.";
 "cupthread.error.forbidden" = "Thao tác này không khả dụng với ứng dụng này.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "Thông tin thanh toán chưa được cập nhật: báo cáo thông tin này yêu cầu khóa ký SDK của ứng dụng.";
+"cupthread.error.signing_secret_not_configured" = "Không thể báo cáo thông tin thanh toán: ứng dụng này chưa cấu hình khóa ký SDK.";
+"cupthread.error.invalid_signature" = "Thông tin thanh toán chưa được cập nhật: chữ ký của báo cáo không xác minh được. Hãy kiểm tra khóa ký SDK của ứng dụng.";
+"cupthread.error.stale_signature" = "Thông tin thanh toán chưa được cập nhật: chữ ký của báo cáo đã hết hạn. Hãy kiểm tra đồng hồ thiết bị và thử lại.";
+

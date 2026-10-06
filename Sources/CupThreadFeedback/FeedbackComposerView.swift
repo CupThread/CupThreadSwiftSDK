@@ -53,7 +53,11 @@ public struct FeedbackComposerView: View {
     }
 
     private var submissionDenial: SdkSubmissionDenial {
-        SdkSubmissionDenial.forFeedback(config: activeConfig, platform: draft.platform)
+        SdkSubmissionDenial.forFeedback(
+            config: activeConfig,
+            platform: draft.platform,
+            supportsAuthentication: client.supportsAuthentication
+        )
     }
 
     var dismissalAffordance: FeedbackComposerDismissalAffordance {

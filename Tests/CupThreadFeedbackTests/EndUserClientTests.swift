@@ -10,6 +10,16 @@ import Testing
 struct EndUserClientTests {
     static let apiHost = "apisync-me.example.com"
 
+    /// Creates a `ChangelogSubscriptionStore` backed by an isolated
+    /// `UserDefaults` suite so tests never touch `.standard`.
+    func makeIsolatedSubscriptionStore(appKey: String = "app_\(UUID().uuidString)")
+        -> (store: ChangelogSubscriptionStore, cleanup: () -> Void) {
+        let suiteName = "test.changelogsubscription.erase.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let store = ChangelogSubscriptionStore(appKey: appKey, userDefaults: defaults)
+        return (store, { defaults.removePersistentDomain(forName: suiteName) })
+    }
+
     @Test func eraseSendsAppKeyBodyWithIdentityHeader() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
@@ -96,10 +106,78 @@ struct EndUserClientTests {
         #expect(isolated.store.token == identity)
     }
 
+    @Test func eraseWithStoreClearsLocalChangelogSubscription() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            let token = request.value(forHTTPHeaderField: "X-User-Token")
+            return (makeHTTPResponse(), try encodeJSON(["erased": true, "endUserId": token]))
+        }
+
+        let subscription = makeIsolatedSubscriptionStore()
+        defer { subscription.cleanup() }
+        subscription.store.persist(email: "user@example.com")
+        #expect(subscription.store.subscribedEmail() == "user@example.com")
+
+        let isolated = makeIsolatedTokenStore()
+        defer { isolated.cleanup() }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, tokenStore: isolated.store)
+        let result = try await client.eraseMyData(store: isolated.store, subscriptionStore: subscription.store)
+
+        #expect(result.erased == true)
+        #expect(subscription.store.subscribedEmail() == nil)
+    }
+
+    @Test func eraseWithStoreKeepsChangelogSubscriptionWhenNothingWasErased() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 404), try encodeJSON(["erased": false, "error": "No profile found"]))
+        }
+
+        let subscription = makeIsolatedSubscriptionStore()
+        defer { subscription.cleanup() }
+        subscription.store.persist(email: "user@example.com")
+
+        let isolated = makeIsolatedTokenStore()
+        defer { isolated.cleanup() }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, tokenStore: isolated.store)
+        let result = try await client.eraseMyData(store: isolated.store, subscriptionStore: subscription.store)
+
+        #expect(result.erased == false)
+        #expect(subscription.store.subscribedEmail() == "user@example.com")
+    }
+
+    @Test func eraseWithStoreClearsDefaultSubscriptionStoreForClientAppKey() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            let token = request.value(forHTTPHeaderField: "X-User-Token")
+            return (makeHTTPResponse(), try encodeJSON(["erased": true, "endUserId": token]))
+        }
+
+        // The public overload builds its own store on `.standard`, keyed by the
+        // client's appKey — exercise exactly that wiring.
+        let appKey = "app_erase_default_subs_\(UUID().uuidString)"
+        let storageKey = ChangelogSubscriptionStore.keyPrefix + appKey
+        let standardDefaults = UserDefaults.standard
+        standardDefaults.set("user@example.com", forKey: storageKey)
+        defer { standardDefaults.removeObject(forKey: storageKey) }
+
+        let isolated = makeIsolatedTokenStore(appKey: appKey)
+        defer { isolated.cleanup() }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, appKey: appKey, tokenStore: isolated.store)
+        let result = try await client.eraseMyData(store: isolated.store)
+
+        #expect(result.erased == true)
+        #expect(standardDefaults.string(forKey: storageKey) == nil)
+    }
+
     @Test func eraseWithStorePropagatesErrorsWithoutResetting() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (makeHTTPResponse(status: 429), try encodeJSON(["error": "Rate limited"]))
         }
+
+        let subscription = makeIsolatedSubscriptionStore()
+        defer { subscription.cleanup() }
+        subscription.store.persist(email: "user@example.com")
 
         let isolated = makeIsolatedTokenStore()
         defer { isolated.cleanup() }
@@ -107,7 +185,7 @@ struct EndUserClientTests {
 
         let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, tokenStore: isolated.store)
         do {
-            _ = try await client.eraseMyData(store: isolated.store)
+            _ = try await client.eraseMyData(store: isolated.store, subscriptionStore: subscription.store)
             Issue.record("Expected error to be thrown")
         } catch FeedbackClientError.rateLimited {
             // expected
@@ -116,6 +194,7 @@ struct EndUserClientTests {
         }
 
         #expect(isolated.store.token == identity)
+        #expect(subscription.store.subscribedEmail() == "user@example.com")
     }
 
     @Test func linkSendsBearerAndIdentityHeaders() async throws {

@@ -202,24 +202,38 @@ struct PermissionViewGatingTests {
 struct PermissionErrorMappingTests {
     static let apiHost = "permission-gate.example.com"
 
-    static func makeAPIClient() -> FeedbackClient {
-        makeClient(baseURL: URL(string: "https://\(apiHost)")!)
+    static func makeAPIClient(
+        authenticationProvider: (@Sendable () async -> String?)? = nil
+    ) -> FeedbackClient {
+        makeClient(
+            baseURL: URL(string: "https://\(apiHost)")!,
+            authenticationProvider: authenticationProvider
+        )
     }
 
     private final class RequestCounter: @unchecked Sendable {
         private let lock = NSLock()
-        private var paths: [String] = []
+        private var entries: [(path: String, authorization: String?)] = []
 
-        func record(_ path: String) {
+        func record(_ request: URLRequest) {
             lock.lock()
             defer { lock.unlock() }
-            paths.append(path)
+            entries.append((
+                request.url?.path ?? "",
+                request.value(forHTTPHeaderField: "Authorization")
+            ))
         }
 
         var recorded: [String] {
             lock.lock()
             defer { lock.unlock() }
-            return paths
+            return entries.map(\.path)
+        }
+
+        var authorizations: [String?] {
+            lock.lock()
+            defer { lock.unlock() }
+            return entries.map(\.authorization)
         }
     }
 
@@ -332,7 +346,7 @@ struct PermissionErrorMappingTests {
     @Test func disallowedRoadmapMakesNoBoardRequests() async throws {
         let counter = RequestCounter()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
-            counter.record(request.url?.path ?? "")
+            counter.record(request)
             return (makeHTTPResponse(), Data("{}".utf8))
         }
         let result = try await loadRoadmapGroups(
@@ -349,7 +363,7 @@ struct PermissionErrorMappingTests {
         let counter = RequestCounter()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             let path = request.url?.path ?? ""
-            counter.record(path)
+            counter.record(request)
             if path.contains("/columns/") {
                 let column: [String: Any] = [
                     "id": "c1",
@@ -383,7 +397,7 @@ struct PermissionErrorMappingTests {
     @Test func disallowedChangelogMakesNoRequests() async throws {
         let counter = RequestCounter()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
-            counter.record(request.url?.path ?? "")
+            counter.record(request)
             return (makeHTTPResponse(), Data("{}".utf8))
         }
         let result = try await loadChangelogEntries(
@@ -397,8 +411,7 @@ struct PermissionErrorMappingTests {
     @Test func allowedChangelogFetchesEntries() async throws {
         let counter = RequestCounter()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
-            let path = request.url?.path ?? ""
-            counter.record(path)
+            counter.record(request)
             let entry: [String: Any] = [
                 "id": "e-perm-1",
                 "title": "Version 1.0",

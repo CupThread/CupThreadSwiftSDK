@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 168, "Expected 168 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 172, "Expected 172 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -284,5 +284,32 @@ struct LocalizationTests {
             #expect(!attachVal.isEmpty)
             #expect(!genericVal.isEmpty)
         }
+    }
+
+    /// Payment-attribute signature failure copy ships in every locale (issue #238)
+    /// and never collides with the signed-in unauthorized copy.
+    @Test func signatureFailureStringsResolveAcrossAllLanguages() throws {
+        let keys = [
+            "cupthread.error.signature_required",
+            "cupthread.error.signing_secret_not_configured",
+            "cupthread.error.invalid_signature",
+            "cupthread.error.stale_signature"
+        ]
+        for lang in Self.targetLanguages {
+            let dict = try loadStrings(for: lang)
+            for key in keys {
+                let value = try #require(dict[key], "Missing \(key) for \(lang)")
+                #expect(!value.isEmpty, "\(lang) has empty \(key)")
+                let unauthorized = try #require(dict["cupthread.error.http_unauthorized"])
+                #expect(value != unauthorized, "\(lang) reuses the unauthorized copy for \(key)")
+            }
+        }
+        // The English stale-signature copy must describe freshness/clock skew,
+        // not a sign-in problem (issue #238 acceptance criteria).
+        let enStale = try #require(try loadStrings(for: "en")["cupthread.error.stale_signature"])
+        #expect(
+            enStale.localizedLowercase.contains("clock") || enStale.localizedLowercase.contains("expired"),
+            "English stale-signature copy should mention signature expiry or clock skew: \(enStale)"
+        )
     }
 }
