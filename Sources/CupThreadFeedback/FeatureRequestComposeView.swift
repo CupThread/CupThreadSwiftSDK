@@ -7,8 +7,13 @@ enum FeatureRequestComposeDismissalAffordance: Equatable, Sendable {
     /// The compose sheet shows the form guarded against accidental discard.
     case guardedCancel
 
-    static func resolve(config: PublicAppConfig?) -> FeatureRequestComposeDismissalAffordance {
-        SdkSubmissionDenial.forFeatureRequest(config: config) != .none ? .close : .guardedCancel
+    static func resolve(
+        config: PublicAppConfig?,
+        supportsAuthentication: Bool = false
+    ) -> FeatureRequestComposeDismissalAffordance {
+        SdkSubmissionDenial.forFeatureRequest(config: config, supportsAuthentication: supportsAuthentication) != .none
+            ? .close
+            : .guardedCancel
     }
 }
 
@@ -43,7 +48,10 @@ struct FeatureRequestComposeView: View {
     }
 
     var dismissalAffordance: FeatureRequestComposeDismissalAffordance {
-        FeatureRequestComposeDismissalAffordance.resolve(config: activeConfig)
+        FeatureRequestComposeDismissalAffordance.resolve(
+            config: activeConfig,
+            supportsAuthentication: client.supportsAuthentication
+        )
     }
 
     var body: some View {
@@ -133,7 +141,10 @@ struct FeatureRequestComposeView: View {
 
     @MainActor
     private func submit() async {
-        guard SdkSubmissionDenial.forFeatureRequest(config: activeConfig) == .none else { return }
+        guard SdkSubmissionDenial.forFeatureRequest(
+            config: activeConfig,
+            supportsAuthentication: client.supportsAuthentication
+        ) == .none else { return }
         isSubmitting = true
         submitError = nil
         defer { isSubmitting = false }

@@ -28,7 +28,10 @@ public struct RoadmapBoardView: View {
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
     private var isRoadmapPermitted: Bool {
-        roadmapLoadPlan(config: sdkAppConfig) == .load
+        roadmapLoadPlan(
+            config: sdkAppConfig,
+            supportsAuthentication: client.supportsAuthentication
+        ) == .load
     }
 
     /// The query actually sent to the server, trimmed to match the throttle's
