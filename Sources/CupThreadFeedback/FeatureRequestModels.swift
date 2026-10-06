@@ -260,6 +260,55 @@ public struct FeatureRequestSubmissionResult: Codable, Equatable, Sendable {
     public let pending: Bool
 }
 
+/// Non-fatal warning envelope attached to an otherwise successful vote
+/// response (`VoteResponse.warning` in the public API schema).
+///
+/// A warning never means the vote failed — it is returned with HTTP 200 and
+/// the vote is recorded. The server currently emits `email_not_verified`
+/// (``VoteWarning/isEmailNotVerified``) on boards that require signed-in
+/// voting when the requested ship-notification email is not one of the
+/// signed-in session's verified addresses; in that case no notification
+/// consent is stored. Codes are plain strings so future server-side codes
+/// decode unchanged and keep their message for diagnostics.
+public struct VoteWarning: Decodable, Equatable, Sendable {
+    /// The code the server emits when a requested ship-notification email is
+    /// not bound to the signed-in session.
+    public static let emailNotVerifiedCode = "email_not_verified"
+
+    /// Machine-readable warning code (e.g. `email_not_verified`). Branch on
+    /// this rather than on ``message``.
+    public let code: String
+    /// Raw server explanation (the wire field is named `error`). Like the
+    /// submission receipt's `warning` (#30, #198), it is diagnostics-oriented
+    /// — for security and localization it must never be rendered in
+    /// user-facing UI.
+    public let message: String
+
+    /// Whether this is the `email_not_verified` warning: the vote was saved,
+    /// but the requested ship-notification email was rejected, so no
+    /// notification consent was stored.
+    public var isEmailNotVerified: Bool { code == Self.emailNotVerifiedCode }
+
+    /// Creates a vote warning.
+    /// - Parameters:
+    ///   - code: Machine-readable warning code.
+    ///   - message: Raw server explanation (wire field `error`).
+    public init(code: String, message: String) {
+        self.code = code
+        self.message = message
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        code = try container.decode(String.self, forKey: .code)
+        message = try container.decodeIfPresent(String.self, forKey: .error) ?? ""
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case code, error
+    }
+}
+
 /// Response to ``FeedbackClient/toggleVote(featureRequestId:userToken:)``.
 public struct VoteResult: Decodable, Equatable, Sendable {
     /// The user's vote state after the toggle.
@@ -268,16 +317,29 @@ public struct VoteResult: Decodable, Equatable, Sendable {
     public let voteCount: Int
     /// Historical votes copied from an external source provider at import time, when any.
     public let importedVotes: Int?
+    /// Non-fatal warning from the server, when present.
+    ///
+    /// The vote itself always succeeds when one is attached. The server emits
+    /// a warning on boards that require signed-in voting when a
+    /// `shipNotifyEmail` was sent that is not one of the signed-in session's
+    /// verified addresses. The SDK's own vote payload never sends that field,
+    /// so built-in ``FeatureRequestsView`` flows never receive one; the field
+    /// is decoded for schema parity with the public API and for clients that
+    /// post votes through their own transport. Branch on
+    /// ``VoteWarning/code`` (see ``VoteWarning/isEmailNotVerified``).
+    public let warning: VoteWarning?
 
     /// Creates a vote result.
     /// - Parameters:
     ///   - voted: The user's vote state after the toggle.
     ///   - voteCount: The request's authoritative vote count after the toggle.
     ///   - importedVotes: Historical votes copied from an external source provider at import time, if any.
-    public init(voted: Bool, voteCount: Int, importedVotes: Int? = nil) {
+    ///   - warning: Non-fatal server warning, if any.
+    public init(voted: Bool, voteCount: Int, importedVotes: Int? = nil, warning: VoteWarning? = nil) {
         self.voted = voted
         self.voteCount = voteCount
         self.importedVotes = importedVotes
+        self.warning = warning
     }
 
     public init(from decoder: Decoder) throws {
@@ -289,10 +351,11 @@ public struct VoteResult: Decodable, Equatable, Sendable {
             ?? false
         voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0
         importedVotes = try container.decodeIfPresent(Int.self, forKey: .importedVotes)
+        warning = try container.decodeIfPresent(VoteWarning.self, forKey: .warning)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case voted, hasVoted, voteCount, importedVotes
+        case voted, hasVoted, voteCount, importedVotes, warning
     }
 }
 
