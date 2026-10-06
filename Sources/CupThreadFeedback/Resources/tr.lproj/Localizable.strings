@@ -184,3 +184,9 @@
 "cupthread.permission.changelog_title" = "Değişiklik günlüğü görüntülenemiyor";
 "cupthread.permission.changelog_description" = "CupThread konsolunda değişiklik günlüğüne anonim erişim kapatıldı.";
 "cupthread.error.forbidden" = "Bu işlem bu uygulama için kullanılamıyor.";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "Ödeme bilgileri güncellenmedi: bildirilmeleri uygulamanın SDK imza gizli anahtarını gerektirir.";
+"cupthread.error.signing_secret_not_configured" = "Ödeme bilgileri bildirilemiyor: bu uygulamada SDK imza gizli anahtarı yapılandırılmamış.";
+"cupthread.error.invalid_signature" = "Ödeme bilgileri güncellenmedi: raporun imzası doğrulanamadı. Uygulamanın SDK imza gizli anahtarını kontrol edin.";
+"cupthread.error.stale_signature" = "Ödeme bilgileri güncellenmedi: raporun imzasının süresi doldu. Cihaz saatini kontrol edip yeniden deneyin.";
+

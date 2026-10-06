@@ -184,3 +184,9 @@
 "cupthread.permission.changelog_title" = "无法查看更新日志";
 "cupthread.permission.changelog_description" = "CupThread 控制台已关闭匿名更新日志访问。";
 "cupthread.error.forbidden" = "此应用当前不允许该操作。";
+/* Issue #238: payment-attribute signature failures — signing problems, never sign-in copy */
+"cupthread.error.signature_required" = "支付信息未更新：上报支付信息需要使用应用的 SDK 签名密钥进行签名。";
+"cupthread.error.signing_secret_not_configured" = "无法上报支付信息：该应用尚未配置 SDK 签名密钥。";
+"cupthread.error.invalid_signature" = "支付信息未更新：报告的签名校验未通过，请检查应用的 SDK 签名密钥。";
+"cupthread.error.stale_signature" = "支付信息未更新：报告的签名已过期，请检查设备时间后重试。";
+

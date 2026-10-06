@@ -68,6 +68,27 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// been verified (HTTP 403 `email_not_verified`). Prompt the user to use their
     /// signed-in account email.
     case emailNotVerified(message: String?, requestId: String?)
+    /// A payment-attribute report (`isPaying`, `plan`, `mrr`, `currency`) was
+    /// sent without the required HMAC signature
+    /// (HTTP 422 `payment_attributes_require_signature`). Configure
+    /// ``FeedbackClientConfiguration/signingSecret`` — or pass the
+    /// `signingSecret` parameter — so ``FeedbackClient/updateUserAttributes``
+    /// signs the report.
+    case paymentAttributesRequireSignature(message: String?, requestId: String?)
+    /// The app has no SDK signing secret configured in the CupThread console
+    /// (HTTP 422 `sdk_signing_secret_not_configured`), so signed payment
+    /// attributes cannot be accepted. Add the SDK signing secret for the app
+    /// in the developer console.
+    case sdkSigningSecretNotConfigured(message: String?, requestId: String?)
+    /// The HMAC signature on a payment-attribute report did not verify
+    /// (HTTP 401 `invalid_signature`) — the signing secret the SDK signed with
+    /// does not match the one configured for the app in the developer console.
+    case invalidSignature(message: String?, requestId: String?)
+    /// The signature timestamp on a payment-attribute report fell outside the
+    /// server's freshness window (HTTP 401 `stale_signature`) — typically
+    /// device clock skew. Ensure the device clock is set correctly and let the
+    /// SDK retry with a fresh signature.
+    case staleSignature(message: String?, requestId: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -91,7 +112,9 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
              .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
-             .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified:
+             .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified,
+             .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
+             .invalidSignature, .staleSignature:
             return nil
         }
     }
@@ -154,6 +177,14 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .emailNotVerified(_, let requestId):
             return requestId
+        case .paymentAttributesRequireSignature(_, let requestId):
+            return requestId
+        case .sdkSigningSecretNotConfigured(_, let requestId):
+            return requestId
+        case .invalidSignature(_, let requestId):
+            return requestId
+        case .staleSignature(_, let requestId):
+            return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound:
@@ -211,6 +242,18 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .emailNotVerified(_, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return "Please use your signed-in account email address to subscribe.\(suffix)"
+        case .paymentAttributesRequireSignature(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return CupThreadStrings.tr("cupthread.error.signature_required") + suffix
+        case .sdkSigningSecretNotConfigured(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return CupThreadStrings.tr("cupthread.error.signing_secret_not_configured") + suffix
+        case .invalidSignature(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return CupThreadStrings.tr("cupthread.error.invalid_signature") + suffix
+        case .staleSignature(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return CupThreadStrings.tr("cupthread.error.stale_signature") + suffix
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
@@ -279,5 +322,25 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``emailNotVerified(message:requestId:)`` with no request id.
     static func emailNotVerified(message: String? = nil) -> FeedbackClientError {
         .emailNotVerified(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``paymentAttributesRequireSignature(message:requestId:)`` with no request id.
+    static func paymentAttributesRequireSignature(message: String? = nil) -> FeedbackClientError {
+        .paymentAttributesRequireSignature(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``sdkSigningSecretNotConfigured(message:requestId:)`` with no request id.
+    static func sdkSigningSecretNotConfigured(message: String? = nil) -> FeedbackClientError {
+        .sdkSigningSecretNotConfigured(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``invalidSignature(message:requestId:)`` with no request id.
+    static func invalidSignature(message: String? = nil) -> FeedbackClientError {
+        .invalidSignature(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``staleSignature(message:requestId:)`` with no request id.
+    static func staleSignature(message: String? = nil) -> FeedbackClientError {
+        .staleSignature(message: message, requestId: nil)
     }
 }
