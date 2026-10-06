@@ -262,11 +262,23 @@ extension FeedbackClient {
     /// The API removed the unauthenticated bare-email unsubscribe; tokens are
     /// single-subscriber secrets delivered by email, so the SDK's own
     /// surfaces no longer offer in-app unsubscription.
+    ///
+    /// A token whose signature verifies for this app unsubscribes even after
+    /// the token's `exp` has passed and even when the app's public surfaces
+    /// are disabled — links already sitting in inboxes keep working (#294).
+    /// The SDK never judges a token locally, so a `200` is final in
+    /// both previously-failing cases; do not drop a signed link for its age
+    /// or for a since-privatized board.
     /// - Parameter token: The signed token from the unsubscribe link.
     /// - Returns: Whether the address was removed.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   (status 400 when the token is missing or expired, or 405 when a
-    ///   JSON client hits the non-destructive GET form) or
+    /// - Throws: ``FeedbackClientError/forbidden(message:requestId:)`` when
+    ///   the token is missing or not valid for this app while the app's
+    ///   public surfaces are disabled (HTTP 403; the response does not say
+    ///   whether the app exists),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   (status 400 when public surfaces are enabled and the token is
+    ///   missing or its signature does not verify, or 405 when a JSON client
+    ///   hits the non-destructive GET form) or
     ///   ``FeedbackClientError/invalidResponse``.
     public func unsubscribeFromChangelog(token: String) async throws -> ChangelogUnsubscribeResult {
         let base = configuration.baseURL.appending(
@@ -292,7 +304,10 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        // The route's 403 means the console disabled this app's public
+        // surfaces and the token is missing or not valid for it (#294);
+        // map it to the typed permission error like the sibling endpoints.
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(ChangelogUnsubscribeResult.self, from: data)
     }
 

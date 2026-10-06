@@ -232,9 +232,12 @@ struct ChangelogClientTests {
     }
 
     @Test func unsubscribeThrowsOnInvalidToken() async throws {
-        // Missing/invalid/expired tokens keep returning 400 as before.
+        // With public surfaces enabled, a token that is missing or whose
+        // signature does not verify keeps returning 400 (#294); the
+        // expired-but-signed 200 and the privatized-board 403 contracts live
+        // in ChangelogUnsubscribeContractTests.
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (makeHTTPResponse(status: 400), try encodeJSON(["error": "Invalid or expired token"]))
+            (makeHTTPResponse(status: 400), try encodeJSON(["error": "Invalid or expired unsubscribe token"]))
         }
 
         do {
