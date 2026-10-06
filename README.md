@@ -155,7 +155,10 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `fetchVersions()` | `GET /api/v1/public/versions/{appKey}` |
 | `fetchChangelog()` | `GET /api/v1/public/apps/{appKey}/changelog` |
 | `subscribeToChangelog(email:userToken:)` | `POST /api/v1/public/apps/{appKey}/changelog/subscribe` |
-| `unsubscribeFromChangelog(token:)` | `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe` (GET on the same URL is a non-destructive confirmation step) || `updateUserAttributes(isPaying:plan:mrr:currency:userToken:)` | `PUT /api/v1/public/apps/{appKey}/user` |
+| `unsubscribeFromChangelog(token:)` | `POST /api/v1/public/apps/{appKey}/changelog/unsubscribe` (GET on the same URL is a non-destructive confirmation step) |
+| `updateUserAttributes(isPaying:plan:mrr:currency:userToken:)` | `PUT /api/v1/public/apps/{appKey}/user` |
+| `eraseMyData(store:)` / `eraseMyData(userToken:)` | `POST /api/v1/me/erase` (sends `X-User-Token`; for signed-in users, the authentication provider's token is attached as `Authorization: Bearer …` so erasure covers every profile linked to that identity, not just this device's anonymous row) |
+| `linkEndUser(sessionToken:userToken:)` | `POST /api/v1/me/link` |
 
 ### Headers & Version Reporting
 

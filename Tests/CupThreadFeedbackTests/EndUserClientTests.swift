@@ -197,6 +197,33 @@ struct EndUserClientTests {
         #expect(subscription.store.subscribedEmail() == "user@example.com")
     }
 
+    @Test func eraseWithStoreSendsBearerFromAuthenticationProvider() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            let token = request.value(forHTTPHeaderField: "X-User-Token")
+            return (makeHTTPResponse(), try encodeJSON(["erased": true, "endUserId": token]))
+        }
+
+        let isolated = makeIsolatedTokenStore()
+        defer { isolated.cleanup() }
+        let identity = isolated.store.token
+
+        let client = makeClient(
+            baseURL: URL(string: "https://\(Self.apiHost)")!,
+            tokenStore: isolated.store,
+            authenticationProvider: { "bearer-1" }
+        )
+        let result = try await client.eraseMyData(store: isolated.store)
+
+        let request = try #require(capture.value)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer bearer-1")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == identity)
+        #expect(result.erased == true)
+        // The bearer does not change the local rotation contract.
+        #expect(isolated.store.token != identity)
+    }
+
     @Test func linkSendsBearerAndIdentityHeaders() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in

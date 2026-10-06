@@ -371,4 +371,54 @@ struct AuthenticationBearerTests {
         #expect(req.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(req.value(forHTTPHeaderField: "X-User-Token") == "tok-abc")
     }
+
+    // MARK: - eraseMyData (#292)
+
+    @Test func eraseMyDataSendsBearerTokenFromAuthenticationProvider() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["erased": true, "endUserId": "enduser-9"]))
+        }
+
+        let client = Self.makeAPIClient(authenticationProvider: { "bearer-1" })
+        let result = try await client.eraseMyData(userToken: "tok-erase")
+
+        let req = try #require(capture.value)
+        #expect(req.url?.path == "/api/v1/me/erase")
+        #expect(req.value(forHTTPHeaderField: "Authorization") == "Bearer bearer-1")
+        #expect(req.value(forHTTPHeaderField: "X-User-Token") == "tok-erase")
+        #expect(result.erased == true)
+        #expect(result.endUserId == "enduser-9")
+    }
+
+    @Test func eraseMyDataWithProviderReturningNilOmitsAuthorizationHeader() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["erased": true]))
+        }
+
+        let client = Self.makeAPIClient(authenticationProvider: { nil })
+        _ = try await client.eraseMyData(userToken: "tok-erase")
+
+        let req = try #require(capture.value)
+        #expect(req.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(req.value(forHTTPHeaderField: "X-User-Token") == "tok-erase")
+    }
+
+    @Test func eraseMyDataWithoutProviderOmitsAuthorizationHeader() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["erased": true]))
+        }
+
+        let client = Self.makeAPIClient()
+        _ = try await client.eraseMyData(userToken: "tok-erase")
+
+        let req = try #require(capture.value)
+        #expect(req.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(req.value(forHTTPHeaderField: "X-User-Token") == "tok-erase")
+    }
 }
