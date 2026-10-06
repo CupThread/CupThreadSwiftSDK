@@ -471,6 +471,9 @@ struct FeedbackClientErrorTests {
         let uploaderMismatch = FeedbackClientError.uploaderMismatch(message: "diff", requestId: reqId)
         #expect(uploaderMismatch.requestId == reqId)
 
+        let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: reqId)
+        #expect(invalidParent.requestId == reqId)
+
         let unexpected = FeedbackClientError.unexpectedStatus(code: 500, message: "err", requestId: reqId)
         #expect(unexpected.requestId == reqId)
 
@@ -512,6 +515,10 @@ struct FeedbackClientErrorTests {
         let uploaderMis = FeedbackClientError.uploaderMismatch(message: "mis", requestId: reqId)
         let uploaderMisDesc = try #require(uploaderMis.errorDescription)
         #expect(uploaderMisDesc.contains("(request id: \(reqId))"))
+
+        let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: reqId)
+        let invalidParentDesc = try #require(invalidParent.errorDescription)
+        #expect(invalidParentDesc.contains("(request id: \(reqId))"))
     }
 
     @Test func typedErrorsDescriptionOmitsRequestIdWhenAbsent() throws {
@@ -538,6 +545,10 @@ struct FeedbackClientErrorTests {
         let uploaderMis = FeedbackClientError.uploaderMismatch(message: "mis", requestId: nil)
         let uploaderMisDesc = try #require(uploaderMis.errorDescription)
         #expect(!uploaderMisDesc.contains("request id"))
+
+        let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: nil)
+        let invalidParentDesc = try #require(invalidParent.errorDescription)
+        #expect(!invalidParentDesc.contains("request id"))
     }
 
     @Test func typedErrorsConvenienceConstructorsDefaultToNilRequestId() {
@@ -552,6 +563,8 @@ struct FeedbackClientErrorTests {
         #expect(FeedbackClientError.uploaderIdentityRequired(message: "test").requestId == nil)
         #expect(FeedbackClientError.uploaderMismatch().requestId == nil)
         #expect(FeedbackClientError.uploaderMismatch(message: "test").requestId == nil)
+        #expect(FeedbackClientError.invalidParent().requestId == nil)
+        #expect(FeedbackClientError.invalidParent(message: "test").requestId == nil)
     }
 
     @Test func typedErrorsEquatableConsidersRequestId() {

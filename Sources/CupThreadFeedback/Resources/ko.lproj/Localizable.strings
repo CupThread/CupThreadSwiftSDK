@@ -80,6 +80,7 @@
 "cupthread.comments.replying_to" = "@%@ 님에게 답글 작성 중";
 "cupthread.comments.compose_prompt" = "댓글을 입력하세요…";
 "cupthread.comments.removed_by_moderator" = "이 댓글은 관리자에 의해 삭제되었습니다.";
+"cupthread.comments.invalid_parent" = "답장하던 댓글을 더 이상 사용할 수 없습니다.";
 "cupthread.comments.sign_in_required" = "로그인하여 대화에 참여하세요.";
 "cupthread.comments.submit" = "댓글 제출";
 "cupthread.comments.cancel_reply" = "답글 취소";

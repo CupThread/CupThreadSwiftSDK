@@ -80,6 +80,7 @@
 "cupthread.comments.replying_to" = "W odpowiedzi do @%@";
 "cupthread.comments.compose_prompt" = "Napisz komentarz…";
 "cupthread.comments.removed_by_moderator" = "Ten komentarz został usunięty przez moderatora.";
+"cupthread.comments.invalid_parent" = "Komentarz, na który odpowiadasz, nie jest już dostępny.";
 "cupthread.comments.sign_in_required" = "Zaloguj się, aby dołączyć do rozmowy.";
 "cupthread.comments.submit" = "Wyślij komentarz";
 "cupthread.comments.cancel_reply" = "Anuluj odpowiedź";

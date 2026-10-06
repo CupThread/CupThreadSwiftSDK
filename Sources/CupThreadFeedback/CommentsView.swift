@@ -363,13 +363,29 @@ public struct CommentsView: View {
             )
             comments.append(newComment)
             draft.body = ""
-            draft.parentId = nil
-            draft.replyToAuthorName = nil
-            draft.replyToClerkId = nil
+            draft.clearReplyTarget()
         } catch {
             guard !error.isSdkCancellation else { return }
+            if Self.invalidatesReplyTarget(for: error) {
+                // The server rejected the stale reply target (#237): clear
+                // it so the next submit succeeds as a top-level comment.
+                draft.clearReplyTarget()
+            }
             submitError = FriendlyError.message(for: error)
         }
+    }
+
+    // MARK: - Reply-target recovery
+
+    /// Whether a failed comment submission means the reply target is stale
+    /// (HTTP 400 `invalid_parent`): the parent was hidden, soft-deleted, or
+    /// is not on this feature request by the time the reply was submitted.
+    /// The composer clears its reply target so a retry posts a top-level
+    /// comment instead of re-failing on the same stale parent.
+    nonisolated static func invalidatesReplyTarget(for error: Error) -> Bool {
+        guard let clientError = error as? FeedbackClientError else { return false }
+        if case .invalidParent = clientError { return true }
+        return false
     }
 
     // MARK: - Accessibility Helpers

@@ -80,6 +80,7 @@
 "cupthread.comments.replying_to" = "@%@ kullanıcısına yanıt veriliyor";
 "cupthread.comments.compose_prompt" = "Bir yorum yazın…";
 "cupthread.comments.removed_by_moderator" = "Bu yorum bir moderatör tarafından kaldırıldı.";
+"cupthread.comments.invalid_parent" = "Yanıt yazdığınız yorum artık kullanılamıyor.";
 "cupthread.comments.sign_in_required" = "Sohbete katılmak için giriş yapın.";
 "cupthread.comments.submit" = "Yorumu gönder";
 "cupthread.comments.cancel_reply" = "Yanıtı iptal et";
