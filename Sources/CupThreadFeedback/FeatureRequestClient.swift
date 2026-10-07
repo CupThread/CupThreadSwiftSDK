@@ -153,10 +153,20 @@ extension FeedbackClient {
     /// exceeding the limit throws ``FeedbackClientError/rateLimited``, which
     /// the SDK surfaces as a friendly "try again in a minute" message rather
     /// than retrying in a tight loop.
+    ///
+    /// On boards that require signed-in voting, the server accepts a
+    /// `shipNotifyEmail` on the vote only when it is one of the signed-in
+    /// session's verified addresses; a mismatched address still records the
+    /// vote but answers with a ``VoteResult/warning``
+    /// (``VoteWarning/isEmailNotVerified``) and stores no ship-notification
+    /// consent. The SDK never sends `shipNotifyEmail`, so its built-in vote
+    /// flow never receives a warning; the field is decoded for schema parity
+    /// with the public API.
     /// - Parameters:
     ///   - featureRequestId: Id of the request to vote on.
     ///   - userToken: A stable UUID string identifying this user.
-    /// - Returns: The new vote state and the request's authoritative vote count.
+    /// - Returns: The new vote state, the request's authoritative vote count,
+    ///   and any non-fatal warning the server attached.
     /// - Throws: ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous

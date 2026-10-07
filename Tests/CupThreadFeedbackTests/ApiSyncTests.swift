@@ -224,6 +224,82 @@ struct FeatureRequestPagingTests {
         #expect(result.voteCount == 2)
     }
 
+    @Test func voteResultDecodesEmailNotVerifiedWarning() throws {
+        // Issue #293: on boards that require signed-in voting, a
+        // shipNotifyEmail not bound to the session answers HTTP 200 with the
+        // vote fields plus a warning envelope — the vote itself is recorded.
+        let json = Data("""
+        {
+            "voted": true,
+            "voteCount": 1,
+            "warning": {
+                "code": "email_not_verified",
+                "error": "Ship notifications on this board are bound to your signed-in email address"
+            }
+        }
+        """.utf8)
+
+        let result = try JSONDecoder().decode(VoteResult.self, from: json)
+        #expect(result.voted == true)
+        #expect(result.voteCount == 1)
+        #expect(result.warning?.code == VoteWarning.emailNotVerifiedCode)
+        #expect(result.warning?.isEmailNotVerified == true)
+        #expect(
+            result.warning?.message
+                == "Ship notifications on this board are bound to your signed-in email address"
+        )
+    }
+
+    @Test func voteResultWithoutWarningDecodesAsNil() throws {
+        // The warning is additive: anonymous boards and omitted
+        // shipNotifyEmail never emit one, so those payloads must keep
+        // decoding unchanged.
+        let json = Data("""
+        {"voted": true, "voteCount": 3}
+        """.utf8)
+
+        let result = try JSONDecoder().decode(VoteResult.self, from: json)
+        #expect(result.voted == true)
+        #expect(result.voteCount == 3)
+        #expect(result.warning == nil)
+    }
+
+    @Test func voteWarningPreservesUnknownCode() throws {
+        // Warning codes are plain strings so future server-side codes decode
+        // unchanged and keep their raw message for diagnostics.
+        let json = Data("""
+        {
+            "voted": false,
+            "voteCount": 0,
+            "warning": {"code": "future_warning_code", "error": "Something new"}
+        }
+        """.utf8)
+
+        let result = try JSONDecoder().decode(VoteResult.self, from: json)
+        #expect(result.warning?.code == "future_warning_code")
+        #expect(result.warning?.isEmailNotVerified == false)
+        #expect(result.warning?.message == "Something new")
+    }
+
+    @Test func toggleVoteSurfacesWarningFromEndpoint() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 200), try encodeJSON([
+                "voted": true,
+                "voteCount": 2,
+                "warning": [
+                    "code": "email_not_verified",
+                    "error": "Ship notifications on this board are bound to your signed-in email address"
+                ]
+            ]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        let result = try await client.toggleVote(featureRequestId: "fr-1", userToken: "tok")
+        #expect(result.voted == true)
+        #expect(result.voteCount == 2)
+        #expect(result.warning?.isEmailNotVerified == true)
+    }
+
     @Test func voteMaps429ToRateLimited() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (makeHTTPResponse(status: 429), try encodeJSON(["error": "Too many votes. Please try again shortly."]))
