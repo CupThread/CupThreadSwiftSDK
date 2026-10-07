@@ -82,6 +82,10 @@ extension FeedbackClient {
     ///     the slot's `clientFileId`.
     /// - Returns: The uploaded attachment reference, carrying the ``FeedbackAttachment/uploadId``
     ///   needed for feedback submission.
+    /// - Note: A redirect off the configured API origin is refused — the
+    ///   session bearer and the attachment bytes are never re-sent to the
+    ///   redirect target — and the 3xx response surfaces as
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
     /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
     ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
     ///   ``FeedbackClientError/rateLimited`` (HTTP 429), or
@@ -141,6 +145,10 @@ extension FeedbackClient {
     ///     the slot's `clientFileId`.
     /// - Returns: The uploaded attachment reference, carrying the ``FeedbackAttachment/uploadId``
     ///   needed for feedback submission.
+    /// - Note: A redirect off the configured API origin is refused — the
+    ///   session bearer and the streamed attachment bytes are never re-sent
+    ///   to the redirect target — and the 3xx response surfaces as
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
     /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
     ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
     ///   ``FeedbackClientError/rateLimited`` (HTTP 429), or
