@@ -108,6 +108,15 @@ extension FeedbackClient {
     /// To explicitly clear an attribute server-side (such as a churned subscription
     /// plan or reset MRR), pass `.null` using the ``UserAttributesSigner/Field`` overload.
     ///
+    /// Signature timestamps come from the device clock corrected by the
+    /// server-time offset the client learns from response `Date` headers
+    /// (API-19), so a device whose clock is off never signs with a timestamp
+    /// outside the server's ±300 s freshness window. When the server still
+    /// rejects a signature as stale (`401 stale_signature`), the client
+    /// refreshes the offset from the failing response and re-signs with the
+    /// corrected clock, retrying exactly once; an `invalid_signature` failure
+    /// (a mismatched secret — time cannot fix it) is never retried.
+    ///
     /// The endpoint is rate limited per client IP (60 requests/minute), so a
     /// single HTTP 429 is retried once after a short backoff — bursts of
     /// first-syncs behind one shared IP recover without caller changes.
@@ -249,11 +258,8 @@ extension FeedbackClient {
         timestamp: Int64? = nil
     ) async throws -> UserAttributesUpdateResult {
         let hasPaymentAttributes = isPaying != .unset || plan != .unset || mrr != .unset
-        let signature: String?
-        let effectiveTimestamp: Int64?
 
-        if hasPaymentAttributes, let secret = (signingSecret ?? configuration.signingSecret)?.nilIfEmpty {
-            let epochSeconds = timestamp ?? Int64(Date().timeIntervalSince1970)
+        func signedPayload(epochSeconds: Int64, secret: String) -> UserAttributesPayload {
             let canonical = UserAttributesSigner.canonicalString(
                 for: .init(
                     appKey: configuration.appKey,
@@ -265,22 +271,62 @@ extension FeedbackClient {
                     timestamp: epochSeconds
                 )
             )
-            signature = UserAttributesSigner.signature(for: canonical, secret: secret)
-            effectiveTimestamp = epochSeconds
-        } else {
-            signature = nil
-            effectiveTimestamp = nil
+            return UserAttributesPayload(
+                isPaying: isPaying,
+                plan: plan,
+                mrr: mrr,
+                currency: currency,
+                signature: UserAttributesSigner.signature(for: canonical, secret: secret),
+                timestamp: epochSeconds
+            )
         }
 
-        let payload = UserAttributesPayload(
-            isPaying: isPaying,
-            plan: plan,
-            mrr: mrr,
-            currency: currency,
-            signature: signature,
-            timestamp: effectiveTimestamp
-        )
+        // The signing clock is the device clock corrected by the server-time
+        // offset learned from response `Date` headers (API-19) — the pinned
+        // `timestamp` test parameter wins when provided. Before any
+        // observation the offset is 0, so behavior matches the device clock.
+        let signingSecretInUse = (signingSecret ?? configuration.signingSecret)?.nilIfEmpty
+        let payload: UserAttributesPayload
+        if hasPaymentAttributes, let secret = signingSecretInUse {
+            let epochSeconds = timestamp ?? Int64(serverClock.correctedNow().timeIntervalSince1970)
+            payload = signedPayload(epochSeconds: epochSeconds, secret: secret)
+        } else {
+            payload = UserAttributesPayload(
+                isPaying: isPaying,
+                plan: plan,
+                mrr: mrr,
+                currency: currency
+            )
+        }
 
+        do {
+            return try await sendUserAttributesAttempt(payload, userToken: userToken)
+        } catch let error as FeedbackClientError {
+            guard case .staleSignature = error,
+                  hasPaymentAttributes, let secret = signingSecretInUse else {
+                throw error
+            }
+            // The signature timestamp fell outside the server's freshness
+            // window (API-19): the failing response's `Date` header has
+            // already refreshed the offset in `validateResponse`, so
+            // re-signing with the corrected clock produces a timestamp inside
+            // the window. Retried exactly once — `invalid_signature` (a
+            // mismatched secret) and every other failure is never retried,
+            // because time cannot fix it.
+            let retryEpochSeconds = Int64(serverClock.correctedNow().timeIntervalSince1970)
+            return try await sendUserAttributesAttempt(
+                signedPayload(epochSeconds: retryEpochSeconds, secret: secret),
+                userToken: userToken
+            )
+        }
+    }
+
+    /// Sends one signed-or-unsigned `PUT /user` attempt, applying the
+    /// endpoint's single HTTP 429 retry (same payload, after a short backoff).
+    private func sendUserAttributesAttempt(
+        _ payload: UserAttributesPayload,
+        userToken: String
+    ) async throws -> UserAttributesUpdateResult {
         do {
             return try await sendJSON(
                 "PUT",

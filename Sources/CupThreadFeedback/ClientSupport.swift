@@ -19,6 +19,17 @@ extension HTTPURLResponse {
         }
         return value
     }
+
+    /// The response's `Date` header (API-19), parsed as the server's time —
+    /// the observation the SDK corrects its clock with so signed
+    /// payment-attribute reports survive device clock skew. `nil` when the
+    /// header is absent or not RFC 1123.
+    var cupthreadServerDate: Date? {
+        guard let value = value(forHTTPHeaderField: "Date"), !value.isEmpty else {
+            return nil
+        }
+        return ServerClock.httpDate(value)
+    }
 }
 
 extension FeedbackClient {
@@ -63,6 +74,10 @@ extension FeedbackClient {
         accepted: Set<Int>,
         mapsPermissionErrors: Bool = false
     ) throws {
+        // Every response carries the server's clock (API-19); observe it on
+        // successes and failures alike — a stale-signature 401's own `Date`
+        // header is what the signature retry below corrects with.
+        observeServerClock(httpResponse)
         let statusCode = httpResponse.statusCode
         guard !accepted.contains(statusCode) else { return }
         let requestId = httpResponse.cupthreadRequestID
@@ -105,6 +120,15 @@ extension FeedbackClient {
             throw FeedbackClientError.payloadTooLarge(message: envelope?.error, requestId: requestId)
         default:
             throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message, requestId: requestId)
+        }
+    }
+
+    /// Records the response's `Date` header as a server-clock observation
+    /// (API-19), so signed payment-attribute reports correct for device
+    /// clock skew. No-op when the header is absent or unparseable.
+    private func observeServerClock(_ httpResponse: HTTPURLResponse) {
+        if let serverDate = httpResponse.cupthreadServerDate {
+            serverClock.record(serverDate: serverDate)
         }
     }
 

@@ -78,6 +78,7 @@ func makeClient(
     signingSecret: String? = nil,
     tokenStore: UserTokenStore? = nil,
     configStore: AppConfigStore? = nil,
+    serverClock: ServerClock? = nil,
     authenticationProvider: (@Sendable () async -> String?)? = nil
 ) -> FeedbackClient {
     let config = FeedbackClientConfiguration(
@@ -92,6 +93,7 @@ func makeClient(
         overlayPresenter: overlayPresenter,
         tokenStore: tokenStore,
         configStore: configStore,
+        serverClock: serverClock,
         authenticationProvider: authenticationProvider
     )
 }
