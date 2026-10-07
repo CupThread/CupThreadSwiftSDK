@@ -25,7 +25,9 @@ public struct FeatureRequestsView: View {
     @State private var activeSheet: FeatureRequestsActiveSheet?
 
     @State private var searchText = ""
-    @State private var versions: [AppVersion] = []
+    /// Version-filter options and their load outcome (issue #285): a failed
+    /// load keeps the menu reachable with a retry instead of disabling it.
+    @State private var versionFilterState = VersionFilterLoadState()
     @State private var selectedVersionID: String?
     @State private var isLoadingNextPage = false
     /// Failure of the latest cursor-page ("load more") attempt. Distinct from
@@ -152,7 +154,12 @@ public struct FeatureRequestsView: View {
             }
         }
         .refreshable { await loadFeatureRequests() }
-        .task { await loadVersions() }
+        // Re-keyed on the anonymous-roadmap verdict (issue #285): versions
+        // answers 401/403 while anonymous reads are disabled; re-attempt on
+        // config transitions instead of staying stuck on the first failure.
+        .task(id: sdkAppConfig?.allowsAnonymousRoadmap) {
+            await loadVersions()
+        }
         .task(id: filterKey) {
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: the backend does not rate-limit it, so no
@@ -307,7 +314,7 @@ public struct FeatureRequestsView: View {
 
     private var versionFilterToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            VersionFilterMenu(selectedVersionID: $selectedVersionID, versions: versions)
+            VersionFilterMenu(selectedVersionID: $selectedVersionID, state: versionFilterState, onRetry: { Task { await loadVersions() } })
         }
     }
 
@@ -321,7 +328,12 @@ public struct FeatureRequestsView: View {
 
     @MainActor
     private func loadVersions() async {
-        versions = (try? await client.fetchVersions()) ?? []
+        versionFilterState.loadStarted()
+        do {
+            versionFilterState.loadFinished(try await client.fetchVersions())
+        } catch {
+            versionFilterState.loadFailed(error)
+        }
     }
 
     @MainActor

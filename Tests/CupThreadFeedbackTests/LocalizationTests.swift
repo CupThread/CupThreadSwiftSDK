@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 172, "Expected 172 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 173, "Expected 173 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -284,6 +284,29 @@ struct LocalizationTests {
             #expect(!attachVal.isEmpty)
             #expect(!genericVal.isEmpty)
         }
+    }
+
+    /// `VersionFilterMenu`'s retry affordance ships localized copy in every
+    /// target language (issue #285): a failed version-options load must offer
+    /// a reachable retry, never a silently disabled menu.
+    @Test func versionFilterRetryStringIsLocalizedAcrossTargetLanguages() throws {
+        for lang in Self.targetLanguages {
+            let strings = try loadStrings(for: lang)
+            let localized = try #require(
+                strings["cupthread.features.version_retry"],
+                "\(lang) is missing cupthread.features.version_retry"
+            )
+            #expect(!localized.isEmpty, "\(lang) has empty cupthread.features.version_retry")
+            #expect(
+                localized != "cupthread.features.version_retry",
+                "\(lang) has unlocalized raw key for cupthread.features.version_retry"
+            )
+        }
+        // The English copy names versions, so it cannot be confused with the
+        // generic list "Try Again" button used by the load-more row.
+        let enRetry = try #require(try loadStrings(for: "en")["cupthread.features.version_retry"])
+        let genericTryAgain = try #require(try loadStrings(for: "en")["cupthread.error.try_again"])
+        #expect(enRetry != genericTryAgain)
     }
 
     /// Payment-attribute signature failure copy ships in every locale (issue #238)
