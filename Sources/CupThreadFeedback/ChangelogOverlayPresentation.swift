@@ -272,8 +272,6 @@ private func topViewController(base: UIViewController? = nil) -> UIViewControlle
 
 // MARK: - Programmatic presentation
 
-// MARK: - Programmatic presentation
-
 extension FeedbackClient {
     /// Checks whether the user has already seen the changelog overlay for the given version or entry ID.
     ///
