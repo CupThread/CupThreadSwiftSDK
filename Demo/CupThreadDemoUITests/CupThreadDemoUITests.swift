@@ -95,6 +95,48 @@ final class CupThreadDemoUITests: XCTestCase {
         saveScreenshot(XCUIScreen.main.screenshot(), name: "feedback_composer")
     }
 
+    // MARK: - Request Economy
+
+    /// Pins the shared-client contract from the `FeedbackClient` docs: the
+    /// client is created once (in `DemoAppModel`, outside any View struct), so
+    /// a cold launch costs exactly one `GET /api/v1/public/config/{appKey}`,
+    /// and backgrounding/foregrounding the app — which re-evaluates the
+    /// `WindowGroup` content — must not re-create the client or re-fetch the
+    /// configuration. A client stored as a View property would issue a second
+    /// config GET on launch (the demo's old duplicate fetch) and re-open the
+    /// rate-limited search budget on every parent re-render.
+    @MainActor
+    func testConfigRequestEconomyAcrossForegrounding() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-configRequestProbe", "-initialTab", "roadmap"]
+        app.launch()
+
+        let roadmapTitle = app.navigationBars["Roadmap"]
+        XCTAssertTrue(roadmapTitle.waitForExistence(timeout: 10), "Roadmap navigation bar should appear on launch")
+
+        let probe = app.staticTexts["cupthread.demo.config_request_count"]
+        XCTAssertTrue(probe.waitForExistence(timeout: 5), "Config request probe should exist under -configRequestProbe")
+
+        // Settle: the single launch-time config GET has landed (and any
+        // duplicate would have landed too) once the first frame is up.
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertEqual(probe.label, "1", "A cold launch must issue exactly one config GET")
+
+        // All four tabs render with the resolved configuration.
+        for tabName in ["Roadmap", "What's New", "Requests", "Feedback"] {
+            XCTAssertTrue(app.tabBars.buttons[tabName].exists, "\(tabName) tab should render")
+        }
+
+        // Background and foreground; the probe refreshes every 0.5 s, so a
+        // stray re-fetch would surface in its label.
+        XCUIDevice.shared.press(XCUIDevice.Button.home)
+        app.activate()
+        XCTAssertTrue(roadmapTitle.waitForExistence(timeout: 10), "Roadmap should still render after foregrounding")
+
+        Thread.sleep(forTimeInterval: 2.0)
+        XCTAssertEqual(probe.label, "1", "Foregrounding must not re-fetch the app configuration")
+    }
+
     // MARK: - Interactive Navigation Test
 
     /// Walks the four tabs against the mock server and exercises two

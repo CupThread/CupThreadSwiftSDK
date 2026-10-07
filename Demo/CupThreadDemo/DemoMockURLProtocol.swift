@@ -45,8 +45,31 @@ final class DemoMockURLProtocol: URLProtocol, @unchecked Sendable {
 
     override func stopLoading() {}
 
+    // MARK: - Request-economy probe
+
+    /// Counts the config GETs served this process so the UI tests can pin the
+    /// shared-client contract: a launch (and any later foregrounding) must
+    /// cost exactly one `GET /api/v1/public/config/{appKey}` per TTL window,
+    /// not one per surface or per re-created client. `URLProtocol` loads on
+    /// background queues, so the counter is lock-guarded.
+    private static let counterLock = NSLock()
+    private static var _configRequestCount = 0
+
+    static var configRequestCount: Int {
+        counterLock.lock()
+        defer { counterLock.unlock() }
+        return _configRequestCount
+    }
+
+    private static func recordConfigRequest() {
+        counterLock.lock()
+        _configRequestCount += 1
+        counterLock.unlock()
+    }
+
     private static func response(for path: String, query: String, method: String) -> (Int, Data) {
         if path.contains("/api/v1/public/config/") {
+            recordConfigRequest()
             return (200, DemoMockData.appConfigJSON)
         }
         if path.contains("/api/v1/public/columns/") {
