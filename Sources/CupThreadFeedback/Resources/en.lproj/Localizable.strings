@@ -29,6 +29,7 @@
 "cupthread.features.all_versions" = "All Versions";
 "cupthread.features.version_picker" = "Version";
 "cupthread.features.filter_by_version" = "Filter by version";
+"cupthread.features.version_retry" = "Retry Loading Versions";
 "cupthread.features.request_a_feature" = "Request a Feature";
 "cupthread.features.request_a_feature_hint" = "Opens the feature request composer";
 "cupthread.features.empty_title" = "No Feature Requests";
