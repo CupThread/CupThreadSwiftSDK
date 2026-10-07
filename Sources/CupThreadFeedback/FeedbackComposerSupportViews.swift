@@ -241,3 +241,23 @@ struct FeedbackSubmitBarView: View {
         #endif
     }
 }
+
+// MARK: - Attachment limit resolution
+
+/// Resolves the attachment byte limit ``FeedbackComposerView`` applies at
+/// presentation, or `nil` when the state machine's compiled-in default stays
+/// in force (first run with no console contact yet).
+///
+/// Priority: a supplied `config` (preview/test override or the environment
+/// value) wins, then the fetched console configuration; when the config read
+/// fails, the last-known limit persisted from an earlier successful fetch
+/// keeps the console limit in force instead of silently rolling back to the
+/// compiled-in 20 MB default (#287). Whatever this returns, an explicit
+/// `maxAttachmentBytes` passed at init still wins —
+/// ``FeedbackAttachmentStateMachine/applyConfigLimit(_:)`` ignores
+/// config-derived values for those machines.
+enum FeedbackComposerAttachmentLimit {
+    static func resolve(config: PublicAppConfig?, lastKnownLimit: Int?) -> Int? {
+        config?.maxAttachmentBytes ?? lastKnownLimit
+    }
+}

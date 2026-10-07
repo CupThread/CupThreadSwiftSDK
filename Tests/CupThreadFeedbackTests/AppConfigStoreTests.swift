@@ -78,9 +78,15 @@ struct AppConfigStoreTests {
         makeClient(baseURL: URL(string: "https://\(Self.host)")!, appKey: appKey, configStore: store)
     }
 
-    private func configJSON(appKey: String, theme: String = "ocean", featureRequests: Bool = false) throws -> Data {
+    private func configJSON(
+        appKey: String,
+        theme: String = "ocean",
+        featureRequests: Bool = false,
+        maxAttachmentBytes: Int = 20_000_000
+    ) throws -> Data {
         var payload = makeConfigJSON()
         payload["appKey"] = appKey
+        payload["maxAttachmentBytes"] = maxAttachmentBytes
         payload["sdk"] = [
             "theme": theme,
             "features": [
@@ -93,8 +99,13 @@ struct AppConfigStoreTests {
         return try encodeJSON(payload)
     }
 
-    private func setConfigHandler(appKey: String, counter: RequestCounter, theme: String = "ocean") throws {
-        let payload = try configJSON(appKey: appKey, theme: theme)
+    private func setConfigHandler(
+        appKey: String,
+        counter: RequestCounter,
+        theme: String = "ocean",
+        maxAttachmentBytes: Int = 20_000_000
+    ) throws {
+        let payload = try configJSON(appKey: appKey, theme: theme, maxAttachmentBytes: maxAttachmentBytes)
         MockURLProtocol.setHandler(forHost: Self.host) { request in
             counter.record(path: request.url?.path ?? "")
             return (makeHTTPResponse(), payload)
@@ -264,6 +275,52 @@ struct AppConfigStoreTests {
         }
 
         #expect(store.lastGoodAppearance() == good.sdk, "A failed refresh must keep the last-good appearance")
+    }
+
+    // MARK: - Last-known attachment limit (#287)
+
+    @Test func lastKnownMaxAttachmentBytesIsNilBeforeAnySuccessfulFetch() {
+        let store = makeStore(appKey: "app_limit_cold")
+
+        #expect(store.lastKnownMaxAttachmentBytes() == nil, "No fetch has ever succeeded")
+    }
+
+    @Test func successPersistsLastGoodMaxAttachmentBytes() async throws {
+        let appKey = "app_limit_success"
+        let counter = makeCounter()
+        try setConfigHandler(appKey: appKey, counter: counter, maxAttachmentBytes: 5_000_000)
+        let store = makeStore(appKey: appKey)
+        let client = makeStoreClient(appKey: appKey, store: store)
+
+        let config = try await client.cachedAppConfig()
+
+        #expect(config.maxAttachmentBytes == 5_000_000)
+        #expect(store.lastKnownMaxAttachmentBytes() == 5_000_000)
+    }
+
+    @Test func failureAfterSuccessKeepsLastKnownMaxAttachmentBytes() async throws {
+        let appKey = "app_limit_failure"
+        let clock = MutableClock()
+        let counter = makeCounter()
+        try setConfigHandler(appKey: appKey, counter: counter, maxAttachmentBytes: 5_000_000)
+        let store = makeStore(appKey: appKey, clock: clock)
+        let client = makeStoreClient(appKey: appKey, store: store)
+
+        _ = try await client.cachedAppConfig()
+
+        setFailureHandler(counter: counter)
+        clock.advance(by: AppConfigStore.defaultTTL + 1)
+        do {
+            _ = try await client.cachedAppConfig()
+            Issue.record("Expected the expired refresh to throw on a 500")
+        } catch {
+            // Expected: the config outage must surface, not be swallowed.
+        }
+
+        #expect(
+            store.lastKnownMaxAttachmentBytes() == 5_000_000,
+            "A failed refresh must keep the last-known console attachment limit in force"
+        )
     }
 
     // MARK: - Loader integration
