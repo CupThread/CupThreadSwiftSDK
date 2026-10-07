@@ -104,27 +104,59 @@ struct LoadMoreRow: View {
 
 // MARK: Version filter menu
 
+/// Toolbar menu for filtering feature requests by app version.
+///
+/// Disabled only when the server answered successfully with zero versions —
+/// "no versions configured". A failed load keeps the menu enabled and adds
+/// an error row with a retry button, so a transient failure (offline, 429,
+/// permission denial) never silently removes the filter for the whole
+/// presentation (issue #285).
 struct VersionFilterMenu: View {
     @Binding var selectedVersionID: String?
-    let versions: [AppVersion]
+    let state: VersionFilterLoadState
+    let onRetry: () -> Void
 
     var body: some View {
         Menu {
             Picker(CupThreadStrings.tr("cupthread.features.version_picker"), selection: $selectedVersionID) {
                 Text(CupThreadStrings.tr("cupthread.features.all_versions")).tag(String?.none)
-                ForEach(versions) { version in
+                ForEach(state.versions) { version in
                     Text(version.label).tag(String?.some(version.id))
                 }
             }
+            if let errorMessage = state.errorMessage {
+                failedLoadRows(errorMessage)
+            }
         } label: {
             Label(
-                selectedVersionID.flatMap { id in versions.first(where: { $0.id == id })?.label }
+                selectedVersionID.flatMap { id in state.versions.first(where: { $0.id == id })?.label }
                     ?? CupThreadStrings.tr("cupthread.features.all_versions"),
                 systemImage: "line.3.horizontal.decrease.circle"
             )
         }
-        .disabled(versions.isEmpty)
+        .disabled(state.isMenuDisabled)
         .accessibilityLabel(CupThreadStrings.tr("cupthread.features.filter_by_version"))
+    }
+
+    @ViewBuilder
+    private func failedLoadRows(_ errorMessage: String) -> some View {
+        Section {
+            Text(errorMessage)
+                .accessibilityIdentifier("cupthread.features.version_error")
+            Button {
+                onRetry()
+            } label: {
+                HStack(spacing: 8) {
+                    if state.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(CupThreadStrings.tr("cupthread.features.version_retry"))
+                }
+            }
+            .disabled(state.isLoading)
+            .accessibilityIdentifier("cupthread.features.version_retry")
+        }
     }
 }
 

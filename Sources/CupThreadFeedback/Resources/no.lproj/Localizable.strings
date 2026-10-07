@@ -29,6 +29,7 @@
 "cupthread.features.all_versions" = "Alle versjoner";
 "cupthread.features.version_picker" = "Versjon";
 "cupthread.features.filter_by_version" = "Filtrer etter versjon";
+"cupthread.features.version_retry" = "Prøv å laste inn versjonene på nytt";
 "cupthread.features.request_a_feature" = "Foreslå funksjon";
 "cupthread.features.request_a_feature_hint" = "Åpner skjema for å foreslå funksjon";
 "cupthread.features.empty_title" = "Ingen funksjonsønsker";

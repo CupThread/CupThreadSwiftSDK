@@ -59,6 +59,61 @@ func makeIsolatedTokenStore(
     )
 }
 
+/// Storage double that rejects every write until allowed, standing in for a
+/// Keychain that cannot confirm writes (e.g. `errSecInteractionNotAllowed`
+/// before first unlock). Rejected writes store nothing, so reads keep the
+/// adoption flow retryable exactly as a failing Keychain would.
+private final class FailingSaveTokenStorage: TokenStorage, @unchecked Sendable {
+    private let lock = NSLock()
+    private var failing: Bool
+    private var storedToken: String?
+    private var accepted: [String] = []
+
+    init(failing: Bool = true) {
+        self.failing = failing
+    }
+
+    func load() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedToken
+    }
+
+    func save(_ token: String) {
+        _ = saveConfirmed(token)
+    }
+
+    @discardableResult
+    func saveConfirmed(_ token: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !failing else { return false }
+        storedToken = token
+        accepted.append(token)
+        return true
+    }
+
+    func delete() {
+        lock.lock()
+        defer { lock.unlock() }
+        storedToken = nil
+    }
+
+    /// Lets subsequent writes succeed (e.g. the device unlocked).
+    func allowSaves() {
+        lock.lock()
+        defer { lock.unlock() }
+        failing = false
+    }
+
+    /// Every token whose write this storage confirmed.
+    var acceptedTokens: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return accepted
+    }
+}
+
 @Suite("UserTokenStoreScoping")
 struct UserTokenStoreScopingTests {
 
@@ -223,5 +278,116 @@ struct UserTokenStoreScopingTests {
         // Construction only wires storage handles (no token reads, no real
         // Keychain I/O): each client owns its own app-key-scoped store.
         #expect(clientA.tokenStore !== clientB.tokenStore)
+    }
+
+    // MARK: - Failed writes keep adoption retryable (SEC-13, issue #289)
+
+    @Test func adoptionFlagIsNotConsumedWhenSaveFails() throws {
+        let suiteName = "test.usertokenstore.sec13.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let legacy = UUID().uuidString
+        let flagKey = UserTokenStore.legacyAdoptionFlagKey(for: "app_sec13")
+        let legacyKeychainStandInKey = "test.sec13.legacy.global"
+        defaults.set(legacy, forKey: legacyKeychainStandInKey)
+
+        let storage = FailingSaveTokenStorage()
+        let store = UserTokenStore(
+            storage: storage,
+            legacyUserDefaults: defaults,
+            legacyKey: UserTokenStore.defaultKey,
+            legacyGlobalStore: UserDefaultsTokenStorage(userDefaults: defaults, key: legacyKeychainStandInKey),
+            adoptionDefaults: defaults,
+            adoptionFlagKey: flagKey
+        )
+
+        // The unconfirmed write still serves the legacy identity for this
+        // read, but nothing is persisted and the one-shot flag stays unset.
+        #expect(store.token == legacy)
+        #expect(storage.acceptedTokens.isEmpty)
+        #expect(storage.load() == nil)
+        #expect(defaults.bool(forKey: flagKey) == false)
+
+        // The next read (storage writable again) retries adoption and
+        // persists the legacy identity exactly once.
+        storage.allowSaves()
+        #expect(store.token == legacy)
+        #expect(storage.acceptedTokens == [legacy])
+        #expect(storage.load() == legacy)
+        #expect(defaults.bool(forKey: flagKey) == true)
+
+        // Adoption is now one-shot: a rotated global identity never clobbers
+        // the confirmed-persisted one.
+        defaults.set(UUID().uuidString, forKey: legacyKeychainStandInKey)
+        #expect(store.token == legacy)
+    }
+
+    @Test func freshIdentityIsNotPersistedWhenSaveFails() throws {
+        let suiteName = "test.usertokenstore.sec13.fresh.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let flagKey = UserTokenStore.legacyAdoptionFlagKey(for: "app_sec13_fresh")
+
+        let storage = FailingSaveTokenStorage()
+        let store = UserTokenStore(
+            storage: storage,
+            legacyUserDefaults: defaults,
+            legacyKey: UserTokenStore.defaultKey,
+            legacyGlobalStore: UserDefaultsTokenStorage(userDefaults: defaults, key: "test.sec13.fresh.empty"),
+            adoptionDefaults: defaults,
+            adoptionFlagKey: flagKey
+        )
+
+        // No legacy identity anywhere and the write fails: the caller gets an
+        // ephemeral UUID, nothing is persisted, and the flag stays unset so
+        // the next read retries instead of rotating the identity.
+        let ephemeral = store.token
+        #expect(UUID(uuidString: ephemeral) != nil)
+        #expect(storage.acceptedTokens.isEmpty)
+        #expect(storage.load() == nil)
+        #expect(defaults.bool(forKey: flagKey) == false)
+
+        // A later successful read mints and persists exactly one identity.
+        storage.allowSaves()
+        let persisted = store.token
+        #expect(UUID(uuidString: persisted) != nil)
+        #expect(storage.acceptedTokens == [persisted])
+        #expect(storage.load() == persisted)
+        #expect(defaults.bool(forKey: flagKey) == true)
+        #expect(store.token == persisted)
+    }
+
+    @Test func sharedStyleAdoptionKeepsLegacyPlaintextUntilWriteIsConfirmed() throws {
+        let suiteName = "test.usertokenstore.sec13.shared.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let legacyKey = "test.sec13.shared.plaintext"
+        let legacy = UUID().uuidString
+        defaults.set(legacy, forKey: legacyKey)
+
+        let storage = FailingSaveTokenStorage()
+        // No adoption flag keys: a `.shared`-style store that owns (purges)
+        // its legacy plaintext after migration.
+        let store = UserTokenStore(
+            storage: storage,
+            legacyUserDefaults: defaults,
+            legacyKey: legacyKey
+        )
+
+        // The unconfirmed write must not purge the plaintext source: losing
+        // it alongside the failed save is exactly the identity-loss bug.
+        #expect(store.token == legacy)
+        #expect(storage.acceptedTokens.isEmpty)
+        #expect(defaults.string(forKey: legacyKey) == legacy)
+
+        // The confirmed write purges the plaintext, completing adoption.
+        storage.allowSaves()
+        #expect(store.token == legacy)
+        #expect(storage.acceptedTokens == [legacy])
+        #expect(defaults.string(forKey: legacyKey) == nil)
+        #expect(store.token == legacy)
     }
 }
