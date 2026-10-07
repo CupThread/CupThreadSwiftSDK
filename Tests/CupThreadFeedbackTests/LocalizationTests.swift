@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 174, "Expected 174 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 181, "Expected 181 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -221,6 +221,33 @@ struct LocalizationTests {
         }
     }
 
+    /// The pending double-opt-in copy (issue #273) ships localized in every
+    /// target language: entry-point titles, footer captions, sheet copy, and
+    /// the resend action.
+    @Test func pendingSubscriptionStringsAreLocalizedAcrossTargetLanguages() throws {
+        let keys = [
+            "cupthread.whatsnew.pending_title",
+            "cupthread.whatsnew.pending_destination",
+            "cupthread.whatsnew.pending_accessibility",
+            "cupthread.subscribe.pending_title",
+            "cupthread.subscribe.pending_message",
+            "cupthread.subscribe.resend_button",
+            "cupthread.subscribe.resending_button"
+        ]
+        for lang in Self.targetLanguages {
+            let strings = try loadStrings(for: lang)
+            for key in keys {
+                let localized = try #require(strings[key], "\(lang) is missing \(key)")
+                #expect(!localized.isEmpty, "\(lang) has empty \(key)")
+                #expect(localized != key, "\(lang) has unlocalized raw key for \(key)")
+                #expect(localized.contains("%@") == key.hasSuffix("_destination")
+                    || key.hasSuffix("_accessibility")
+                    || key == "cupthread.subscribe.pending_message",
+                    "\(lang) key \(key) lost its %@ placeholder")
+            }
+        }
+    }
+
     /// `CommentsView` actions provide localized accessibility labels across all target languages (issue #191).
     @Test func commentActionAccessibilityStringsAreLocalizedAcrossTargetLanguages() throws {
         let keys = [
@@ -251,6 +278,37 @@ struct LocalizationTests {
         let confirmed = WhatsNewView.subscribeEntryTitle(subscribedEmail: "alex@example.com")
         #expect(confirmed == CupThreadStrings.tr("cupthread.whatsnew.emails_on"))
         #expect(confirmed != "Manage Emails")
+    }
+
+    /// The record-based entry title maps the double-opt-in phase (issue #273):
+    /// pending names the outstanding confirmation, confirmed keeps "emails on",
+    /// and no record falls back to the subscribe call to action.
+    @MainActor
+    @Test func whatsNewSubscribeEntryTitleByRecordResolvesCorrectKeys() {
+        #expect(
+            WhatsNewView.subscribeEntryTitle(record: nil)
+                == CupThreadStrings.tr("cupthread.whatsnew.subscribe_button")
+        )
+        #expect(
+            WhatsNewView.subscribeEntryTitle(
+                record: ChangelogSubscriptionRecord(email: "alex@example.com", state: .confirmed)
+            ) == CupThreadStrings.tr("cupthread.whatsnew.emails_on")
+        )
+        #expect(
+            WhatsNewView.subscribeEntryTitle(
+                record: ChangelogSubscriptionRecord(
+                    email: "alex@example.com", state: .pending(since: Date(timeIntervalSince1970: 0))
+                )
+            ) == CupThreadStrings.tr("cupthread.whatsnew.pending_title")
+        )
+        // The pending title must not be the confirmed copy.
+        #expect(
+            WhatsNewView.subscribeEntryTitle(
+                record: ChangelogSubscriptionRecord(
+                    email: "alex@example.com", state: .pending(since: Date(timeIntervalSince1970: 0))
+                )
+            ) != CupThreadStrings.tr("cupthread.whatsnew.emails_on")
+        )
     }
 
     @MainActor

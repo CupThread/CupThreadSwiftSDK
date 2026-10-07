@@ -114,7 +114,7 @@ struct EndUserClientTests {
 
         let subscription = makeIsolatedSubscriptionStore()
         defer { subscription.cleanup() }
-        subscription.store.persist(email: "user@example.com")
+        subscription.store.persist(record: ChangelogSubscriptionRecord(email: "user@example.com", state: .confirmed))
         #expect(subscription.store.subscribedEmail() == "user@example.com")
 
         let isolated = makeIsolatedTokenStore()
@@ -134,7 +134,7 @@ struct EndUserClientTests {
 
         let subscription = makeIsolatedSubscriptionStore()
         defer { subscription.cleanup() }
-        subscription.store.persist(email: "user@example.com")
+        subscription.store.persist(record: ChangelogSubscriptionRecord(email: "user@example.com", state: .confirmed))
 
         let isolated = makeIsolatedTokenStore()
         defer { isolated.cleanup() }
@@ -177,7 +177,7 @@ struct EndUserClientTests {
 
         let subscription = makeIsolatedSubscriptionStore()
         defer { subscription.cleanup() }
-        subscription.store.persist(email: "user@example.com")
+        subscription.store.persist(record: ChangelogSubscriptionRecord(email: "user@example.com", state: .confirmed))
 
         let isolated = makeIsolatedTokenStore()
         defer { isolated.cleanup() }
