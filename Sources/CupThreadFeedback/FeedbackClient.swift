@@ -104,6 +104,20 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 /// The views (``FeedbackComposerView``, ``FeatureRequestsView``,
 /// ``RoadmapBoardView``, ``WhatsNewView``) use the same client, so you can mix
 /// ready-made UI with direct calls like ``submit(_:userToken:)``.
+///
+/// ## Redirect policy
+///
+/// Requests never follow redirects off the API origin. The default session
+/// (used whenever no `session:` is injected) carries a redirect delegate that
+/// refuses any redirect whose origin — scheme, host, and effective port —
+/// differs from the original request's origin, so `Authorization: Bearer …`,
+/// `X-User-Token`, and request bodies (which 307/308 redirects replay) are
+/// never delivered to a third-party host, even by a compromised or misconfigured
+/// API origin. A refused redirect surfaces the 3xx response itself, which
+/// response validation reports as
+/// ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
+/// Same-origin redirects (e.g. relative `Location` paths on the API host) are
+/// followed normally.
 public struct FeedbackClient: Sendable {
     /// The configuration this client was created with.
     public let configuration: FeedbackClientConfiguration
@@ -136,6 +150,22 @@ public struct FeedbackClient: Sendable {
     /// Resolves the signed-in end user's bearer token on demand.
     let authenticationProvider: (@Sendable () async -> String?)?
 
+    /// The process-wide session used by clients that do not inject one: built
+    /// from the default configuration with `SameOriginRedirectLimiter`
+    /// installed, so every request refuses redirects that leave the original
+    /// request's origin (see the redirect policy on ``FeedbackClient``).
+    /// Cached in a static so all default clients share one session — and one
+    /// delegate — for the process lifetime. Hosts that issue their own
+    /// requests against the same API origin can reuse this session to opt
+    /// into the same policy.
+    public static let defaultSession: URLSession = {
+        URLSession(
+            configuration: URLSessionConfiguration.default,
+            delegate: SameOriginRedirectLimiter(),
+            delegateQueue: nil
+        )
+    }()
+
     /// Creates a client for a CupThread app.
     ///
     /// Some actions are signed-in-only on the server — posting comments on
@@ -154,7 +184,11 @@ public struct FeedbackClient: Sendable {
     /// - Parameters:
     ///   - configuration: API root, app key, and default reported platform.
     ///   - session: The URL session requests run in. Override to install a
-    ///     custom `URLProtocol` (tests) or custom timeouts; defaults to `.shared`.
+    ///     custom `URLProtocol` (tests) or custom timeouts; when omitted,
+    ///     requests run in a process-wide shared session that refuses
+    ///     cross-origin redirects (see “Redirect policy” on ``FeedbackClient``).
+    ///     Injected sessions are not modified — install a redirect policy on
+    ///     them yourself if they can face untrusted redirects.
     ///   - turnstileTokenProvider: Async closure resolving a Cloudflare
     ///     Turnstile token for gated intake calls, `nil` when none is
     ///     available. Called once per submission attempt, so it can mint a
@@ -164,7 +198,7 @@ public struct FeedbackClient: Sendable {
     ///     authenticated request, so it can refresh an expiring token.
     public init(
         configuration: FeedbackClientConfiguration,
-        session: URLSession = .shared,
+        session: URLSession = FeedbackClient.defaultSession,
         turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) {
@@ -179,7 +213,7 @@ public struct FeedbackClient: Sendable {
 
     init(
         configuration: FeedbackClientConfiguration,
-        session: URLSession = .shared,
+        session: URLSession = FeedbackClient.defaultSession,
         overlayPresenter: (any ChangelogOverlayPresenter)? = nil,
         tokenStore: UserTokenStore? = nil,
         configStore: AppConfigStore? = nil,

@@ -132,6 +132,10 @@ extension FeedbackClient {
     ///     `Authorization: Bearer <sessionToken>`.
     ///   - userToken: Anonymous user token sent as `X-User-Token`.
     /// - Returns: The confirmed link, including the authenticated identity.
+    /// - Note: The Clerk session bearer is never re-sent to a redirect
+    ///   target: a redirect off the configured API origin is refused and the
+    ///   3xx response surfaces as
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
     /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   with status 401 when the session is missing, 404 when no profile
     ///   matches, and 409 when the profile is already confirmed to a
