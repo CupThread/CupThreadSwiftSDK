@@ -160,13 +160,6 @@ extension FeedbackClient {
             // An uploadId referenced by the submission failed the
             // server-side content inspection (PRIV-02 media policy).
             return .scanRejected(message: envelopeMessage ?? "", requestId: requestId)
-        case (402, "tier_limit_submissions"):
-            // The app's workspace hit its monthly submission quota — feature
-            // requests and feedback enforce the same contract.
-            return .submissionQuotaExceeded(message: envelopeMessage, requestId: requestId)
-        case (402, "subscription_inactive"):
-            // The app's workspace subscription is inactive or canceled.
-            return .subscriptionInactive(message: envelopeMessage, requestId: requestId)
         case (403, let turnstileCode) where isTurnstileRejection(code: turnstileCode, message: envelopeMessage):
             // The Turnstile human-verification gate (#53): the uploads
             // sessions route rejects with a machine-readable code; the intake
@@ -185,12 +178,36 @@ extension FeedbackClient {
         case (403, "email_not_verified"):
             return .emailNotVerified(message: envelopeMessage, requestId: requestId)
         default:
-            return signatureTypedError(
+            return quotaTypedError(
+                statusCode: statusCode,
+                code: code,
+                envelopeMessage: envelopeMessage,
+                requestId: requestId
+            ) ?? signatureTypedError(
                 statusCode: statusCode,
                 code: code,
                 envelopeMessage: envelopeMessage,
                 requestId: requestId
             )
+        }
+    }
+
+    /// Maps workspace quota and subscription metering envelopes (API-12, #112).
+    private static func quotaTypedError(
+        statusCode: Int,
+        code: String?,
+        envelopeMessage: String?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        switch (statusCode, code) {
+        case (402, "tier_limit_submissions"):
+            return .submissionQuotaExceeded(message: envelopeMessage, requestId: requestId)
+        case (402, "subscription_inactive"):
+            return .subscriptionInactive(message: envelopeMessage, requestId: requestId)
+        case (429, "daily_storage_quota_exceeded"):
+            return .dailyStorageQuotaExceeded(message: envelopeMessage, requestId: requestId)
+        default:
+            return nil
         }
     }
 

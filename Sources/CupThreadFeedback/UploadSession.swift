@@ -22,7 +22,9 @@ extension FeedbackClient {
     ///     submission alike.
     /// - Returns: The session, including bearer token and pre-allocated slots.
     /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
-    ///   identity could be presented, ``FeedbackClientError/rateLimited`` on
+    ///   identity could be presented, ``FeedbackClientError/dailyStorageQuotaExceeded``
+    ///   when the workspace has exceeded its daily upload storage limit (HTTP 429
+    ///   `daily_storage_quota_exceeded`), ``FeedbackClientError/rateLimited`` on
     ///   HTTP 429, ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
     ///   disables feedback attachments (HTTP 401/403), or
@@ -203,7 +205,9 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/unsupportedMediaType`` when the type
     ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
     ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
-    ///   when no identity could be presented, or
+    ///   when no identity could be presented,
+    ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
+    ///   has exceeded its daily upload limit, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
     ///   other server failures.
     public func uploadAttachment(
@@ -250,7 +254,9 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/unsupportedMediaType`` when the type
     ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
     ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
-    ///   when no identity could be presented, or
+    ///   when no identity could be presented,
+    ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
+    ///   has exceeded its daily upload limit, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
     ///   other server failures.
     public func uploadAttachment(
