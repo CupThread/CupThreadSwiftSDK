@@ -4,14 +4,16 @@ import SwiftUI
 
 /// Extracted vote-pill enablement (#34). Own requests stay disabled, and a
 /// resolved config with `allowAnonymousVote == false` disables every pill —
-/// except when the client can attach a bearer token
-/// (`FeedbackClient.supportsAuthentication`): a signed-in host is not bound by
-/// the *anonymous*-access switches, and the server stays authoritative for
-/// actual 401/403 rejections.
+/// except when the client can attach a bearer token right now (the resolved
+/// ``FeedbackClient/resolveAuthenticatedAccess()`` value): a signed-in user is
+/// not bound by the *anonymous*-access switches, and the server stays
+/// authoritative for actual 401/403 rejections.
 enum FeatureVoteGate {
     /// Whether the vote action should be disabled for this request.
     /// `supportsAuthentication` defaults to `false` so a call site that forgets
-    /// to thread it fails closed (the pre-#233 anonymous behavior).
+    /// to thread it fails closed (the pre-#233 anonymous behavior). Call sites
+    /// pass the *resolved* access value (`resolveAuthenticatedAccess()`), not the
+    /// mere presence of a provider (issue #297).
     static func isActionDisabled(
         isOwnRequest: Bool,
         config: PublicAppConfig?,
@@ -50,7 +52,8 @@ enum SdkSubmissionDenial: Equatable, Sendable {
     case platformNotAllowed
 
     /// Preflight for the feedback composer. `nil` config fails open. A client
-    /// with an authentication provider is not bound by the anonymous-feedback
+    /// that can produce a bearer token for the current user (resolved access,
+    /// not mere provider presence) is not bound by the anonymous-feedback
     /// switch; platform allow-lists still apply.
     static func forFeedback(
         config: PublicAppConfig?,
@@ -66,8 +69,9 @@ enum SdkSubmissionDenial: Equatable, Sendable {
     }
 
     /// Preflight for the feature-request composer. Platform allow-lists
-    /// apply to feedback submissions, not feature requests. A client with an
-    /// authentication provider is not bound by the anonymous switch.
+    /// apply to feedback submissions, not feature requests. A client that can
+    /// produce a bearer token for the current user is not bound by the
+    /// anonymous switch.
     static func forFeatureRequest(
         config: PublicAppConfig?,
         supportsAuthentication: Bool = false
@@ -117,22 +121,24 @@ enum RoadmapLoadPlan: Equatable, Sendable {
 ///
 /// A `nil` config fails open (the server stays authoritative). A resolved
 /// config with ``PublicAppConfig/allowsAnonymousRoadmap`` `false` skips —
-/// unless `supportsAuthentication` is set, in which case the client's bearer
-/// token satisfies the *anonymous*-access preflight and the fetch proceeds.
+/// unless `supportsAuthentication` (the resolved access value) is set, in
+/// which case the client's bearer token satisfies the *anonymous*-access
+/// preflight and the fetch proceeds.
 func roadmapLoadPlan(config: PublicAppConfig?, supportsAuthentication: Bool = false) -> RoadmapLoadPlan {
     (supportsAuthentication || (config?.allowsAnonymousRoadmap ?? true)) ? .load : .skip
 }
 
 /// Loads the board's groups, or returns `nil` without issuing requests when
-/// the console disallows anonymous roadmap access and the client has no
-/// authentication provider.
+/// the console disallows anonymous roadmap access and the client cannot
+/// produce a bearer token for the current user.
 func loadRoadmapGroups(
     client: FeedbackClient,
     userToken: String,
     query: String?,
     config: PublicAppConfig?
 ) async throws -> [RoadmapGroup]? {
-    guard roadmapLoadPlan(config: config, supportsAuthentication: client.supportsAuthentication) == .load else {
+    let supportsAuthentication = await client.resolveAuthenticatedAccess()
+    guard roadmapLoadPlan(config: config, supportsAuthentication: supportsAuthentication) == .load else {
         return nil
     }
     async let columns = client.fetchColumns()
@@ -162,31 +168,63 @@ enum ChangelogLoadPlan: Equatable, Sendable {
 ///
 /// A `nil` config fails open (the server stays authoritative). A resolved
 /// config with ``PublicAppConfig/allowsAnonymousChangelog`` `false` skips —
-/// unless `supportsAuthentication` is set, in which case the client's bearer
-/// token satisfies the *anonymous*-access preflight and the fetch proceeds.
+/// unless `supportsAuthentication` (the resolved access value) is set, in
+/// which case the client's bearer token satisfies the *anonymous*-access
+/// preflight and the fetch proceeds.
 func changelogLoadPlan(config: PublicAppConfig?, supportsAuthentication: Bool = false) -> ChangelogLoadPlan {
     (supportsAuthentication || (config?.allowsAnonymousChangelog ?? true)) ? .load : .skip
 }
 
 /// Fetches changelog entries, or returns `nil` without issuing requests when
-/// the console disallows anonymous changelog access and the client has no
-/// authentication provider.
+/// the console disallows anonymous changelog access and the client cannot
+/// produce a bearer token for the current user.
 func loadChangelogEntries(
     client: FeedbackClient,
     config: PublicAppConfig?
 ) async throws -> [ChangelogEntry]? {
-    guard changelogLoadPlan(config: config, supportsAuthentication: client.supportsAuthentication) == .load else {
+    let supportsAuthentication = await client.resolveAuthenticatedAccess()
+    guard changelogLoadPlan(config: config, supportsAuthentication: supportsAuthentication) == .load else {
         return nil
     }
     return try await client.fetchChangelog()
+}
+
+// MARK: - Server permission rejection
+
+/// Whether a thrown error is the server rejecting a load the client believed
+/// it could make — the `401 authentication_required` mapping. Roadmap,
+/// changelog, and overlay load paths render the permission placeholder (or
+/// keep the overlay hidden) for it instead of the generic error state: the
+/// preflight resolved a token but the server disagreed, e.g. because the
+/// token expired between the check and the send (issue #297).
+func isSdkPermissionRejection(_ error: Error) -> Bool {
+    guard let clientError = error as? FeedbackClientError else { return false }
+    if case .authenticationRequired = clientError { return true }
+    return false
+}
+
+/// Whether a surface must render its permission placeholder (issue #297).
+///
+/// An *unsettled* verdict — a locked-down console whose resolved-access state
+/// has not arrived yet — blocks nothing: the surface keeps its loading state
+/// instead of flashing the placeholder for a signed-in user whose provider
+/// has not answered. Settled verdicts block when the preflight denied, or
+/// when the server's 401 overrode a permitted one.
+func isSurfacePermissionBlocked(
+    verdictResolved: Bool,
+    permitted: Bool,
+    rejectedByServer: Bool
+) -> Bool {
+    guard verdictResolved else { return false }
+    return !permitted || rejectedByServer
 }
 
 // MARK: - Permission placeholder
 
 /// Full-surface placeholder for the console's *permission* switches (issue
 /// #34): the surface is on, but the current user may not use it — anonymous
-/// users are bound by the `allowAnonymous*` switches, while clients with an
-/// authentication provider pass this preflight (the server stays
+/// users are bound by the `allowAnonymous*` switches, while clients that can
+/// produce a bearer token pass this preflight (the server stays
 /// authoritative) — or the reporting platform is outside the allow-list.
 /// Distinct from ``FeatureDisabledView``, which covers the visibility switches.
 struct SdkPermissionDeniedView: View {

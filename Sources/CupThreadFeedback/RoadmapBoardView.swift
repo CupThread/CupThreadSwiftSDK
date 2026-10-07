@@ -25,13 +25,44 @@ public struct RoadmapBoardView: View {
     /// Transient notice for a failed reload whose groups stay on screen
     /// (a reload failure never wipes already-rendered content).
     @State private var reloadNotice: String?
+    /// Whether a request sent right now could carry the signed-in identity's
+    /// bearer token (resolved on every load — issue #297). `false` until the
+    /// first load resolved it, so an undecided verdict never renders the
+    /// permission placeholder for a signed-in user.
+    @State private var isAuthenticated = false
+    /// Whether `isAuthenticated` has been resolved at least once. Before that,
+    /// a locked-down config must not produce a permission verdict: the board
+    /// keeps its loading skeleton instead.
+    @State private var hasResolvedAuthentication = false
+    /// The server answered `401 authentication_required` on a fetch whose
+    /// preflight passed (e.g. the token expired between the check and the
+    /// send): the permission placeholder replaces the board.
+    @State private var rejectedByServer = false
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
     private var isRoadmapPermitted: Bool {
         roadmapLoadPlan(
             config: sdkAppConfig,
-            supportsAuthentication: client.supportsAuthentication
+            supportsAuthentication: isAuthenticated
         ) == .load
+    }
+
+    /// Whether the permission verdict can be decided: either anonymous roadmap
+    /// access is allowed (the verdict cannot depend on authentication) or the
+    /// resolved access state is in.
+    private var isRoadmapVerdictResolved: Bool {
+        hasResolvedAuthentication || (sdkAppConfig?.allowsAnonymousRoadmap ?? true)
+    }
+
+    /// Whether the board must render the permission placeholder: the
+    /// preflight denied a locked-down board, or the server's 401 overrode a
+    /// permitted one.
+    private var isRoadmapPermissionBlocked: Bool {
+        isSurfacePermissionBlocked(
+            verdictResolved: isRoadmapVerdictResolved,
+            permitted: isRoadmapPermitted,
+            rejectedByServer: rejectedByServer
+        )
     }
 
     /// The query actually sent to the server, trimmed to match the throttle's
@@ -74,7 +105,7 @@ public struct RoadmapBoardView: View {
 
     public var body: some View {
         Group {
-            if !isRoadmapPermitted {
+            if isRoadmapPermissionBlocked {
                 SdkPermissionDeniedView(
                     titleKey: "cupthread.permission.roadmap_title",
                     descriptionKey: "cupthread.permission.roadmap_description"
@@ -107,6 +138,7 @@ public struct RoadmapBoardView: View {
             }
         }
         .task(id: trimmedSearchText) {
+            await resolveAuthenticationAccess()
             guard isRoadmapPermitted else { return }
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: unrate-limited, so no debounce/throttle.
@@ -337,7 +369,9 @@ public struct RoadmapBoardView: View {
 
     @MainActor
     private func load() async {
+        await resolveAuthenticationAccess()
         guard isRoadmapPermitted else { return }
+        rejectedByServer = false
         isLoading = true
         loadError = nil
         reloadNotice = nil
@@ -363,6 +397,14 @@ public struct RoadmapBoardView: View {
         } catch {
             // A cancelled load (keystroke restart, dismissal) never reached a verdict: keep the board.
             guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) else { return }
+            if isSdkPermissionRejection(error) {
+                // The preflight passed but the server still answered 401 — the
+                // token expired (or was revoked) between the check and the
+                // send. The signed-out permission placeholder replaces the
+                // board instead of the generic error state (issue #297).
+                rejectedByServer = true
+                return
+            }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()
             }
@@ -373,5 +415,14 @@ public struct RoadmapBoardView: View {
                 loadError = message
             }
         }
+    }
+
+    /// Resolves whether the client can act as the signed-in user right now and
+    /// records it for the permission verdict. Runs on every load: the user can
+    /// sign in or out while the board is presented.
+    @MainActor
+    private func resolveAuthenticationAccess() async {
+        isAuthenticated = await client.resolveAuthenticatedAccess()
+        hasResolvedAuthentication = true
     }
 }

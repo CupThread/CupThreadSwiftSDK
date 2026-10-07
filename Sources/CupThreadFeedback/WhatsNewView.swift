@@ -18,6 +18,19 @@ public struct WhatsNewView: View {
     @State private var isSubscribePresented = false
     /// The remembered subscription email; drives the entry-point copy.
     @State private var subscribedEmail: String?
+    /// Whether a request sent right now could carry the signed-in identity's
+    /// bearer token (resolved on every load — issue #297). `false` until the
+    /// first load resolved it, so an undecided verdict never renders the
+    /// permission placeholder for a signed-in user.
+    @State private var isAuthenticated = false
+    /// Whether `isAuthenticated` has been resolved at least once. Before that,
+    /// a locked-down config must not produce a permission verdict: the surface
+    /// keeps its loading skeleton instead.
+    @State private var hasResolvedAuthentication = false
+    /// The server answered `401 authentication_required` on a fetch whose
+    /// preflight passed (e.g. the token expired between the check and the
+    /// send): the permission placeholder replaces the list.
+    @State private var rejectedByServer = false
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
     var entries: [ChangelogEntry] { state.entries }
@@ -29,8 +42,26 @@ public struct WhatsNewView: View {
     private var isChangelogPermitted: Bool {
         changelogLoadPlan(
             config: sdkAppConfig,
-            supportsAuthentication: client.supportsAuthentication
+            supportsAuthentication: isAuthenticated
         ) == .load
+    }
+
+    /// Whether the permission verdict can be decided: either anonymous
+    /// changelog access is allowed (the verdict cannot depend on
+    /// authentication) or the resolved access state is in.
+    private var isChangelogVerdictResolved: Bool {
+        hasResolvedAuthentication || (sdkAppConfig?.allowsAnonymousChangelog ?? true)
+    }
+
+    /// Whether the surface must render the permission placeholder: the
+    /// preflight denied a locked-down console, or the server's 401 overrode a
+    /// permitted one.
+    private var isChangelogPermissionBlocked: Bool {
+        isSurfacePermissionBlocked(
+            verdictResolved: isChangelogVerdictResolved,
+            permitted: isChangelogPermitted,
+            rejectedByServer: rejectedByServer
+        )
     }
 
     private var subscriptionStore: ChangelogSubscriptionStore {
@@ -57,7 +88,7 @@ public struct WhatsNewView: View {
 
     public var body: some View {
         Group {
-            if !isChangelogPermitted {
+            if isChangelogPermissionBlocked {
                 SdkPermissionDeniedView(
                     titleKey: "cupthread.permission.changelog_title",
                     descriptionKey: "cupthread.permission.changelog_description"
@@ -75,7 +106,7 @@ public struct WhatsNewView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            if isChangelogPermitted {
+            if isChangelogPermitted, !isChangelogPermissionBlocked {
                 subscribeToolbarItem
             }
         }
@@ -94,6 +125,7 @@ public struct WhatsNewView: View {
             await loadEntries()
         }
         .task {
+            await resolveAuthenticationAccess()
             guard isChangelogPermitted else {
                 state.handlePermissionDenied()
                 return
@@ -207,13 +239,12 @@ public struct WhatsNewView: View {
 
     @MainActor
     func loadEntries() async {
-        guard changelogLoadPlan(
-            config: sdkAppConfig,
-            supportsAuthentication: client.supportsAuthentication
-        ) == .load else {
+        await resolveAuthenticationAccess()
+        guard isChangelogPermitted else {
             state.handlePermissionDenied()
             return
         }
+        rejectedByServer = false
         let generationAtStart = state.startLoading()
         defer {
             state.finishLoading(generation: generationAtStart)
@@ -226,8 +257,26 @@ public struct WhatsNewView: View {
         } catch {
             // A cancelled load (dismissal, superseded restart) never reached
             // a verdict — keep the currently rendered entries.
+            guard !error.isSdkCancellation else { return }
+            if isSdkPermissionRejection(error) {
+                // The preflight passed but the server still answered 401 —
+                // the token expired between the check and the send. The
+                // signed-out permission placeholder replaces the list instead
+                // of the generic error state (issue #297).
+                rejectedByServer = true
+                return
+            }
             state.handleFailure(error: error, generation: generationAtStart)
         }
+    }
+
+    /// Resolves whether the client can act as the signed-in user right now and
+    /// records it for the permission verdict. Runs on every load: the user can
+    /// sign in or out while the surface is presented.
+    @MainActor
+    private func resolveAuthenticationAccess() async {
+        isAuthenticated = await client.resolveAuthenticatedAccess()
+        hasResolvedAuthentication = true
     }
 }
 

@@ -150,7 +150,7 @@ struct SubmittedBanner: View {
 struct FeatureRequestsEmptyState: View {
     let searchText: String
     /// Whether the user may open the composer (anonymous submission allowed,
-    /// or the client carries an authentication provider).
+    /// or the client can produce a bearer token for the current user).
     let canCompose: Bool
     let onCompose: () -> Void
 
