@@ -39,6 +39,17 @@ extension FeedbackClient {
     /// requests, votes, and comments are anonymized while aggregate counts
     /// are preserved.
     ///
+    /// When an `authenticationProvider` is configured and resolves to a
+    /// token, it is presented as `Authorization: Bearer …` so a signed-in
+    /// user's data is erased by identity: every end-user profile linked to
+    /// that authenticated identity in this app, not just the row keyed to
+    /// this device's anonymous token. The `X-User-Token` header is always
+    /// sent, so the device's anonymous row is covered either way. Hosts of
+    /// signed-in users should ensure the provider can return a fresh token
+    /// at erase time — with a provider configured but no token resolved,
+    /// only the anonymous row is addressed and a server `404` (nothing
+    /// matched this device) surfaces as `erased: false`.
+    ///
     /// - Parameter userToken: Anonymous user token sent as `X-User-Token`.
     /// - Returns: Whether a profile was erased. A `404` from the server is
     ///   normalized to `erased: false` rather than an error, so replaying an
@@ -52,6 +63,7 @@ extension FeedbackClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(MeAppKeyPayload(appKey: configuration.appKey))
 
         let (data, response) = try await session.data(for: request)
@@ -79,6 +91,12 @@ extension FeedbackClient {
     /// the same time so no PII survives a confirmed erasure on the device.
     /// When the result is `erased: false` (no profile matched the identity),
     /// both stores are left untouched.
+    ///
+    /// Like ``eraseMyData(userToken:)``, a resolved authentication-provider
+    /// token is presented as `Authorization: Bearer …`, so for a signed-in
+    /// user erasure covers every profile linked to their identity in this
+    /// app plus this device's anonymous row. With a provider configured but
+    /// no token resolved, only the anonymous row is addressed.
     ///
     /// - Parameter store: The store whose identity is erased and reset.
     /// - Returns: Whether a profile was erased.
