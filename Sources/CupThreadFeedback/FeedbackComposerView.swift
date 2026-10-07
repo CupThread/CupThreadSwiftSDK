@@ -256,6 +256,7 @@ public struct FeedbackComposerView: View {
                 .textInputAutocapitalization(.never)
                 .keyboardType(.emailAddress)
                 #endif
+                .feedbackEmailHint(draft.reporterEmail)
         } header: {
             Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
         } footer: {
@@ -443,22 +444,18 @@ public struct FeedbackComposerView: View {
     private var submitBar: some View {
         FeedbackSubmitBarView(
             isSubmitting: isSubmitting,
-            canSubmit: canSubmit
+            canSubmit: attachmentState.canSubmit(draft: draft)
         ) {
             Task { await submitDraft() }
         }
     }
 
-    // MARK: Submit
-
-    private var canSubmit: Bool {
-        attachmentState.canSubmit(draft: draft)
-    }
+    // MARK: - Submit
 
     @MainActor
     private func submitDraft() async {
         guard submissionDenial == .none else { return }
-        guard canSubmit && !isSubmitting else { return }
+        guard attachmentState.canSubmit(draft: draft) && !isSubmitting else { return }
         isSubmitting = true
         defer { isSubmitting = false }
         errorMessage = nil

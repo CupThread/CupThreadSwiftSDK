@@ -10,6 +10,7 @@
 "cupthread.feedback.section_contact_footer" = "选填 — 仅用于后续跟进反馈处理进展。";
 "cupthread.feedback.name_label" = "姓名";
 "cupthread.feedback.email_label" = "邮箱";
+"cupthread.feedback.email_invalid_hint" = "邮箱地址似乎无效 — 我们可能无法回复。";
 "cupthread.feedback.section_attachments" = "附件";
 "cupthread.feedback.section_attachments_footer" = "添加屏幕截图或日志以协助我们诊断问题。";
 "cupthread.feedback.add_attachment" = "添加图片 / 截图";

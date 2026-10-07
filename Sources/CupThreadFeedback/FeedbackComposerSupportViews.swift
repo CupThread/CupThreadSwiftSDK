@@ -17,6 +17,37 @@ struct PhotosPickerLabelView: View {
 }
 #endif
 
+// MARK: - Contact email hint
+
+extension FeedbackComposerView {
+    /// The contact section's non-blocking email hint condition (#283): the
+    /// user typed something into the optional field that cannot plausibly
+    /// receive a reply. Submission stays enabled — the field is optional and
+    /// the server is authoritative; the hint only nudges toward a fix.
+    static func showsContactEmailHint(_ email: String) -> Bool {
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !EmailShape.isPlausible(email)
+    }
+}
+
+extension View {
+    /// Appends the composer's one-line email-shape hint row (#283). Renders
+    /// nothing while the contact field is empty or plausible.
+    @ViewBuilder
+    func feedbackEmailHint(_ email: String) -> some View {
+        if FeedbackComposerView.showsContactEmailHint(email) {
+            Label {
+                Text(CupThreadStrings.tr("cupthread.feedback.email_invalid_hint"))
+            } icon: {
+                Image(systemName: "exclamationmark.triangle")
+            }
+            .font(.footnote)
+            .foregroundStyle(.orange)
+            .accessibilityElement(children: .combine)
+        }
+    }
+}
+
 // MARK: - Success state
 
 struct FeedbackSentView: View {
