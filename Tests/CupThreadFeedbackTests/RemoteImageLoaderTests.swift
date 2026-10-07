@@ -1,5 +1,11 @@
 import Foundation
+import ImageIO
 import Testing
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 @testable import CupThreadFeedback
 
 /// Lock-guarded request counter for the image mock host.
@@ -55,6 +61,28 @@ struct RemoteImageLoaderTests {
 
     private func makePNGData() -> Data {
         Data(base64Encoded: Self.pngBase64)!
+    }
+
+    /// Solid-color PNG of the given pixel size, synthesized in-test so decode
+    /// bounds can be exercised against arbitrarily large sources.
+    private func makePNGData(width: Int, height: Int) -> Data {
+        let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let image = context.makeImage()!
+        let output = NSMutableData()
+        let destination = CGImageDestinationCreateWithData(output, "public.png" as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationFinalize(destination)
+        return output as Data
     }
 
     private func makeImageURL(_ path: String) -> URL {
@@ -303,5 +331,138 @@ struct RemoteImageLoaderTests {
 
         _ = try await loader.image(for: imageURL)
         #expect(counter.requestCount == 1)
+    }
+
+    // MARK: PERF-3: bounded decode and byte-budgeted cache
+
+    @Test func largeAvatarSourceDecodesBoundedToDefaultPixelEdge() async throws {
+        let largePNG = makePNGData(width: 3000, height: 3000)
+        let imageURL = makeImageURL("/huge-avatar.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            return (self.makeImageResponse(request.url ?? imageURL), largePNG)
+        }
+        let loader = RemoteImageLoader(session: makeMockSession())
+
+        let image = try await loader.image(for: imageURL)
+        let pixels = RemoteImageLoader.decodedPixelDimensions(of: image)
+
+        #expect(pixels.width > 0, "A decodable source must produce a non-empty bitmap")
+        #expect(
+            max(pixels.width, pixels.height) <= Int(RemoteImageLoader.defaultMaxDecodedPixelEdge),
+            "A 3000×3000 source must decode bounded to the pixel-edge cap, not at full resolution"
+        )
+    }
+
+    @Test func decodePixelEdgeCapIsInjectable() async throws {
+        let png = makePNGData(width: 300, height: 200)
+        let imageURL = makeImageURL("/injectable-edge.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            return (self.makeImageResponse(request.url ?? imageURL), png)
+        }
+        let loader = RemoteImageLoader(session: makeMockSession(), maxDecodedPixelEdge: 64)
+
+        let image = try await loader.image(for: imageURL)
+        let pixels = RemoteImageLoader.decodedPixelDimensions(of: image)
+
+        #expect(max(pixels.width, pixels.height) <= 64, "The injected pixel-edge cap must bound the decode")
+    }
+
+    @Test func smallSourceImagesAreNotUpscaled() async throws {
+        let png = makePNGData()
+        let imageURL = makeImageURL("/tiny-avatar.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            return (self.makeImageResponse(request.url ?? imageURL), png)
+        }
+        let loader = RemoteImageLoader(session: makeMockSession())
+
+        let image = try await loader.image(for: imageURL)
+        let pixels = RemoteImageLoader.decodedPixelDimensions(of: image)
+
+        #expect(pixels.width == 2 && pixels.height == 2, "Sources under the cap must keep their native size")
+    }
+
+    @Test func oversizedResponseBodyIsRejectedAndNotCached() async throws {
+        let counter = RequestCounter()
+        let png = makePNGData()
+        let imageURL = makeImageURL("/oversized-body.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            counter.record()
+            return (self.makeImageResponse(request.url ?? imageURL), png)
+        }
+        // The 2×2 PNG fixture is a valid image well above this cap.
+        let loader = RemoteImageLoader(session: makeMockSession(), maxResponseBytes: 32)
+
+        do {
+            _ = try await loader.image(for: imageURL)
+            Issue.record("Expected the oversized body to be rejected")
+        } catch let urlError as URLError {
+            #expect(urlError.code == .cannotDecodeContentData, "Oversized bodies must surface a decode failure")
+        } catch {
+            Issue.record("Expected URLError, got \(error)")
+        }
+
+        #expect(loader.cachedImageIfPresent(for: imageURL) == nil, "A rejected body must never be cached")
+        #expect(loader.recentFailureCount == 1, "The rejection must replay through the negative cache")
+
+        await #expect(throws: (any Error).self) {
+            try await loader.image(for: imageURL)
+        }
+        #expect(counter.requestCount == 1, "The rejection must replay offline inside the retry window")
+    }
+
+    @Test func cacheEvictsByByteCostBeforeCountLimit() async throws {
+        let counter = RequestCounter()
+        let png = makePNGData()
+        let urls = (0..<4).map { makeImageURL("/cost-\($0).png") }
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            counter.record()
+            return (self.makeImageResponse(request.url ?? urls[0]), png)
+        }
+        // Learn the fixture's per-entry cost offline, then size the byte
+        // budget to hold at most two entries while the count limit (100)
+        // stays far above the four URLs loaded.
+        let fixture = try RemoteImageLoader.decodeBoundedImage(from: png, maxPixelEdge: 600)
+        let fixtureCost = RemoteImageLoader.cacheCost(of: fixture)
+        #expect(fixtureCost > 0, "Every decodable image must carry a non-zero cache cost")
+
+        let loader = RemoteImageLoader(
+            session: makeMockSession(),
+            cacheCountLimit: 100,
+            cacheCostLimit: 2 * fixtureCost
+        )
+        for url in urls {
+            _ = try await loader.image(for: url)
+        }
+        #expect(counter.requestCount == 4)
+
+        let stillCached = urls.filter { loader.cachedImageIfPresent(for: $0) != nil }
+        #expect(
+            stillCached.count <= 2,
+            "Entries must be evicted by accumulated cost (budget \(2 * fixtureCost)) while the count limit (100) cannot bind"
+        )
+    }
+
+    @Test func cacheCostReflectsDecodedBitmapBytes() throws {
+        // 10×10 RGBA8 bitmap with a deliberately padded 64-byte row stride:
+        // the cost must follow bytesPerRow (640), not width × height × 4 (400).
+        let context = CGContext(
+            data: nil,
+            width: 10,
+            height: 10,
+            bitsPerComponent: 8,
+            bytesPerRow: 64,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
+        let cgImage = context.makeImage()!
+        #expect(cgImage.bytesPerRow == 64, "The fixture must preserve its padded row stride")
+        #if canImport(UIKit)
+        let image = UIImage(cgImage: cgImage)
+        #elseif canImport(AppKit)
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        #endif
+
+        #expect(RemoteImageLoader.cacheCost(of: image) == 640)
     }
 }
