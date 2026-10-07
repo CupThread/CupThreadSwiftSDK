@@ -193,3 +193,21 @@
 "cupthread.error.invalid_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten kunne ikke verifiseres. Sjekk appens SDK-signeringshemmelighet.";
 "cupthread.error.stale_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten er utløpt. Sjekk enhetens klokke og prøv på nytt.";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Tilbakemeldingsserveren returnerte et ugyldig svar.";
+"cupthread.error.unreadable_upload_response" = "Tilbakemeldingsserveren returnerte et uleselig opplastingssvar.";
+"cupthread.error.auth_required" = "Denne handlingen er bare tilgjengelig for innloggede brukere.";
+"cupthread.error.scan_rejected" = "Vedlegget det vises til ble avvist ved innholdskontroll og kunne ikke lastes opp.";
+"cupthread.error.unsupported_media" = "Denne bildetypen støttes ikke. Legg ved et PNG-, JPEG-, WebP- eller GIF-bilde.";
+"cupthread.error.payload_too_large" = "Den filen er for stor til å laste opp.";
+"cupthread.error.uploader_identity_required" = "Opplasting krever en sluttbrukeridentitet. Send med et userToken (se UserTokenStore) når du laster opp vedlegg.";
+"cupthread.error.uploader_mismatch" = "Dette vedlegget ble lastet opp med en annen identitet. Fjern det og legg det ved igjen, og prøv på nytt.";
+"cupthread.error.quota_exceeded" = "Denne appen har nådd innsendingsgrensen for denne måneden. Prøv igjen senere.";
+"cupthread.error.subscription_inactive" = "Innsendinger er utilgjengelige for denne appen akkurat nå. Prøv igjen senere.";
+"cupthread.error.profile_not_found" = "Denne brukerprofilen er ikke lenger tilgjengelig.";
+"cupthread.error.comments_unavailable" = "Kommentarer er ikke tilgjengelige for denne funksjonsforespørselen.";
+"cupthread.error.email_not_verified" = "Bruk e-postadressen til den innloggede kontoen din for å abonnere.";
+"cupthread.attachment.oversized" = "Vedlegg (%1$@) overskrider maksimal tillatt størrelse på %2$@.";
+"cupthread.attachment.unprocessable" = "Det valgte bildet kunne ikke behandles for opplasting.";
+"cupthread.attachment.unsupported_type" = "Denne bildetypen støttes ikke. Legg ved et PNG-, JPEG-, WebP- eller GIF-bilde.";

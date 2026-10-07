@@ -193,3 +193,21 @@
 "cupthread.error.invalid_signature" = "付款資訊未更新：報告的簽名驗證未通過，請檢查應用程式的 SDK 簽名密鑰。";
 "cupthread.error.stale_signature" = "付款資訊未更新：報告的簽名已過期，請檢查裝置時間後再試一次。";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "回饋伺服器傳回了無效的回應。";
+"cupthread.error.unreadable_upload_response" = "回饋伺服器傳回了無法解讀的上傳回應。";
+"cupthread.error.auth_required" = "此操作僅限已登入使用者使用。";
+"cupthread.error.scan_rejected" = "所引用的附件未通過內容安全檢查，無法上傳。";
+"cupthread.error.unsupported_media" = "不支援此圖片類型，請附上 PNG、JPEG、WebP 或 GIF 格式的圖片。";
+"cupthread.error.payload_too_large" = "檔案過大，無法上傳。";
+"cupthread.error.uploader_identity_required" = "上傳需要終端使用者身分：上傳附件時請傳入 userToken（參見 UserTokenStore）。";
+"cupthread.error.uploader_mismatch" = "此附件是以其他身分上傳的，請移除後重新附加，再試一次。";
+"cupthread.error.quota_exceeded" = "此應用程式已達本月提交上限，請稍後再試。";
+"cupthread.error.subscription_inactive" = "此應用程式目前無法提交內容，請稍後再試。";
+"cupthread.error.profile_not_found" = "該使用者的個人檔案已不存在。";
+"cupthread.error.comments_unavailable" = "此功能請求暫不支援留言。";
+"cupthread.error.email_not_verified" = "請使用您登入帳號的電子郵件地址訂閱。";
+"cupthread.attachment.oversized" = "附件（%1$@）超過了允許的大小上限 %2$@。";
+"cupthread.attachment.unprocessable" = "所選照片無法處理，無法上傳。";
+"cupthread.attachment.unsupported_type" = "不支援此圖片類型，請附上 PNG、JPEG、WebP 或 GIF 格式的圖片。";

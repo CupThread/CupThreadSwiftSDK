@@ -193,3 +193,21 @@
 "cupthread.error.invalid_signature" = "支払い情報は更新されませんでした：レポートの署名を検証できませんでした。アプリの SDK 署名シークレットを確認してください。";
 "cupthread.error.stale_signature" = "支払い情報は更新されませんでした：レポートの署名の有効期限が切れています。端末の時刻を確認して、もう一度お試しください。";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "フィードバックサーバーが無効な応答を返しました。";
+"cupthread.error.unreadable_upload_response" = "フィードバックサーバーが判読できないアップロード応答を返しました。";
+"cupthread.error.auth_required" = "この操作はサインイン済みのユーザーのみ利用できます。";
+"cupthread.error.scan_rejected" = "参照された添付ファイルはコンテンツ検査で拒否されたため、アップロードできませんでした。";
+"cupthread.error.unsupported_media" = "この画像の種類はサポートされていません。PNG、JPEG、WebP、GIF のいずれかを添付してください。";
+"cupthread.error.payload_too_large" = "そのファイルは大きすぎるためアップロードできません。";
+"cupthread.error.uploader_identity_required" = "アップロードにはエンドユーザーの ID が必要です。添付ファイルのアップロード時には userToken を渡してください（UserTokenStore を参照）。";
+"cupthread.error.uploader_mismatch" = "この添付ファイルは別の ID でアップロードされています。削除して添付し直してから、もう一度お試しください。";
+"cupthread.error.quota_exceeded" = "このアプリは今月の送信上限に達しました。しばらくしてからもう一度お試しください。";
+"cupthread.error.subscription_inactive" = "このアプリは現在フィードバックを送信できません。しばらくしてからもう一度お試しください。";
+"cupthread.error.profile_not_found" = "このユーザープロフィールは利用できなくなりました。";
+"cupthread.error.comments_unavailable" = "この機能リクエストではコメントを利用できません。";
+"cupthread.error.email_not_verified" = "購読にはサインイン済みアカウントのメールアドレスを使用してください。";
+"cupthread.attachment.oversized" = "添付ファイル（%1$@）が最大許容サイズ %2$@ を超えています。";
+"cupthread.attachment.unprocessable" = "選択した写真を処理できず、アップロードできませんでした。";
+"cupthread.attachment.unsupported_type" = "この画像の種類はサポートされていません。PNG、JPEG、WebP、GIF のいずれかを添付してください。";

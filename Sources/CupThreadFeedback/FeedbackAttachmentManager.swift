@@ -20,11 +20,11 @@ public enum AttachmentValidationError: LocalizedError, Equatable, Sendable {
         case .oversized(let size, let limit):
             let formattedLimit = ByteCountFormatter.string(fromByteCount: Int64(limit), countStyle: .file)
             let formattedSize = ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
-            return "Attachment (\(formattedSize)) exceeds the maximum allowed size of \(formattedLimit)."
+            return CupThreadStrings.tr("cupthread.attachment.oversized", formattedSize, formattedLimit)
         case .unprocessableImage:
-            return "The selected photo could not be processed for upload."
+            return CupThreadStrings.tr("cupthread.attachment.unprocessable")
         case .unsupportedType:
-            return "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF."
+            return CupThreadStrings.tr("cupthread.attachment.unsupported_type")
         }
     }
 }

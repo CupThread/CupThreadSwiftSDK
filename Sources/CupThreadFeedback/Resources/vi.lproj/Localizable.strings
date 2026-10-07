@@ -193,3 +193,21 @@
 "cupthread.error.invalid_signature" = "Thông tin thanh toán chưa được cập nhật: chữ ký của báo cáo không xác minh được. Hãy kiểm tra khóa ký SDK của ứng dụng.";
 "cupthread.error.stale_signature" = "Thông tin thanh toán chưa được cập nhật: chữ ký của báo cáo đã hết hạn. Hãy kiểm tra đồng hồ thiết bị và thử lại.";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Máy chủ phản hồi đã trả về một phản hồi không hợp lệ.";
+"cupthread.error.unreadable_upload_response" = "Máy chủ phản hồi đã trả về một phản hồi tải lên không thể đọc được.";
+"cupthread.error.auth_required" = "Thao tác này chỉ khả dụng cho người dùng đã đăng nhập.";
+"cupthread.error.scan_rejected" = "Tệp đính kèm được tham chiếu đã bị từ chối khi kiểm tra nội dung và không thể tải lên.";
+"cupthread.error.unsupported_media" = "Không hỗ trợ loại hình ảnh này. Vui lòng đính kèm ảnh PNG, JPEG, WebP hoặc GIF.";
+"cupthread.error.payload_too_large" = "Tệp đó quá lớn để tải lên.";
+"cupthread.error.uploader_identity_required" = "Tải lên cần có danh tính người dùng cuối. Hãy truyền userToken (xem UserTokenStore) khi tải tệp đính kèm.";
+"cupthread.error.uploader_mismatch" = "Tệp đính kèm này được tải lên bằng danh tính khác. Vui lòng gỡ bỏ và đính kèm lại, rồi thử lại.";
+"cupthread.error.quota_exceeded" = "Ứng dụng này đã đạt giới hạn gửi trong tháng này. Vui lòng thử lại sau.";
+"cupthread.error.subscription_inactive" = "Hiện không thể gửi nội dung cho ứng dụng này. Vui lòng thử lại sau.";
+"cupthread.error.profile_not_found" = "Hồ sơ người dùng này không còn khả dụng.";
+"cupthread.error.comments_unavailable" = "Tính năng bình luận không khả dụng cho yêu cầu tính năng này.";
+"cupthread.error.email_not_verified" = "Vui lòng dùng địa chỉ email của tài khoản đã đăng nhập để đăng ký.";
+"cupthread.attachment.oversized" = "Tệp đính kèm (%1$@) vượt quá kích thước tối đa cho phép là %2$@.";
+"cupthread.attachment.unprocessable" = "Không thể xử lý ảnh đã chọn để tải lên.";
+"cupthread.attachment.unsupported_type" = "Không hỗ trợ loại hình ảnh này. Vui lòng đính kèm ảnh PNG, JPEG, WebP hoặc GIF.";

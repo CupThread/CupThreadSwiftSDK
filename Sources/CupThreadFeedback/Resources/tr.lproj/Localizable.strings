@@ -193,3 +193,21 @@
 "cupthread.error.invalid_signature" = "Ödeme bilgileri güncellenmedi: raporun imzası doğrulanamadı. Uygulamanın SDK imza gizli anahtarını kontrol edin.";
 "cupthread.error.stale_signature" = "Ödeme bilgileri güncellenmedi: raporun imzasının süresi doldu. Cihaz saatini kontrol edip yeniden deneyin.";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Geri bildirim sunucusu geçersiz bir yanıt döndürdü.";
+"cupthread.error.unreadable_upload_response" = "Geri bildirim sunucusu okunamayan bir yükleme yanıtı döndürdü.";
+"cupthread.error.auth_required" = "Bu işlem yalnızca oturum açmış kullanıcılar tarafından kullanılabilir.";
+"cupthread.error.scan_rejected" = "Atıfta bulunulan ek, içerik incelemesi nedeniyle reddedildiği için yüklenemedi.";
+"cupthread.error.unsupported_media" = "Bu görsel türü desteklenmiyor. Lütfen PNG, JPEG, WebP veya GIF bir görsel ekleyin.";
+"cupthread.error.payload_too_large" = "Bu dosya yüklenemeyecek kadar büyük.";
+"cupthread.error.uploader_identity_required" = "Yüklemeler son kullanıcı kimliği gerektirir. Ek yüklerken bir userToken iletin (bkz. UserTokenStore).";
+"cupthread.error.uploader_mismatch" = "Bu ek farklı bir kimlikle yüklenmiş. Lütfen kaldırıp yeniden ekleyin ve tekrar deneyin.";
+"cupthread.error.quota_exceeded" = "Bu uygulama bu ayki gönderim sınırına ulaştı. Lütfen daha sonra tekrar deneyin.";
+"cupthread.error.subscription_inactive" = "Bu uygulama için gönderimler şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.";
+"cupthread.error.profile_not_found" = "Bu kullanıcı profili artık kullanılamıyor.";
+"cupthread.error.comments_unavailable" = "Bu özellik talebi için yorumlar kullanılamıyor.";
+"cupthread.error.email_not_verified" = "Abone olmak için oturum açtığınız hesabın e-posta adresini kullanın.";
+"cupthread.attachment.oversized" = "Ek (%1$@), izin verilen en büyük %2$@ boyutunu aşıyor.";
+"cupthread.attachment.unprocessable" = "Seçilen fotoğraf yükleme için işlenemedi.";
+"cupthread.attachment.unsupported_type" = "Bu görsel türü desteklenmiyor. Lütfen PNG, JPEG, WebP veya GIF bir görsel ekleyin.";

@@ -157,6 +157,14 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         }
     }
 
+    /// The ` (request id: …)` display suffix for typed error copy. Kept in
+    /// its own helper so `errorDescription` bodies carry catalog keys only
+    /// (issue #266).
+    private static func requestIdSuffix(_ requestId: String?) -> String {
+        guard let requestId else { return "" }
+        return " (request id: \(requestId))"
+    }
+
     /// The `X-Request-Id` correlation identifier associated with this error, if available.
     public var requestId: String? {
         switch self {
@@ -204,75 +212,59 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            return "The feedback server returned an invalid response."
+            return CupThreadStrings.tr("cupthread.error.invalid_response")
         case .unreadableUploadResponse:
-            return "The feedback server returned an unreadable upload response."
+            return CupThreadStrings.tr("cupthread.error.unreadable_upload_response")
         case .authenticationRequired:
-            return "This action is only available to signed-in users."
+            return CupThreadStrings.tr("cupthread.error.auth_required")
         case .forbidden(_, let requestId):
             // Raw server body stays off the user-facing copy (#30); callers
             // can read the associated `message` programmatically.
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.forbidden") + suffix
+            return CupThreadStrings.tr("cupthread.error.forbidden") + Self.requestIdSuffix(requestId)
         case .turnstileRequired(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.turnstile_required") + suffix
+            return CupThreadStrings.tr("cupthread.error.turnstile_required") + Self.requestIdSuffix(requestId)
         case .scanRejected(_, let requestId):
             // Raw server scan detail stays off user-facing copy (#30, #154); callers
             // can read the associated detail via `scanDetail` or pattern matching.
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "The referenced attachment could not be uploaded due to content inspection rejection.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.scan_rejected") + Self.requestIdSuffix(requestId)
         case .rateLimited(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "You're doing that too often. Please try again in a minute.\(suffix)"
+            // Same copy as `.unexpectedStatus(code: 429)` so one rate-limit
+            // condition reads identically on every surface (issue #266).
+            return CupThreadStrings.tr("cupthread.error.http_rate_limited") + Self.requestIdSuffix(requestId)
         case .unsupportedMediaType(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.unsupported_media") + Self.requestIdSuffix(requestId)
         case .payloadTooLarge(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "That file is too large to upload.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.payload_too_large") + Self.requestIdSuffix(requestId)
         case .uploaderIdentityRequired(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "Uploads require an end-user identity. Pass a userToken (see UserTokenStore) when uploading attachments.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.uploader_identity_required") + Self.requestIdSuffix(requestId)
         case .uploaderMismatch(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.uploader_mismatch") + Self.requestIdSuffix(requestId)
         case .submissionQuotaExceeded(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "This app has reached its submission limit for this month. Please try again later.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.quota_exceeded") + Self.requestIdSuffix(requestId)
         case .subscriptionInactive(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "Submissions are unavailable for this app right now. Please try again later.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.subscription_inactive") + Self.requestIdSuffix(requestId)
         case .userProfileNotFound:
-            return "This user profile is no longer available."
+            return CupThreadStrings.tr("cupthread.error.profile_not_found")
         case .commentsUnavailable(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "Comments are not available for this feature request.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.comments_unavailable") + Self.requestIdSuffix(requestId)
         case .invalidParent(_, let requestId):
             // Raw server body stays off the user-facing copy (#30); callers
             // can read the associated `message` programmatically.
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.comments.invalid_parent") + suffix
+            return CupThreadStrings.tr("cupthread.comments.invalid_parent") + Self.requestIdSuffix(requestId)
         case .emailNotVerified(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "Please use your signed-in account email address to subscribe.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.email_not_verified") + Self.requestIdSuffix(requestId)
         case .paymentAttributesRequireSignature(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.signature_required") + suffix
+            return CupThreadStrings.tr("cupthread.error.signature_required") + Self.requestIdSuffix(requestId)
         case .sdkSigningSecretNotConfigured(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.signing_secret_not_configured") + suffix
+            return CupThreadStrings.tr("cupthread.error.signing_secret_not_configured") + Self.requestIdSuffix(requestId)
         case .invalidSignature(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.invalid_signature") + suffix
+            return CupThreadStrings.tr("cupthread.error.invalid_signature") + Self.requestIdSuffix(requestId)
         case .staleSignature(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.stale_signature") + suffix
+            return CupThreadStrings.tr("cupthread.error.stale_signature") + Self.requestIdSuffix(requestId)
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return Self.friendlyStatusMessage(code: code) + suffix
+            return Self.friendlyStatusMessage(code: code) + Self.requestIdSuffix(requestId)
         }
     }
 }

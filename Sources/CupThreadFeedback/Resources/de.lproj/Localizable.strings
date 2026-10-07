@@ -193,3 +193,21 @@
 "cupthread.error.invalid_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts konnte nicht verifiziert werden. Prüfen Sie das SDK-Signatur-Geheimnis der App.";
 "cupthread.error.stale_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts ist abgelaufen. Prüfen Sie die Geräteuhr und versuchen Sie es erneut.";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Der Feedback-Server hat eine ungültige Antwort zurückgegeben.";
+"cupthread.error.unreadable_upload_response" = "Der Feedback-Server hat eine unlesbare Upload-Antwort zurückgegeben.";
+"cupthread.error.auth_required" = "Diese Aktion ist nur für angemeldete Nutzer verfügbar.";
+"cupthread.error.scan_rejected" = "Der angehängte Anhang wurde bei der Inhaltsprüfung abgelehnt und konnte nicht hochgeladen werden.";
+"cupthread.error.unsupported_media" = "Dieser Bildtyp wird nicht unterstützt. Bitte hänge ein PNG, JPEG, WebP oder GIF an.";
+"cupthread.error.payload_too_large" = "Diese Datei ist zu groß zum Hochladen.";
+"cupthread.error.uploader_identity_required" = "Uploads erfordern eine Endbenutzer-Identität. Übergib beim Hochladen von Anhängen einen userToken (siehe UserTokenStore).";
+"cupthread.error.uploader_mismatch" = "Dieser Anhang wurde mit einer anderen Identität hochgeladen. Bitte entferne ihn, hänge ihn erneut an und versuche es noch einmal.";
+"cupthread.error.quota_exceeded" = "Diese App hat ihr Einreichungslimit für diesen Monat erreicht. Bitte versuche es später erneut.";
+"cupthread.error.subscription_inactive" = "Einreichungen sind für diese App derzeit nicht möglich. Bitte versuche es später erneut.";
+"cupthread.error.profile_not_found" = "Dieses Nutzerprofil ist nicht mehr verfügbar.";
+"cupthread.error.comments_unavailable" = "Kommentare sind für diese Funktionsanfrage nicht verfügbar.";
+"cupthread.error.email_not_verified" = "Bitte nutze die E-Mail-Adresse deines angemeldeten Kontos, um dich zu abonnieren.";
+"cupthread.attachment.oversized" = "Anhang (%1$@) überschreitet die maximal erlaubte Größe von %2$@.";
+"cupthread.attachment.unprocessable" = "Das ausgewählte Foto konnte für den Upload nicht verarbeitet werden.";
+"cupthread.attachment.unsupported_type" = "Dieser Bildtyp wird nicht unterstützt. Bitte hänge ein PNG, JPEG, WebP oder GIF an.";
