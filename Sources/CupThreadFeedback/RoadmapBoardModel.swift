@@ -61,6 +61,9 @@ enum RoadmapBoardDisplayState: Equatable, Sendable {
 /// regular-width and tvOS layouts used to test `groups.isEmpty` themselves and
 /// fell through to an empty `ForEach` on zero-match searches, rendering a
 /// blank board instead of the "No Results" placeholder.
+///
+/// Accepts either raw or trimmed search queries; whitespace-only strings are
+/// treated as an empty query so unsearched empty columns are preserved.
 func makeBoardDisplayState(
     isLoading: Bool,
     hasLoadedOnce: Bool,
@@ -74,9 +77,10 @@ func makeBoardDisplayState(
     if let loadError {
         return .error(loadError)
     }
-    let visibleGroups = searchText.isEmpty ? groups : groups.filter { !$0.requests.isEmpty }
+    let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let visibleGroups = trimmedQuery.isEmpty ? groups : groups.filter { !$0.requests.isEmpty }
     if visibleGroups.isEmpty {
-        return searchText.isEmpty ? .emptyBoard : .emptySearch(query: searchText)
+        return trimmedQuery.isEmpty ? .emptyBoard : .emptySearch(query: trimmedQuery)
     }
     return .board(visibleGroups)
 }

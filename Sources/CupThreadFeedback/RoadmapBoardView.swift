@@ -171,7 +171,7 @@ public struct RoadmapBoardView: View {
             isLoading: isLoading,
             hasLoadedOnce: hasLoadedOnce,
             loadError: loadError,
-            searchText: searchText,
+            searchText: trimmedSearchText,
             groups: groups
         )
     }
