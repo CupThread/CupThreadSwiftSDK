@@ -193,3 +193,8 @@
 "cupthread.error.invalid_signature" = "支付信息未更新：报告的签名校验未通过，请检查应用的 SDK 签名密钥。";
 "cupthread.error.stale_signature" = "支付信息未更新：报告的签名已过期，请检查设备时间后重试。";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "您的内容太长，请精简后再试。";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "已输入 %1$lld 个字符，上限 %2$lld 个";

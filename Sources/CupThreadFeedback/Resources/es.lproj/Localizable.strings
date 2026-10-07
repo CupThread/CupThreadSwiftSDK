@@ -193,3 +193,8 @@
 "cupthread.error.invalid_signature" = "Los datos de pago no se actualizaron: la firma del informe no se pudo verificar. Comprueba el secreto de firma del SDK de la app.";
 "cupthread.error.stale_signature" = "Los datos de pago no se actualizaron: la firma del informe ha caducado. Comprueba el reloj del dispositivo e inténtalo de nuevo.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Tu mensaje es demasiado largo. Acórtalo e inténtalo de nuevo.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld de %2$lld caracteres";

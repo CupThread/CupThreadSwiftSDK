@@ -114,7 +114,10 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
     ///   feedback is disabled for the app (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse``.
+    ///   or ``FeedbackClientError/invalidResponse``, or
+    ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds
+    ///   the client-side intake byte budget (BUG-18) — rejected locally with
+    ///   no network round trip; shorten the title/description and submit again.
     ///
     /// When the client was created with a `turnstileTokenProvider`, its token
     /// is sent as `turnstileToken`; a Turnstile rejection (HTTP 403) asks the
@@ -129,7 +132,7 @@ extension FeedbackClient {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
             await self.applyBearerToken(to: &request)
-            request.httpBody = try self.encoder.encode(FeatureRequestSubmitPayload(
+            request.httpBody = try self.encodedIntakeBody(FeatureRequestSubmitPayload(
                 appKey: self.configuration.appKey,
                 title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
                 description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
