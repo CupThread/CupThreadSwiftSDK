@@ -7,10 +7,30 @@ protocol TokenStorage: Sendable {
     func load() -> String?
 
     /// Persists the specified token.
+    ///
+    /// Best-effort: write failures may be ignored. Call paths that must not
+    /// lose an identity (first mint, one-shot legacy adoption) use
+    /// ``saveConfirmed(_:)`` instead.
     func save(_ token: String)
+
+    /// Persists the token and reports whether the write was confirmed durable.
+    ///
+    /// The default delegates to ``save(_:)`` and reports success, which is
+    /// accurate for storages that cannot fail. Backing stores that can
+    /// observe write failures (the Keychain) override this. One-shot flags
+    /// must only be committed after this returns `true`.
+    @discardableResult
+    func saveConfirmed(_ token: String) -> Bool
 
     /// Deletes any stored token.
     func delete()
+}
+
+extension TokenStorage {
+    func saveConfirmed(_ token: String) -> Bool {
+        save(token)
+        return true
+    }
 }
 
 /// Token storage backed by `UserDefaults`.
@@ -49,9 +69,16 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
     /// The default Keychain service identifier used by the SDK.
     static let defaultService = "com.cupthread.userToken"
 
+    /// Test seam standing in for `SecItemAdd`.
+    typealias SecItemAddOperation = @Sendable (CFDictionary) -> OSStatus
+    /// Test seam standing in for `SecItemUpdate`.
+    typealias SecItemUpdateOperation = @Sendable (CFDictionary, CFDictionary) -> OSStatus
+
     let service: String
     let account: String
     let accessibility: CFString
+    private let addItem: SecItemAddOperation
+    private let updateItem: SecItemUpdateOperation
 
     init(
         service: String = KeychainTokenStorage.defaultService,
@@ -61,6 +88,24 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
         self.service = service
         self.account = account
         self.accessibility = accessibility
+        self.addItem = { SecItemAdd($0, nil) }
+        self.updateItem = { SecItemUpdate($0, $1) }
+    }
+
+    /// Scripts `SecItemAdd`/`SecItemUpdate` outcomes so the write-status
+    /// handling is unit-testable without touching the real Keychain.
+    init(
+        service: String,
+        account: String,
+        accessibility: CFString,
+        addItem: @escaping SecItemAddOperation,
+        updateItem: @escaping SecItemUpdateOperation
+    ) {
+        self.service = service
+        self.account = account
+        self.accessibility = accessibility
+        self.addItem = addItem
+        self.updateItem = updateItem
     }
 
     func load() -> String? {
@@ -84,7 +129,18 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
     }
 
     func save(_ token: String) {
-        guard let data = token.data(using: .utf8) else { return }
+        _ = saveConfirmed(token)
+    }
+
+    /// Persists the token and reports whether the Keychain confirmed it.
+    ///
+    /// Returns `false` for every `SecItemAdd` status other than
+    /// `errSecSuccess` (including inaccessible-Keychain failures such as
+    /// `errSecInteractionNotAllowed`), and for the duplicate-item path when
+    /// `SecItemUpdate` does not return `errSecSuccess`.
+    @discardableResult
+    func saveConfirmed(_ token: String) -> Bool {
+        guard let data = token.data(using: .utf8) else { return false }
 
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -96,14 +152,15 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
         addAttributes[kSecValueData as String] = data
         addAttributes[kSecAttrAccessible as String] = accessibility
 
-        let status = SecItemAdd(addAttributes as CFDictionary, nil)
-        if status == errSecDuplicateItem {
-            let updateAttributes: [String: Any] = [
-                kSecValueData as String: data,
-                kSecAttrAccessible as String: accessibility
-            ]
-            SecItemUpdate(baseQuery as CFDictionary, updateAttributes as CFDictionary)
+        let status = addItem(addAttributes as CFDictionary)
+        guard status == errSecDuplicateItem else {
+            return status == errSecSuccess
         }
+        let updateAttributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: accessibility
+        ]
+        return updateItem(baseQuery as CFDictionary, updateAttributes as CFDictionary) == errSecSuccess
     }
 
     func delete() {
@@ -168,8 +225,10 @@ public final class UserTokenStore: @unchecked Sendable {
     /// their first read but never delete it, so sibling app keys and
     /// ``UserTokenStore/shared`` keep access.
     private let legacyGlobalStore: (any TokenStorage)?
-    /// Flags that the one-shot legacy adoption ran, so ``reset()`` is not
-    /// undone by re-inheriting the (possibly rotated) global identity.
+    /// Flags that this store verifiably holds a persisted identity — either a
+    /// confirmed legacy adoption or a confirmed fresh mint — so ``reset()``
+    /// is not undone by re-inheriting the (possibly rotated) global identity.
+    /// Never committed on an unconfirmed write.
     private let adoptionDefaults: UserDefaults?
     private let adoptionFlagKey: String?
     /// Only the store that owns the global identity (`.shared`) deletes the
@@ -276,7 +335,10 @@ public final class UserTokenStore: @unchecked Sendable {
     /// Returns the existing token, or generates and persists a new UUID on first access.
     ///
     /// Synchronized across threads and instances via double-checked locking so concurrent
-    /// first accesses always resolve and persist the same identity.
+    /// first accesses always resolve and persist the same identity. When the backing
+    /// storage cannot confirm a write (e.g. an inaccessible Keychain before first
+    /// unlock), the returned token is ephemeral: nothing is persisted, the adoption
+    /// flag is left untouched, and the next read retries so the identity never rotates.
     public var token: String {
         if let existing = storage.load(), !existing.isEmpty {
             removeLegacyPlaintextIfOwned()
@@ -296,7 +358,13 @@ public final class UserTokenStore: @unchecked Sendable {
         }
 
         let new = UUID().uuidString
-        storage.save(new)
+        guard storage.saveConfirmed(new) else {
+            // The write could not be confirmed; serve an ephemeral token and
+            // leave adoption retryable rather than minting an identity that
+            // exists nowhere.
+            return new
+        }
+        markAdoptionComplete()
         removeLegacyPlaintextIfOwned()
         return new
     }
@@ -305,30 +373,27 @@ public final class UserTokenStore: @unchecked Sendable {
     ///
     /// Scoped stores check the Keychain-held global identity first (the
     /// authoritative location since the plaintext-to-Keychain migration),
-    /// then the pre-Keychain `UserDefaults` plaintext. The adoption flag is
-    /// written even when no legacy identity exists, so a later ``reset()``
-    /// cannot be undone by re-inheriting a stale or rotated global token.
+    /// then the pre-Keychain `UserDefaults` plaintext. The adoption flag's
+    /// invariant is "a legacy identity was successfully persisted into this
+    /// store", not "an adoption attempt was made": the flag is committed only
+    /// after ``TokenStorage/saveConfirmed(_:)`` confirms the write, so a
+    /// transiently inaccessible Keychain keeps adoption retryable instead of
+    /// permanently rotating the identity. The inherited value is still served
+    /// for the current read when the write fails, which preserves the one-shot
+    /// guarantee against *successful* adoption.
     private func adoptLegacyIdentityOnce() -> String? {
-        let adoptionAlreadyDone: Bool
-        if let adoptionDefaults, let adoptionFlagKey {
-            if adoptionDefaults.bool(forKey: adoptionFlagKey) {
-                adoptionAlreadyDone = true
-            } else {
-                adoptionDefaults.set(true, forKey: adoptionFlagKey)
-                adoptionAlreadyDone = false
-            }
-        } else {
-            // `.shared` has no flag: its plaintext source self-destructs on
-            // adoption, which already makes the migration one-shot.
-            adoptionAlreadyDone = false
+        if let adoptionDefaults, let adoptionFlagKey,
+           adoptionDefaults.bool(forKey: adoptionFlagKey) {
+            return nil
         }
-
-        guard !adoptionAlreadyDone else { return nil }
 
         if let legacyGlobalStore,
            let inherited = legacyGlobalStore.load(),
            !inherited.isEmpty {
-            storage.save(inherited)
+            guard storage.saveConfirmed(inherited) else {
+                return inherited
+            }
+            markAdoptionComplete()
             return inherited
         }
 
@@ -336,14 +401,25 @@ public final class UserTokenStore: @unchecked Sendable {
            let legacyKey,
            let inherited = legacyUserDefaults.string(forKey: legacyKey),
            !inherited.isEmpty {
-            storage.save(inherited)
+            guard storage.saveConfirmed(inherited) else {
+                return inherited
+            }
             if ownsLegacyPlaintext {
                 legacyUserDefaults.removeObject(forKey: legacyKey)
             }
+            markAdoptionComplete()
             return inherited
         }
 
         return nil
+    }
+
+    /// Commits the one-shot adoption flag. Only called once the store
+    /// verifiably holds the identity just persisted; a no-op for `.shared`,
+    /// whose plaintext source self-destructs on adoption.
+    private func markAdoptionComplete() {
+        guard let adoptionDefaults, let adoptionFlagKey else { return }
+        adoptionDefaults.set(true, forKey: adoptionFlagKey)
     }
 
     private func removeLegacyPlaintextIfOwned() {
