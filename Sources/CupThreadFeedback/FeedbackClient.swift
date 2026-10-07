@@ -124,6 +124,15 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 /// Same-origin redirects (e.g. relative `Location` paths on the API host) are
 /// followed normally.
 public struct FeedbackClient: Sendable {
+    /// The default maximum number of cursor pages to fetch during complete-data
+    /// walks before gracefully stopping (100).
+    ///
+    /// With standard page sizes (100–200 items per page), 100 pages covers
+    /// 10 000–20 000 items — comfortably above realistic public boards,
+    /// comments threads, and changelogs while defending against runaway
+    /// backends, shifting keyset cursors, or infinite pagination loops.
+    public static let defaultMaxPages = 100
+
     /// The configuration this client was created with.
     public let configuration: FeedbackClientConfiguration
     let session: URLSession

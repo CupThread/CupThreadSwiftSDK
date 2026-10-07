@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Changelog models (GET /api/v1/public/apps/{appKey}/changelog)
 
@@ -128,29 +129,46 @@ extension FeedbackClient {
     /// Callers that want explicit page control can use
     /// ``FeedbackClient/fetchChangelog(limit:cursor:)``.
     ///
+    /// The walk stops safely upon reaching `maxPages` (defaults to
+    /// ``FeedbackClient/defaultMaxPages``, 100) to guarantee termination against
+    /// runaway backends or shifting keyset cursors. When the cap is reached,
+    /// entries collected so far are returned and a warning diagnostic is logged.
+    ///
     /// Throws `FeedbackClientError.authenticationRequired` when the app has
     /// disabled anonymous changelog access; unknown app keys surface as
     /// `.unexpectedStatus` with status 404.
+    /// - Parameter maxPages: Maximum number of cursor pages to fetch before stopping;
+    ///   defaults to ``FeedbackClient/defaultMaxPages`` (100).
     /// - Returns: All published entries, newest first.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
     ///   changelog access is disabled, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   for other HTTP failures, or ``FeedbackClientError/invalidResponse``.
-    public func fetchChangelog() async throws -> [ChangelogEntry] {
+    public func fetchChangelog(maxPages: Int = Self.defaultMaxPages) async throws -> [ChangelogEntry] {
+        let effectiveMaxPages = max(1, maxPages)
         var collected: [ChangelogEntry] = []
         var seenIDs = Set<String>()
         var cursor: String?
-        while true {
+        var pagesFetched = 0
+        while pagesFetched < effectiveMaxPages {
+            pagesFetched += 1
             let page = try await fetchChangelog(limit: Self.changelogMaxPageSize, cursor: cursor)
             let freshEntries = page.entries.filter { seenIDs.insert($0.id).inserted }
             collected.append(contentsOf: freshEntries)
             // A page that yields nothing new would replay forever; stop on
             // the last page or on a misbehaving cursor.
             guard page.hasMore, let nextCursor = page.nextCursor, !freshEntries.isEmpty else {
-                break
+                return Self.sortChangelogEntries(collected)
             }
             cursor = nextCursor
         }
-        return collected.sorted { lhs, rhs in
+        paginationLogger.warning(
+            "Changelog pagination reached maximum page cap (\(effectiveMaxPages, privacy: .public)) for app '\(self.configuration.appKey, privacy: .public)'; returning \(collected.count, privacy: .public) collected entries."
+        )
+        return Self.sortChangelogEntries(collected)
+    }
+
+    private static func sortChangelogEntries(_ entries: [ChangelogEntry]) -> [ChangelogEntry] {
+        entries.sorted { lhs, rhs in
             (lhs.publishedAtDate ?? .distantPast) > (rhs.publishedAtDate ?? .distantPast)
         }
     }
