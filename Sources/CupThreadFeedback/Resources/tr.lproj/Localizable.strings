@@ -10,6 +10,7 @@
 "cupthread.feedback.section_contact_footer" = "İsteğe bağlı — yalnızca geri bildiriminiz hakkında sizinle iletişim kurmak için kullanılır.";
 "cupthread.feedback.name_label" = "Ad";
 "cupthread.feedback.email_label" = "E-posta";
+"cupthread.feedback.email_invalid_hint" = "Bu geçerli bir e-posta adresine benzemiyor — yanıt veremeyebiliriz.";
 "cupthread.feedback.section_attachments" = "Ekler";
 "cupthread.feedback.section_attachments_footer" = "Sorunları teşhis etmemize yardımcı olmak için ekran görüntüleri veya günlükler ekleyin.";
 "cupthread.feedback.add_attachment" = "Görsel / Ekran Görüntüsü Ekle";

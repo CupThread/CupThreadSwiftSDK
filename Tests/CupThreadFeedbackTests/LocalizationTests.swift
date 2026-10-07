@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 172, "Expected 172 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 173, "Expected 173 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -311,5 +311,19 @@ struct LocalizationTests {
             enStale.localizedLowercase.contains("clock") || enStale.localizedLowercase.contains("expired"),
             "English stale-signature copy should mention signature expiry or clock skew: \(enStale)"
         )
+    }
+
+    /// The composer's non-blocking contact-email hint ships in every locale
+    /// (issue #283) — the key-completeness sweep above covers key parity, and
+    /// this pins the hint itself so it can never silently regress to English
+    /// or an empty string.
+    @Test func feedbackEmailInvalidHintShipsInEveryLocale() throws {
+        for lang in Self.targetLanguages {
+            let value = try #require(
+                loadStrings(for: lang)["cupthread.feedback.email_invalid_hint"],
+                "Missing cupthread.feedback.email_invalid_hint for \(lang)"
+            )
+            #expect(!value.isEmpty, "\(lang) has empty cupthread.feedback.email_invalid_hint")
+        }
     }
 }

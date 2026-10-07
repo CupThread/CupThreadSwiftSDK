@@ -49,15 +49,11 @@ struct ChangelogSubscribeModel: Equatable, Sendable {
     }
 
     /// Lightweight shape check — full validation happens server-side.
+    ///
+    /// Delegates to the shared `EmailShape` helper (#283), which also rejects
+    /// the multiple-`@`, empty-label, and trailing-dot shapes #281 documented.
     var isValidEmail: Bool {
-        let trimmed = trimmedEmail
-        guard let at = trimmed.firstIndex(of: "@"),
-              at != trimmed.startIndex,
-              at != trimmed.index(before: trimmed.endIndex),
-              trimmed.suffix(from: at).contains(".") else {
-            return false
-        }
-        return !trimmed.contains(where: \.isWhitespace)
+        EmailShape.isPlausible(email)
     }
 
     /// A dismissal affordance is rendered in **every** phase, so users on

@@ -10,6 +10,7 @@
 "cupthread.feedback.section_contact_footer" = "Valgfrit — vi bruger det kun til at følge op på din feedback.";
 "cupthread.feedback.name_label" = "Navn";
 "cupthread.feedback.email_label" = "E-mail";
+"cupthread.feedback.email_invalid_hint" = "Dette ligner ikke en gyldig e-mail — vi kan derfor ikke svare dig.";
 "cupthread.feedback.section_attachments" = "Vedhæftede filer";
 "cupthread.feedback.section_attachments_footer" = "Vedhæft skærmbilleder eller logfiler for at hjælpe os med at diagnosticere problemer.";
 "cupthread.feedback.add_attachment" = "Tilføj billede / skærmbillede";

@@ -10,6 +10,7 @@
 "cupthread.feedback.section_contact_footer" = "Opcional — solo se utilizará para el seguimiento de tu feedback.";
 "cupthread.feedback.name_label" = "Nombre";
 "cupthread.feedback.email_label" = "Correo electrónico";
+"cupthread.feedback.email_invalid_hint" = "Esto no parece un correo electrónico válido; puede que no podamos responderte.";
 "cupthread.feedback.section_attachments" = "Archivos adjuntos";
 "cupthread.feedback.section_attachments_footer" = "Adjunta capturas de pantalla o registros para ayudarnos a diagnosticar problemas.";
 "cupthread.feedback.add_attachment" = "Añadir imagen / captura de pantalla";

@@ -10,6 +10,7 @@
 "cupthread.feedback.section_contact_footer" = "Tùy chọn — chúng tôi chỉ dùng thông tin này để theo dõi phản hồi của bạn.";
 "cupthread.feedback.name_label" = "Họ và tên";
 "cupthread.feedback.email_label" = "Email";
+"cupthread.feedback.email_invalid_hint" = "Địa chỉ này có vẻ không phải email hợp lệ — chúng tôi có thể không phản hồi được.";
 "cupthread.feedback.section_attachments" = "Tệp đính kèm";
 "cupthread.feedback.section_attachments_footer" = "Đính kèm ảnh chụp màn hình hoặc nhật ký để giúp chúng tôi chẩn đoán sự cố.";
 "cupthread.feedback.add_attachment" = "Thêm hình ảnh / Ảnh chụp màn hình";
