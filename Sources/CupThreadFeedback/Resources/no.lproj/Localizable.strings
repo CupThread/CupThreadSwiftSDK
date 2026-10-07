@@ -193,3 +193,5 @@
 "cupthread.error.invalid_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten kunne ikke verifiseres. Sjekk appens SDK-signeringshemmelighet.";
 "cupthread.error.stale_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten er utløpt. Sjekk enhetens klokke og prøv på nytt.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Denne tilbakemeldingen eller vedlegget er allerede sendt.";

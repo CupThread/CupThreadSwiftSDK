@@ -193,3 +193,5 @@
 "cupthread.error.invalid_signature" = "Ödeme bilgileri güncellenmedi: raporun imzası doğrulanamadı. Uygulamanın SDK imza gizli anahtarını kontrol edin.";
 "cupthread.error.stale_signature" = "Ödeme bilgileri güncellenmedi: raporun imzasının süresi doldu. Cihaz saatini kontrol edip yeniden deneyin.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Bu geri bildirim veya ek zaten gönderildi.";

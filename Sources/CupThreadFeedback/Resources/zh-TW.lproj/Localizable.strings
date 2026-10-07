@@ -193,3 +193,5 @@
 "cupthread.error.invalid_signature" = "付款資訊未更新：報告的簽名驗證未通過，請檢查應用程式的 SDK 簽名密鑰。";
 "cupthread.error.stale_signature" = "付款資訊未更新：報告的簽名已過期，請檢查裝置時間後再試一次。";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "此意見反應或附件已被提交。";

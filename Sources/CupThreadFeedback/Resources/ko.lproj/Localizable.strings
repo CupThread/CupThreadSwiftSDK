@@ -193,3 +193,5 @@
 "cupthread.error.invalid_signature" = "결제 정보가 업데이트되지 않았습니다: 보고서의 서명을 확인하지 못했습니다. 앱의 SDK 서명 시크릿을 확인해 주세요.";
 "cupthread.error.stale_signature" = "결제 정보가 업데이트되지 않았습니다: 보고서의 서명이 만료되었습니다. 기기의 시계를 확인한 후 다시 시도해 주세요.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "이 피드백 또는 첨부 파일은 이미 제출되었습니다.";

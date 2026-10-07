@@ -401,14 +401,6 @@ public struct FeedbackComposerView: View {
         )
     }
 
-    /// A photo readied for the streaming upload path: the spooled temp file
-    /// plus the server-facing name and MIME type.
-    private struct PreparedPhotoUpload {
-        let fileURL: URL
-        let filename: String
-        let mimeType: String
-    }
-
     /// Prepares the picked photo and spools the upload-ready bytes to a
     /// temporary file so the upload streams from disk instead of holding a
     /// second in-memory copy for the whole network round-trip; the prepared
@@ -471,6 +463,14 @@ public struct FeedbackComposerView: View {
             }
         } catch {
             guard !error.isSdkCancellation else { return }
+            if Self.clearsConsumedAttachments(for: error) {
+                // The server rejected a duplicate attachment (#257): the upload ID was already
+                // finalized into another submission. Clear upload-bearing attachments from the
+                // draft so the user does not retry the same consumed IDs.
+                for attachment in draft.attachments where attachment.uploadId != nil {
+                    attachmentState.removeAttachment(id: attachment.id, draft: &draft)
+                }
+            }
             errorMessage = FriendlyError.message(for: error)
         }
     }

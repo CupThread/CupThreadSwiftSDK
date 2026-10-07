@@ -193,3 +193,5 @@
 "cupthread.error.invalid_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia nie przeszedł weryfikacji. Sprawdź tajny klucz podpisu SDK aplikacji.";
 "cupthread.error.stale_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia wygasł. Sprawdź zegar urządzenia i spróbuj ponownie.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Ta opinia lub załącznik zostały już przesłane.";

@@ -193,3 +193,5 @@
 "cupthread.error.invalid_signature" = "支払い情報は更新されませんでした：レポートの署名を検証できませんでした。アプリの SDK 署名シークレットを確認してください。";
 "cupthread.error.stale_signature" = "支払い情報は更新されませんでした：レポートの署名の有効期限が切れています。端末の時刻を確認して、もう一度お試しください。";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "このフィードバックまたは添付ファイルは既に送信されています。";

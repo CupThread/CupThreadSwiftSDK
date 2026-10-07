@@ -193,3 +193,5 @@
 "cupthread.error.invalid_signature" = "Los datos de pago no se actualizaron: la firma del informe no se pudo verificar. Comprueba el secreto de firma del SDK de la app.";
 "cupthread.error.stale_signature" = "Los datos de pago no se actualizaron: la firma del informe ha caducado. Comprueba el reloj del dispositivo e inténtalo de nuevo.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Estos comentarios o archivos adjuntos ya se han enviado.";

@@ -193,3 +193,5 @@
 "cupthread.error.invalid_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts konnte nicht verifiziert werden. Prüfen Sie das SDK-Signatur-Geheimnis der App.";
 "cupthread.error.stale_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts ist abgelaufen. Prüfen Sie die Geräteuhr und versuchen Sie es erneut.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Dieses Feedback oder dieser Anhang wurde bereits übermittelt.";
