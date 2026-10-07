@@ -275,14 +275,37 @@ public struct FeedbackClient: Sendable {
 
     private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]
 
-    /// Whether this client can act on behalf of a signed-in end user —
-    /// i.e. it was created with an `authenticationProvider`. Signed-in-only
-    /// actions (posting comments, authenticated intake, voting, or accessing
-    /// roadmap and changelog surfaces when anonymous access is disabled)
-    /// require it; SDK surfaces use this to show a deliberate signed-out state
-    /// instead of requests that cannot succeed.
+    /// Whether this client was created with an `authenticationProvider`.
+    ///
+    /// This reports **provider presence only** — not whether an end user is
+    /// signed in right now. The provider's contract is to return `nil` while
+    /// signed out, and hosts normally install it unconditionally, so a `true`
+    /// value says nothing about the current session. SDK permission preflights
+    /// must therefore not gate on this property: they resolve
+    /// ``resolveAuthenticatedAccess()`` instead, so a signed-out user of a
+    /// host with an installed provider still sees the deliberate signed-out
+    /// state instead of requests that cannot succeed (issue #297). The
+    /// property is kept for source compatibility with hosts that only need to
+    /// know whether the SDK could act for a signed-in user at all.
     public var supportsAuthentication: Bool {
         authenticationProvider != nil
+    }
+
+    /// Resolves whether a request sent **right now** can carry the signed-in
+    /// identity's bearer token: an `authenticationProvider` must be installed
+    /// *and* return a non-empty token. `false` covers every signed-out shape —
+    /// no provider at all, or a provider answering `nil`/blank because the
+    /// user is signed out or the token cannot be refreshed.
+    ///
+    /// Permission preflights gate on this resolved value and re-evaluate it on
+    /// every load, so a sign-in (or sign-out) between two loads is picked up
+    /// without recreating the surface. The result is deliberately not cached:
+    /// the same provider backs ``applyBearerToken(to:)``, so a resolved `true`
+    /// is exactly the condition under which the follow-up request attaches
+    /// `Authorization: Bearer …`.
+    func resolveAuthenticatedAccess() async -> Bool {
+        guard let authenticationProvider else { return false }
+        return await authenticationProvider()?.nilIfEmpty != nil
     }
 
     /// Resolves the signed-in identity's bearer token through the

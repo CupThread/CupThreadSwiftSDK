@@ -45,15 +45,20 @@ public struct FeatureRequestsView: View {
     /// server; drives the pill's success bounce/haptic so a reverted
     /// (failed) vote never fires success cues.
     @State private var voteSuccessPulses: [String: Int] = [:]
+    /// Whether a request sent right now could carry the signed-in identity's
+    /// bearer token. Resolved at the start of every load (issue #297) — the
+    /// user can sign in or out while the list is presented. Fail-closed until
+    /// then: list content only renders after the first load anyway.
+    @State private var isAuthenticated = false
 
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
     /// Whether the compose sheet and toolbar should offer the composer rather
     /// than the denial placeholder: anonymous submission is allowed by the
-    /// console, or the client can attach a bearer token (`nil` config fails
-    /// open; the server stays authoritative).
+    /// console, or the client can produce a bearer token for the current user
+    /// (`nil` config fails open; the server stays authoritative).
     private var canCompose: Bool {
-        (sdkAppConfig?.allowsAnonymousFeedback ?? true) || client.supportsAuthentication
+        (sdkAppConfig?.allowsAnonymousFeedback ?? true) || isAuthenticated
     }
 
     private var items: [FeatureRequestItem] {
@@ -214,7 +219,7 @@ public struct FeatureRequestsView: View {
                             onSelectCard: { activeSheet = .comments(item) },
                             onSelectUser: { activeSheet = .profile($0) },
                             appConfig: sdkAppConfig,
-                            supportsAuthentication: client.supportsAuthentication
+                            supportsAuthentication: isAuthenticated
                         ) {
                             Task { await toggleVoteOptimistic(for: item) }
                         }
@@ -263,7 +268,7 @@ public struct FeatureRequestsView: View {
                         onSelectCard: { activeSheet = .comments(item) },
                         onSelectUser: { activeSheet = .profile($0) },
                         appConfig: sdkAppConfig,
-                        supportsAuthentication: client.supportsAuthentication
+                        supportsAuthentication: isAuthenticated
                     ) {
                         Task { await toggleVoteOptimistic(for: item) }
                     }
@@ -321,6 +326,7 @@ public struct FeatureRequestsView: View {
 
     @MainActor
     private func loadFeatureRequests() async {
+        isAuthenticated = await client.resolveAuthenticatedAccess()
         loadGeneration += 1
         isLoading = true
         loadError = nil
@@ -396,7 +402,7 @@ public struct FeatureRequestsView: View {
         guard !FeatureVoteGate.isActionDisabled(
             isOwnRequest: item.isOwnRequest,
             config: sdkAppConfig,
-            supportsAuthentication: client.supportsAuthentication
+            supportsAuthentication: isAuthenticated
         ) else {
             return
         }

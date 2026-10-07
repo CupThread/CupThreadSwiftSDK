@@ -80,16 +80,34 @@ struct FeatureRequestComposeDismissalTests {
     }
 
     @Test @MainActor func composeViewShowsFormForAuthenticatedClientUnderDeniedConfig() {
-        // An authentication provider satisfies the anonymous-proposal
-        // preflight; the server stays authoritative (issue #233).
+        // A resolved bearer token satisfies the anonymous-proposal preflight;
+        // the server stays authoritative (issue #233). The verdict arrives
+        // asynchronously in `.task` (issue #297), so view-level tests inject
+        // the resolved value.
         let client = makeClient(authenticationProvider: { "signed-in-jwt" })
+        let deniedConfig = makeConfig(allowAnonymousFeedback: false)
+        let view = FeatureRequestComposeView(
+            client: client,
+            userToken: "test_token",
+            config: deniedConfig,
+            preResolvedAuthentication: true
+        ) {}
+        #expect(view.dismissalAffordance == .guardedCancel)
+        _ = view.body
+    }
+
+    @Test @MainActor func composeViewStaysDeniedForSignedOutClientUnderDeniedConfig() {
+        // An installed provider that answers `nil` (signed out) does not
+        // satisfy the preflight: the denial placeholder with Close stays up
+        // instead of a form that can only fail at submit (issue #297).
+        let client = makeClient(authenticationProvider: { nil })
         let deniedConfig = makeConfig(allowAnonymousFeedback: false)
         let view = FeatureRequestComposeView(
             client: client,
             userToken: "test_token",
             config: deniedConfig
         ) {}
-        #expect(view.dismissalAffordance == .guardedCancel)
+        #expect(view.dismissalAffordance == .close)
         _ = view.body
     }
 

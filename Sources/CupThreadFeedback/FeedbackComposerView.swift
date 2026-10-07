@@ -45,6 +45,8 @@ public struct FeedbackComposerView: View {
     @State private var attachmentState: FeedbackAttachmentStateMachine
     @State private var errorMessage: String?
     @State private var result: FeedbackSubmissionResult?
+    /// Bearer-token availability right now; fail-closed until `.task` resolves it (issue #297).
+    @State private var isAuthenticated = false
     @Environment(\.sdkAppConfig) private var sdkAppConfig
     @Environment(\.dismiss) private var dismiss
 
@@ -56,7 +58,7 @@ public struct FeedbackComposerView: View {
         SdkSubmissionDenial.forFeedback(
             config: activeConfig,
             platform: draft.platform,
-            supportsAuthentication: client.supportsAuthentication
+            supportsAuthentication: isAuthenticated
         )
     }
 
@@ -192,6 +194,7 @@ public struct FeedbackComposerView: View {
             if let resolvedConfig {
                 attachmentState.applyConfigLimit(resolvedConfig.maxAttachmentBytes)
             }
+            isAuthenticated = await client.resolveAuthenticatedAccess()
         }
         .sdkSurface(client: client, feature: .feedback)
     }

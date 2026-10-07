@@ -14,10 +14,11 @@ struct FeatureRequestCard: View {
     /// Console configuration used to preflight-disable the vote pill when
     /// anonymous voting is off. `nil` fails open (own-request still disables).
     var appConfig: PublicAppConfig?
-    /// Whether the client can attach a bearer token; authenticated clients
-    /// keep vote pills enabled even when anonymous voting is switched off.
-    /// Defaults to `false` (fail closed) so a call site that forgets to thread
-    /// it keeps the anonymous-only behavior.
+    /// Whether the client can attach a bearer token for the current user
+    /// (the resolved access value); signed-in users keep vote pills enabled
+    /// even when anonymous voting is switched off. Defaults to `false`
+    /// (fail closed) so a call site that forgets to thread it keeps the
+    /// anonymous-only behavior.
     var supportsAuthentication: Bool = false
     let vote: () -> Void
 

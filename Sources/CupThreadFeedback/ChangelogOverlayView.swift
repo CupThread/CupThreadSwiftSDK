@@ -201,24 +201,34 @@ public struct ChangelogOverlayView: View {
     ///
     /// Enforces the console's `sdk.features.changelog` switch the same way
     /// ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)`` does: when
-    /// the surface is off the changelog request is never made.
+    /// the surface is off the changelog request is never made. The
+    /// anonymous-access preflight resolves the client's bearer token (issue
+    /// #297), and a `401 authentication_required` from the fetch itself — the
+    /// token expired between the check and the send — is the permission-denied
+    /// outcome, not a failure.
     ///
     /// Returns `nil` when the fetch was cancelled (the overlay closed or the
     /// presenting task was superseded mid-load) — a cancelled load never
     /// reached a verdict, so callers must keep their current state instead
     /// of reporting a failure.
     static func fetchSelfLoadedContent(in client: FeedbackClient) async -> SelfLoadedContent? {
+        let config: PublicAppConfig
         do {
-            let config = try await client.cachedAppConfig()
-            guard config.sdk.features.isEnabled(.changelog) else {
-                return .featureDisabled(config.sdk)
-            }
-            guard changelogLoadPlan(
-                config: config,
-                supportsAuthentication: client.supportsAuthentication
-            ) == .load else {
-                return .permissionDenied(config.sdk)
-            }
+            config = try await client.cachedAppConfig()
+        } catch {
+            guard !error.isSdkCancellation else { return nil }
+            return .failed(FriendlyError.message(for: error))
+        }
+        guard config.sdk.features.isEnabled(.changelog) else {
+            return .featureDisabled(config.sdk)
+        }
+        guard changelogLoadPlan(
+            config: config,
+            supportsAuthentication: await client.resolveAuthenticatedAccess()
+        ) == .load else {
+            return .permissionDenied(config.sdk)
+        }
+        do {
             let all = try await client.fetchChangelog()
             return .entries(
                 Array(all.prefix(config.sdk.changelogOverlay.entryCount)),
@@ -226,6 +236,9 @@ public struct ChangelogOverlayView: View {
             )
         } catch {
             guard !error.isSdkCancellation else { return nil }
+            if isSdkPermissionRejection(error) {
+                return .permissionDenied(config.sdk)
+            }
             return .failed(FriendlyError.message(for: error))
         }
     }
@@ -386,110 +399,5 @@ extension View {
         autoMarkSeen: Bool = true
     ) -> some View {
         modifier(ChangelogOverlayModifier(client: client, autoMarkSeen: autoMarkSeen, isPresented: isPresented))
-    }
-}
-
-// MARK: - Programmatic presentation
-
-extension FeedbackClient {
-    /// Checks whether the user has already seen the changelog overlay for the given version or entry ID.
-    ///
-    /// Seen versions are tracked in a thread-safe store bounded to the newest 64 releases
-    /// for this app key.
-    ///
-    /// - Parameter version: The version label (e.g. `"1.2.0"`) or entry ID.
-    /// - Returns: `true` if previously recorded as seen.
-    public func hasSeenChangelog(version: String) -> Bool {
-        ChangelogSeenStore.shared(for: configuration.appKey).hasSeen(version)
-    }
-
-    /// Marks the given changelog version or entry ID as seen.
-    ///
-    /// Persists the version label or entry ID in a thread-safe store scoped to this app key,
-    /// bounded to the newest 64 releases (older entries are automatically pruned).
-    ///
-    /// - Parameter version: The version label or entry ID to record.
-    public func markChangelogSeen(version: String) {
-        ChangelogSeenStore.shared(for: configuration.appKey).markSeen(version)
-    }
-
-    /// Marks both a changelog entry ID and an optional version label as seen in a single atomic pass.
-    ///
-    /// Persists the tokens in a thread-safe store scoped to this app key, executing capacity
-    /// truncation and persistence in a single disk write.
-    ///
-    /// - Parameters:
-    ///   - id: The entry ID to record.
-    ///   - versionLabel: An optional version label (e.g. `"1.2.0"`) to record.
-    public func markChangelogSeen(id: String, versionLabel: String?) {
-        ChangelogSeenStore.shared(for: configuration.appKey).markSeen(id: id, versionLabel: versionLabel)
-    }
-
-    /// Presents the latest changelog overlay using copy and limits from the console.
-    ///
-    /// Returns `false` when changelog is hidden, there is no host window to present
-    /// from, or there are no published entries. Throws if the network request fails.
-    ///
-    /// Use ``prepareChangelogOverlay(onlyIfUnseen:)`` plus ``ChangelogOverlayView`` instead
-    /// when you need control over where and how the sheet appears.
-    /// - Parameter onlyIfUnseen: When `true`, suppresses presentation if the newest
-    ///   version has already been marked as seen via ``hasSeenChangelog(version:)``.
-    /// - Returns: Whether the overlay was actually presented.
-    /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
-    ///   when either network call fails.
-    @MainActor
-    @discardableResult
-    public func presentLatestChangelog(onlyIfUnseen: Bool = false) async throws -> Bool {
-        guard let prepared = try await prepareChangelogOverlay(onlyIfUnseen: onlyIfUnseen) else { return false }
-        let presenter = overlayPresenter ?? DefaultChangelogOverlayPresenter()
-        return await presentPreparedChangelogOverlay(
-            client: self,
-            entries: prepared.entries,
-            appearance: prepared.appearance,
-            presenter: presenter
-        )
-    }
-
-    /// Fetches overlay configuration and the newest published entries.
-    /// Returns `nil` when the console hid changelog, nothing has been published,
-    /// or when `onlyIfUnseen` is true and the latest release was already seen.
-    ///
-    /// Pair the result with ``ChangelogOverlayView`` for custom presentation:
-    ///
-    /// ```swift
-    /// if let prepared = try await client.prepareChangelogOverlay(onlyIfUnseen: true) {
-    ///     preparedOverlay = prepared
-    ///     showSheet = true
-    /// }
-    /// // …in the sheet content, entries and appearance stay paired:
-    /// ChangelogOverlayView(client: client, prepared: preparedOverlay)
-    /// ```
-    ///
-    /// - Parameter onlyIfUnseen: When `true`, returns `nil` if the newest entry
-    ///   was already marked as seen.
-    /// - Returns: Newest entries (capped by the console's entry count) plus
-    ///   the appearance, or `nil` when the overlay should stay hidden.
-    /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
-    ///   when either network call fails.
-    public func prepareChangelogOverlay(
-        onlyIfUnseen: Bool = false
-    ) async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
-        let config = try await cachedAppConfig()
-        guard config.sdk.features.isEnabled(.changelog) else { return nil }
-        guard changelogLoadPlan(
-            config: config,
-            supportsAuthentication: supportsAuthentication
-        ) == .load else { return nil }
-        let all = try await fetchChangelog()
-        let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
-        guard let latest = entries.first else { return nil }
-
-        if onlyIfUnseen {
-            let isSeen = hasSeenChangelog(version: latest.id) ||
-                (latest.versionLabel.map { hasSeenChangelog(version: $0) } ?? false)
-            if isSeen { return nil }
-        }
-
-        return (entries, config.sdk)
     }
 }

@@ -269,3 +269,125 @@ private func topViewController(base: UIViewController? = nil) -> UIViewControlle
     return root
 }
 #endif
+
+// MARK: - Programmatic presentation
+
+extension FeedbackClient {
+    /// Checks whether the user has already seen the changelog overlay for the given version or entry ID.
+    ///
+    /// Seen versions are tracked in a thread-safe store bounded to the newest 64 releases
+    /// for this app key.
+    ///
+    /// - Parameter version: The version label (e.g. `"1.2.0"`) or entry ID.
+    /// - Returns: `true` if previously recorded as seen.
+    public func hasSeenChangelog(version: String) -> Bool {
+        ChangelogSeenStore.shared(for: configuration.appKey).hasSeen(version)
+    }
+
+    /// Marks the given changelog version or entry ID as seen.
+    ///
+    /// Persists the version label or entry ID in a thread-safe store scoped to this app key,
+    /// bounded to the newest 64 releases (older entries are automatically pruned).
+    ///
+    /// - Parameter version: The version label or entry ID to record.
+    public func markChangelogSeen(version: String) {
+        ChangelogSeenStore.shared(for: configuration.appKey).markSeen(version)
+    }
+
+    /// Marks both a changelog entry ID and an optional version label as seen in a single atomic pass.
+    ///
+    /// Persists the tokens in a thread-safe store scoped to this app key, executing capacity
+    /// truncation and persistence in a single disk write.
+    ///
+    /// - Parameters:
+    ///   - id: The entry ID to record.
+    ///   - versionLabel: An optional version label (e.g. `"1.2.0"`) to record.
+    public func markChangelogSeen(id: String, versionLabel: String?) {
+        ChangelogSeenStore.shared(for: configuration.appKey).markSeen(id: id, versionLabel: versionLabel)
+    }
+
+    /// Presents the latest changelog overlay using copy and limits from the console.
+    ///
+    /// Returns `false` when changelog is hidden, sign-in is required but no
+    /// usable bearer token can be presented, there is no host window to present
+    /// from, or there are no published entries. Throws if the network request fails.
+    ///
+    /// Use ``prepareChangelogOverlay(onlyIfUnseen:)`` plus ``ChangelogOverlayView`` instead
+    /// when you need control over where and how the sheet appears.
+    /// - Parameter onlyIfUnseen: When `true`, suppresses presentation if the newest
+    ///   version has already been marked as seen via ``hasSeenChangelog(version:)``.
+    /// - Returns: Whether the overlay was actually presented.
+    /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
+    ///   when either network call fails.
+    @MainActor
+    @discardableResult
+    public func presentLatestChangelog(onlyIfUnseen: Bool = false) async throws -> Bool {
+        guard let prepared = try await prepareChangelogOverlay(onlyIfUnseen: onlyIfUnseen) else { return false }
+        let presenter = overlayPresenter ?? DefaultChangelogOverlayPresenter()
+        return await presentPreparedChangelogOverlay(
+            client: self,
+            entries: prepared.entries,
+            appearance: prepared.appearance,
+            presenter: presenter
+        )
+    }
+
+    /// Fetches overlay configuration and the newest published entries.
+    /// Returns `nil` when the console hid changelog, sign-in is required but
+    /// the client cannot produce a bearer token (or the server rejected the
+    /// one it produced with `401 authentication_required`), nothing has been
+    /// published, or when `onlyIfUnseen` is true and the latest release was
+    /// already seen.
+    ///
+    /// Pair the result with ``ChangelogOverlayView`` for custom presentation:
+    ///
+    /// ```swift
+    /// if let prepared = try await client.prepareChangelogOverlay(onlyIfUnseen: true) {
+    ///     preparedOverlay = prepared
+    ///     showSheet = true
+    /// }
+    /// // …in the sheet content, entries and appearance stay paired:
+    /// ChangelogOverlayView(client: client, prepared: preparedOverlay)
+    /// ```
+    ///
+    /// The anonymous-access preflight resolves the bearer token on every call,
+    /// so a sign-in between two launches is picked up (issue #297); a
+    /// signed-out user on a sign-in-required board gets `nil` instead of a
+    /// guaranteed-to-fail fetch.
+    /// - Parameter onlyIfUnseen: When `true`, returns `nil` if the newest entry
+    ///   was already marked as seen.
+    /// - Returns: Newest entries (capped by the console's entry count) plus
+    ///   the appearance, or `nil` when the overlay should stay hidden.
+    /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
+    ///   when either network call fails.
+    public func prepareChangelogOverlay(
+        onlyIfUnseen: Bool = false
+    ) async throws -> (entries: [ChangelogEntry], appearance: SdkAppearance)? {
+        let config = try await cachedAppConfig()
+        guard config.sdk.features.isEnabled(.changelog) else { return nil }
+        guard changelogLoadPlan(
+            config: config,
+            supportsAuthentication: await resolveAuthenticatedAccess()
+        ) == .load else { return nil }
+        let all: [ChangelogEntry]
+        do {
+            all = try await fetchChangelog()
+        } catch {
+            // The preflight resolved a token but the server still answered
+            // 401 (e.g. it expired between the check and the send): the
+            // overlay stays hidden, exactly as for a signed-out user.
+            if isSdkPermissionRejection(error) { return nil }
+            throw error
+        }
+        let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
+        guard let latest = entries.first else { return nil }
+
+        if onlyIfUnseen {
+            let isSeen = hasSeenChangelog(version: latest.id) ||
+                (latest.versionLabel.map { hasSeenChangelog(version: $0) } ?? false)
+            if isSeen { return nil }
+        }
+
+        return (entries, config.sdk)
+    }
+}

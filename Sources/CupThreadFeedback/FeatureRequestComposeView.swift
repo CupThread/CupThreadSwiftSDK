@@ -26,21 +26,33 @@ struct FeatureRequestComposeView: View {
     @State private var draft = FeatureRequestDraft()
     @State private var isSubmitting = false
     @State private var submitError: String?
+    /// Whether a request sent right now could carry the signed-in identity's
+    /// bearer token. Resolved when the sheet appears (issue #297); fail-closed
+    /// until then, so a locked-down console never opens the form for a
+    /// signed-out user.
+    @State private var isAuthenticated: Bool
     @Environment(\.sdkAppConfig) private var sdkAppConfig
     @Environment(\.dismiss) private var dismiss
 
     private let configOverride: PublicAppConfig?
 
+    /// - Parameters:
+    ///   - config: Optional console configuration override (previews/tests).
+    ///   - preResolvedAuthentication: Injects the resolved access verdict for
+    ///     view-level tests; production presentations leave it `false` and
+    ///     the sheet resolves in `.task`.
     init(
         client: FeedbackClient,
         userToken: String,
         config: PublicAppConfig? = nil,
+        preResolvedAuthentication: Bool = false,
         onSubmitted: @escaping () -> Void
     ) {
         self.client = client
         self.userToken = userToken
         self.configOverride = config
         self.onSubmitted = onSubmitted
+        _isAuthenticated = State(initialValue: preResolvedAuthentication)
     }
 
     private var activeConfig: PublicAppConfig? {
@@ -50,7 +62,7 @@ struct FeatureRequestComposeView: View {
     var dismissalAffordance: FeatureRequestComposeDismissalAffordance {
         FeatureRequestComposeDismissalAffordance.resolve(
             config: activeConfig,
-            supportsAuthentication: client.supportsAuthentication
+            supportsAuthentication: isAuthenticated
         )
     }
 
@@ -75,6 +87,9 @@ struct FeatureRequestComposeView: View {
             #if os(macOS)
             .frame(minWidth: 460, minHeight: 420)
             #endif
+            .task {
+                isAuthenticated = await client.resolveAuthenticatedAccess()
+            }
             .toolbar {
                 if dismissalAffordance == .close {
                     ToolbarItem(placement: .cancellationAction) {
@@ -143,7 +158,7 @@ struct FeatureRequestComposeView: View {
     private func submit() async {
         guard SdkSubmissionDenial.forFeatureRequest(
             config: activeConfig,
-            supportsAuthentication: client.supportsAuthentication
+            supportsAuthentication: isAuthenticated
         ) == .none else { return }
         isSubmitting = true
         submitError = nil
