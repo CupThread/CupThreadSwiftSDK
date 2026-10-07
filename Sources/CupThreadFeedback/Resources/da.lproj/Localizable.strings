@@ -29,6 +29,7 @@
 "cupthread.features.all_versions" = "Alle versioner";
 "cupthread.features.version_picker" = "Version";
 "cupthread.features.filter_by_version" = "Filtrer efter version";
+"cupthread.features.version_retry" = "Prøv at indlæse versionerne igen";
 "cupthread.features.request_a_feature" = "Foreslå funktion";
 "cupthread.features.request_a_feature_hint" = "Åbner formularen til at foreslå en funktion";
 "cupthread.features.empty_title" = "Ingen funktionsønsker";

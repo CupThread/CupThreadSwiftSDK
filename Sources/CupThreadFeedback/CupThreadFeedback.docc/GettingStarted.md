@@ -43,6 +43,10 @@ let tokenStore = UserTokenStore(appKey: "app_xxx")
 let userToken = tokenStore.token
 ```
 
+### Network security: redirects never leave the API origin
+
+The default session refuses any HTTP redirect that leaves the configured `baseURL`'s origin (scheme, host, and effective port). URLSession would otherwise re-send every request header — including `Authorization: Bearer …` and the `X-User-Token` identity — and, on 307/308 redirects, the request body (e.g. attachment upload bytes) to whatever host the `Location` header names. A refused redirect surfaces the 3xx response itself as ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` instead of silently succeeding against the redirect target. Same-origin redirects are followed normally. This policy ships on the SDK's default session; if you inject your own `session:`, install an equivalent redirect policy on it.
+
 ## Show a surface
 
 All surfaces are SwiftUI views. Embed them in a `NavigationStack` and wrap your hierarchy in ``CupThreadTheme`` so the console-selected theme and feature flags apply everywhere:

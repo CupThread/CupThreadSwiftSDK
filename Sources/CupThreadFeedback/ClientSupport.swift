@@ -9,12 +9,42 @@ struct APIErrorEnvelope: Decodable, Sendable {
     let code: String?
 }
 
+/// The correlation-id grammar shared by both directions of the
+/// `X-Request-Id` header (OPS-01): requests send ids matching
+/// `^[A-Za-z0-9._-]{8,64}$`, the server honors exactly those ids and
+/// replaces anything else, and echoed response headers are only propagated
+/// when they conform (SEC-12). Any other echo value — HTML from a captive
+/// portal, a phishing nudge injected by a TLS proxy, oversized junk from a
+/// gateway — is not a correlation id and must never reach user-facing
+/// error copy.
+enum RequestIDGrammar {
+    static let minLength = 8
+    static let maxLength = 64
+
+    /// Whether `value` matches the `^[A-Za-z0-9._-]{8,64}$` grammar.
+    static func isValid(_ value: String) -> Bool {
+        guard (minLength...maxLength).contains(value.count) else { return false }
+        return value.allSatisfy { character in
+            guard character.isASCII else { return false }
+            return character.isLetter || character.isNumber
+                || character == "." || character == "_" || character == "-"
+        }
+    }
+}
+
 extension HTTPURLResponse {
     /// The `X-Request-Id` correlation header (OPS-01) the server attaches to
     /// every response — the caller's request id when format-valid, otherwise
     /// a server-generated UUID. Quote it in bug reports and support requests.
+    ///
+    /// Only ids matching the protocol's grammar are propagated — the same
+    /// rule the server applies to the request direction — so arbitrary or
+    /// oversized header text from gateways, captive portals, or proxies
+    /// never reaches user-facing error copy (SEC-12).
     var cupthreadRequestID: String? {
-        guard let value = value(forHTTPHeaderField: "X-Request-Id"), !value.isEmpty else {
+        guard let value = value(forHTTPHeaderField: "X-Request-Id"),
+              RequestIDGrammar.isValid(value)
+        else {
             return nil
         }
         return value
@@ -35,8 +65,10 @@ extension HTTPURLResponse {
 extension FeedbackClient {
     /// The `X-Request-Id` to send with a request (OPS-01): the
     /// configuration's stable id when set, otherwise a fresh UUID per request.
-    /// The server honors ids matching `^[A-Za-z0-9._-]{8,64}$` and replaces
-    /// anything else.
+    /// The server honors ids matching `RequestIDGrammar`
+    /// (`^[A-Za-z0-9._-]{8,64}$`) and replaces anything else; response echoes
+    /// are validated against the same grammar before being attached to
+    /// errors (SEC-12).
     func nextRequestID() -> String {
         if let requestID = configuration.requestID, !requestID.isEmpty {
             return requestID

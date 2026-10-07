@@ -203,6 +203,107 @@ struct UserTokenStoreTests {
         #expect(storage.load() == nil)
     }
 
+    @Test func saveConfirmedPersistsAndReportsSuccess() throws {
+        let testService = "com.cupthread.test.saveconfirmed.\(UUID().uuidString)"
+        let testAccount = "account.\(UUID().uuidString)"
+        let storage = KeychainTokenStorage(service: testService, account: testAccount)
+        defer { storage.delete() }
+
+        // Add path.
+        #expect(storage.saveConfirmed(UUID().uuidString))
+        let first = storage.load()
+        #expect(first != nil)
+
+        // Duplicate path falls back to SecItemUpdate and still reports success.
+        let second = UUID().uuidString
+        #expect(storage.saveConfirmed(second))
+        #expect(storage.load() == second)
+    }
+
+    @Test func saveConfirmedReportsAddFailureInsteadOfSwallowingIt() {
+        let updates = InvocationRecorder()
+        let storage = scriptedKeychainStorage(
+            addStatus: errSecInteractionNotAllowed,
+            updateStatus: errSecSuccess,
+            updates: updates
+        )
+
+        // An inaccessible Keychain (e.g. before first unlock) must surface as
+        // a failed write, not silently disappear.
+        #expect(storage.saveConfirmed("token") == false)
+        #expect(updates.invocations == 0)
+    }
+
+    @Test func saveConfirmedReportsAnyNonSuccessAddStatus() {
+        let updates = InvocationRecorder()
+        let storage = scriptedKeychainStorage(
+            addStatus: errSecMissingEntitlement,
+            updateStatus: errSecSuccess,
+            updates: updates
+        )
+
+        #expect(storage.saveConfirmed("token") == false)
+        #expect(updates.invocations == 0)
+    }
+
+    @Test func saveConfirmedDuplicatePathUpdatesAndReportsSuccess() {
+        let updates = InvocationRecorder()
+        let storage = scriptedKeychainStorage(
+            addStatus: errSecDuplicateItem,
+            updateStatus: errSecSuccess,
+            updates: updates
+        )
+
+        #expect(storage.saveConfirmed("token") == true)
+        #expect(updates.invocations == 1)
+    }
+
+    @Test func saveConfirmedReportsFailedDuplicateUpdate() {
+        let updates = InvocationRecorder()
+        let storage = scriptedKeychainStorage(
+            addStatus: errSecDuplicateItem,
+            updateStatus: errSecInteractionNotAllowed,
+            updates: updates
+        )
+
+        // The duplicate path must not claim success when SecItemUpdate fails.
+        #expect(storage.saveConfirmed("token") == false)
+        #expect(updates.invocations == 1)
+    }
+
+    @Test func inaccessibleKeychainAdoptionServesLegacyIdentityWithoutConsumingFlag() throws {
+        let context = makeIsolatedDefaults()
+        defer { context.cleanup() }
+
+        let legacyToken = UUID().uuidString
+        let legacyKeychainKey = "test.sec13.global.\(UUID().uuidString)"
+        let flagKey = "test.sec13.flag.\(UUID().uuidString)"
+        context.defaults.set(legacyToken, forKey: legacyKeychainKey)
+
+        // A Keychain that rejects every write, as one does before first unlock.
+        let storage = KeychainTokenStorage(
+            service: "com.cupthread.test.sec13.\(UUID().uuidString)",
+            account: "account.\(UUID().uuidString)",
+            accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            addItem: { _ in errSecInteractionNotAllowed },
+            updateItem: { _, _ in errSecInteractionNotAllowed }
+        )
+        let store = UserTokenStore(
+            storage: storage,
+            legacyUserDefaults: context.defaults,
+            legacyKey: "unused",
+            legacyGlobalStore: UserDefaultsTokenStorage(userDefaults: context.defaults, key: legacyKeychainKey),
+            adoptionDefaults: context.defaults,
+            adoptionFlagKey: flagKey
+        )
+
+        // The legacy identity is served for this read while the flag stays
+        // unset, so a later writable Keychain re-runs adoption instead of
+        // permanently rotating the end-user identity (SEC-13).
+        #expect(store.token == legacyToken)
+        #expect(context.defaults.bool(forKey: flagKey) == false)
+    }
+
     @Test func migrationWithRealKeychainTransfersLegacyToken() throws {
         let context = makeIsolatedDefaults()
         defer { context.cleanup() }
@@ -282,6 +383,43 @@ struct UserTokenStoreTests {
 
         let resolved = try #require(uniqueTokens.first)
         #expect(keychainStorage.load() == resolved)
+    }
+}
+
+/// Builds a `KeychainTokenStorage` whose `SecItemAdd`/`SecItemUpdate` outcomes
+/// are scripted, so write-status handling is testable without real Keychain I/O.
+private func scriptedKeychainStorage(
+    addStatus: OSStatus,
+    updateStatus: OSStatus,
+    updates: InvocationRecorder
+) -> KeychainTokenStorage {
+    KeychainTokenStorage(
+        service: "com.cupthread.test.scripted.\(UUID().uuidString)",
+        account: "account.\(UUID().uuidString)",
+        accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+        addItem: { _ in addStatus },
+        updateItem: { _, _ in
+            updates.record()
+            return updateStatus
+        }
+    )
+}
+
+/// Thread-safe invocation counter for scripted `SecItemUpdate` seams.
+private final class InvocationRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var invocations: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func record() {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
     }
 }
 
