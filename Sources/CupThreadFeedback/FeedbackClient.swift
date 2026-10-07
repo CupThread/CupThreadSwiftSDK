@@ -27,9 +27,11 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 
     /// The platform value reported with feedback submissions.
     ///
-    /// Defaults to ``FeedbackPlatform/current``, which matches the OS the SDK
-    /// is running on. Override it when the app reports a custom platform —
-    /// e.g. a Mac Catalyst build that should count as `.macos`.
+    /// Defaults to ``FeedbackPlatform/current``, which reports `macos` on
+    /// macOS and `ios` everywhere else — visionOS and tvOS are iOS-family
+    /// builds and report `ios`. Override it when the app should report a
+    /// different value — e.g. reporting `ios` from a Mac Catalyst build
+    /// (which defaults to `macos`).
     public let defaultPlatform: FeedbackPlatform
 
     /// A stable `X-Request-Id` sent with every request, so server logs can
@@ -57,7 +59,8 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///   - baseURL: The API root, normally `https://api.cupthread.com`.
     ///   - appKey: Your app's key from the CupThread developer console.
     ///   - defaultPlatform: The platform reported with feedback submissions.
-    ///     Defaults to the OS the SDK is running on.
+    ///     Defaults to `macos` on macOS and `ios` everywhere else (visionOS
+    ///     and tvOS are iOS-family builds and report `ios`).
     ///   - requestID: Optional stable `X-Request-Id` sent with every request;
     ///     defaults to a per-request UUID.
     ///   - signingSecret: Optional SDK signing secret for HMAC-SHA256 request
