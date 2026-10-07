@@ -318,12 +318,16 @@ extension FeedbackClient {
     /// bearer token is attached as `Authorization: Bearer …` so versions
     /// load when `allowAnonymousRoadmap = false`.
     /// - Returns: Released and planned versions, sorted by ``AppVersion/position``.
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   access is disabled for the app (HTTP 401 `authentication_required`),
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
+    ///   roadmap access is disabled for the app (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchVersions() async throws -> [AppVersion] {
-        let response: ListVersionsResponse = try await get("/api/v1/public/versions/\(configuration.appKey)")
+        let response: ListVersionsResponse = try await get(
+            "/api/v1/public/versions/\(configuration.appKey)",
+            mapsPermissionErrors: true
+        )
         return response.versions.sorted { $0.position < $1.position }
     }
 
