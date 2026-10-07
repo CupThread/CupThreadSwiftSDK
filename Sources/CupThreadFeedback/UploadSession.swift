@@ -18,8 +18,11 @@ extension FeedbackClient {
     ///   - userToken: Anonymous end-user token sent as `X-User-Token`.
     ///   - turnstileToken: Optional Turnstile token for apps that require one.
     ///     When `nil`, the client's `turnstileTokenProvider` is consulted as a
-    ///     fallback, so one provider configuration covers attachments and
-    ///     submission alike.
+    ///     fallback — with the ``TurnstileAction/feedback`` binding — so one
+    ///     provider configuration covers attachments and submission alike.
+    ///     Render the token under that binding (the app key as `cdata`);
+    ///     upload sessions deliberately share the feedback action with
+    ///     `POST /api/v1/feedback`.
     /// - Returns: The session, including bearer token and pre-allocated slots.
     /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
     ///   identity could be presented, ``FeedbackClientError/rateLimited`` on
@@ -50,7 +53,9 @@ extension FeedbackClient {
         )
         var effectiveTurnstileToken = turnstileToken?.nilIfEmpty
         if effectiveTurnstileToken == nil {
-            effectiveTurnstileToken = await resolvedTurnstileToken()
+            effectiveTurnstileToken = await resolvedTurnstileToken(
+                for: .feedback(appKey: configuration.appKey)
+            )
         }
         await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(CreateSessionPayload(
