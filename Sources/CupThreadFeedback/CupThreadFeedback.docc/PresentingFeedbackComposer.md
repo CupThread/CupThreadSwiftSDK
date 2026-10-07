@@ -9,7 +9,7 @@ Collect structured bug reports, feedback, and user ideas with automatic environm
 ``FeedbackComposerView`` provides a ready-made SwiftUI feedback form that handles input validation, platform diagnostics, attachment management, and server submission out of the box.
 
 The form automatically captures:
-- **Platform**: The surface the form runs on (iOS, macOS, visionOS, or tvOS).
+- **Platform**: The surface the form runs on, recorded as `ios` for the iOS family (iPhone, iPad, visionOS, tvOS) and `macos` on macOS.
 - **App version & build**: Pulled from `Bundle.main`.
 - **Optional contact info**: Name and email, typed by the user and cleared after each successful submission.
 - **Attachments**: Images picked from the user's photo library, uploaded through upload sessions to CupThread storage (photo attachments have sensitive EXIF and GPS location metadata stripped before upload to protect user privacy while preserving multi-frame animations like GIF and animated WebP intact, and HEIC photos are transcoded to JPEG — the API accepts PNG, JPEG, WebP, and GIF only).

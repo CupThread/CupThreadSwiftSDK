@@ -101,7 +101,7 @@ let client = FeedbackClient(
 let userToken = UserTokenStore.shared.token  // stable anonymous UUID
 ```
 
-`FeedbackPlatform.current` reports the running OS automatically (`ios`, `macos`, `visionos`, `tvos`).
+`FeedbackPlatform.current` reports `macos` on macOS and `ios` everywhere else — visionOS and tvOS are iOS-family builds, so they report `ios`. If the console restricts submissions by platform, allow `ios` (or leave the allow-list empty, which permits all platforms) for visionOS and tvOS builds; visionos and tvos are not reportable platform values.
 
 ---
 
