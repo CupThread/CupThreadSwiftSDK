@@ -22,6 +22,28 @@ private final class RequestCounter: @unchecked Sendable {
     }
 }
 
+/// Lock-guarded, manually advanced clock for driving the negative-cache window.
+private final class SteppingClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: Date
+
+    init(_ current: Date = Date(timeIntervalSinceReferenceDate: 0)) {
+        self.current = current
+    }
+
+    var time: Date {
+        lock.lock()
+        defer { lock.unlock() }
+        return current
+    }
+
+    func advance(by interval: TimeInterval) {
+        lock.lock()
+        defer { lock.unlock() }
+        current = current.addingTimeInterval(interval)
+    }
+}
+
 @Suite(.serialized)
 @MainActor
 struct RemoteImageLoaderTests {
@@ -86,10 +108,62 @@ struct RemoteImageLoaderTests {
         #expect(firstImage === secondImage)
     }
 
-    @Test func failedDownloadIsNotCachedAndNextLoadRetries() async throws {
+    @Test func permanentlyFailingURLHitsNetworkOnceInsideRetryWindow() async throws {
+        let counter = RequestCounter()
+        let imageURL = makeImageURL("/always-404.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            counter.record()
+            return (self.makeImageResponse(request.url ?? imageURL, status: 404), Data())
+        }
+        let loader = RemoteImageLoader(session: makeMockSession())
+
+        for _ in 0..<3 {
+            do {
+                _ = try await loader.image(for: imageURL)
+                Issue.record("Expected the failed fetch to throw")
+            } catch let urlError as URLError {
+                #expect(urlError.code == .badServerResponse, "Replays must surface the recorded error")
+            } catch {
+                Issue.record("Expected URLError, got \(error)")
+            }
+        }
+
+        #expect(counter.requestCount == 1, "Failures inside the retry window must replay without network requests")
+        #expect(loader.recentFailureCount == 1)
+    }
+
+    @Test func failureWindowExpiryResumesNetworkRetries() async throws {
+        let clock = SteppingClock()
+        let counter = RequestCounter()
+        let imageURL = makeImageURL("/expiring-404.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            counter.record()
+            return (self.makeImageResponse(request.url ?? imageURL, status: 404), Data())
+        }
+        let loader = RemoteImageLoader(
+            session: makeMockSession(),
+            failureRetryInterval: 60,
+            now: { clock.time }
+        )
+
+        await #expect(throws: (any Error).self) {
+            try await loader.image(for: imageURL)
+        }
+        #expect(counter.requestCount == 1)
+
+        clock.advance(by: 61)
+
+        await #expect(throws: (any Error).self) {
+            try await loader.image(for: imageURL)
+        }
+        #expect(counter.requestCount == 2, "A lapsed negative-cache entry must allow a new network request")
+    }
+
+    @Test func transientFailureRecoversAfterRetryWindowAndSuccessIsCached() async throws {
+        let clock = SteppingClock()
         let counter = RequestCounter()
         let png = makePNGData()
-        let imageURL = makeImageURL("/flaky.png")
+        let imageURL = makeImageURL("/flaky-then-fine.png")
         MockURLProtocol.setHandler(forHost: Self.host) { request in
             let call = counter.record()
             if call == 1 {
@@ -97,15 +171,54 @@ struct RemoteImageLoaderTests {
             }
             return (self.makeImageResponse(request.url ?? imageURL), png)
         }
-        let loader = RemoteImageLoader(session: makeMockSession())
+        let loader = RemoteImageLoader(
+            session: makeMockSession(),
+            failureRetryInterval: 60,
+            now: { clock.time }
+        )
 
         await #expect(throws: (any Error).self) {
             try await loader.image(for: imageURL)
         }
         #expect(counter.requestCount == 1)
 
+        clock.advance(by: 61)
         let recovered = try await loader.image(for: imageURL)
         #expect(counter.requestCount == 2)
+        #expect(loader.recentFailureCount == 0, "A successful fetch must clear the negative-cache entry")
+
+        let fromCache = try await loader.image(for: imageURL)
+        #expect(counter.requestCount == 2, "Success caching must be unchanged by the failure ledger")
+        #expect(recovered === fromCache)
+    }
+
+    @Test func expiredFailureLedgerEntriesArePrunedOnInsert() async throws {
+        let clock = SteppingClock()
+        let counter = RequestCounter()
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            counter.record()
+            let fallback = URL(string: "https://\(Self.host)/prune-fallback.png")!
+            return (self.makeImageResponse(request.url ?? fallback, status: 404), Data())
+        }
+        let loader = RemoteImageLoader(
+            session: makeMockSession(),
+            failureRetryInterval: 60,
+            now: { clock.time }
+        )
+
+        for index in 0..<8 {
+            await #expect(throws: (any Error).self) {
+                try await loader.image(for: makeImageURL("/prune-\(index).png"))
+            }
+        }
+        #expect(loader.recentFailureCount == 8)
+
+        clock.advance(by: 61)
+        await #expect(throws: (any Error).self) {
+            try await loader.image(for: makeImageURL("/prune-fresh.png"))
+        }
+
+        #expect(loader.recentFailureCount == 1, "Expired ledger entries must be pruned so the ledger stays bounded")
     }
 
     @Test func cachedImageIdentityIsPreservedAcrossLoads() async throws {
