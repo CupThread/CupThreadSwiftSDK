@@ -30,6 +30,7 @@
 "cupthread.features.all_versions" = "Tất cả các phiên bản";
 "cupthread.features.version_picker" = "Phiên bản";
 "cupthread.features.filter_by_version" = "Lọc theo phiên bản";
+"cupthread.features.version_retry" = "Thử tải lại các phiên bản";
 "cupthread.features.request_a_feature" = "Đề xuất tính năng";
 "cupthread.features.request_a_feature_hint" = "Mở khung soạn yêu cầu tính năng";
 "cupthread.features.empty_title" = "Chưa có yêu cầu tính năng nào";

@@ -15,28 +15,25 @@ public struct FeatureRequestsView: View {
     public let userToken: String
 
     @State private var listState = FeatureRequestsListState()
-    @State private var isLoading = true
-    /// True once the first load finished. Later reloads (search, version filter)
-    /// keep showing content instead of flashing skeletons.
-    @State private var hasLoadedOnce = false
+    /// Load lifecycle (in-flight flag, first-verdict flag, generation). Only a
+    /// completed verdict of the newest, non-cancelled load resolves it — a
+    /// cancelled or superseded load writes nothing (issue #286).
+    @State private var loadState = FeatureRequestsLoadState()
     @State private var loadError: String?
     @State private var isComposePresented = false
     @State private var showSubmittedBanner = false
     @State private var activeSheet: FeatureRequestsActiveSheet?
 
     @State private var searchText = ""
-    @State private var versions: [AppVersion] = []
+    /// Version-filter options and their load outcome (issue #285): a failed
+    /// load keeps the menu reachable with a retry instead of disabling it.
+    @State private var versionFilterState = VersionFilterLoadState()
     @State private var selectedVersionID: String?
     @State private var isLoadingNextPage = false
     /// Failure of the latest cursor-page ("load more") attempt. Distinct from
     /// `loadError`, which is the initial-load failure: the loaded pages stay
     /// on screen and the load-more row turns into an explicit retry.
     @State private var pageError: String?
-    /// Bumped by every replacing load (search text, version filter,
-    /// pull-to-refresh, submit). A cursor-page response computed for an older
-    /// generation is dropped instead of being appended onto the new filter's
-    /// results.
-    @State private var loadGeneration = 0
     @State private var voteNotice: String?
     /// Transient notice for a failed reload whose results stay on screen
     /// (a reload failure never wipes already-rendered content).
@@ -61,13 +58,18 @@ public struct FeatureRequestsView: View {
         (sdkAppConfig?.allowsAnonymousFeedback ?? true) || isAuthenticated
     }
 
-    private var items: [FeatureRequestItem] {
+    var items: [FeatureRequestItem] {
         listState.items
     }
 
     private var votingIds: Set<String> {
         listState.votingIds
     }
+
+    // Lifecycle accessors for the rendering branches (and view-level tests).
+    var isLoading: Bool { loadState.isLoading }
+    var hasLoadedOnce: Bool { loadState.hasLoadedOnce }
+    var loadGeneration: Int { loadState.loadGeneration }
 
     /// The query actually sent to the server, trimmed to match the throttle's
     /// duplicate detection.
@@ -152,7 +154,12 @@ public struct FeatureRequestsView: View {
             }
         }
         .refreshable { await loadFeatureRequests() }
-        .task { await loadVersions() }
+        // Re-keyed on the anonymous-roadmap verdict (issue #285): versions
+        // answers 401/403 while anonymous reads are disabled; re-attempt on
+        // config transitions instead of staying stuck on the first failure.
+        .task(id: sdkAppConfig?.allowsAnonymousRoadmap) {
+            await loadVersions()
+        }
         .task(id: filterKey) {
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: the backend does not rate-limit it, so no
@@ -307,7 +314,7 @@ public struct FeatureRequestsView: View {
 
     private var versionFilterToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            VersionFilterMenu(selectedVersionID: $selectedVersionID, versions: versions)
+            VersionFilterMenu(selectedVersionID: $selectedVersionID, state: versionFilterState, onRetry: { Task { await loadVersions() } })
         }
     }
 
@@ -321,20 +328,28 @@ public struct FeatureRequestsView: View {
 
     @MainActor
     private func loadVersions() async {
-        versions = (try? await client.fetchVersions()) ?? []
+        versionFilterState.loadStarted()
+        do {
+            versionFilterState.loadFinished(try await client.fetchVersions())
+        } catch {
+            versionFilterState.loadFailed(error)
+        }
     }
 
     @MainActor
     private func loadFeatureRequests() async {
         isAuthenticated = await client.resolveAuthenticatedAccess()
-        loadGeneration += 1
-        isLoading = true
+        let generationAtStart = loadState.startLoading()
         loadError = nil
         reloadNotice = nil
         pageError = nil
         defer {
-            isLoading = false
-            hasLoadedOnce = true
+            // Only a completed verdict of the newest, non-cancelled load may
+            // resolve the lifecycle. A cancelled or superseded load never
+            // reached one: clearing `isLoading` or setting `hasLoadedOnce`
+            // here would fabricate the empty state while the replacement load
+            // is still in flight (issue #286).
+            loadState.finishLoading(generation: generationAtStart, wasCancelled: Task.isCancelled)
         }
         do {
             let result = try await client.fetchFeatureRequests(
@@ -342,10 +357,14 @@ public struct FeatureRequestsView: View {
                 versionId: selectedVersionID,
                 query: trimmedSearchText.isEmpty ? nil : trimmedSearchText
             )
-            guard !Task.isCancelled else { return }
+            // A newer replacing load (search/version change, pull-to-refresh)
+            // superseded this one — applying its page would render the older
+            // filter's results.
+            guard loadGeneration == generationAtStart else { return }
             listState.applyPage(result, replacesExisting: true)
         } catch {
-            guard !Task.isCancelled,
+            guard loadGeneration == generationAtStart,
+                  !Task.isCancelled,
                   let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty)
             else { return }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
@@ -435,5 +454,22 @@ public struct FeatureRequestsView: View {
         #if canImport(UIKit)
         UIAccessibility.post(notification: .announcement, argument: message)
         #endif
+    }
+}
+
+// MARK: - Test support
+
+extension FeatureRequestsView {
+    /// Internal initializer for tests with custom list and load state.
+    init(
+        client: FeedbackClient,
+        userToken: String,
+        listState: FeatureRequestsListState,
+        loadState: FeatureRequestsLoadState
+    ) {
+        self.client = client
+        self.userToken = userToken
+        _listState = State(initialValue: listState)
+        _loadState = State(initialValue: loadState)
     }
 }

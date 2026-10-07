@@ -30,6 +30,7 @@
 "cupthread.features.all_versions" = "Tüm Sürümler";
 "cupthread.features.version_picker" = "Sürüm";
 "cupthread.features.filter_by_version" = "Sürüme göre filtrele";
+"cupthread.features.version_retry" = "Sürümleri yeniden yüklemeyi dene";
 "cupthread.features.request_a_feature" = "Özellik Öner";
 "cupthread.features.request_a_feature_hint" = "Özellik talebi oluşturma ekranını açar";
 "cupthread.features.empty_title" = "Özellik Talebi Yok";

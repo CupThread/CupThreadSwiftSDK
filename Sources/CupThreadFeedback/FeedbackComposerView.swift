@@ -101,10 +101,10 @@ public struct FeedbackComposerView: View {
     ///   - maxAttachmentBytes: Optional client-side upload size cap in bytes.
     ///     An explicit non-nil value is authoritative and takes precedence over console
     ///     configuration. When `nil`, falls back to the fetched
-    ///     ``PublicAppConfig/maxAttachmentBytes`` or
-    ///     ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` (20 MB). Photos
-    ///     larger than the limit are automatically downscaled and re-encoded
-    ///     as JPEG to fit before upload (see
+    ///     ``PublicAppConfig/maxAttachmentBytes``, then to the last-known limit
+    ///     from an earlier fetch, ultimately to ``PhotoAttachmentHelper/defaultMaxAttachmentBytes``
+    ///     (20 MB) on first run. Photos larger than the limit are automatically
+    ///     downscaled and re-encoded as JPEG to fit before upload (see
     ///     ``PhotoAttachmentHelper/downscaledImageData(_:limit:maxDimension:)``).
     ///   - stripSensitiveMetadata: When `true` (the default), photo attachments selected
     ///     via the photo picker are re-encoded to strip GPS coordinates, camera details,
@@ -184,15 +184,14 @@ public struct FeedbackComposerView: View {
         .task {
             // Read through the shared config cache: the surface gate's fetch
             // (and any other surface's) already warmed it, so presenting the
-            // composer costs at most one config GET per TTL window.
-            let resolvedConfig: PublicAppConfig?
-            if let activeConfig {
-                resolvedConfig = activeConfig
-            } else {
-                resolvedConfig = try? await client.cachedAppConfig()
-            }
-            if let resolvedConfig {
-                attachmentState.applyConfigLimit(resolvedConfig.maxAttachmentBytes)
+            // composer costs at most one config GET per TTL window. A failed
+            // read keeps the last-known console limit in force (#287) instead
+            // of the compiled-in default — the downscale driver input (#52).
+            let resolvedConfig: PublicAppConfig? = if let activeConfig { activeConfig } else { try? await client.cachedAppConfig() }
+            if let limit = FeedbackComposerAttachmentLimit.resolve(
+                config: resolvedConfig, lastKnownLimit: client.configStore.lastKnownMaxAttachmentBytes()
+            ) {
+                attachmentState.applyConfigLimit(limit)
             }
             isAuthenticated = await client.resolveAuthenticatedAccess()
         }

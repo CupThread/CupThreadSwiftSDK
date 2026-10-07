@@ -27,16 +27,27 @@ final class UserDefaultsConfigStorage: SdkConfigCacheStorage, @unchecked Sendabl
     }
 }
 
-/// Persists the last successfully fetched ``SdkAppearance`` per app key.
+/// Persists the last successfully fetched ``SdkAppearance`` and console
+/// attachment limit per app key.
 ///
 /// Consulted only when a fetch fails: the cached theme, feature flags, and
 /// overlay copy stay in force instead of rolling back to defaults, so console
-/// kill-switches keep working through outages. The cache has no TTL — every
-/// successful fetch overwrites it, and entries are namespaced per app key so
-/// multiple apps in one process stay isolated.
+/// kill-switches keep working through outages — and the attachment limit
+/// keeps the composer's automatic downscale path matched to the server-side
+/// limit (#287). The cache has no TTL — every successful fetch overwrites it,
+/// and entries are namespaced per app key so multiple apps in one process
+/// stay isolated.
 final class SdkConfigCache: Sendable {
     /// Prefix of the `UserDefaults` keys holding cached appearances.
     static let keyPrefix = "com.cupthread.sdkConfigCache."
+
+    /// On-disk payload: the appearance plus the console upload limit. The
+    /// limit is optional so payloads written by SDK versions that cached the
+    /// bare appearance still decode — with an unknown (`nil`) limit.
+    private struct Payload: Codable {
+        let appearance: SdkAppearance
+        let maxAttachmentBytes: Int?
+    }
 
     private let storage: any SdkConfigCacheStorage
     private let key: String
@@ -57,14 +68,36 @@ final class SdkConfigCache: Sendable {
     /// The persisted appearance for this app key, or `nil` when no fetch has
     /// ever succeeded (or the stored payload cannot be decoded).
     func cachedAppearance() -> SdkAppearance? {
-        guard let data = storage.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(SdkAppearance.self, from: data)
+        decodePayload()?.appearance
     }
 
-    /// Overwrites the cached appearance after a successful fetch.
-    func store(_ appearance: SdkAppearance) {
-        guard let data = try? JSONEncoder().encode(appearance) else { return }
+    /// The persisted console attachment limit for this app key, or `nil` when
+    /// no fetch has ever succeeded or the stored payload was written by an
+    /// SDK version that did not yet persist the limit.
+    func cachedMaxAttachmentBytes() -> Int? {
+        decodePayload()?.maxAttachmentBytes
+    }
+
+    /// Overwrites the cached entry after a successful fetch.
+    func store(appearance: SdkAppearance, maxAttachmentBytes: Int) {
+        let payload = Payload(appearance: appearance, maxAttachmentBytes: maxAttachmentBytes)
+        guard let data = try? JSONEncoder().encode(payload) else { return }
         storage.set(data, forKey: key)
+    }
+
+    /// Decodes the stored payload. The envelope format is tried first; a
+    /// payload written by an older SDK version is a bare ``SdkAppearance``
+    /// (whose decoder accepts missing keys, so it must not be consulted
+    /// before the envelope), which decodes with a `nil` limit.
+    private func decodePayload() -> Payload? {
+        guard let data = storage.data(forKey: key) else { return nil }
+        if let payload = try? JSONDecoder().decode(Payload.self, from: data) {
+            return payload
+        }
+        guard let appearance = try? JSONDecoder().decode(SdkAppearance.self, from: data) else {
+            return nil
+        }
+        return Payload(appearance: appearance, maxAttachmentBytes: nil)
     }
 }
 
@@ -90,9 +123,9 @@ final class SdkConfigCache: Sendable {
 ///
 /// Every success is also written through to the on-disk last-good
 /// ``SdkConfigCache`` so a later failure can restore the last working
-/// appearance (see ``SdkConfigStatus``). The in-memory TTL entry is never
-/// seeded from disk: the disk cache has no fetch timestamp, and treating it
-/// as fresh would silently suppress refreshes.
+/// appearance and attachment limit (see ``SdkConfigStatus``). The in-memory
+/// TTL entry is never seeded from disk: the disk cache has no fetch
+/// timestamp, and treating it as fresh would silently suppress refreshes.
 final class AppConfigStore: @unchecked Sendable {
     /// How long a fetched configuration is reused before the next read
     /// refetches. Short by design so console changes keep propagating quickly.
@@ -173,6 +206,15 @@ final class AppConfigStore: @unchecked Sendable {
         lastGood.cachedAppearance()
     }
 
+    /// The last successfully fetched console attachment limit (disk-backed),
+    /// for failure paths that must keep the last working limit in force —
+    /// the composer's attachment preflight and automatic downscale driver
+    /// (#287). `nil` when no fetch has ever succeeded, or the cached payload
+    /// was written by an SDK version that did not yet persist the limit.
+    func lastKnownMaxAttachmentBytes() -> Int? {
+        lastGood.cachedMaxAttachmentBytes()
+    }
+
     // MARK: Lock-guarded sections (kept synchronous: `NSLock.unlock` is
     // unavailable from async contexts)
 
@@ -187,7 +229,10 @@ final class AppConfigStore: @unchecked Sendable {
             let config = try await task.value
             if created {
                 finish(with: .success(config))
-                lastGood.store(config.sdk)
+                lastGood.store(
+                    appearance: config.sdk,
+                    maxAttachmentBytes: config.maxAttachmentBytes
+                )
             }
             return config
         } catch {

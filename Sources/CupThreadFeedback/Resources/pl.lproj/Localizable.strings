@@ -30,6 +30,7 @@
 "cupthread.features.all_versions" = "Wszystkie wersje";
 "cupthread.features.version_picker" = "Wersja";
 "cupthread.features.filter_by_version" = "Filtruj według wersji";
+"cupthread.features.version_retry" = "Ponów wczytywanie wersji";
 "cupthread.features.request_a_feature" = "Zaproponuj funkcję";
 "cupthread.features.request_a_feature_hint" = "Otwiera formularz propozycji funkcji";
 "cupthread.features.empty_title" = "Brak propozycji funkcji";

@@ -286,6 +286,29 @@ struct LocalizationTests {
         }
     }
 
+    /// `VersionFilterMenu`'s retry affordance ships localized copy in every
+    /// target language (issue #285): a failed version-options load must offer
+    /// a reachable retry, never a silently disabled menu.
+    @Test func versionFilterRetryStringIsLocalizedAcrossTargetLanguages() throws {
+        for lang in Self.targetLanguages {
+            let strings = try loadStrings(for: lang)
+            let localized = try #require(
+                strings["cupthread.features.version_retry"],
+                "\(lang) is missing cupthread.features.version_retry"
+            )
+            #expect(!localized.isEmpty, "\(lang) has empty cupthread.features.version_retry")
+            #expect(
+                localized != "cupthread.features.version_retry",
+                "\(lang) has unlocalized raw key for cupthread.features.version_retry"
+            )
+        }
+        // The English copy names versions, so it cannot be confused with the
+        // generic list "Try Again" button used by the load-more row.
+        let enRetry = try #require(try loadStrings(for: "en")["cupthread.features.version_retry"])
+        let genericTryAgain = try #require(try loadStrings(for: "en")["cupthread.error.try_again"])
+        #expect(enRetry != genericTryAgain)
+    }
+
     /// Payment-attribute signature failure copy ships in every locale (issue #238)
     /// and never collides with the signed-in unauthorized copy.
     @Test func signatureFailureStringsResolveAcrossAllLanguages() throws {

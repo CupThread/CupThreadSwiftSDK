@@ -30,6 +30,7 @@
 "cupthread.features.all_versions" = "すべてのバージョン";
 "cupthread.features.version_picker" = "バージョン";
 "cupthread.features.filter_by_version" = "バージョンでフィルター";
+"cupthread.features.version_retry" = "バージョン一覧を再読み込み";
 "cupthread.features.request_a_feature" = "機能をリクエスト";
 "cupthread.features.request_a_feature_hint" = "機能リクエストの作成画面を開きます。";
 "cupthread.features.empty_title" = "機能リクエストがありません";

@@ -30,6 +30,7 @@
 "cupthread.features.all_versions" = "所有版本";
 "cupthread.features.version_picker" = "版本";
 "cupthread.features.filter_by_version" = "按版本篩選";
+"cupthread.features.version_retry" = "重新載入版本列表";
 "cupthread.features.request_a_feature" = "提出新建議";
 "cupthread.features.request_a_feature_hint" = "開啟功能建議提交面板";
 "cupthread.features.empty_title" = "暫無功能建議";

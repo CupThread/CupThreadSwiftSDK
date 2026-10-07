@@ -30,6 +30,7 @@
 "cupthread.features.all_versions" = "Tutte le versioni";
 "cupthread.features.version_picker" = "Versione";
 "cupthread.features.filter_by_version" = "Filtra per versione";
+"cupthread.features.version_retry" = "Riprova a caricare le versioni";
 "cupthread.features.request_a_feature" = "Richiedi funzionalità";
 "cupthread.features.request_a_feature_hint" = "Apre la schermata per richiedere una funzionalità";
 "cupthread.features.empty_title" = "Nessuna richiesta di funzionalità";
