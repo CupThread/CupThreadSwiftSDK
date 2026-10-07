@@ -96,6 +96,15 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// device clock skew. Ensure the device clock is set correctly and let the
     /// SDK retry with a fresh signature.
     case staleSignature(message: String?, requestId: String?)
+    /// The upload session expired before the file could be uploaded
+    /// (HTTP 401 `session_expired` / `session_invalid_or_expired`). Remove
+    /// and re-attach the file to create a fresh upload session and try again.
+    case uploadSessionExpired(message: String?, requestId: String?)
+    /// The upload session was invalid, unknown, or no longer pending
+    /// (HTTP 401 `session_invalid`, HTTP 409 `session_not_pending` /
+    /// `already_uploaded`). Remove and re-attach the file to create a fresh
+    /// upload session and try again.
+    case uploadSessionInvalid(message: String?, requestId: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -121,7 +130,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
              .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified,
              .invalidParent, .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
-             .invalidSignature, .staleSignature:
+             .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid:
             return nil
         }
     }
@@ -193,6 +202,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .invalidSignature(_, let requestId):
             return requestId
         case .staleSignature(_, let requestId):
+            return requestId
+        case .uploadSessionExpired(_, let requestId):
+            return requestId
+        case .uploadSessionInvalid(_, let requestId):
             return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
@@ -268,6 +281,12 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .staleSignature(_, let requestId):
             let suffix = requestId.map { " (request id: \($0))" } ?? ""
             return CupThreadStrings.tr("cupthread.error.stale_signature") + suffix
+        case .uploadSessionExpired(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "The upload session has expired. Please remove and re-attach the file, then try again.\(suffix)"
+        case .uploadSessionInvalid(_, let requestId):
+            let suffix = requestId.map { " (request id: \($0))" } ?? ""
+            return "The upload session is invalid or no longer active. Please remove and re-attach the file, then try again.\(suffix)"
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
@@ -361,5 +380,15 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``staleSignature(message:requestId:)`` with no request id.
     static func staleSignature(message: String? = nil) -> FeedbackClientError {
         .staleSignature(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``uploadSessionExpired(message:requestId:)`` with no request id.
+    static func uploadSessionExpired(message: String? = nil) -> FeedbackClientError {
+        .uploadSessionExpired(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``uploadSessionInvalid(message:requestId:)`` with no request id.
+    static func uploadSessionInvalid(message: String? = nil) -> FeedbackClientError {
+        .uploadSessionInvalid(message: message, requestId: nil)
     }
 }

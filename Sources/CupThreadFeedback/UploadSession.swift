@@ -88,7 +88,10 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
     /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
     ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
-    ///   ``FeedbackClientError/rateLimited`` (HTTP 429), or
+    ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
+    ///   ``FeedbackClientError/uploadSessionExpired`` (HTTP 401 `session_expired` /
+    ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid``
+    ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` /
     ///   ``FeedbackClientError/invalidResponse`` for other failures.
     public func uploadAttachment(
@@ -151,7 +154,10 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
     /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
     ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
-    ///   ``FeedbackClientError/rateLimited`` (HTTP 429), or
+    ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
+    ///   ``FeedbackClientError/uploadSessionExpired`` (HTTP 401 `session_expired` /
+    ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid``
+    ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` /
     ///   ``FeedbackClientError/invalidResponse`` for other failures.
     public func uploadAttachment(
@@ -203,7 +209,10 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/unsupportedMediaType`` when the type
     ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
     ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
-    ///   when no identity could be presented, or
+    ///   when no identity could be presented,
+    ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
+    ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
+    ///   lifecycle failures, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
     ///   other server failures.
     public func uploadAttachment(
@@ -250,7 +259,10 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/unsupportedMediaType`` when the type
     ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
     ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
-    ///   when no identity could be presented, or
+    ///   when no identity could be presented,
+    ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
+    ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
+    ///   lifecycle failures, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
     ///   other server failures.
     public func uploadAttachment(
@@ -416,5 +428,27 @@ extension FeedbackClient {
         }
 
         return configuration.baseURL.appending(path: trimmed)
+    }
+
+    /// Maps upload session lifecycle error envelopes on PUT (API-13):
+    /// session expiry and invalidation codes return typed errors so callers
+    /// can instruct users to re-attach instead of showing signed-in HTTP 401 copy.
+    static func uploadSessionLifecycleTypedError(
+        statusCode: Int,
+        code: String?,
+        envelopeMessage: String?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        switch (statusCode, code) {
+        case (401, "session_expired"),
+             (401, "session_invalid_or_expired"):
+            return .uploadSessionExpired(message: envelopeMessage, requestId: requestId)
+        case (401, "session_invalid"),
+             (409, "session_not_pending"),
+             (409, "already_uploaded"):
+            return .uploadSessionInvalid(message: envelopeMessage, requestId: requestId)
+        default:
+            return nil
+        }
     }
 }

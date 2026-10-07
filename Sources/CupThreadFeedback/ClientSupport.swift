@@ -173,24 +173,42 @@ extension FeedbackClient {
             // endpoints return only the human message until their Phase 0
             // code ships, so the message matches as a fallback.
             return .turnstileRequired(message: envelopeMessage, requestId: requestId)
-        case (400, "uploader_identity_required"):
-            return .uploaderIdentityRequired(message: envelopeMessage, requestId: requestId)
-        case (400, "uploader_mismatch"):
-            return .uploaderMismatch(message: envelopeMessage, requestId: requestId)
-        case (400, "invalid_parent"):
-            // The reply target is missing, hidden, or not on this feature
-            // request — the composer composed a stale reply (moderation
-            // changed the parent between reply and submit).
-            return .invalidParent(message: envelopeMessage, requestId: requestId)
+        case (400, _):
+            return badRequestTypedError(code: code, envelopeMessage: envelopeMessage, requestId: requestId)
         case (403, "email_not_verified"):
             return .emailNotVerified(message: envelopeMessage, requestId: requestId)
         default:
-            return signatureTypedError(
+            return uploadSessionLifecycleTypedError(
+                statusCode: statusCode,
+                code: code,
+                envelopeMessage: envelopeMessage,
+                requestId: requestId
+            ) ?? signatureTypedError(
                 statusCode: statusCode,
                 code: code,
                 envelopeMessage: envelopeMessage,
                 requestId: requestId
             )
+        }
+    }
+
+    private static func badRequestTypedError(
+        code: String?,
+        envelopeMessage: String?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        switch code {
+        case "uploader_identity_required":
+            return .uploaderIdentityRequired(message: envelopeMessage, requestId: requestId)
+        case "uploader_mismatch":
+            return .uploaderMismatch(message: envelopeMessage, requestId: requestId)
+        case "invalid_parent":
+            // The reply target is missing, hidden, or not on this feature
+            // request — the composer composed a stale reply (moderation
+            // changed the parent between reply and submit).
+            return .invalidParent(message: envelopeMessage, requestId: requestId)
+        default:
+            return nil
         }
     }
 
