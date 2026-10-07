@@ -25,7 +25,10 @@ extension FeedbackClient {
     ///   identity could be presented, ``FeedbackClientError/rateLimited`` on
     ///   HTTP 429, ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
-    ///   disables feedback attachments (HTTP 401/403), or
+    ///   disables feedback attachments (HTTP 401/403),
+    ///   ``FeedbackClientError/unsupportedMediaType(message:requestId:)``
+    ///   when a declared MIME type or executable extension is rejected
+    ///   (HTTP 400 `unsupported_mime_type` / `executable_extension_prohibited`), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   / ``FeedbackClientError/invalidResponse`` for other failures.
     public func createUploadSession(
