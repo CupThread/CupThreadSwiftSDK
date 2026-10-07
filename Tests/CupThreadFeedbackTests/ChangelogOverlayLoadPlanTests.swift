@@ -74,7 +74,7 @@ struct ChangelogOverlayLoadPlanTests {
 
     @Test func fallbackAppearanceKeepsLastGoodAppearanceWhenFetchFails() async throws {
         let cache = SdkConfigCache(appKey: "app_loadplan_lastgood", storage: InMemoryConfigStorage())
-        cache.store(makeConsoleAppearance())
+        cache.store(appearance: makeConsoleAppearance(), maxAttachmentBytes: 5_000_000)
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (makeHTTPResponse(status: 500), try encodeJSON(["error": "boom"]))
         }

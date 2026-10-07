@@ -586,7 +586,7 @@ struct ValidateResponseRequestIdTests {
     private let client = makeClient(baseURL: URL(string: "https://api.example.com")!, appKey: "app_key")
 
     @Test func validateResponse429SurfacesRequestIdWhenPresent() throws {
-        let response = makeHTTPResponse(status: 429, headers: ["X-Request-Id": "req-429"])
+        let response = makeHTTPResponse(status: 429, headers: ["X-Request-Id": "request-429"])
         let data = try encodeJSON(["error": "Too many requests"])
 
         do {
@@ -598,8 +598,8 @@ struct ValidateResponseRequestIdTests {
                 return
             }
             #expect(message == "Too many requests")
-            #expect(requestId == "req-429")
-            #expect(error.requestId == "req-429")
+            #expect(requestId == "request-429")
+            #expect(error.requestId == "request-429")
         }
     }
 
@@ -622,7 +622,7 @@ struct ValidateResponseRequestIdTests {
     }
 
     @Test func validateResponse415SurfacesRequestIdWhenPresent() throws {
-        let response = makeHTTPResponse(status: 415, headers: ["X-Request-Id": "req-415"])
+        let response = makeHTTPResponse(status: 415, headers: ["X-Request-Id": "request-415"])
         let data = try encodeJSON(["error": "Unsupported Media Type"])
 
         do {
@@ -634,8 +634,8 @@ struct ValidateResponseRequestIdTests {
                 return
             }
             #expect(message == "Unsupported Media Type")
-            #expect(requestId == "req-415")
-            #expect(error.requestId == "req-415")
+            #expect(requestId == "request-415")
+            #expect(error.requestId == "request-415")
         }
     }
 
@@ -658,7 +658,7 @@ struct ValidateResponseRequestIdTests {
     }
 
     @Test func validateResponse413SurfacesRequestIdWhenPresent() throws {
-        let response = makeHTTPResponse(status: 413, headers: ["X-Request-Id": "req-413"])
+        let response = makeHTTPResponse(status: 413, headers: ["X-Request-Id": "request-413"])
         let data = try encodeJSON(["error": "Payload Too Large"])
 
         do {
@@ -670,8 +670,8 @@ struct ValidateResponseRequestIdTests {
                 return
             }
             #expect(message == "Payload Too Large")
-            #expect(requestId == "req-413")
-            #expect(error.requestId == "req-413")
+            #expect(requestId == "request-413")
+            #expect(error.requestId == "request-413")
         }
     }
 
@@ -694,7 +694,7 @@ struct ValidateResponseRequestIdTests {
     }
 
     @Test func validateResponse422ScanRejectedSurfacesRequestIdWhenPresent() throws {
-        let response = makeHTTPResponse(status: 422, headers: ["X-Request-Id": "req-422"])
+        let response = makeHTTPResponse(status: 422, headers: ["X-Request-Id": "request-422"])
         let data = try encodeJSON(["error": "File rejected by content scan", "code": "scan_rejected"])
 
         do {
@@ -706,8 +706,8 @@ struct ValidateResponseRequestIdTests {
                 return
             }
             #expect(message == "File rejected by content scan")
-            #expect(requestId == "req-422")
-            #expect(error.requestId == "req-422")
+            #expect(requestId == "request-422")
+            #expect(error.requestId == "request-422")
         }
     }
 
@@ -799,6 +799,59 @@ struct ValidateResponseRequestIdTests {
             #expect(requestId == nil)
             #expect(error.requestId == nil)
         }
+    }
+
+    // MARK: Echo-side grammar validation (SEC-12)
+
+    /// Reads the echoed `X-Request-Id` the way `validateResponse` does.
+    private func echoedRequestID(fromHeader value: String?) -> String? {
+        var headers: [String: String] = [:]
+        if let value {
+            headers["X-Request-Id"] = value
+        }
+        return makeHTTPResponse(headers: headers).cupthreadRequestID
+    }
+
+    @Test func requestIDEchoRejectsNonConformingHeaderValue() throws {
+        // Well-formed ids keep propagating (covered by the suffix tests
+        // above); everything outside the grammar is dropped.
+        #expect(echoedRequestID(fromHeader: "<script>alert(1)</script>") == nil)
+        #expect(echoedRequestID(fromHeader: String(repeating: "a", count: 4096)) == nil)
+        #expect(echoedRequestID(fromHeader: "   ") == nil)
+        #expect(echoedRequestID(fromHeader: "") == nil)
+        #expect(echoedRequestID(fromHeader: "requêst-id-1") == nil)
+        #expect(echoedRequestID(fromHeader: "req id 1234") == nil)
+        #expect(echoedRequestID(fromHeader: nil) == nil)
+
+        // A dropped echo also disappears from user-facing copy: the thrown
+        // error carries no request id and renders no suffix.
+        let response = makeHTTPResponse(
+            status: 429,
+            headers: ["X-Request-Id": "<script>alert(1)</script>"]
+        )
+        let data = try encodeJSON(["error": "Too many requests"])
+        do {
+            try client.validateResponse(response, data: data, accepted: [200])
+            Issue.record("Expected error")
+        } catch let error as FeedbackClientError {
+            #expect(error.requestId == nil)
+            let desc = try #require(error.errorDescription)
+            #expect(desc.contains("request id") == false)
+            #expect(desc.contains("<script>") == false)
+        }
+    }
+
+    @Test func requestIDEchoAcceptsGrammarBoundaryValues() {
+        // Length bounds: 8 and 64 characters accepted, 7 and 65 rejected.
+        #expect(echoedRequestID(fromHeader: "abcd1234") == "abcd1234")
+        #expect(echoedRequestID(fromHeader: String(repeating: "x", count: 64)) == String(repeating: "x", count: 64))
+        #expect(echoedRequestID(fromHeader: "abc1234") == nil)
+        #expect(echoedRequestID(fromHeader: String(repeating: "x", count: 65)) == nil)
+
+        // Every grammar character is accepted, and server-generated
+        // UUID echoes conform too.
+        #expect(echoedRequestID(fromHeader: "Az.9_-10") == "Az.9_-10")
+        #expect(echoedRequestID(fromHeader: "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0") != nil)
     }
 }
 
