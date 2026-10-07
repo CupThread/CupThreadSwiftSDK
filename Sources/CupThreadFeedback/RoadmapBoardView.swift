@@ -15,11 +15,8 @@ public struct RoadmapBoardView: View {
     public let userToken: String
 
     @State private var groups: [RoadmapGroup] = []
-    @State private var isLoading = true
-    /// True once the first load finished (success or failure). Later reloads —
-    /// e.g. search-driven — keep showing content instead of flashing skeletons.
-    @State private var hasLoadedOnce = false
-    @State private var loadError: String?
+    /// First-load lifecycle and stale-write generation tracking (issue #274).
+    @State private var loadState = RoadmapBoardLoadState()
     @State private var selectedGroupID: String?
     @State private var searchText = ""
     /// Transient notice for a failed reload whose groups stay on screen
@@ -71,6 +68,16 @@ public struct RoadmapBoardView: View {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Restarts the load lifecycle whenever the permission verdict or the
+    /// search query changes (issue #274). Keyed on the search text alone, the
+    /// task never re-ran when `sdkAppConfig` (or resolved authentication)
+    /// flipped the verdict, so a denied→permitted config transition left the
+    /// board on its first-load skeleton forever. A verdict-stable config
+    /// refresh keeps the key — and the in-flight load — unchanged.
+    private var loadTaskKey: String {
+        makeRoadmapLoadTaskKey(isRoadmapPermitted: isRoadmapPermitted, trimmedSearchText: trimmedSearchText)
+    }
+
     #if canImport(UIKit)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
@@ -99,7 +106,7 @@ public struct RoadmapBoardView: View {
         _searchText = State(initialValue: initialSearchText)
         if let initialGroups {
             _groups = State(initialValue: initialGroups)
-            _hasLoadedOnce = State(initialValue: true)
+            _loadState = State(initialValue: RoadmapBoardLoadState(isLoading: false, hasLoadedOnce: true))
         }
     }
 
@@ -137,9 +144,12 @@ public struct RoadmapBoardView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .task(id: trimmedSearchText) {
+        .task(id: loadTaskKey) {
             await resolveAuthenticationAccess()
-            guard isRoadmapPermitted else { return }
+            guard isRoadmapPermitted else {
+                settlePermissionDeniedState()
+                return
+            }
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: unrate-limited, so no debounce/throttle.
                 await load()
@@ -168,9 +178,9 @@ public struct RoadmapBoardView: View {
     /// switches over it so loading, error, empty, and content states agree.
     private var displayState: RoadmapBoardDisplayState {
         makeBoardDisplayState(
-            isLoading: isLoading,
-            hasLoadedOnce: hasLoadedOnce,
-            loadError: loadError,
+            isLoading: loadState.isLoading,
+            hasLoadedOnce: loadState.hasLoadedOnce,
+            loadError: loadState.loadError,
             searchText: searchText,
             groups: groups
         )
@@ -370,15 +380,14 @@ public struct RoadmapBoardView: View {
     @MainActor
     private func load() async {
         await resolveAuthenticationAccess()
-        guard isRoadmapPermitted else { return }
-        rejectedByServer = false
-        isLoading = true
-        loadError = nil
-        reloadNotice = nil
-        defer {
-            isLoading = false
-            hasLoadedOnce = true
+        guard isRoadmapPermitted else {
+            settlePermissionDeniedState()
+            return
         }
+        rejectedByServer = false
+        let generation = loadState.startLoading()
+        reloadNotice = nil
+        defer { loadState.finishLoading(generation: generation) }
         do {
             // The board needs complete data — grouping a single page would
             // silently truncate every column once the app outgrows the
@@ -392,29 +401,53 @@ public struct RoadmapBoardView: View {
                 query: query,
                 config: sdkAppConfig
             ) {
+                // A newer load or a permission denial owns the board now.
+                guard loadState.isCurrent(generation: generation) else { return }
                 groups = loaded
             }
         } catch {
-            // A cancelled load (keystroke restart, dismissal) never reached a verdict: keep the board.
-            guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) else { return }
-            if isSdkPermissionRejection(error) {
-                // The preflight passed but the server still answered 401 — the
-                // token expired (or was revoked) between the check and the
-                // send. The signed-out permission placeholder replaces the
-                // board instead of the generic error state (issue #297).
-                rejectedByServer = true
-                return
-            }
-            if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
-                await client.searchThrottle.enterCooldown()
-            }
-            switch outcome {
-            case .inlineNotice(let message):
-                reloadNotice = message
-            case .fullScreenError(let message):
-                loadError = message
-            }
+            await handleLoadFailure(error, generation: generation)
         }
+    }
+
+    /// Classifies and presents a failed load for `generation`. A cancelled
+    /// load (keystroke restart, dismissal) never reached a verdict and a
+    /// superseded run must not write — so both keep the board untouched
+    /// (issue #274). A server permission rejection swaps in the placeholder;
+    /// every other failure becomes a transient notice over existing content
+    /// or a full-screen error.
+    @MainActor
+    private func handleLoadFailure(_ error: Error, generation: Int) async {
+        guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) else { return }
+        guard loadState.isCurrent(generation: generation) else { return }
+        if isSdkPermissionRejection(error) {
+            // The preflight passed but the server still answered 401 — the
+            // token expired (or was revoked) between the check and the
+            // send. The signed-out permission placeholder replaces the
+            // board instead of the generic error state (issue #297).
+            rejectedByServer = true
+            return
+        }
+        if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
+            await client.searchThrottle.enterCooldown()
+        }
+        switch outcome {
+        case .inlineNotice(let message):
+            reloadNotice = message
+        case .fullScreenError(let message):
+            loadState.handleFailure(message: message, generation: generation)
+        }
+    }
+
+    /// Settles the lifecycle on the denied path (issue #274): the board can
+    /// no longer be stranded on its first-load skeleton if the body leaves
+    /// the permission placeholder without a task restart, and the generation
+    /// bump discards the writes of any in-flight permitted load — including
+    /// unstructured ones (pull-to-refresh) that SwiftUI's task cancellation
+    /// does not reach.
+    private func settlePermissionDeniedState() {
+        loadState.settlePermissionDenied()
+        reloadNotice = nil
     }
 
     /// Resolves whether the client can act as the signed-in user right now and
