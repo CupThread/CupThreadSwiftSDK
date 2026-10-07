@@ -24,9 +24,11 @@ import Foundation
 ///   during which query-bearing admissions are denied; the next emission
 ///   after the cooldown resumes searching.
 ///
-/// Plain listings (no query) bypass the throttle — the backend does not
-/// rate-limit them. User-initiated loads (pull-to-refresh, retry buttons)
-/// bypass it too, so the throttle can never strand a deliberate action.
+/// Plain listings (no query) bypass the throttle completely — the backend does not
+/// rate-limit them. User-initiated loads (pull-to-refresh, retry buttons, deep pagination)
+/// bypass waiting so the throttle can never strand a deliberate action, but query-bearing
+/// fetches are recorded (via ``recordQueryFetch(key:)``) so the sliding window accurately
+/// tracks them against the per-IP budget.
 actor SearchRequestThrottle {
     private let minimumInterval: Duration
     private let windowPeriod: Duration
@@ -94,6 +96,23 @@ actor SearchRequestThrottle {
             admittedTimes.append(admittedAt)
             return true
         }
+    }
+
+    /// Records a query-bearing fetch that already happened (or is about to)
+    /// without suspending — user-initiated loads are never delayed, but they
+    /// still spend the per-IP budget, so the window must reflect them.
+    func recordQueryFetch(key: String? = nil) {
+        admittedTimes.removeAll { now() - $0 >= windowPeriod }
+        admittedTimes.append(now())
+        if let key {
+            lastAdmittedKey = key
+            lastAdmittedAt = now()
+        }
+    }
+
+    /// Number of admitted query-bearing fetches currently within the sliding window.
+    var admittedCount: Int {
+        admittedTimes.filter { now() - $0 < windowPeriod }.count
     }
 
     /// Starts the post-429 cooldown and clears the duplicate gate, so the

@@ -151,7 +151,7 @@ public struct RoadmapBoardView: View {
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
             guard await client.searchThrottle.waitForAdmission(key: "roadmap|\(trimmedSearchText)") else { return }
-            await load()
+            await load(alreadyAdmitted: true)
         }
         .task(id: reloadNotice) {
             guard reloadNotice != nil else { return }
@@ -368,7 +368,7 @@ public struct RoadmapBoardView: View {
     }
 
     @MainActor
-    private func load() async {
+    private func load(alreadyAdmitted: Bool = false) async {
         await resolveAuthenticationAccess()
         guard isRoadmapPermitted else { return }
         rejectedByServer = false
@@ -390,7 +390,8 @@ public struct RoadmapBoardView: View {
                 client: client,
                 userToken: userToken,
                 query: query,
-                config: sdkAppConfig
+                config: sdkAppConfig,
+                skipInitialAdmissionRecord: alreadyAdmitted
             ) {
                 groups = loaded
             }

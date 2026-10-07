@@ -135,15 +135,24 @@ func loadRoadmapGroups(
     client: FeedbackClient,
     userToken: String,
     query: String?,
-    config: PublicAppConfig?
+    config: PublicAppConfig?,
+    skipInitialAdmissionRecord: Bool = false
 ) async throws -> [RoadmapGroup]? {
     let supportsAuthentication = await client.resolveAuthenticatedAccess()
     guard roadmapLoadPlan(config: config, supportsAuthentication: supportsAuthentication) == .load else {
         return nil
     }
+    let isQueryActive = query.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
     async let columns = client.fetchColumns()
     let requests = try await collectAllRequests { cursor in
-        try await client.fetchFeatureRequests(
+        if isQueryActive {
+            if cursor == nil && skipInitialAdmissionRecord {
+                // The caller already committed an admission slot for the initial page via `waitForAdmission`.
+            } else {
+                await client.searchThrottle.recordQueryFetch()
+            }
+        }
+        return try await client.fetchFeatureRequests(
             userToken: userToken,
             limit: 200,
             query: query,

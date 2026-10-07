@@ -224,6 +224,7 @@ public struct FeedbackClient: Sendable {
         configuration: FeedbackClientConfiguration,
         session: URLSession = FeedbackClient.defaultSession,
         overlayPresenter: (any ChangelogOverlayPresenter)? = nil,
+        searchThrottle: SearchRequestThrottle? = nil,
         tokenStore: UserTokenStore? = nil,
         configStore: AppConfigStore? = nil,
         serverClock: ServerClock? = nil,
@@ -236,7 +237,7 @@ public struct FeedbackClient: Sendable {
         self.decoder = JSONDecoder()
         self.overlayPresenter = overlayPresenter
         self.authenticationProvider = authenticationProvider
-        self.searchThrottle = SearchRequestThrottle()
+        self.searchThrottle = searchThrottle ?? SearchRequestThrottle()
         self.tokenStore = tokenStore ?? UserTokenStore(appKey: configuration.appKey)
         self.configStore = configStore ?? AppConfigStore(
             lastGood: SdkConfigCache(appKey: configuration.appKey)

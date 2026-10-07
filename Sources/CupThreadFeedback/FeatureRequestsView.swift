@@ -174,7 +174,7 @@ public struct FeatureRequestsView: View {
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
             guard await client.searchThrottle.waitForAdmission(key: filterKey) else { return }
-            await loadFeatureRequests()
+            await loadFeatureRequests(recordsThrottle: false)
         }
         .task(id: showSubmittedBanner) {
             guard showSubmittedBanner else { return }
@@ -323,11 +323,13 @@ public struct FeatureRequestsView: View {
             isComposePresented = true
         }
     }
+}
 
-    // MARK: Actions
+// MARK: - Actions
 
+private extension FeatureRequestsView {
     @MainActor
-    private func loadVersions() async {
+    func loadVersions() async {
         versionFilterState.loadStarted()
         do {
             versionFilterState.loadFinished(try await client.fetchVersions())
@@ -337,7 +339,7 @@ public struct FeatureRequestsView: View {
     }
 
     @MainActor
-    private func loadFeatureRequests() async {
+    private func loadFeatureRequests(recordsThrottle: Bool = true) async {
         isAuthenticated = await client.resolveAuthenticatedAccess()
         let generationAtStart = loadState.startLoading()
         loadError = nil
@@ -350,6 +352,9 @@ public struct FeatureRequestsView: View {
             // here would fabricate the empty state while the replacement load
             // is still in flight (issue #286).
             loadState.finishLoading(generation: generationAtStart, wasCancelled: Task.isCancelled)
+        }
+        if recordsThrottle && !trimmedSearchText.isEmpty {
+            await client.searchThrottle.recordQueryFetch(key: filterKey)
         }
         do {
             let result = try await client.fetchFeatureRequests(
@@ -386,6 +391,9 @@ public struct FeatureRequestsView: View {
         isLoadingNextPage = true
         defer { isLoadingNextPage = false }
         do {
+            if !trimmedSearchText.isEmpty {
+                await client.searchThrottle.recordQueryFetch()
+            }
             let result = try await client.fetchFeatureRequests(
                 userToken: userToken,
                 versionId: selectedVersionID,
