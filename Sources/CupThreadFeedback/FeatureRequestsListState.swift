@@ -134,6 +134,60 @@ struct FeatureRequestsListState: Equatable, Sendable {
     }
 }
 
+// MARK: - Version filter load state
+
+/// Load state for the version-filter options of `FeatureRequestsView`
+/// (issue #285).
+///
+/// The load used a bare `try?`: every failure — offline, 5xx, the versions
+/// endpoint's 429 rate limit, or a permission denial — collapsed into an
+/// empty list, and `VersionFilterMenu` disabled itself for the whole
+/// presentation with no error copy and no retry. The state keeps the
+/// failure classified so the menu can distinguish "this app has no
+/// versions" (a successful empty list) from "the load failed" (an error
+/// next to a reachable retry).
+struct VersionFilterLoadState: Equatable, Sendable {
+    /// The loaded filter options, empty until a successful fetch.
+    var versions: [AppVersion] = []
+
+    /// User-facing copy for the latest failed fetch; `nil` while a load is
+    /// in flight or the last one succeeded.
+    var errorMessage: String?
+
+    /// Whether a fetch is currently in flight (drives the retry row's
+    /// spinner and disables re-entry).
+    var isLoading = false
+
+    /// Whether the filter menu should disable itself: only when the server
+    /// answered successfully with zero versions. A failed load keeps the
+    /// menu enabled so the retry affordance stays reachable.
+    var isMenuDisabled: Bool {
+        versions.isEmpty && errorMessage == nil
+    }
+
+    /// Begins a fetch: clears any stale error so a retry that fails again
+    /// re-renders fresh copy rather than stacking attempts.
+    mutating func loadStarted() {
+        isLoading = true
+        errorMessage = nil
+    }
+
+    /// Ends a fetch with the server's version list.
+    mutating func loadFinished(_ loaded: [AppVersion]) {
+        versions = loaded
+        isLoading = false
+    }
+
+    /// Ends a fetch with a thrown error. Cancellation keeps the previously
+    /// rendered state: a cancelled load never reached a verdict, so it
+    /// presents neither an error nor a cleared list.
+    mutating func loadFailed(_ error: Error) {
+        isLoading = false
+        guard !error.isSdkCancellation else { return }
+        errorMessage = FriendlyError.message(for: error)
+    }
+}
+
 // MARK: - Vote failure presentation
 
 /// How a failed optimistic vote should be presented to the user.

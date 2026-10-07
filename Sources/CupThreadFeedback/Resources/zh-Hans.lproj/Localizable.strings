@@ -29,6 +29,7 @@
 "cupthread.features.all_versions" = "所有版本";
 "cupthread.features.version_picker" = "版本";
 "cupthread.features.filter_by_version" = "按版本筛选";
+"cupthread.features.version_retry" = "重新加载版本列表";
 "cupthread.features.request_a_feature" = "提出新需求";
 "cupthread.features.request_a_feature_hint" = "打开需求建议提交面板";
 "cupthread.features.empty_title" = "暂无需求建议";
