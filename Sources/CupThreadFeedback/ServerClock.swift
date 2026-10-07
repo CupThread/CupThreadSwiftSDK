@@ -22,9 +22,7 @@ final class ServerClock: @unchecked Sendable {
         self.now = now
     }
 
-    // DateFormatter is documented thread-safe for formatting since
-    // macOS 10.9 / iOS 7, and only ever used read-only here.
-    nonisolated(unsafe) private static let httpDateFormatter: DateFormatter = {
+    private static let httpDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(identifier: "GMT")
