@@ -20,13 +20,24 @@ struct FeatureRequestsListState: Equatable, Sendable {
     /// comes back.
     var hasMorePages: Bool
 
+    /// The search query that produced the currently loaded items, trimmed.
+    /// Used as the highlight query on cards so stale rows are never highlighted
+    /// against a newer query that was throttled or cancelled before executing.
+    var lastExecutedQuery: String
+
     /// Creates a list state with optional initial items and in-flight voting IDs.
     /// - Parameters:
     ///   - items: Initial items in the list.
     ///   - votingIds: Initial item IDs with in-flight vote requests.
-    init(items: [FeatureRequestItem] = [], votingIds: Set<String> = []) {
+    ///   - lastExecutedQuery: Search query that produced `items`.
+    init(
+        items: [FeatureRequestItem] = [],
+        votingIds: Set<String> = [],
+        lastExecutedQuery: String = ""
+    ) {
         self.items = items
         self.votingIds = votingIds
+        self.lastExecutedQuery = lastExecutedQuery
         self.nextCursor = nil
         self.hasMorePages = false
     }
@@ -41,10 +52,18 @@ struct FeatureRequestsListState: Equatable, Sendable {
     /// - Parameters:
     ///   - result: The fetched page, including `hasMore`/`nextCursor`.
     ///   - replacesExisting: `true` for a fresh load, `false` to append.
-    mutating func applyPage(_ result: ListFeatureRequestsResult, replacesExisting: Bool) {
+    ///   - executedQuery: The search query that produced this replacement page.
+    mutating func applyPage(
+        _ result: ListFeatureRequestsResult,
+        replacesExisting: Bool,
+        executedQuery: String? = nil
+    ) {
         nextCursor = result.nextCursor
         hasMorePages = result.hasMore && result.nextCursor != nil
         if replacesExisting {
+            if let executedQuery {
+                lastExecutedQuery = executedQuery
+            }
             mergeReloadedItems(result.requests)
         } else {
             let knownIDs = Set(items.map(\.id))

@@ -38,6 +38,9 @@ public struct FeatureRequestsView: View {
     /// Transient notice for a failed reload whose results stay on screen
     /// (a reload failure never wipes already-rendered content).
     @State private var reloadNotice: String?
+    /// Deduplicates admission-denial notices so repeated keystrokes during
+    /// cooldown do not continuously re-trigger or restart the notice banner.
+    @State private var hasEmittedAdmissionNotice = false
     /// Per-item counters incremented once a vote is *confirmed* by the
     /// server; drives the pill's success bounce/haptic so a reverted
     /// (failed) vote never fires success cues.
@@ -164,6 +167,7 @@ public struct FeatureRequestsView: View {
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: the backend does not rate-limit it, so no
                 // debounce or throttle admission is needed.
+                hasEmittedAdmissionNotice = false
                 await loadFeatureRequests()
                 return
             }
@@ -173,7 +177,23 @@ public struct FeatureRequestsView: View {
             // 30/min per-IP search budget and skips duplicate queries.
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            guard await client.searchThrottle.waitForAdmission(key: filterKey) else { return }
+            let admitted = await client.searchThrottle.waitForAdmission(key: filterKey)
+            guard admitted else {
+                guard let outcome = SearchAdmissionOutcome.outcome(
+                    isCancelled: Task.isCancelled,
+                    hasExistingContent: !items.isEmpty
+                ) else { return }
+                switch outcome {
+                case .inlineNotice(let message):
+                    if !hasEmittedAdmissionNotice {
+                        reloadNotice = message
+                        hasEmittedAdmissionNotice = true
+                    }
+                case .fullScreenError(let message):
+                    loadError = message
+                }
+                return
+            }
             await loadFeatureRequests()
         }
         .task(id: showSubmittedBanner) {
@@ -220,7 +240,7 @@ public struct FeatureRequestsView: View {
                     ForEach(items) { item in
                         FeatureRequestCard(
                             item: item,
-                            highlightQuery: searchText,
+                            highlightQuery: listState.lastExecutedQuery,
                             isVoteInFlight: votingIds.contains(item.id),
                             successPulse: voteSuccessPulses[item.id, default: 0],
                             onSelectCard: { activeSheet = .comments(item) },
@@ -269,7 +289,7 @@ public struct FeatureRequestsView: View {
                 ForEach(items) { item in
                     FeatureRequestCard(
                         item: item,
-                        highlightQuery: searchText,
+                        highlightQuery: listState.lastExecutedQuery,
                         isVoteInFlight: votingIds.contains(item.id),
                         successPulse: voteSuccessPulses[item.id, default: 0],
                         onSelectCard: { activeSheet = .comments(item) },
@@ -323,9 +343,11 @@ public struct FeatureRequestsView: View {
             isComposePresented = true
         }
     }
+}
 
-    // MARK: Actions
+// MARK: - Actions
 
+extension FeatureRequestsView {
     @MainActor
     private func loadVersions() async {
         versionFilterState.loadStarted()
@@ -361,7 +383,8 @@ public struct FeatureRequestsView: View {
             // superseded this one — applying its page would render the older
             // filter's results.
             guard loadGeneration == generationAtStart else { return }
-            listState.applyPage(result, replacesExisting: true)
+            hasEmittedAdmissionNotice = false
+            listState.applyPage(result, replacesExisting: true, executedQuery: trimmedSearchText)
         } catch {
             guard loadGeneration == generationAtStart,
                   !Task.isCancelled,
@@ -369,6 +392,7 @@ public struct FeatureRequestsView: View {
             else { return }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()
+                hasEmittedAdmissionNotice = true
             }
             switch outcome {
             case .inlineNotice(let message):
