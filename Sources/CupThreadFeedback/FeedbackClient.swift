@@ -86,13 +86,16 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 ///
 /// One client serves every SDK surface — feedback, feature requests, roadmap,
 /// and changelog. Create it once with a ``FeedbackClientConfiguration`` and
-/// share it freely; the client is `Sendable` and stateless apart from two
+/// share it freely; the client is `Sendable` and stateless apart from three
 /// shared helpers: the search throttle (``SearchRequestThrottle``), which the
 /// search surfaces share so sustained typing stays below the API's per-IP
-/// search rate limit, and the short-TTL app-config cache
+/// search rate limit, the short-TTL app-config cache
 /// (``FeedbackClient/cachedAppConfig()``), which all surfaces share so
 /// presenting any number of them costs at most one configuration GET per
-/// TTL window.
+/// TTL window, and the server-clock offset (``ServerClock``), which learns
+/// the API's clock from response `Date` headers so signed payment-attribute
+/// reports stay inside the server's signature freshness window on devices
+/// with a skewed clock.
 ///
 /// ```swift
 /// let client = FeedbackClient(
@@ -138,6 +141,10 @@ public struct FeedbackClient: Sendable {
     /// Shared short-TTL cache for the app configuration; every config reader
     /// (theme, surface gating, composer, changelog overlay) goes through it.
     let configStore: AppConfigStore
+    /// Learned offset between the API's clock and this device's clock
+    /// (``ServerClock``); feeds the signature timestamps of payment-attribute
+    /// reports so a skewed device clock never produces a stale signature.
+    let serverClock: ServerClock
     /// Optional provider the SDK consults for a Cloudflare Turnstile token on
     /// the human-verification-gated intake calls (feedback and feature-request
     /// submission, upload-session creation). Production intake is gated, so
@@ -219,6 +226,7 @@ public struct FeedbackClient: Sendable {
         overlayPresenter: (any ChangelogOverlayPresenter)? = nil,
         tokenStore: UserTokenStore? = nil,
         configStore: AppConfigStore? = nil,
+        serverClock: ServerClock? = nil,
         turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) {
@@ -233,6 +241,7 @@ public struct FeedbackClient: Sendable {
         self.configStore = configStore ?? AppConfigStore(
             lastGood: SdkConfigCache(appKey: configuration.appKey)
         )
+        self.serverClock = serverClock ?? ServerClock()
         self.turnstileTokenProvider = turnstileTokenProvider
     }
 
