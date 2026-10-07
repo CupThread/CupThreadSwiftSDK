@@ -41,7 +41,9 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     /// is replaced. When `nil` (the default) the SDK generates a fresh UUID
     /// per request. Every response echoes an `X-Request-Id`, which the SDK
     /// attaches to ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    /// so users can quote it in support conversations.
+    /// so users can quote it in support conversations — but only after the
+    /// echo is validated against the same grammar, so header text injected
+    /// by gateways or proxies never reaches user-facing error copy (SEC-12).
     public let requestID: String?
 
     /// The secret key used to HMAC-SHA256 sign payment-attribute reports
