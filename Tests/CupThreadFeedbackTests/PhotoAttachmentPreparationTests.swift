@@ -164,6 +164,56 @@ struct PhotoAttachmentPreparationTests {
         #expect(prepared.fileExtension == "jpg")
     }
 
+    @Test func prepareForUploadDownscalesWhenTranscodeInflatesPastLimit() async throws {
+        // BUG-6: HEIC compresses photo-like content far better than the
+        // quality-0.9 JPEG transcode, so a HEIC photo that arrives under the
+        // byte limit can inflate past it during the transcode. The pipeline
+        // must rescue it with a downscale instead of failing `oversized`.
+        guard let image = createPhotoLikeTestImage(width: 2_000, height: 1_200),
+              let heic = createHEICFixture(cgImage: image),
+              let transcoded = PhotoAttachmentHelper.jpegRepresentationResampled(from: heic) else {
+            return
+        }
+        // Skip when this host's encoders do not produce the BUG-6 shape
+        // (HEIC under the limit, transcoded JPEG over it).
+        let limit = (heic.count + transcoded.count) / 2
+        guard transcoded.count > heic.count, heic.count <= limit, transcoded.count > limit else {
+            return
+        }
+
+        let prepared = try await PhotoAttachmentHelper.prepareForUpload(heic, limit: limit, stripSensitiveMetadata: false)
+
+        #expect(prepared.data.count <= limit)
+        #expect(prepared.data.starts(with: [0xFF, 0xD8, 0xFF]))
+        #expect(prepared.mimeType == "image/jpeg")
+        #expect(prepared.fileExtension == "jpg")
+    }
+
+    @Test func prepareForUploadSurfacesOversizedWhenTranscodedBytesCannotFitLimit() async throws {
+        // BUG-6 companion: when even the post-transcode downscale cannot fit
+        // the bytes (tiny limit, quality floor reached), the pipeline fails
+        // with `oversized` measured against the transcoded size, not a
+        // silent pass-through.
+        guard let image = createPhotoLikeTestImage(width: 60, height: 40),
+              let heic = createHEICFixture(cgImage: image),
+              let transcoded = PhotoAttachmentHelper.jpegRepresentationResampled(from: heic) else {
+            return
+        }
+        let limit = heic.count + 300
+        guard transcoded.count > limit else {
+            return
+        }
+
+        do {
+            _ = try await PhotoAttachmentHelper.prepareForUpload(heic, limit: limit, stripSensitiveMetadata: false)
+            Issue.record("Expected oversized failure when the transcoded bytes cannot fit")
+        } catch let error as AttachmentValidationError {
+            #expect(error == .oversized(size: transcoded.count, limit: limit))
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
     // MARK: - single re-encode pass (#79)
 
     @Test func prepareForUploadStripsHEICMetadataThroughTheSingleTranscodePass() async throws {
@@ -230,6 +280,41 @@ struct PhotoAttachmentPreparationTests {
         } else {
             context.setFillColor(CGColor(red: 0.2, green: 0.5, blue: 0.8, alpha: 1.0))
             context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return context.makeImage()
+    }
+
+    /// Photo-like fixture: a smooth gradient base with mid-frequency detail.
+    /// HEIC compresses it several times smaller than the quality-0.9 JPEG
+    /// transcode does, which reproduces the BUG-6 inflation shape reliably
+    /// (pure noise does not — HEVC and JPEG converge on incompressible data).
+    private func createPhotoLikeTestImage(width: Int, height: Int) -> CGImage? {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo.rawValue
+        ), let buffer = context.data else { return nil }
+        let pixels = buffer.bindMemory(to: UInt8.self, capacity: context.bytesPerRow * height)
+        for row in 0..<height {
+            let vertical = Double(row) / Double(max(height - 1, 1))
+            let rowStart = row * context.bytesPerRow
+            for column in 0..<width {
+                let horizontal = Double(column) / Double(max(width - 1, 1))
+                let baseRed = 0.1 + 0.8 * vertical
+                let baseGreen = 0.2 + 0.6 * (1 - vertical)
+                let baseBlue = 0.3 + 0.5 * horizontal
+                let wobble = sin(Double(row) / 7.0) * sin(Double(column) / 11.0) * 0.18
+                pixels[rowStart + column * 4 + 0] = UInt8(max(0, min(1, baseRed + wobble)) * 255)
+                pixels[rowStart + column * 4 + 1] = UInt8(max(0, min(1, baseGreen + wobble * 0.6)) * 255)
+                pixels[rowStart + column * 4 + 2] = UInt8(max(0, min(1, baseBlue + wobble * 0.3)) * 255)
+                pixels[rowStart + column * 4 + 3] = 255
+            }
         }
         return context.makeImage()
     }
