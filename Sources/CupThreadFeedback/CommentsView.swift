@@ -17,8 +17,8 @@ public struct CommentsView: View {
     public let featureRequestTitle: String
 
     @State private var comments: [FeatureRequestComment] = []
-    @State private var isLoading = true
-    @State private var loadError: String?
+    /// First-load lifecycle and stale-write generation tracking (CONC-4).
+    @State private var loadState = SurfaceLoadState()
     @State private var isCommentsUnavailable = false
     @State private var draft = CommentDraft()
     @State private var isSubmitting = false
@@ -41,10 +41,10 @@ public struct CommentsView: View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    if isLoading {
+                    if loadState.isLoading {
                         ProgressView()
                             .padding(.top, 32)
-                    } else if let loadError {
+                    } else if let loadError = loadState.loadError {
                         LoadErrorView(message: loadError) {
                             await loadComments()
                         }
@@ -337,21 +337,29 @@ public struct CommentsView: View {
 
     @MainActor
     private func loadComments() async {
-        isLoading = true
-        loadError = nil
+        let generation = loadState.startLoading()
+        // The defer (not a trailing assignment) resets `isLoading`: a
+        // cancelled load (dismissal, restart for another request) returns
+        // early and must still leave the spinner (CONC-4).
+        defer { loadState.finishLoading(generation: generation) }
+        isCommentsUnavailable = false
         do {
-            isCommentsUnavailable = false
-            comments = try await client.fetchComments(featureRequestId: featureRequestId)
+            let fetched = try await client.fetchComments(featureRequestId: featureRequestId)
+            // A superseded load (pull-to-refresh racing the initial task,
+            // retry taps stacking up) must not clobber the newer run's
+            // comments.
+            guard loadState.isCurrent(generation: generation) else { return }
+            comments = fetched
         } catch {
-            // A cancelled load (dismissal, restart for another request) never
-            // reached a verdict — keep the currently rendered comments.
-            guard !error.isSdkCancellation else { return }
+            // A cancelled load never reached a verdict — keep the currently
+            // rendered comments. A superseded run must not write either;
+            // both leave the surface to the surviving load.
+            guard loadState.isCurrent(generation: generation), !error.isSdkCancellation else { return }
             if let clientError = error as? FeedbackClientError, case .commentsUnavailable = clientError {
                 isCommentsUnavailable = true
             }
-            loadError = FriendlyError.message(for: error)
+            loadState.loadError = FriendlyError.message(for: error)
         }
-        isLoading = false
     }
 
     @MainActor
