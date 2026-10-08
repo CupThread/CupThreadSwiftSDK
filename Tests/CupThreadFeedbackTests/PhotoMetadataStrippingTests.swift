@@ -493,6 +493,181 @@ struct PhotoMetadataStrippingTests {
         #expect(!PhotoAttachmentHelper.isAnimatedImageContainer(source: tiffSource, data: tiffData))
     }
 
+    // MARK: - Animated Container Metadata (SEC-10)
+
+    @Test func strippingSensitiveMetadataRemovesEXIFChunkFromAnimatedWebP() {
+        let gpsMarker = "SEC10 GPS 37.7749 -122.4194"
+        let fixture = createAnimatedWebPFixtureWithEXIFChunk(gpsMarker: gpsMarker)
+
+        // The fixture really carries the GPS EXIF payload and animates.
+        #expect(fixture.data.range(of: Data(gpsMarker.utf8)) != nil)
+        guard let inputSource = CGImageSourceCreateWithData(fixture.data as CFData, nil) else {
+            Issue.record("Failed to create image source from WebP EXIF fixture")
+            return
+        }
+        #expect(CGImageSourceGetCount(inputSource) == 2)
+
+        guard let stripped = PhotoAttachmentHelper.strippingSensitiveMetadata(from: fixture.data) else {
+            Issue.record("strippingSensitiveMetadata returned nil for EXIF-carrying animated WebP")
+            return
+        }
+
+        // The GPS EXIF payload must be gone...
+        #expect(stripped.range(of: Data(gpsMarker.utf8)) == nil)
+        // ...exactly the EXIF chunk removed and nothing else...
+        #expect(stripped.count == fixture.data.count - fixture.exifChunkByteCount)
+        // ...the VP8X EXIF flag cleared back to animation-only...
+        let bytes = [UInt8](stripped)
+        #expect(bytes.count > 20)
+        #expect(bytes[20] == 0x02)
+        // ...and the rewritten container must still animate with both frames.
+        guard let outputSource = CGImageSourceCreateWithData(stripped as CFData, nil) else {
+            Issue.record("Stripped WebP is no longer decodable")
+            return
+        }
+        #expect(CGImageSourceGetCount(outputSource) == 2)
+
+        let format = PhotoAttachmentHelper.sniffImageFormat(from: stripped)
+        #expect(format?.mimeType == "image/webp")
+        #expect(format?.fileExtension == "webp")
+    }
+
+    @Test func strippingSensitiveMetadataRemovesMetadataExtensionsFromAnimatedGIF() {
+        let gpsMarker = "SEC10 GPS 37.7749 -122.4194"
+        let commentMarker = "SEC10 made-by TestTool (user@example.com)"
+        let xmpMarker = "SEC10 <x:xmpmeta>37.7749</x:xmpmeta>"
+        guard let fixture = createAnimatedGIFWithMetadataExtensions(
+            gpsMarker: gpsMarker,
+            commentMarker: commentMarker,
+            xmpMarker: xmpMarker
+        ) else {
+            Issue.record("Failed to create GIF metadata fixture")
+            return
+        }
+
+        #expect(fixture.data.range(of: Data(gpsMarker.utf8)) != nil)
+        #expect(fixture.data.range(of: Data(commentMarker.utf8)) != nil)
+        #expect(fixture.data.range(of: Data(xmpMarker.utf8)) != nil)
+
+        guard let stripped = PhotoAttachmentHelper.strippingSensitiveMetadata(from: fixture.data) else {
+            Issue.record("strippingSensitiveMetadata returned nil for metadata-carrying animated GIF")
+            return
+        }
+
+        // EXIF, XMP, and comment extension payloads must all be gone...
+        #expect(stripped.range(of: Data(gpsMarker.utf8)) == nil)
+        #expect(stripped.range(of: Data(commentMarker.utf8)) == nil)
+        #expect(stripped.range(of: Data(xmpMarker.utf8)) == nil)
+        // ...exactly the three extension blocks removed and nothing else...
+        #expect(stripped.count == fixture.data.count - fixture.insertedByteCount)
+        // ...with loop control (if the encoder wrote one) preserved.
+        let hadLoopExtension = fixture.data.range(of: Data("NETSCAPE2.0".utf8)) != nil
+        #expect((stripped.range(of: Data("NETSCAPE2.0".utf8)) != nil) == hadLoopExtension)
+
+        // The rewritten container must still animate with unchanged timing.
+        guard let outputSource = CGImageSourceCreateWithData(stripped as CFData, nil) else {
+            Issue.record("Stripped GIF is no longer decodable")
+            return
+        }
+        #expect(CGImageSourceGetCount(outputSource) == 2)
+        let frameProperties = CGImageSourceCopyPropertiesAtIndex(outputSource, 0, nil) as? [CFString: Any]
+        let gifDict = frameProperties?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+        let delay = (gifDict?[kCGImagePropertyGIFDelayTime] as? Double)
+            ?? (gifDict?[kCGImagePropertyGIFUnclampedDelayTime] as? Double)
+        #expect(delay == 0.5)
+
+        let format = PhotoAttachmentHelper.sniffImageFormat(from: stripped)
+        #expect(format?.mimeType == "image/gif")
+        #expect(format?.fileExtension == "gif")
+    }
+
+    @Test func strippingSensitiveMetadataLeavesCleanAnimatedContainersByteIdentical() {
+        guard let frame1 = createTestImage(width: 80, height: 60, red: 0.8, green: 0.2, blue: 0.2),
+              let frame2 = createTestImage(width: 80, height: 60, red: 0.2, green: 0.8, blue: 0.2),
+              let gifFixture = createGIFFixture(frames: [frame1, frame2], delayTimes: [0.5, 0.5]) else {
+            Issue.record("Failed to create animated fixtures")
+            return
+        }
+
+        // Containers without metadata chunks keep the #85 byte-identical pass-through.
+        #expect(PhotoAttachmentHelper.strippingSensitiveMetadata(from: gifFixture) == gifFixture)
+        #expect(PhotoAttachmentHelper.strippingSensitiveMetadata(from: createAnimatedWebPFixture()) == createAnimatedWebPFixture())
+    }
+
+    @Test func prepareForUploadStripsAnimatedWebPGPSMetadata() async throws {
+        let gpsMarker = "SEC10 GPS 37.7749 -122.4194"
+        let fixture = createAnimatedWebPFixtureWithEXIFChunk(gpsMarker: gpsMarker).data
+
+        let prepared = try await PhotoAttachmentHelper.prepareForUpload(
+            fixture,
+            limit: PhotoAttachmentHelper.defaultMaxAttachmentBytes,
+            stripSensitiveMetadata: true
+        )
+
+        #expect(prepared.mimeType == "image/webp")
+        #expect(prepared.fileExtension == "webp")
+        #expect(prepared.data.range(of: Data(gpsMarker.utf8)) == nil)
+        guard let source = CGImageSourceCreateWithData(prepared.data as CFData, nil) else {
+            Issue.record("Failed to parse prepared WebP")
+            return
+        }
+        #expect(CGImageSourceGetCount(source) == 2)
+    }
+
+    @Test func animatedContainerMetadataWalkerReportsCleanContainers() {
+        #expect(PhotoAttachmentHelper.stripAnimatedContainerMetadata(from: createAnimatedWebPFixture()) == .clean)
+
+        guard let frame1 = createTestImage(width: 40, height: 40),
+              let frame2 = createTestImage(width: 40, height: 40),
+              let gifFixture = createGIFFixture(frames: [frame1, frame2]) else {
+            Issue.record("Failed to create GIF fixture")
+            return
+        }
+        #expect(PhotoAttachmentHelper.stripAnimatedContainerMetadata(from: gifFixture) == .clean)
+
+        #expect(PhotoAttachmentHelper.isMetadataApplicationIdentifier(Array("NETSCAPE2.0\0\0".utf8)) == false)
+        #expect(PhotoAttachmentHelper.isMetadataApplicationIdentifier(Array("ANIMEXTS1.0\0\0".utf8)) == false)
+        #expect(PhotoAttachmentHelper.isMetadataApplicationIdentifier(Array("Exif\0\0\0\0\0\0\0".utf8)) == true)
+        #expect(PhotoAttachmentHelper.isMetadataApplicationIdentifier(Array("exif\0\0\0\0\0\0\0".utf8)) == true)
+        #expect(PhotoAttachmentHelper.isMetadataApplicationIdentifier(Array("XMP DataXMP".utf8)) == true)
+        #expect(PhotoAttachmentHelper.isMetadataApplicationIdentifier([]) == false)
+    }
+
+    @Test func animatedContainerMetadataWalkerFailsClosedOnMalformedContainers() {
+        // WebP: RIFF chunk list cut off mid-header.
+        let webpFixture = createAnimatedWebPFixture()
+        #expect(PhotoAttachmentHelper.stripWebPContainerMetadata(from: webpFixture.prefix(20)) == .unsafe)
+
+        // WebP: chunk size field overrunning the container.
+        var overrun = [UInt8](webpFixture)
+        overrun[16] = 0xFF
+        overrun[17] = 0xFF
+        overrun[18] = 0xFF
+        #expect(PhotoAttachmentHelper.stripWebPContainerMetadata(from: Data(overrun)) == .unsafe)
+
+        // WebP: not WebP bytes at all.
+        #expect(PhotoAttachmentHelper.stripWebPContainerMetadata(from: Data(repeating: 0x00, count: 32)) == .unsafe)
+
+        // GIF: block introducer that is neither extension, image, nor trailer.
+        guard let frame1 = createTestImage(width: 40, height: 40),
+              let frame2 = createTestImage(width: 40, height: 40),
+              let gifFixture = createGIFFixture(frames: [frame1, frame2]) else {
+            Issue.record("Failed to create GIF fixture")
+            return
+        }
+        var unknownBlock = [UInt8](gifFixture)
+        unknownBlock[firstBlockOffset(in: unknownBlock)] = 0x00
+        #expect(PhotoAttachmentHelper.stripGIFContainerMetadata(from: Data(unknownBlock)) == .unsafe)
+
+        // GIF: application extension whose first sub-block claims more bytes
+        // than the container holds (deterministic hand-built structure).
+        var malformedGIF: [UInt8] = Array("GIF89a".utf8)
+        malformedGIF += [0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00] // 1x1 logical screen, no GCT
+        malformedGIF += [0x21, 0xFF, 0x20] // app extension, first sub-block claims 32 bytes
+        malformedGIF += Array(repeating: 0x41, count: 8) // only 8 present before EOF
+        #expect(PhotoAttachmentHelper.stripGIFContainerMetadata(from: Data(malformedGIF)) == .unsafe)
+    }
+
     // MARK: - Test Fixture Helpers
 
     private func createTestImage(
@@ -565,6 +740,93 @@ struct PhotoMetadataStrippingTests {
             idx = next
         }
         return data
+    }
+
+    /// The animated WebP fixture spliced with a top-level `EXIF` RIFF chunk
+    /// carrying a GPS TIFF payload, mirroring what `cwebp -metadata exif`
+    /// produces: the chunk sits after `VP8X` and the VP8X EXIF flag bit is
+    /// set alongside the animation bit.
+    private func createAnimatedWebPFixtureWithEXIFChunk(gpsMarker: String) -> (data: Data, exifChunkByteCount: Int) {
+        var bytes = [UInt8](createAnimatedWebPFixture())
+        // VP8X flags byte sits at offset 20 (RIFF header 12 + chunk header 8):
+        // set the EXIF-present bit (0x08) alongside the animation bit (0x02).
+        bytes[20] |= 0x08
+
+        var chunk: [UInt8] = Array("EXIF".utf8)
+        let payload = exifTIFFPayloadWithGPSMarker(gpsMarker)
+        chunk += [UInt8(truncatingIfNeeded: payload.count), 0, 0, 0] // little-endian size
+        chunk += payload
+        if payload.count % 2 == 1 { chunk.append(0x00) } // RIFF pad byte
+        bytes.insert(contentsOf: chunk, at: 30) // immediately after the VP8X chunk (12 + 8 + 10)
+
+        let riffSize = UInt32(bytes.count - 8)
+        bytes[4] = UInt8(truncatingIfNeeded: riffSize)
+        bytes[5] = UInt8(truncatingIfNeeded: riffSize >> 8)
+        bytes[6] = UInt8(truncatingIfNeeded: riffSize >> 16)
+        bytes[7] = UInt8(truncatingIfNeeded: riffSize >> 24)
+        return (Data(bytes), chunk.count)
+    }
+
+    /// Minimal little-endian TIFF carrying a GPS IFD, followed by a unique
+    /// ASCII marker: the shape a WebP `EXIF` chunk stores in (the same GPS
+    /// data the JPEG fixtures embed via ImageIO).
+    private func exifTIFFPayloadWithGPSMarker(_ marker: String) -> [UInt8] {
+        var tiff: [UInt8] = [0x49, 0x49, 0x2A, 0x00] // "II", TIFF magic 42
+        tiff += [0x08, 0x00, 0x00, 0x00] // IFD0 at offset 8
+        tiff += [0x01, 0x00] // one IFD0 entry
+        tiff += [0x25, 0x88] // tag 0x8825 (GPSInfo)
+        tiff += [0x04, 0x00] // type LONG
+        tiff += [0x01, 0x00, 0x00, 0x00] // count 1
+        tiff += [0x1A, 0x00, 0x00, 0x00] // GPS IFD at offset 26
+        tiff += [0x00, 0x00, 0x00, 0x00] // no next IFD (offset 26 reached)
+        tiff += [0x02, 0x00] // two GPS IFD entries
+        tiff += [0x01, 0x00, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x4E, 0x00, 0x00, 0x00] // GPSLatitudeRef "N"
+        tiff += [0x02, 0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x38, 0x00, 0x00, 0x00] // GPSLatitude RATIONAL @ 56
+        tiff += [0x00, 0x00, 0x00, 0x00] // no next IFD (offset 56 reached)
+        tiff += [0x25, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00] // 37/1 degrees (offsets 56..<64)
+        tiff += Array(marker.utf8) // unique search marker inside the chunk
+        return tiff
+    }
+
+    /// A 2-frame animated GIF spliced with EXIF and XMP application
+    /// extensions plus a comment extension, placed where mainstream encoders
+    /// write them: between the screen descriptor and the first image block.
+    private func createAnimatedGIFWithMetadataExtensions(
+        gpsMarker: String,
+        commentMarker: String,
+        xmpMarker: String
+    ) -> (data: Data, insertedByteCount: Int)? {
+        guard let frame1 = createTestImage(width: 80, height: 60, red: 0.8, green: 0.2, blue: 0.2),
+              let frame2 = createTestImage(width: 80, height: 60, red: 0.2, green: 0.8, blue: 0.2),
+              let gif = createGIFFixture(frames: [frame1, frame2], delayTimes: [0.5, 0.5]) else {
+            return nil
+        }
+        var bytes = [UInt8](gif)
+
+        func applicationExtension(identifier: [UInt8], payloadMarker: String) -> [UInt8] {
+            let identifierBlock = identifier + [UInt8](repeating: 0x00, count: max(0, 11 - identifier.count))
+            let payload = Array(payloadMarker.utf8)
+            return [0x21, 0xFF, UInt8(identifierBlock.count)] + identifierBlock
+                + [UInt8(payload.count)] + payload + [0x00]
+        }
+
+        let exifExtension = applicationExtension(identifier: Array("Exif".utf8), payloadMarker: gpsMarker)
+        let xmpExtension = applicationExtension(identifier: Array("XMP DataXMP".utf8), payloadMarker: xmpMarker)
+        let comment: [UInt8] = [0x21, 0xFE, UInt8(commentMarker.utf8.count)] + Array(commentMarker.utf8) + [0x00]
+        let inserted = exifExtension + xmpExtension + comment
+        bytes.insert(contentsOf: inserted, at: firstBlockOffset(in: bytes))
+        return (Data(bytes), inserted.count)
+    }
+
+    /// Offset of the first block after the header, logical screen descriptor,
+    /// and optional global color table.
+    private func firstBlockOffset(in bytes: [UInt8]) -> Int {
+        var offset = 13
+        let packed = bytes[10]
+        if packed & 0x80 != 0 {
+            offset += 3 * (1 << (Int(packed & 0x07) + 1))
+        }
+        return offset
     }
 
     private func createJPEGFixture(

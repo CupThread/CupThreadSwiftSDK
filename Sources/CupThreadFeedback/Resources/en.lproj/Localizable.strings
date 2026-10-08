@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "You're Subscribed";
 "cupthread.subscribe.manage_message" = "Update emails will go to %@. To change the address or unsubscribe, use the link in any update email.";
 "cupthread.subscribe.use_different_email" = "Use a Different Email";
+"cupthread.subscribe.pending_title" = "Confirmation Pending";
+"cupthread.subscribe.pending_message" = "We sent a confirmation link to %@. Open it to start receiving update emails.";
+"cupthread.subscribe.resend_button" = "Resend Confirmation Email";
+"cupthread.subscribe.resending_button" = "Resending…";
 "cupthread.whatsnew.emails_on" = "Update Emails On";
 "cupthread.whatsnew.emails_on_destination" = "Notifications go to %@.";
 "cupthread.whatsnew.get_emails" = "Get Update Emails";
 "cupthread.whatsnew.get_emails_caption" = "Be notified when a new version ships.";
 "cupthread.whatsnew.subscribe_accessibility" = "Subscribe to update emails";
 "cupthread.whatsnew.emails_on_accessibility" = "Update emails are on for %@";
+"cupthread.whatsnew.pending_title" = "Confirmation Pending";
+"cupthread.whatsnew.pending_destination" = "We sent a confirmation link to %@.";
+"cupthread.whatsnew.pending_accessibility" = "Email confirmation pending for %@";
 "cupthread.whatsnew.version_accessibility" = "Version %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Shipped requests: %@";
 "cupthread.features.unavailable_feedback" = "Feedback Unavailable";
@@ -192,3 +199,8 @@
 "cupthread.error.signing_secret_not_configured" = "Payment details can't be reported because this app has no SDK signing secret configured.";
 "cupthread.error.invalid_signature" = "Payment details weren't updated: the report's signature didn't verify. Check the app's SDK signing secret.";
 "cupthread.error.stale_signature" = "Payment details weren't updated: the report's signature expired. Check the device clock and try again.";
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Your message is too long. Please shorten it and try again.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld of %2$lld characters";

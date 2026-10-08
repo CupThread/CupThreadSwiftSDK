@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Ihr Abonnement ist aktiv";
 "cupthread.subscribe.manage_message" = "Update-E-Mails werden an %@ gesendet. Um die Adresse zu ändern oder sich abzumelden, verwenden Sie den Link in einer der Update-E-Mails.";
 "cupthread.subscribe.use_different_email" = "Andere E-Mail-Adresse verwenden";
+"cupthread.subscribe.pending_title" = "Bestätigung ausstehend";
+"cupthread.subscribe.pending_message" = "Wir haben einen Bestätigungslink an %@ gesendet. Öffnen Sie ihn, um Update-E-Mails zu erhalten.";
+"cupthread.subscribe.resend_button" = "Bestätigungs-E-Mail erneut senden";
+"cupthread.subscribe.resending_button" = "Wird erneut gesendet…";
 "cupthread.whatsnew.emails_on" = "Update-E-Mails aktiv";
 "cupthread.whatsnew.emails_on_destination" = "Benachrichtigungen gehen an %@.";
 "cupthread.whatsnew.get_emails" = "Update-E-Mails erhalten";
 "cupthread.whatsnew.get_emails_caption" = "Lassen Sie sich benachrichtigen, sobald eine neue Version erscheint.";
 "cupthread.whatsnew.subscribe_accessibility" = "Update-E-Mails abonnieren";
 "cupthread.whatsnew.emails_on_accessibility" = "Update-E-Mails sind für %@ aktiviert";
+"cupthread.whatsnew.pending_title" = "Bestätigung ausstehend";
+"cupthread.whatsnew.pending_destination" = "Wir haben einen Bestätigungslink an %@ gesendet.";
+"cupthread.whatsnew.pending_accessibility" = "E-Mail-Bestätigung für %@ ausstehend";
 "cupthread.whatsnew.version_accessibility" = "Version %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Ausgelieferte Anfragen: %@";
 "cupthread.features.unavailable_feedback" = "Feedback nicht verfügbar";
@@ -193,3 +200,8 @@
 "cupthread.error.invalid_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts konnte nicht verifiziert werden. Prüfen Sie das SDK-Signatur-Geheimnis der App.";
 "cupthread.error.stale_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts ist abgelaufen. Prüfen Sie die Geräteuhr und versuchen Sie es erneut.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Ihr Text ist zu lang. Bitte kürzen Sie ihn und versuchen Sie es erneut.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld von %2$lld Zeichen";

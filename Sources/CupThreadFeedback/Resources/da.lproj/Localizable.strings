@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Du abonnerer";
 "cupthread.subscribe.manage_message" = "Opdateringsmails sendes til %@. For at ændre adressen eller opsige abonnementet skal du bruge linket i en opdateringsmail.";
 "cupthread.subscribe.use_different_email" = "Brug en anden e-mailadresse";
+"cupthread.subscribe.pending_title" = "Bekræftelse afventer";
+"cupthread.subscribe.pending_message" = "Vi har sendt et bekræftelseslink til %@. Åbn det for at begynde at modtage opdateringsmails.";
+"cupthread.subscribe.resend_button" = "Send bekræftelsesmailen igen";
+"cupthread.subscribe.resending_button" = "Sender igen…";
 "cupthread.whatsnew.emails_on" = "Opdateringsmails slået til";
 "cupthread.whatsnew.emails_on_destination" = "Notifikationer går til %@.";
 "cupthread.whatsnew.get_emails" = "Modtag opdateringsmails";
 "cupthread.whatsnew.get_emails_caption" = "Få besked, når en ny version udkommer.";
 "cupthread.whatsnew.subscribe_accessibility" = "Abonnér på opdateringsmails";
 "cupthread.whatsnew.emails_on_accessibility" = "Opdateringsmails er slået til for %@";
+"cupthread.whatsnew.pending_title" = "Bekræftelse afventer";
+"cupthread.whatsnew.pending_destination" = "Vi har sendt et bekræftelseslink til %@.";
+"cupthread.whatsnew.pending_accessibility" = "E-mailbekræftelse afventer for %@";
 "cupthread.whatsnew.version_accessibility" = "Version %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Udsendte ønsker: %@";
 "cupthread.features.unavailable_feedback" = "Feedback utilgængelig";
@@ -193,3 +200,8 @@
 "cupthread.error.invalid_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur kunne ikke verificeres. Tjek appens SDK-signeringshemmelighed.";
 "cupthread.error.stale_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur er udløbet. Tjek enhedens ur, og prøv igen.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Beskeden er for lang. Forkort den og prøv igen.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld af %2$lld tegn";

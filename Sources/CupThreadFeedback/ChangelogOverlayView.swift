@@ -207,6 +207,9 @@ public struct ChangelogOverlayView: View {
     /// token expired between the check and the send — is the permission-denied
     /// outcome, not a failure.
     ///
+    /// Fetches a single page of newest entries sized to the console-configured
+    /// `entryCount` rather than walking full changelog history.
+    ///
     /// Returns `nil` when the fetch was cancelled (the overlay closed or the
     /// presenting task was superseded mid-load) — a cancelled load never
     /// reached a verdict, so callers must keep their current state instead
@@ -229,9 +232,10 @@ public struct ChangelogOverlayView: View {
             return .permissionDenied(config.sdk)
         }
         do {
-            let all = try await client.fetchChangelog()
+            let limit = max(1, config.sdk.changelogOverlay.entryCount)
+            let page = try await client.fetchChangelog(limit: limit)
             return .entries(
-                Array(all.prefix(config.sdk.changelogOverlay.entryCount)),
+                Array(page.entries.prefix(config.sdk.changelogOverlay.entryCount)),
                 appearance: config.sdk
             )
         } catch {
@@ -376,8 +380,10 @@ private struct ChangelogOverlayModifier: ViewModifier {
 extension View {
     /// Presents the console-configured latest-changelog overlay as a sheet.
     ///
-    /// The sheet fetches the app configuration and newest entries when shown,
-    /// so the copy (title, buttons, entry count) always matches the console.
+    /// The sheet fetches the app configuration and a single page of newest entries
+    /// (sized to the console-configured entry count) when shown, so the copy
+    /// (title, buttons, entry count) always matches the console without walking
+    /// full changelog history.
     /// When the console turns the changelog surface off, the sheet shows an
     /// "unavailable" placeholder instead of fetching entries.
     ///

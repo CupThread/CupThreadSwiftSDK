@@ -37,6 +37,103 @@ func makeGroups(columns: [BoardColumn], requests: [FeatureRequestItem]) -> [Road
     return groups
 }
 
+// MARK: - Board load state
+
+/// Loading lifecycle for ``RoadmapBoardView``: whether the first load
+/// finished, the current full-screen error, and a monotonic generation
+/// counter that discards stale out-of-order load writes (issue #274).
+///
+/// The generation matters because a load can be superseded two ways: by a
+/// newer load (keystroke restart, pull-to-refresh) or by a permission
+/// denial, which restarts the task without starting a load. Either way the
+/// superseded run must not write results, errors, or notices — its writes
+/// would land behind content (or the permission placeholder) that a newer
+/// run now owns.
+struct RoadmapBoardLoadState: Equatable, Sendable {
+    /// Whether a board fetch is currently in flight.
+    var isLoading: Bool
+    /// True once the first load settled: finished (success or failure) or was
+    /// permission-denied. A *cancelled* load never marks this true, so a
+    /// superseded first load keeps the skeleton until the surviving run lands.
+    var hasLoadedOnce: Bool
+    /// User-friendly message when the latest failure had nothing to show.
+    var loadError: String?
+    /// Monotonically increasing counter; writes from a stale generation are
+    /// discarded.
+    var loadGeneration: Int
+
+    init(
+        isLoading: Bool = true,
+        hasLoadedOnce: Bool = false,
+        loadError: String? = nil,
+        loadGeneration: Int = 0
+    ) {
+        self.isLoading = isLoading
+        self.hasLoadedOnce = hasLoadedOnce
+        self.loadError = loadError
+        self.loadGeneration = loadGeneration
+    }
+
+    /// Starts a load cycle: bumps the generation, marks the board loading,
+    /// and clears any previous full-screen error. Returns the generation to
+    /// pass to ``finishLoading(generation:)`` and check with
+    /// ``isCurrent(generation:)`` around every deferred write.
+    @discardableResult
+    mutating func startLoading() -> Int {
+        loadGeneration += 1
+        isLoading = true
+        loadError = nil
+        return loadGeneration
+    }
+
+    /// Ends the load cycle for `generation`. A superseded load leaves the
+    /// flags alone — the newer load (or denial) owns them.
+    mutating func finishLoading(generation: Int) {
+        guard loadGeneration == generation else { return }
+        isLoading = false
+        hasLoadedOnce = true
+    }
+
+    /// Whether `generation` is still the current load cycle. Deferred writes
+    /// (fetched groups, notices) must be gated on this so a superseded run
+    /// cannot write behind newer content or the permission placeholder.
+    func isCurrent(generation: Int) -> Bool {
+        loadGeneration == generation
+    }
+
+    /// Records a full-screen load failure for `generation`; ignored when a
+    /// newer load or a permission denial has superseded it.
+    mutating func handleFailure(message: String, generation: Int) {
+        guard loadGeneration == generation else { return }
+        loadError = message
+    }
+
+    /// Settles the lifecycle for a permission denial (issue #274): the board
+    /// is no longer first-loading, and the generation bump invalidates any
+    /// in-flight permitted load so its success/failure writes cannot land
+    /// behind the permission placeholder. With `groups` empty,
+    /// `makeBoardDisplayState` renders `.emptyBoard` after this — but the
+    /// permission placeholder replaces the board while denied, and a
+    /// permitted flip restarts the load via the task key.
+    mutating func settlePermissionDenied() {
+        loadGeneration += 1
+        isLoading = false
+        hasLoadedOnce = true
+        loadError = nil
+    }
+}
+
+/// The `.task` identity for the roadmap board's load lifecycle (issue #274):
+/// the permission verdict plus the trimmed search text. Keying on the search
+/// text alone never re-ran the task when the config (or resolved
+/// authentication) flipped the verdict, stranding the board on its
+/// first-load skeleton; keying on the verdict alone would miss keystrokes.
+/// A verdict-stable config refresh produces the same key and therefore no
+/// restart.
+func makeRoadmapLoadTaskKey(isRoadmapPermitted: Bool, trimmedSearchText: String) -> String {
+    "\(isRoadmapPermitted)|\(trimmedSearchText)"
+}
+
 // MARK: - Board display state
 
 /// The rendered state of the roadmap board, shared by all three layouts

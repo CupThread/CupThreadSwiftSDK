@@ -15,13 +15,15 @@ public struct RoadmapBoardView: View {
     public let userToken: String
 
     @State private var groups: [RoadmapGroup] = []
-    @State private var isLoading = true
-    /// True once the first load finished (success or failure). Later reloads —
-    /// e.g. search-driven — keep showing content instead of flashing skeletons.
-    @State private var hasLoadedOnce = false
-    @State private var loadError: String?
+    /// First-load lifecycle and stale-write generation tracking (issue #274).
+    @State private var loadState = RoadmapBoardLoadState()
     @State private var selectedGroupID: String?
     @State private var searchText = ""
+    /// The search query that produced the currently loaded roadmap groups.
+    @State private var lastExecutedQuery = ""
+    /// Deduplicates admission-denial notices so repeated keystrokes during
+    /// cooldown do not continuously re-trigger or restart the notice banner.
+    @State private var hasEmittedAdmissionNotice = false
     /// Transient notice for a failed reload whose groups stay on screen
     /// (a reload failure never wipes already-rendered content).
     @State private var reloadNotice: String?
@@ -71,6 +73,16 @@ public struct RoadmapBoardView: View {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Restarts the load lifecycle whenever the permission verdict or the
+    /// search query changes (issue #274). Keyed on the search text alone, the
+    /// task never re-ran when `sdkAppConfig` (or resolved authentication)
+    /// flipped the verdict, so a denied→permitted config transition left the
+    /// board on its first-load skeleton forever. A verdict-stable config
+    /// refresh keeps the key — and the in-flight load — unchanged.
+    private var loadTaskKey: String {
+        makeRoadmapLoadTaskKey(isRoadmapPermitted: isRoadmapPermitted, trimmedSearchText: trimmedSearchText)
+    }
+
     #if canImport(UIKit)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
@@ -85,6 +97,7 @@ public struct RoadmapBoardView: View {
         self.client = client
         self.userToken = userToken
         _searchText = State(initialValue: initialSearchText)
+        _lastExecutedQuery = State(initialValue: "")
     }
 
     /// Internal initializer for tests and previews with preloaded groups.
@@ -97,9 +110,10 @@ public struct RoadmapBoardView: View {
         self.client = client
         self.userToken = userToken
         _searchText = State(initialValue: initialSearchText)
+        _lastExecutedQuery = State(initialValue: initialSearchText)
         if let initialGroups {
             _groups = State(initialValue: initialGroups)
-            _hasLoadedOnce = State(initialValue: true)
+            _loadState = State(initialValue: RoadmapBoardLoadState(isLoading: false, hasLoadedOnce: true))
         }
     }
 
@@ -137,11 +151,15 @@ public struct RoadmapBoardView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .task(id: trimmedSearchText) {
+        .task(id: loadTaskKey) {
             await resolveAuthenticationAccess()
-            guard isRoadmapPermitted else { return }
+            guard isRoadmapPermitted else {
+                settlePermissionDeniedState()
+                return
+            }
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: unrate-limited, so no debounce/throttle.
+                hasEmittedAdmissionNotice = false
                 await load()
                 return
             }
@@ -150,7 +168,23 @@ public struct RoadmapBoardView: View {
             // fetches below the 30/min per-IP budget and skips duplicates.
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            guard await client.searchThrottle.waitForAdmission(key: "roadmap|\(trimmedSearchText)") else { return }
+            let admitted = await client.searchThrottle.waitForAdmission(key: "roadmap|\(trimmedSearchText)")
+            guard admitted else {
+                guard let outcome = SearchAdmissionOutcome.outcome(
+                    isCancelled: Task.isCancelled,
+                    hasExistingContent: !groups.isEmpty
+                ) else { return }
+                switch outcome {
+                case .inlineNotice(let message):
+                    if !hasEmittedAdmissionNotice {
+                        reloadNotice = message
+                        hasEmittedAdmissionNotice = true
+                    }
+                case .fullScreenError(let message):
+                    loadState.loadError = message
+                }
+                return
+            }
             await load()
         }
         .task(id: reloadNotice) {
@@ -168,10 +202,10 @@ public struct RoadmapBoardView: View {
     /// switches over it so loading, error, empty, and content states agree.
     private var displayState: RoadmapBoardDisplayState {
         makeBoardDisplayState(
-            isLoading: isLoading,
-            hasLoadedOnce: hasLoadedOnce,
-            loadError: loadError,
-            searchText: trimmedSearchText,
+            isLoading: loadState.isLoading,
+            hasLoadedOnce: loadState.hasLoadedOnce,
+            loadError: loadState.loadError,
+            searchText: lastExecutedQuery,
             groups: groups
         )
     }
@@ -270,7 +304,7 @@ public struct RoadmapBoardView: View {
                     EmptyColumnView()
                 } else {
                     ForEach(group.requests) { item in
-                        RoadmapCard(item: item, highlightQuery: searchText)
+                        RoadmapCard(item: item, highlightQuery: lastExecutedQuery)
                     }
                 }
             }
@@ -301,7 +335,7 @@ public struct RoadmapBoardView: View {
                         .frame(maxWidth: .infinity)
                 case .board(let visibleGroups):
                     ForEach(visibleGroups) { group in
-                        ColumnCard(group: group, highlightQuery: searchText)
+                        ColumnCard(group: group, highlightQuery: lastExecutedQuery)
                     }
                 }
             }
@@ -328,7 +362,7 @@ public struct RoadmapBoardView: View {
                 ForEach(visibleGroups) { group in
                     Section(group.name) {
                         ForEach(group.requests) { item in
-                            RoadmapCard(item: item, highlightQuery: searchText)
+                            RoadmapCard(item: item, highlightQuery: lastExecutedQuery)
                                 #if !os(tvOS)
                                 .listRowSeparator(.hidden)
                                 #endif
@@ -348,7 +382,7 @@ public struct RoadmapBoardView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if searchText.isEmpty {
+        if lastExecutedQuery.isEmpty {
             ContentUnavailableView {
                 Label(CupThreadStrings.tr("cupthread.roadmap.no_columns_title"), systemImage: "square.grid.3x3")
             } description: {
@@ -356,11 +390,15 @@ public struct RoadmapBoardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ContentUnavailableView.search(text: searchText)
+            ContentUnavailableView.search(text: lastExecutedQuery)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
+}
 
+// MARK: - Actions
+
+extension RoadmapBoardView {
     /// Centers a full-height state view inside the pager's layout slot.
     private func stateContainer<V: View>(_ content: V) -> some View {
         content
@@ -370,15 +408,14 @@ public struct RoadmapBoardView: View {
     @MainActor
     private func load() async {
         await resolveAuthenticationAccess()
-        guard isRoadmapPermitted else { return }
-        rejectedByServer = false
-        isLoading = true
-        loadError = nil
-        reloadNotice = nil
-        defer {
-            isLoading = false
-            hasLoadedOnce = true
+        guard isRoadmapPermitted else {
+            settlePermissionDeniedState()
+            return
         }
+        rejectedByServer = false
+        let generation = loadState.startLoading()
+        reloadNotice = nil
+        defer { loadState.finishLoading(generation: generation) }
         do {
             // The board needs complete data — grouping a single page would
             // silently truncate every column once the app outgrows the
@@ -392,29 +429,58 @@ public struct RoadmapBoardView: View {
                 query: query,
                 config: sdkAppConfig
             ) {
+                // A newer load or a permission denial owns the board now.
+                guard loadState.isCurrent(generation: generation) else { return }
                 groups = loaded
+                lastExecutedQuery = trimmedSearchText
+                hasEmittedAdmissionNotice = false
             }
         } catch {
-            // A cancelled load (keystroke restart, dismissal) never reached a verdict: keep the board.
-            guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) else { return }
-            if isSdkPermissionRejection(error) {
-                // The preflight passed but the server still answered 401 — the
-                // token expired (or was revoked) between the check and the
-                // send. The signed-out permission placeholder replaces the
-                // board instead of the generic error state (issue #297).
-                rejectedByServer = true
-                return
-            }
-            if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
-                await client.searchThrottle.enterCooldown()
-            }
-            switch outcome {
-            case .inlineNotice(let message):
-                reloadNotice = message
-            case .fullScreenError(let message):
-                loadError = message
-            }
+            await handleLoadFailure(error, generation: generation)
         }
+    }
+
+    /// Classifies and presents a failed load for `generation`. A cancelled
+    /// load (keystroke restart, dismissal) never reached a verdict and a
+    /// superseded run must not write — so both keep the board untouched
+    /// (issue #274). A server permission rejection swaps in the placeholder;
+    /// every other failure becomes a transient notice over existing content
+    /// or a full-screen error.
+    @MainActor
+    private func handleLoadFailure(_ error: Error, generation: Int) async {
+        guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) else { return }
+        guard loadState.isCurrent(generation: generation) else { return }
+        if isSdkPermissionRejection(error) {
+            // The preflight passed but the server still answered 401 — the
+            // token expired (or was revoked) between the check and the
+            // send. The signed-out permission placeholder replaces the
+            // board instead of the generic error state (issue #297).
+            rejectedByServer = true
+            return
+        }
+        if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
+            await client.searchThrottle.enterCooldown()
+            // The rate-limit notice is emitted below; mark it so repeated
+            // keystrokes during the cooldown cannot re-trigger it (#269).
+            hasEmittedAdmissionNotice = true
+        }
+        switch outcome {
+        case .inlineNotice(let message):
+            reloadNotice = message
+        case .fullScreenError(let message):
+            loadState.handleFailure(message: message, generation: generation)
+        }
+    }
+
+    /// Settles the lifecycle on the denied path (issue #274): the board can
+    /// no longer be stranded on its first-load skeleton if the body leaves
+    /// the permission placeholder without a task restart, and the generation
+    /// bump discards the writes of any in-flight permitted load — including
+    /// unstructured ones (pull-to-refresh) that SwiftUI's task cancellation
+    /// does not reach.
+    private func settlePermissionDeniedState() {
+        loadState.settlePermissionDenied()
+        reloadNotice = nil
     }
 
     /// Resolves whether the client can act as the signed-in user right now and

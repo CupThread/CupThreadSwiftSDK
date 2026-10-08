@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Ya estás suscrito";
 "cupthread.subscribe.manage_message" = "Las novedades se enviarán a %@. Para cambiar la dirección o darte de baja, usa el enlace de cualquier correo de novedades.";
 "cupthread.subscribe.use_different_email" = "Usar otro correo electrónico";
+"cupthread.subscribe.pending_title" = "Confirmación pendiente";
+"cupthread.subscribe.pending_message" = "Enviamos un enlace de confirmación a %@. Ábrelo para empezar a recibir las novedades por correo.";
+"cupthread.subscribe.resend_button" = "Reenviar correo de confirmación";
+"cupthread.subscribe.resending_button" = "Reenviando…";
 "cupthread.whatsnew.emails_on" = "Novedades por correo activadas";
 "cupthread.whatsnew.emails_on_destination" = "Las notificaciones llegan a %@.";
 "cupthread.whatsnew.get_emails" = "Recibir novedades por correo";
 "cupthread.whatsnew.get_emails_caption" = "Recibe un aviso cuando se publique una nueva versión.";
 "cupthread.whatsnew.subscribe_accessibility" = "Suscribirse a las novedades por correo";
 "cupthread.whatsnew.emails_on_accessibility" = "Las novedades por correo están activadas para %@";
+"cupthread.whatsnew.pending_title" = "Confirmación pendiente";
+"cupthread.whatsnew.pending_destination" = "Enviamos un enlace de confirmación a %@.";
+"cupthread.whatsnew.pending_accessibility" = "Confirmación por correo pendiente para %@";
 "cupthread.whatsnew.version_accessibility" = "Versión %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Solicitudes publicadas: %@";
 "cupthread.features.unavailable_feedback" = "Feedback no disponible";
@@ -193,3 +200,8 @@
 "cupthread.error.invalid_signature" = "Los datos de pago no se actualizaron: la firma del informe no se pudo verificar. Comprueba el secreto de firma del SDK de la app.";
 "cupthread.error.stale_signature" = "Los datos de pago no se actualizaron: la firma del informe ha caducado. Comprueba el reloj del dispositivo e inténtalo de nuevo.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Tu mensaje es demasiado largo. Acórtalo e inténtalo de nuevo.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld de %2$lld caracteres";
