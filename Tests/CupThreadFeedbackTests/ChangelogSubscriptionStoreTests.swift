@@ -19,43 +19,89 @@ struct ChangelogSubscriptionStoreTests {
         return IsolatedContext(defaults: defaults, suiteName: suiteName)
     }
 
-    @Test func freshStoreReadsEmptyAndRoundTripsPersistedEmail() throws {
+    @Test func freshStoreReadsNoRecordAndRoundTripsBothStates() throws {
         let storage = InMemorySubscriptionStorage()
         let store = ChangelogSubscriptionStore(appKey: "app_roundtrip", storage: storage)
+        #expect(store.subscriptionRecord() == nil)
         #expect(store.subscribedEmail() == nil)
 
-        store.persist(email: "user@example.com")
+        let since = Date(timeIntervalSince1970: 1_760_000_000)
+        store.persist(record: ChangelogSubscriptionRecord(email: "user@example.com", state: .pending(since: since)))
+        #expect(
+            store.subscriptionRecord()
+                == ChangelogSubscriptionRecord(email: "user@example.com", state: .pending(since: since))
+        )
         #expect(store.subscribedEmail() == "user@example.com")
 
         // A second instance over the same storage observes the same state.
         let reopened = ChangelogSubscriptionStore(appKey: "app_roundtrip", storage: storage)
-        #expect(reopened.subscribedEmail() == "user@example.com")
+        #expect(
+            reopened.subscriptionRecord()
+                == ChangelogSubscriptionRecord(email: "user@example.com", state: .pending(since: since))
+        )
 
         reopened.clear()
-        #expect(store.subscribedEmail() == nil)
-        #expect(reopened.subscribedEmail() == nil)
+        #expect(store.subscriptionRecord() == nil)
+        #expect(reopened.subscriptionRecord() == nil)
+    }
+
+    @Test func confirmedStateRoundTrips() throws {
+        let storage = InMemorySubscriptionStorage()
+        let store = ChangelogSubscriptionStore(appKey: "app_confirmed", storage: storage)
+        store.persist(record: ChangelogSubscriptionRecord(email: "user@example.com", state: .confirmed))
+        #expect(
+            store.subscriptionRecord()
+                == ChangelogSubscriptionRecord(email: "user@example.com", state: .confirmed)
+        )
+        #expect(store.subscriptionRecord()?.state.isPending == false)
+    }
+
+    @Test func legacyBareEmailReadsBackAsConfirmed() throws {
+        let context = makeIsolatedDefaults()
+        defer { context.cleanup() }
+
+        let mockStorage = InMemorySubscriptionStorage()
+        let store = ChangelogSubscriptionStore(
+            appKey: "app_legacy",
+            storage: mockStorage,
+            legacyUserDefaults: context.defaults
+        )
+        // Exactly the value pre-#273 SDK versions wrote: a bare email string.
+        context.defaults.set("legacy@example.com", forKey: store.storageKey)
+
+        #expect(store.subscribedEmail() == "legacy@example.com")
+        #expect(
+            store.subscriptionRecord()
+                == ChangelogSubscriptionRecord(email: "legacy@example.com", state: .confirmed)
+        )
     }
 
     @Test func persistTrimsWhitespaceAndClearRemovesStorage() throws {
         let storage = InMemorySubscriptionStorage()
         let store = ChangelogSubscriptionStore(appKey: "app_trim", storage: storage)
-        store.persist(email: "  user@example.com\n")
+        store.persist(
+            record: ChangelogSubscriptionRecord(email: "  user@example.com\n", state: .confirmed)
+        )
         #expect(store.subscribedEmail() == "user@example.com")
 
         // Whitespace-only input is ignored and never evicts an existing record.
-        store.persist(email: "   ")
+        store.persist(record: ChangelogSubscriptionRecord(email: "   ", state: .confirmed))
         #expect(store.subscribedEmail() == "user@example.com")
 
         store.clear()
-        #expect(store.subscribedEmail() == nil)
+        #expect(store.subscriptionRecord() == nil)
     }
 
-    @Test func persistOverwritesPreviousEmail() throws {
+    @Test func persistOverwritesPreviousEmailAndState() throws {
         let storage = InMemorySubscriptionStorage()
         let store = ChangelogSubscriptionStore(appKey: "app_overwrite", storage: storage)
-        store.persist(email: "old@example.com")
-        store.persist(email: "new@example.com")
-        #expect(store.subscribedEmail() == "new@example.com")
+        store.persist(record: ChangelogSubscriptionRecord(email: "old@example.com", state: .confirmed))
+        let since = Date(timeIntervalSince1970: 1_760_000_100)
+        store.persist(record: ChangelogSubscriptionRecord(email: "new@example.com", state: .pending(since: since)))
+        #expect(
+            store.subscriptionRecord()
+                == ChangelogSubscriptionRecord(email: "new@example.com", state: .pending(since: since))
+        )
     }
 
     @Test func storageIsScopedPerAppKey() throws {
@@ -64,17 +110,18 @@ struct ChangelogSubscriptionStoreTests {
         let storeA = ChangelogSubscriptionStore(appKey: "app_a", storage: storageA)
         let storeB = ChangelogSubscriptionStore(appKey: "app_b", storage: storageB)
 
-        storeA.persist(email: "a@example.com")
+        storeA.persist(record: ChangelogSubscriptionRecord(email: "a@example.com", state: .confirmed))
         #expect(storeA.subscribedEmail() == "a@example.com")
-        #expect(storeB.subscribedEmail() == nil)
+        #expect(storeB.subscriptionRecord() == nil)
 
-        storeB.persist(email: "b@example.com")
+        let pending = ChangelogSubscriptionRecord(email: "b@example.com", state: .pending(since: .now))
+        storeB.persist(record: pending)
         #expect(storeA.subscribedEmail() == "a@example.com")
-        #expect(storeB.subscribedEmail() == "b@example.com")
+        #expect(storeB.subscriptionRecord() == pending)
 
         storeA.clear()
-        #expect(storeA.subscribedEmail() == nil)
-        #expect(storeB.subscribedEmail() == "b@example.com")
+        #expect(storeA.subscriptionRecord() == nil)
+        #expect(storeB.subscriptionRecord() == pending)
     }
 
     @Test func initialPhaseIsFormWithoutStoredEmailAndManageWithOne() {
@@ -90,14 +137,14 @@ struct ChangelogSubscriptionStoreTests {
         await withTaskGroup(of: Void.self) { group in
             for email in emails {
                 group.addTask {
-                    store.persist(email: email)
-                    _ = store.subscribedEmail()
+                    store.persist(record: ChangelogSubscriptionRecord(email: email, state: .confirmed))
+                    _ = store.subscriptionRecord()
                 }
             }
         }
 
-        let final = try #require(store.subscribedEmail())
-        #expect(emails.contains(final))
+        let final = try #require(store.subscriptionRecord())
+        #expect(emails.contains(final.email))
     }
 
     @Test func migrationAdoptsLegacyEmailAndPurgesFromUserDefaults() throws {
@@ -185,7 +232,7 @@ struct ChangelogSubscriptionStoreTests {
         )
         defer { store.clear() }
 
-        store.persist(email: "  active@example.com \n")
+        store.persist(record: ChangelogSubscriptionRecord(email: "active@example.com", state: .confirmed))
         #expect(store.subscribedEmail() == "active@example.com")
         #expect(context.defaults.string(forKey: storageKey) == nil)
 
@@ -193,7 +240,11 @@ struct ChangelogSubscriptionStoreTests {
             service: ChangelogSubscriptionStore.keychainService,
             account: storageKey
         )
-        #expect(keychainStorage.load() == "active@example.com")
+        let stored = try #require(keychainStorage.load())
+        #expect(
+            try JSONDecoder().decode(ChangelogSubscriptionRecord.self, from: Data(stored.utf8))
+                == ChangelogSubscriptionRecord(email: "active@example.com", state: .confirmed)
+        )
 
         // clear() purges both Keychain item and legacy UserDefaults
         context.defaults.set("lingering@example.com", forKey: storageKey)
