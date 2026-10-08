@@ -204,5 +204,19 @@ struct RoadmapBoardViewTests {
         )
 
         _ = board.body
+        #expect(!board.isLoading)
+        #expect(board.hasLoadedOnce)
+    }
+
+    @Test @MainActor func roadmapBoardViewInitialRenderKeepsSkeletonCondition() {
+        let client = makeTestClient()
+        let board = RoadmapBoardView(
+            client: client,
+            userToken: "user_test_token_123"
+        )
+
+        _ = board.body
+        #expect(board.isLoading)
+        #expect(!board.hasLoadedOnce)
     }
 }

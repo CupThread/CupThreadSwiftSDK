@@ -17,6 +17,8 @@ public struct RoadmapBoardView: View {
     @State private var groups: [RoadmapGroup] = []
     /// First-load lifecycle and stale-write generation tracking (issue #274).
     @State private var loadState = RoadmapBoardLoadState()
+    var isLoading: Bool { loadState.isLoading }
+    var hasLoadedOnce: Bool { loadState.hasLoadedOnce }
     @State private var selectedGroupID: String?
     @State private var searchText = ""
     /// The search query that produced the currently loaded roadmap groups.
@@ -153,6 +155,7 @@ public struct RoadmapBoardView: View {
         }
         .task(id: loadTaskKey) {
             await resolveAuthenticationAccess()
+            guard !Task.isCancelled else { return }
             guard isRoadmapPermitted else {
                 settlePermissionDeniedState()
                 return
@@ -409,6 +412,7 @@ extension RoadmapBoardView {
     @MainActor
     private func load(alreadyAdmitted: Bool = false) async {
         await resolveAuthenticationAccess()
+        guard !Task.isCancelled else { return }
         guard isRoadmapPermitted else {
             settlePermissionDeniedState()
             return
@@ -416,14 +420,11 @@ extension RoadmapBoardView {
         rejectedByServer = false
         let generation = loadState.startLoading()
         reloadNotice = nil
-        defer { loadState.finishLoading(generation: generation) }
+        defer { loadState.finishLoading(generation: generation, wasCancelled: Task.isCancelled) }
         do {
-            // The board needs complete data — grouping a single page would
-            // silently truncate every column once the app outgrows the
-            // server's page size — so page through with a wide page size and
-            // let ``collectAllRequests`` stop at the real end of the result
-            // set. Columns load independently and concurrently.
-            let query = trimmedSearchText.isEmpty ? nil : trimmedSearchText
+            // Page through with collectAllRequests so columns load complete data.
+            let queryText = trimmedSearchText
+            let query = queryText.isEmpty ? nil : queryText
             if let loaded = try await loadRoadmapGroups(
                 client: client,
                 userToken: userToken,
@@ -431,10 +432,10 @@ extension RoadmapBoardView {
                 config: sdkAppConfig,
                 skipInitialAdmissionRecord: alreadyAdmitted
             ) {
-                // A newer load or a permission denial owns the board now.
-                guard loadState.isCurrent(generation: generation) else { return }
+                // A newer load, cancellation, or a permission denial owns the board now.
+                guard loadState.isCurrent(generation: generation), !Task.isCancelled else { return }
                 groups = loaded
-                lastExecutedQuery = trimmedSearchText
+                lastExecutedQuery = queryText
                 hasEmittedAdmissionNotice = false
             }
         } catch {
@@ -445,13 +446,15 @@ extension RoadmapBoardView {
     /// Classifies and presents a failed load for `generation`. A cancelled
     /// load (keystroke restart, dismissal) never reached a verdict and a
     /// superseded run must not write — so both keep the board untouched
-    /// (issue #274). A server permission rejection swaps in the placeholder;
+    /// (issue #274, #187). A server permission rejection swaps in the placeholder;
     /// every other failure becomes a transient notice over existing content
     /// or a full-screen error.
     @MainActor
     private func handleLoadFailure(_ error: Error, generation: Int) async {
-        guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty) else { return }
-        guard loadState.isCurrent(generation: generation) else { return }
+        guard loadState.isCurrent(generation: generation),
+              !Task.isCancelled,
+              let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !groups.isEmpty)
+        else { return }
         if isSdkPermissionRejection(error) {
             // The preflight passed but the server still answered 401 — the
             // token expired (or was revoked) between the check and the
@@ -474,12 +477,9 @@ extension RoadmapBoardView {
         }
     }
 
-    /// Settles the lifecycle on the denied path (issue #274): the board can
-    /// no longer be stranded on its first-load skeleton if the body leaves
-    /// the permission placeholder without a task restart, and the generation
-    /// bump discards the writes of any in-flight permitted load — including
-    /// unstructured ones (pull-to-refresh) that SwiftUI's task cancellation
-    /// does not reach.
+    /// Settles the lifecycle on the denied path (issue #274): ensures the board
+    /// does not get stranded on the first-load skeleton, and invalidates any in-flight
+    /// permitted load so its writes are discarded.
     private func settlePermissionDeniedState() {
         loadState.settlePermissionDenied()
         reloadNotice = nil
