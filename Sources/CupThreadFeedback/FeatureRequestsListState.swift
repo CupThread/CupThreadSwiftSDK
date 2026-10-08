@@ -109,11 +109,25 @@ struct FeatureRequestsListState: Equatable, Sendable {
     ///   - itemId: The ID of the item that was voted on.
     ///   - voted: Authoritative vote status from the server.
     ///   - voteCount: Authoritative vote count from the server.
-    mutating func reconcileVoteSuccess(itemId: String, voted: Bool, voteCount: Int) {
+    ///   - originalVoted: The pre-tap vote state before optimistic mutation. If provided,
+    ///     the return value indicates whether the server state reflects an actual transition
+    ///     relative to the pre-tap state (suppressing pulses on idempotent no-ops).
+    /// - Returns: `true` if an actual vote state transition occurred (or if `originalVoted` was omitted).
+    @discardableResult
+    mutating func reconcileVoteSuccess(
+        itemId: String,
+        voted: Bool,
+        voteCount: Int,
+        originalVoted: Bool? = nil
+    ) -> Bool {
         votingIds.remove(itemId)
         if let idx = items.firstIndex(where: { $0.id == itemId }) {
             items[idx] = items[idx].withVoteState(voted: voted, count: voteCount)
         }
+        if let originalVoted {
+            return voted != originalVoted
+        }
+        return true
     }
 
     /// Reconciles a failed vote request by reverting only the vote fields.

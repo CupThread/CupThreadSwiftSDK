@@ -86,6 +86,44 @@ struct FeatureRequestsListStateTests {
         #expect(state.items[0].voteCount == 10)
     }
 
+    @Test func voteSuccessDetectsStateTransitionsAndSuppressesPulseOnIdempotentNoOp() {
+        let unvotedItem = makeItem(id: "fr-1", voteCount: 5, hasVoted: false)
+        var state = FeatureRequestsListState(items: [unvotedItem])
+
+        // 1. Unvoted item cast vote success -> transition occurs
+        let tap1 = state.applyOptimisticVote(for: "fr-1")
+        #expect(tap1?.originalVoted == false)
+        let didTransition1 = state.reconcileVoteSuccess(itemId: "fr-1", voted: true, voteCount: 6, originalVoted: false)
+        #expect(didTransition1 == true, "Casting a vote when unvoted must indicate a transition")
+        #expect(state.items[0].hasVoted == true)
+        #expect(state.items[0].voteCount == 6)
+
+        // 2. Voted item unvote success -> transition occurs
+        let tap2 = state.applyOptimisticVote(for: "fr-1")
+        #expect(tap2?.originalVoted == true)
+        let didTransition2 = state.reconcileVoteSuccess(itemId: "fr-1", voted: false, voteCount: 5, originalVoted: true)
+        #expect(didTransition2 == true, "Removing a vote when voted must indicate a transition")
+        #expect(state.items[0].hasVoted == false)
+        #expect(state.items[0].voteCount == 5)
+
+        // 3. User attempts unvote, but server returns voted: true (idempotent insert / no-op) -> no transition, pulse suppressed
+        let votedItem = makeItem(id: "fr-2", voteCount: 10, hasVoted: true)
+        var state2 = FeatureRequestsListState(items: [votedItem])
+        let tap3 = state2.applyOptimisticVote(for: "fr-2")
+        #expect(tap3?.originalVoted == true)
+        let didTransition3 = state2.reconcileVoteSuccess(itemId: "fr-2", voted: true, voteCount: 10, originalVoted: true)
+        #expect(didTransition3 == false, "Idempotent insert response after optimistic unvote must NOT indicate a transition")
+        #expect(state2.items[0].hasVoted == true)
+        #expect(state2.items[0].voteCount == 10)
+
+        // 4. User attempts cast, but server returns voted: false (idempotent unvote / no-op) -> no transition, pulse suppressed
+        let tap4 = state.applyOptimisticVote(for: "fr-1")
+        #expect(tap4?.originalVoted == false)
+        let didTransition4 = state.reconcileVoteSuccess(itemId: "fr-1", voted: false, voteCount: 5, originalVoted: false)
+        #expect(didTransition4 == false, "Idempotent unvote response after optimistic cast must NOT indicate a transition")
+        #expect(state.items[0].hasVoted == false)
+    }
+
     @Test func voteSuccessWithRowIndexShift() {
         let itemA = makeItem(id: "fr-a", title: "A", voteCount: 2)
         let itemB = makeItem(id: "fr-b", title: "B", voteCount: 5)

@@ -38,7 +38,7 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 - ``FeatureRequestDraft``: A new feature request before submission.
 - ``ListFeatureRequestsResult``: Paginated list response.
 - ``FeatureRequestSubmissionResult``: Response to a new request.
-- ``VoteResult``: Response to a vote toggle.
+- ``VoteResult``: Response to casting or removing a vote.
 - ``FeatureRequestsView``: Browse, search, and vote on requests.
 - ``RoadmapBoardView``: Kanban board grouped by public columns.
 

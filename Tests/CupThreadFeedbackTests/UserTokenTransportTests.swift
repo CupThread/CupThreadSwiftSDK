@@ -13,6 +13,8 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
     case fetchFeatureRequests
     case submitFeatureRequest
     case toggleVote
+    case castVote
+    case removeVote
     case postComment
     case subscribeToChangelog
     case updateUserAttributes
@@ -64,8 +66,8 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
             return try encodeJSON(["erased": true])
         case .linkEndUser:
             return try encodeJSON(["linked": true])
-        case .feedbackSubmit, .toggleVote, .subscribeToChangelog:
-            // All three decode leniently from an empty JSON object.
+        case .feedbackSubmit, .toggleVote, .castVote, .removeVote, .subscribeToChangelog:
+            // All decode leniently from an empty JSON object.
             return Data("{}".utf8)
         }
     }
@@ -74,7 +76,7 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
         switch self {
         case .feedbackSubmit, .createUploadSession, .uploadSessionSlotPut:
             try await performAttachmentFlow(on: client)
-        case .fetchFeatureRequests, .submitFeatureRequest, .toggleVote, .postComment:
+        case .fetchFeatureRequests, .submitFeatureRequest, .toggleVote, .castVote, .removeVote, .postComment:
             try await performFeatureRequestFlow(on: client)
         case .subscribeToChangelog, .updateUserAttributes, .eraseMyData, .linkEndUser:
             try await performAccountFlow(on: client)
@@ -116,6 +118,10 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
             _ = try await client.submitFeatureRequest(FeatureRequestDraft(title: "t", description: "d"), userToken: token)
         case .toggleVote:
             _ = try await client.toggleVote(featureRequestId: "fr-1", userToken: token)
+        case .castVote:
+            _ = try await client.castVote(featureRequestId: "fr-1", userToken: token)
+        case .removeVote:
+            _ = try await client.removeVote(featureRequestId: "fr-1", userToken: token)
         case .postComment:
             _ = try await client.postComment(featureRequestId: "fr-1", draft: CommentDraft(body: "hi"), userToken: token)
         default:

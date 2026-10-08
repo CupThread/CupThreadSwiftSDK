@@ -107,6 +107,80 @@ struct IntakeAndVotingBearerTests {
         #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_anon")
     }
 
+    // MARK: - castVote & removeVote
+
+    @Test func castVoteAttachesBearerTokenWhenAuthenticated() async throws {
+        let capture = CaptureBox<URLRequest>()
+        let json = voteSuccessJSON
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 200), try encodeJSON(json))
+        }
+        defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
+
+        let client = makeClient(
+            baseURL: Self.baseURL,
+            authenticationProvider: { "user-jwt-cast-123" }
+        )
+
+        let result = try await client.castVote(featureRequestId: "req_1", userToken: "user_vote_1")
+        #expect(result.voted == true)
+        #expect(result.voteCount == 42)
+
+        let request = try #require(capture.value)
+        #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer user-jwt-cast-123")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_1")
+        #expect(request.value(forHTTPHeaderField: "X-Request-Id") != nil)
+        #expect(request.value(forHTTPHeaderField: "X-SDK-Version") != nil)
+    }
+
+    @Test func removeVoteAttachesBearerTokenWhenAuthenticated() async throws {
+        let capture = CaptureBox<URLRequest>()
+        let unvoteSuccessJSON: [String: Any] = ["voted": false, "voteCount": 41]
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 200), try encodeJSON(unvoteSuccessJSON))
+        }
+        defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
+
+        let client = makeClient(
+            baseURL: Self.baseURL,
+            authenticationProvider: { "user-jwt-remove-789" }
+        )
+
+        let result = try await client.removeVote(featureRequestId: "req_1", userToken: "user_vote_1")
+        #expect(result.voted == false)
+        #expect(result.voteCount == 41)
+
+        let request = try #require(capture.value)
+        #expect(request.httpMethod == "DELETE")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer user-jwt-remove-789")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_1")
+        #expect(request.value(forHTTPHeaderField: "X-Request-Id") != nil)
+        #expect(request.value(forHTTPHeaderField: "X-SDK-Version") != nil)
+    }
+
+    @Test func removeVoteWithoutProviderOmitsAuthorizationHeader() async throws {
+        let capture = CaptureBox<URLRequest>()
+        let unvoteSuccessJSON: [String: Any] = ["voted": false, "voteCount": 41]
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 200), try encodeJSON(unvoteSuccessJSON))
+        }
+        defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
+
+        let client = makeClient(baseURL: Self.baseURL)
+        #expect(client.supportsAuthentication == false)
+
+        let result = try await client.removeVote(featureRequestId: "req_1", userToken: "user_vote_anon")
+        #expect(result.voted == false)
+        let request = try #require(capture.value)
+        #expect(request.httpMethod == "DELETE")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_anon")
+    }
+
     // MARK: - submitFeatureRequest
 
     @Test func submitFeatureRequestAttachesBearerTokenWhenAuthenticated() async throws {

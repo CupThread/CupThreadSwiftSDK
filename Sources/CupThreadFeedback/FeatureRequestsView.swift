@@ -471,11 +471,23 @@ private extension FeatureRequestsView {
         }
 
         do {
-            let result = try await client.toggleVote(featureRequestId: item.id, userToken: userToken)
-            listState.reconcileVoteSuccess(itemId: item.id, voted: result.voted, voteCount: result.voteCount)
-            // Success cues fire here, on the confirmed state — never on the
-            // optimistic flip nor on a reverted failure.
-            voteSuccessPulses[item.id, default: 0] += 1
+            let result: VoteResult
+            if originalVoted {
+                result = try await client.removeVote(featureRequestId: item.id, userToken: userToken)
+            } else {
+                result = try await client.castVote(featureRequestId: item.id, userToken: userToken)
+            }
+            let didTransition = listState.reconcileVoteSuccess(
+                itemId: item.id,
+                voted: result.voted,
+                voteCount: result.voteCount,
+                originalVoted: originalVoted
+            )
+            // Success cues fire here, on confirmed state transitions — never on the
+            // optimistic flip, nor on an idempotent no-op or reverted failure.
+            if didTransition {
+                voteSuccessPulses[item.id, default: 0] += 1
+            }
         } catch {
             listState.reconcileVoteFailure(
                 itemId: item.id,
