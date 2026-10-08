@@ -342,6 +342,28 @@ struct CommentPaginationTests {
         }
         #expect(script.requestedCursors == [nil, "c1"])
     }
+
+    @Test func fetchCommentsTerminatesAtMaxPagesWhenServerContinuesAdvertisingMore() async throws {
+        var requestCount = 0
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            requestCount += 1
+            let commentId = "c-\(requestCount)"
+            return commentPage(
+                comments: [makeCommentJSON(id: commentId)],
+                total: 0,
+                hasMore: true,
+                nextCursor: "cur-\(requestCount)"
+            )
+        }
+
+        let comments = try await Self.makePagedClient().fetchComments(
+            featureRequestId: "fr-1",
+            maxPages: 3
+        )
+
+        #expect(requestCount == 3)
+        #expect(comments.map(\.id) == ["c-1", "c-2", "c-3"])
+    }
 }
 
 // MARK: - JSON fixtures
