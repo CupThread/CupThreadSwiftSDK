@@ -154,7 +154,7 @@ struct RedirectPolicyTests {
     /// the shipped `SameOriginRedirectLimiter` delegate — the same policy the
     /// default session installs.
     private func makeClient(
-        turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
+        turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) -> FeedbackClient {
         let configuration = URLSessionConfiguration.ephemeral
@@ -289,7 +289,7 @@ struct RedirectPolicyTests {
         }
         defer { removeHandler(forHost: host) }
 
-        let client = makeClient(turnstileTokenProvider: { "cf-turnstile-token" })
+        let client = makeClient(turnstileTokenProvider: { _ in "cf-turnstile-token" })
         do {
             _ = try await client.submit(
                 FeedbackDraft(title: "Title", description: "Description", platform: .ios),
@@ -323,7 +323,7 @@ struct RedirectPolicyTests {
         }
         defer { removeHandler(forHost: host) }
 
-        let client = makeClient(turnstileTokenProvider: { "cf-turnstile-token" })
+        let client = makeClient(turnstileTokenProvider: { _ in "cf-turnstile-token" })
         do {
             _ = try await client.submit(
                 FeedbackDraft(title: "Title", description: "Description", platform: .ios),

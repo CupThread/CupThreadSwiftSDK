@@ -86,30 +86,80 @@ func sanitizeMarkdownAttributedString(_ attributedString: AttributedString) -> A
     return sanitized
 }
 
-/// Validates whether a candidate host is allowed for download URLs relative to a base host:
-/// - Same host (case-insensitive)
-/// - Subdomain or parent domain
-/// - Shares the same root domain (e.g. CDN hosts or apex domain)
-func isAllowedDownloadHost(_ candidateHost: String, baseHost: String) -> Bool {
-    if candidateHost == baseHost {
-        return true
+/// Multi-tenant hosting suffixes that never imply a shared operator (curated,
+/// zero-dependency subset of the Public Suffix List). Hosts that only share one
+/// of these suffixes are different sites, so ``isAllowedDownloadHost(_:baseHost:)``
+/// requires matching full registrable domains instead.
+private let multiTenantHostSuffixes: Set<String> = [
+    "amazonaws.com", "appspot.com", "azurewebsites.net", "azurestaticapps.net",
+    "cloudfront.net", "firebaseapp.com", "fly.dev", "gitlab-pages.com", "gitlab.io",
+    "github.io", "githubusercontent.com", "herokuapp.com", "netlify.app",
+    "netlify.com", "onrender.com", "pages.dev", "r2.dev", "run.app", "surge.sh",
+    "vercel.app", "web.app", "workers.dev"
+]
+
+/// Second-level labels the Public Suffix List reserves under country-code TLDs
+/// (`co.uk`, `com.au`, `org.il`, …). Treating any `<label>.<tld>` pair whose
+/// label is one of these as a public suffix also keeps unlisted ccSLDs
+/// (e.g. `co.ke`) from collapsing unrelated hosts into a shared root.
+private let registrySecondLevelLabels: Set<String> = [
+    "ac", "co", "com", "edu", "go", "gov", "idv", "ne", "net", "or", "org"
+]
+
+/// Returns the registrable domain (public suffix plus one label) of `host`, or
+/// `nil` when `host` is itself a bare public suffix and cannot establish
+/// same-site trust.
+private func registrableDomain(of host: String) -> String? {
+    let labels = host.split(separator: ".")
+    guard labels.count >= 2 else {
+        return nil // A single label is a bare TLD (or an intranet host), never registrable.
     }
-    let baseParts = baseHost.split(separator: ".")
-    if baseParts.allSatisfy({ Int($0) != nil }) {
+    let lastTwo = labels.suffix(2).joined(separator: ".")
+    let endsWithPublicSuffix = multiTenantHostSuffixes.contains(lastTwo)
+        || registrySecondLevelLabels.contains(String(labels[labels.count - 2]))
+    guard endsWithPublicSuffix else {
+        return lastTwo
+    }
+    // Under a public suffix the registrable domain needs one more label;
+    // the bare suffix itself (`co.uk`, `github.io`) has none.
+    return labels.count >= 3 ? labels.suffix(3).joined(separator: ".") : nil
+}
+
+/// Validates whether a candidate host is allowed for download URLs relative to a
+/// base host, as defense-in-depth against a compromised or buggy upload response
+/// planting an off-origin URL on ``FeedbackAttachment/url``:
+/// - Same host (case-insensitive) is allowed.
+/// - Otherwise both hosts must share the same registrable domain (public suffix
+///   plus one label): the base's apex and its sibling subdomains are allowed,
+///   e.g. `cdn.cupthread.com` or `cupthread.com` for base `api.cupthread.com`.
+/// - Sharing only a public suffix or a multi-tenant hosting suffix is rejected:
+///   `com`, `co.uk`, and `github.io` pair hosts that have no shared operator.
+/// - IP-literal and single-label hosts fail closed.
+func isAllowedDownloadHost(_ candidateHost: String, baseHost: String) -> Bool {
+    guard let candidate = normalizedDownloadHost(candidateHost),
+          let base = normalizedDownloadHost(baseHost) else {
         return false
     }
-    if candidateHost.hasSuffix("." + baseHost) || baseHost.hasSuffix("." + candidateHost) {
+    if candidate == base {
         return true
     }
-    let candidateParts = candidateHost.split(separator: ".")
-    if candidateParts.count >= 2 && baseParts.count >= 2 {
-        let candidateRoot = candidateParts.suffix(2).joined(separator: ".")
-        let baseRoot = baseParts.suffix(2).joined(separator: ".")
-        if candidateRoot == baseRoot {
-            return true
-        }
+    let baseLabels = base.split(separator: ".")
+    if !baseLabels.isEmpty, baseLabels.allSatisfy({ Int($0) != nil }) {
+        return false // IP-literal base hosts have no registrable-domain relation.
     }
-    return false
+    guard let candidateDomain = registrableDomain(of: candidate),
+          let baseDomain = registrableDomain(of: base) else {
+        return false
+    }
+    return candidateDomain == baseDomain
+}
+
+private func normalizedDownloadHost(_ host: String) -> String? {
+    var trimmed = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    while trimmed.hasSuffix(".") {
+        trimmed.removeLast()
+    }
+    return trimmed.isEmpty ? nil : trimmed
 }
 
 // MARK: - View Modifiers

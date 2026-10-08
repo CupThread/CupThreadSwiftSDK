@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "已訂閱";
 "cupthread.subscribe.manage_message" = "更新電郵會傳送至 %@。想更改電郵地址或者取消訂閱，請使用任何更新電郵入面嘅連結。";
 "cupthread.subscribe.use_different_email" = "使用其他電郵";
+"cupthread.subscribe.pending_title" = "等待確認";
+"cupthread.subscribe.pending_message" = "我哋已將確認連結傳送至 %@。開啟連結就會開始收到更新電郵。";
+"cupthread.subscribe.resend_button" = "重新傳送確認電郵";
+"cupthread.subscribe.resending_button" = "正在重新傳送…";
 "cupthread.whatsnew.emails_on" = "更新電郵已開啟";
 "cupthread.whatsnew.emails_on_destination" = "通知會傳送至 %@。";
 "cupthread.whatsnew.get_emails" = "接收更新電郵";
 "cupthread.whatsnew.get_emails_caption" = "有新版本推出時接收通知。";
 "cupthread.whatsnew.subscribe_accessibility" = "訂閱更新電郵";
 "cupthread.whatsnew.emails_on_accessibility" = "%@ 已開啟更新電郵";
+"cupthread.whatsnew.pending_title" = "等待確認";
+"cupthread.whatsnew.pending_destination" = "我哋已將確認連結傳送至 %@。";
+"cupthread.whatsnew.pending_accessibility" = "%@ 嘅電郵確認尚未完成";
 "cupthread.whatsnew.version_accessibility" = "版本 %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "已交付嘅建議：%@";
 "cupthread.features.unavailable_feedback" = "反饋無法使用";
@@ -193,3 +200,34 @@
 "cupthread.error.invalid_signature" = "付款資訊未更新：報告的簽名驗證未通過，請檢查應用程式的 SDK 簽名密鑰。";
 "cupthread.error.stale_signature" = "付款資訊未更新：報告的簽名已過期，請檢查裝置時間後再試一次。";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "此意見反應或附件已被提交。";
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "回饋伺服器傳回咗無效嘅回應。";
+"cupthread.error.unreadable_upload_response" = "回饋伺服器傳回咗無法解讀嘅上載回應。";
+"cupthread.error.auth_required" = "此操作只限已登入用戶使用。";
+"cupthread.error.scan_rejected" = "所引用嘅附件未通過內容安全檢查，無法上載。";
+"cupthread.error.unsupported_media" = "不支援此圖片類型，請附上 PNG、JPEG、WebP 或 GIF 格式嘅圖片。";
+"cupthread.error.payload_too_large" = "檔案太大，無法上載。";
+"cupthread.error.uploader_identity_required" = "上載需要終端用戶身分：上載附件時請傳入 userToken（參見 UserTokenStore）。";
+"cupthread.error.uploader_mismatch" = "此附件係用其他身分上載嘅，請移除後重新附加，再試一次。";
+"cupthread.error.quota_exceeded" = "此應用程式已達本月提交上限，請稍後再試。";
+"cupthread.error.subscription_inactive" = "此應用程式目前無法提交內容，請稍後再試。";
+"cupthread.error.profile_not_found" = "該用戶嘅個人檔案已不存在。";
+"cupthread.error.comments_unavailable" = "此功能請求暫不支援留言。";
+"cupthread.error.email_not_verified" = "請使用你登入帳號嘅電郵地址訂閱。";
+"cupthread.attachment.oversized" = "附件（%1$@）超過咗允許嘅大小上限 %2$@。";
+"cupthread.attachment.unprocessable" = "所選相片無法處理，無法上載。";
+"cupthread.attachment.unsupported_type" = "不支援此圖片類型，請附上 PNG、JPEG、WebP 或 GIF 格式嘅圖片。";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "你的內容太長，請精簡後再試。";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "已輸入 %1$lld 個字元，上限 %2$lld 個";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "上載工作階段已過期。請移除檔案後重新附加，再試一次。";
+"cupthread.error.upload_session_invalid" = "上載工作階段無效或已失效。請移除檔案後重新附加，再試一次。";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "此應用程式已達今日上載上限，請稍後再試。";

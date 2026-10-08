@@ -6,8 +6,12 @@ enum ChangelogSubscribePhase: Equatable, Sendable {
     case form
     /// Subscription just recorded; awaiting the emailed double opt-in.
     case subscribed
-    /// Returning user; shows the remembered subscribed address.
+    /// Returning user with a confirmed subscription; shows the address.
     case manage
+    /// Returning user whose subscription is still awaiting the emailed
+    /// confirmation (issue #273): offers resending the confirmation email
+    /// and switching to a different address, with honest pending copy.
+    case managePending
 }
 
 /// What the sheet's primary (confirmation) button does in the current phase.
@@ -21,27 +25,52 @@ enum ChangelogSubscribeAction: Equatable, Sendable {
 /// Pure state machine behind `ChangelogSubscribeView`.
 ///
 /// Owns the phase/toolbar decisions the sheet renders so they can be unit
-/// tested without hosting SwiftUI. The guarantee pinned here (and tested) is
-/// that **every** phase exposes a close affordance and that the only action
-/// in the entire machine capable of touching the network is `.subscribe` —
-/// unsubscribing happens out-of-band through the emailed link, never through
-/// a sheet button.
+/// tested without hosting SwiftUI. The guarantees pinned here (and tested)
+/// are that **every** phase exposes a close affordance and that no modeled
+/// action can reach the unsubscribe endpoint — unsubscribing happens
+/// out-of-band through the emailed link, never through a sheet button. Two
+/// actions touch the network: the form's `.subscribe` and, in the pending
+/// manage phase, the secondary resend-confirmation request.
 struct ChangelogSubscribeModel: Equatable, Sendable {
     private(set) var phase: ChangelogSubscribePhase
     var email = ""
     let rememberedEmail: String
     var isWorking = false
+    /// True while the resend-confirmation request is in flight; blocks only
+    /// the resend button, never the close affordance.
+    var isResending = false
 
-    /// Opens in `.manage` when a subscription is remembered for this app key,
-    /// otherwise on the blank email form.
-    init(subscribedEmail: String?) {
-        phase = subscribedEmail == nil ? .form : .manage
-        rememberedEmail = subscribedEmail ?? ""
+    /// Opens in a manage phase when a subscription is remembered for this
+    /// app key — `.managePending` while the emailed confirmation is
+    /// outstanding, `.manage` once confirmed — otherwise on the blank form.
+    init(record: ChangelogSubscriptionRecord?) {
+        guard let record else {
+            phase = .form
+            rememberedEmail = ""
+            return
+        }
+        rememberedEmail = record.email
+        phase = record.state.isPending ? .managePending : .manage
     }
 
-    /// The phase a sheet should open in for the given remembered state.
+    /// Convenience for callers that only know the remembered address: it is
+    /// treated as a confirmed subscription (the pre-#273 storage shape).
+    init(subscribedEmail: String?) {
+        self.init(
+            record: subscribedEmail.map {
+                ChangelogSubscriptionRecord(email: $0, state: .confirmed)
+            }
+        )
+    }
+
+    /// The phase a sheet should open in for the given remembered address.
     static func initialPhase(subscribedEmail: String?) -> ChangelogSubscribePhase {
-        subscribedEmail == nil ? .form : .manage
+        ChangelogSubscribeModel(subscribedEmail: subscribedEmail).phase
+    }
+
+    /// The phase a sheet should open in for the given remembered record.
+    static func initialPhase(record: ChangelogSubscriptionRecord?) -> ChangelogSubscribePhase {
+        ChangelogSubscribeModel(record: record).phase
     }
 
     var trimmedEmail: String {
@@ -63,19 +92,25 @@ struct ChangelogSubscribeModel: Equatable, Sendable {
         true
     }
 
+    /// Whether the current phase offers the secondary "Resend Confirmation
+    /// Email" action: only the pending manage phase.
+    var showsResendConfirmation: Bool {
+        phase == .managePending
+    }
+
     var primaryTitle: String {
         switch phase {
         case .form:
             return isWorking
                 ? CupThreadStrings.tr("cupthread.subscribe.subscribing_button")
                 : CupThreadStrings.tr("cupthread.subscribe.subscribe_button")
-        case .subscribed, .manage:
+        case .subscribed, .manage, .managePending:
             return CupThreadStrings.tr("cupthread.subscribe.done_button")
         }
     }
 
-    /// Only the blank form's primary button performs work; in `.subscribed`
-    /// and `.manage` it is a plain close action.
+    /// Only the blank form's primary button performs work; in `.subscribed`,
+    /// `.manage`, and `.managePending` it is a plain close action.
     var primaryAction: ChangelogSubscribeAction {
         phase == .form ? .subscribe : .close
     }
@@ -90,10 +125,11 @@ struct ChangelogSubscribeModel: Equatable, Sendable {
         isWorking = false
     }
 
-    /// Transition for "Use a Different Email" from the manage phase.
+    /// Transition for "Use a Different Email" from either manage phase.
     mutating func startNewEmailEntry() {
         email = ""
         isWorking = false
+        isResending = false
         phase = .form
     }
 }

@@ -26,12 +26,20 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// e.g. voting too fast, or a burst of uploads. Recoverable: wait for the
     /// rate-limit window before retrying.
     case rateLimited(message: String?, requestId: String?)
-    /// An upload was rejected by the media-type policy (HTTP 415) — e.g. SVG,
-    /// or bytes that do not match the declared MIME type. Only PNG, JPEG,
-    /// WebP, and GIF are accepted.
+    /// An upload was rejected by the media-type policy (HTTP 415 or HTTP 400
+    /// `unsupported_mime_type` / `executable_extension_prohibited`) — e.g. SVG,
+    /// executable extension, or bytes that do not match the declared MIME type.
+    /// Only PNG, JPEG, WebP, and GIF are accepted.
     case unsupportedMediaType(message: String?, requestId: String?)
     /// An upload exceeded the server's size limit (HTTP 413).
     case payloadTooLarge(message: String?, requestId: String?)
+    /// The submission's free-text content exceeded the client-side payload
+    /// budget and was rejected locally, before any network round trip
+    /// (BUG-18). Shorten the text — typically the description or comment
+    /// body — and submit again. The per-field caps live in
+    /// ``IntakeTextLimits``; the server's `413` for uploads keeps mapping to
+    /// ``FeedbackClientError/payloadTooLarge(message:requestId:)``.
+    case textTooLong
     /// No end-user identity could be presented where one is required
     /// (HTTP 400 `uploader_identity_required`) — upload sessions are always
     /// bound to an uploader identity.
@@ -101,6 +109,22 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// device clock skew. Ensure the device clock is set correctly and let the
     /// SDK retry with a fresh signature.
     case staleSignature(message: String?, requestId: String?)
+    /// The upload session expired before the file could be uploaded
+    /// (HTTP 401 `session_expired` / `session_invalid_or_expired`). Remove
+    /// and re-attach the file to create a fresh upload session and try again.
+    case uploadSessionExpired(message: String?, requestId: String?)
+    /// The upload session was invalid, unknown, or no longer pending
+    /// (HTTP 401 `session_invalid`, HTTP 409 `session_not_pending` /
+    /// `already_uploaded`). Remove and re-attach the file to create a fresh
+    /// upload session and try again.
+    case uploadSessionInvalid(message: String?, requestId: String?)
+    /// A feedback submission referenced an attachment upload ID that was already
+    /// finalized into another submission (HTTP 409 `already_finalized`).
+    /// The losing request creates no duplicate submission and consumes no monthly quota.
+    /// Callers must not retry with the same upload IDs; remove consumed attachments
+    /// or treat the submission as already completed. `message` carries the raw server
+    /// text for diagnostics; it is never shown to end users.
+    case alreadyFinalized(message: String?, requestId: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -127,7 +151,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .subscriptionInactive, .dailyStorageQuotaExceeded, .turnstileRequired,
              .commentsUnavailable, .emailNotVerified, .invalidParent,
              .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
-             .invalidSignature, .staleSignature:
+             .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
+             .alreadyFinalized, .textTooLong:
             return nil
         }
     }
@@ -161,6 +186,14 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         default:
             return CupThreadStrings.tr("cupthread.error.request_failed")
         }
+    }
+
+    /// The ` (request id: …)` display suffix for typed error copy. Kept in
+    /// its own helper so `errorDescription` bodies carry catalog keys only
+    /// (issue #266).
+    private static func requestIdSuffix(_ requestId: String?) -> String {
+        guard let requestId else { return "" }
+        return " (request id: \(requestId))"
     }
 
     /// The `X-Request-Id` correlation identifier associated with this error, if available.
@@ -202,9 +235,15 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .staleSignature(_, let requestId):
             return requestId
+        case .uploadSessionExpired(_, let requestId):
+            return requestId
+        case .uploadSessionInvalid(_, let requestId):
+            return requestId
+        case .alreadyFinalized(_, let requestId):
+            return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
-        case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound:
+        case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound, .textTooLong:
             return nil
         }
     }
@@ -212,78 +251,72 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            return "The feedback server returned an invalid response."
+            return CupThreadStrings.tr("cupthread.error.invalid_response")
         case .unreadableUploadResponse:
-            return "The feedback server returned an unreadable upload response."
+            return CupThreadStrings.tr("cupthread.error.unreadable_upload_response")
         case .authenticationRequired:
-            return "This action is only available to signed-in users."
+            return CupThreadStrings.tr("cupthread.error.auth_required")
         case .forbidden(_, let requestId):
             // Raw server body stays off the user-facing copy (#30); callers
             // can read the associated `message` programmatically.
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.forbidden") + suffix
+            return CupThreadStrings.tr("cupthread.error.forbidden") + Self.requestIdSuffix(requestId)
         case .turnstileRequired(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.turnstile_required") + suffix
+            return CupThreadStrings.tr("cupthread.error.turnstile_required") + Self.requestIdSuffix(requestId)
         case .scanRejected(_, let requestId):
             // Raw server scan detail stays off user-facing copy (#30, #154); callers
             // can read the associated detail via `scanDetail` or pattern matching.
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "The referenced attachment could not be uploaded due to content inspection rejection.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.scan_rejected") + Self.requestIdSuffix(requestId)
         case .rateLimited(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "You're doing that too often. Please try again in a minute.\(suffix)"
+            // Same copy as `.unexpectedStatus(code: 429)` so one rate-limit
+            // condition reads identically on every surface (issue #266).
+            return CupThreadStrings.tr("cupthread.error.http_rate_limited") + Self.requestIdSuffix(requestId)
         case .unsupportedMediaType(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.unsupported_media") + Self.requestIdSuffix(requestId)
         case .payloadTooLarge(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "That file is too large to upload.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.payload_too_large") + Self.requestIdSuffix(requestId)
+        case .textTooLong:
+            // Rejected client-side, so there is no request id to quote.
+            return CupThreadStrings.tr("cupthread.error.text_too_long")
         case .uploaderIdentityRequired(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "Uploads require an end-user identity. Pass a userToken (see UserTokenStore) when uploading attachments.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.uploader_identity_required") + Self.requestIdSuffix(requestId)
         case .uploaderMismatch(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.uploader_mismatch") + Self.requestIdSuffix(requestId)
         case .submissionQuotaExceeded(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "This app has reached its submission limit for this month. Please try again later.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.quota_exceeded") + Self.requestIdSuffix(requestId)
         case .subscriptionInactive(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "Submissions are unavailable for this app right now. Please try again later.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.subscription_inactive") + Self.requestIdSuffix(requestId)
         case .dailyStorageQuotaExceeded(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "This app has reached its upload limit for today. Please try again later.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.daily_storage_quota_exceeded") + Self.requestIdSuffix(requestId)
         case .userProfileNotFound:
-            return "This user profile is no longer available."
+            return CupThreadStrings.tr("cupthread.error.profile_not_found")
         case .commentsUnavailable(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "Comments are not available for this feature request.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.comments_unavailable") + Self.requestIdSuffix(requestId)
         case .invalidParent(_, let requestId):
             // Raw server body stays off the user-facing copy (#30); callers
             // can read the associated `message` programmatically.
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.comments.invalid_parent") + suffix
+            return CupThreadStrings.tr("cupthread.comments.invalid_parent") + Self.requestIdSuffix(requestId)
         case .emailNotVerified(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return "Please use your signed-in account email address to subscribe.\(suffix)"
+            return CupThreadStrings.tr("cupthread.error.email_not_verified") + Self.requestIdSuffix(requestId)
         case .paymentAttributesRequireSignature(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.signature_required") + suffix
+            return CupThreadStrings.tr("cupthread.error.signature_required") + Self.requestIdSuffix(requestId)
         case .sdkSigningSecretNotConfigured(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.signing_secret_not_configured") + suffix
+            return CupThreadStrings.tr("cupthread.error.signing_secret_not_configured") + Self.requestIdSuffix(requestId)
         case .invalidSignature(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.invalid_signature") + suffix
+            return CupThreadStrings.tr("cupthread.error.invalid_signature") + Self.requestIdSuffix(requestId)
         case .staleSignature(_, let requestId):
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return CupThreadStrings.tr("cupthread.error.stale_signature") + suffix
+            return CupThreadStrings.tr("cupthread.error.stale_signature") + Self.requestIdSuffix(requestId)
+        case .uploadSessionExpired(_, let requestId):
+            return CupThreadStrings.tr("cupthread.error.upload_session_expired") + Self.requestIdSuffix(requestId)
+        case .uploadSessionInvalid(_, let requestId):
+            return CupThreadStrings.tr("cupthread.error.upload_session_invalid") + Self.requestIdSuffix(requestId)
+        case .alreadyFinalized(_, let requestId):
+            // Raw server body stays off the user-facing copy (#257); callers
+            // can read the associated `message` programmatically.
+            return CupThreadStrings.tr("cupthread.error.already_finalized") + Self.requestIdSuffix(requestId)
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
-            let suffix = requestId.map { " (request id: \($0))" } ?? ""
-            return Self.friendlyStatusMessage(code: code) + suffix
+            return Self.friendlyStatusMessage(code: code) + Self.requestIdSuffix(requestId)
         }
     }
 }
@@ -377,5 +410,20 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``staleSignature(message:requestId:)`` with no request id.
     static func staleSignature(message: String? = nil) -> FeedbackClientError {
         .staleSignature(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``uploadSessionExpired(message:requestId:)`` with no request id.
+    static func uploadSessionExpired(message: String? = nil) -> FeedbackClientError {
+        .uploadSessionExpired(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``uploadSessionInvalid(message:requestId:)`` with no request id.
+    static func uploadSessionInvalid(message: String? = nil) -> FeedbackClientError {
+        .uploadSessionInvalid(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``alreadyFinalized(message:requestId:)`` with no request id.
+    static func alreadyFinalized(message: String? = nil) -> FeedbackClientError {
+        .alreadyFinalized(message: message, requestId: nil)
     }
 }

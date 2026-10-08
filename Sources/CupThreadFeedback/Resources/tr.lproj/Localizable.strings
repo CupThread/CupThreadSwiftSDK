@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Abonesiniz";
 "cupthread.subscribe.manage_message" = "Güncelleme e-postaları %@ adresine gönderilecek. Adresi değiştirmek veya abonelikten çıkmak için herhangi bir güncelleme e-postasındaki bağlantıyı kullanın.";
 "cupthread.subscribe.use_different_email" = "Farklı bir e-posta kullan";
+"cupthread.subscribe.pending_title" = "Onay bekleniyor";
+"cupthread.subscribe.pending_message" = "%@ adresine bir onay bağlantısı gönderdik. Güncelleme e-postaları almaya başlamak için bağlantıyı açın.";
+"cupthread.subscribe.resend_button" = "Onay e-postasını yeniden gönder";
+"cupthread.subscribe.resending_button" = "Yeniden gönderiliyor…";
 "cupthread.whatsnew.emails_on" = "Güncelleme e-postaları açık";
 "cupthread.whatsnew.emails_on_destination" = "Bildirimler %@ adresine gider.";
 "cupthread.whatsnew.get_emails" = "Güncelleme e-postaları al";
 "cupthread.whatsnew.get_emails_caption" = "Yeni bir sürüm çıktığında bildirim alın.";
 "cupthread.whatsnew.subscribe_accessibility" = "Güncelleme e-postalarına abone ol";
 "cupthread.whatsnew.emails_on_accessibility" = "%@ için güncelleme e-postaları açık";
+"cupthread.whatsnew.pending_title" = "Onay bekleniyor";
+"cupthread.whatsnew.pending_destination" = "%@ adresine bir onay bağlantısı gönderdik.";
+"cupthread.whatsnew.pending_accessibility" = "%@ için e-posta onayı bekleniyor";
 "cupthread.whatsnew.version_accessibility" = "Sürüm %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Yayınlanan talepler: %@";
 "cupthread.features.unavailable_feedback" = "Geri Bildirim Kullanılamıyor";
@@ -193,3 +200,34 @@
 "cupthread.error.invalid_signature" = "Ödeme bilgileri güncellenmedi: raporun imzası doğrulanamadı. Uygulamanın SDK imza gizli anahtarını kontrol edin.";
 "cupthread.error.stale_signature" = "Ödeme bilgileri güncellenmedi: raporun imzasının süresi doldu. Cihaz saatini kontrol edip yeniden deneyin.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Bu geri bildirim veya ek zaten gönderildi.";
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Geri bildirim sunucusu geçersiz bir yanıt döndürdü.";
+"cupthread.error.unreadable_upload_response" = "Geri bildirim sunucusu okunamayan bir yükleme yanıtı döndürdü.";
+"cupthread.error.auth_required" = "Bu işlem yalnızca oturum açmış kullanıcılar tarafından kullanılabilir.";
+"cupthread.error.scan_rejected" = "Atıfta bulunulan ek, içerik incelemesi nedeniyle reddedildiği için yüklenemedi.";
+"cupthread.error.unsupported_media" = "Bu görsel türü desteklenmiyor. Lütfen PNG, JPEG, WebP veya GIF bir görsel ekleyin.";
+"cupthread.error.payload_too_large" = "Bu dosya yüklenemeyecek kadar büyük.";
+"cupthread.error.uploader_identity_required" = "Yüklemeler son kullanıcı kimliği gerektirir. Ek yüklerken bir userToken iletin (bkz. UserTokenStore).";
+"cupthread.error.uploader_mismatch" = "Bu ek farklı bir kimlikle yüklenmiş. Lütfen kaldırıp yeniden ekleyin ve tekrar deneyin.";
+"cupthread.error.quota_exceeded" = "Bu uygulama bu ayki gönderim sınırına ulaştı. Lütfen daha sonra tekrar deneyin.";
+"cupthread.error.subscription_inactive" = "Bu uygulama için gönderimler şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.";
+"cupthread.error.profile_not_found" = "Bu kullanıcı profili artık kullanılamıyor.";
+"cupthread.error.comments_unavailable" = "Bu özellik talebi için yorumlar kullanılamıyor.";
+"cupthread.error.email_not_verified" = "Abone olmak için oturum açtığınız hesabın e-posta adresini kullanın.";
+"cupthread.attachment.oversized" = "Ek (%1$@), izin verilen en büyük %2$@ boyutunu aşıyor.";
+"cupthread.attachment.unprocessable" = "Seçilen fotoğraf yükleme için işlenemedi.";
+"cupthread.attachment.unsupported_type" = "Bu görsel türü desteklenmiyor. Lütfen PNG, JPEG, WebP veya GIF bir görsel ekleyin.";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Mesajınız çok uzun. Lütfen kısaltıp tekrar deneyin.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "kullanılan %1$lld ／ sınır %2$lld karakter";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "Yükleme oturumunun süresi doldu. Lütfen dosyayı kaldırıp yeniden ekleyin ve tekrar deneyin.";
+"cupthread.error.upload_session_invalid" = "Yükleme oturumu geçersiz veya artık etkin değil. Lütfen dosyayı kaldırıp yeniden ekleyin ve tekrar deneyin.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Bu uygulama bugünkü yükleme sınırına ulaştı. Lütfen daha sonra tekrar deneyin.";

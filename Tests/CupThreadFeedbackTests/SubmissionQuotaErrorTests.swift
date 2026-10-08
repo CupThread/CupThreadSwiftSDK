@@ -52,7 +52,7 @@ struct SubmissionQuotaErrorTests {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }
-            #expect(error.errorDescription?.contains("Submissions are unavailable") == true)
+            #expect(error.errorDescription == CupThreadStrings.tr("cupthread.error.subscription_inactive"))
         }
     }
     @Test func feedbackSubmitMapsQuota402ToSubmissionQuotaExceeded() async throws {
@@ -78,7 +78,7 @@ struct SubmissionQuotaErrorTests {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }
-            #expect(error.errorDescription?.contains("submission limit") == true)
+            #expect(error.errorDescription == CupThreadStrings.tr("cupthread.error.quota_exceeded"))
         }
     }
 
@@ -115,12 +115,10 @@ struct SubmissionQuotaErrorTests {
         let quota = FeedbackClientError.submissionQuotaExceeded(message: "server detail")
         let inactive = FeedbackClientError.subscriptionInactive(message: "server detail")
         #expect(
-            quota.errorDescription
-                == "This app has reached its submission limit for this month. Please try again later."
+            quota.errorDescription == CupThreadStrings.tr("cupthread.error.quota_exceeded")
         )
         #expect(
-            inactive.errorDescription
-                == "Submissions are unavailable for this app right now. Please try again later."
+            inactive.errorDescription == CupThreadStrings.tr("cupthread.error.subscription_inactive")
         )
     }
 

@@ -18,8 +18,11 @@ extension FeedbackClient {
     ///   - userToken: Anonymous end-user token sent as `X-User-Token`.
     ///   - turnstileToken: Optional Turnstile token for apps that require one.
     ///     When `nil`, the client's `turnstileTokenProvider` is consulted as a
-    ///     fallback, so one provider configuration covers attachments and
-    ///     submission alike.
+    ///     fallback — with the ``TurnstileAction/feedback`` binding — so one
+    ///     provider configuration covers attachments and submission alike.
+    ///     Render the token under that binding (the app key as `cdata`);
+    ///     upload sessions deliberately share the feedback action with
+    ///     `POST /api/v1/feedback`.
     /// - Returns: The session, including bearer token and pre-allocated slots.
     /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
     ///   identity could be presented, ``FeedbackClientError/dailyStorageQuotaExceeded``
@@ -27,7 +30,10 @@ extension FeedbackClient {
     ///   `daily_storage_quota_exceeded`), ``FeedbackClientError/rateLimited`` on
     ///   HTTP 429, ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
-    ///   disables feedback attachments (HTTP 401/403), or
+    ///   disables feedback attachments (HTTP 401/403),
+    ///   ``FeedbackClientError/unsupportedMediaType(message:requestId:)``
+    ///   when a declared MIME type or executable extension is rejected
+    ///   (HTTP 400 `unsupported_mime_type` / `executable_extension_prohibited`), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   / ``FeedbackClientError/invalidResponse`` for other failures.
     public func createUploadSession(
@@ -52,7 +58,9 @@ extension FeedbackClient {
         )
         var effectiveTurnstileToken = turnstileToken?.nilIfEmpty
         if effectiveTurnstileToken == nil {
-            effectiveTurnstileToken = await resolvedTurnstileToken()
+            effectiveTurnstileToken = await resolvedTurnstileToken(
+                for: .feedback(appKey: configuration.appKey)
+            )
         }
         await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(CreateSessionPayload(
@@ -90,7 +98,10 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
     /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
     ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
-    ///   ``FeedbackClientError/rateLimited`` (HTTP 429), or
+    ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
+    ///   ``FeedbackClientError/uploadSessionExpired`` (HTTP 401 `session_expired` /
+    ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid``
+    ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` /
     ///   ``FeedbackClientError/invalidResponse`` for other failures.
     public func uploadAttachment(
@@ -153,7 +164,10 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
     /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
     ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
-    ///   ``FeedbackClientError/rateLimited`` (HTTP 429), or
+    ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
+    ///   ``FeedbackClientError/uploadSessionExpired`` (HTTP 401 `session_expired` /
+    ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid``
+    ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` /
     ///   ``FeedbackClientError/invalidResponse`` for other failures.
     public func uploadAttachment(
@@ -206,6 +220,9 @@ extension FeedbackClient {
     ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
     ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
     ///   when no identity could be presented,
+    ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
+    ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
+    ///   lifecycle failures,
     ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
     ///   has exceeded its daily upload limit, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
@@ -255,6 +272,9 @@ extension FeedbackClient {
     ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
     ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
     ///   when no identity could be presented,
+    ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
+    ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
+    ///   lifecycle failures,
     ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
     ///   has exceeded its daily upload limit, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
@@ -394,7 +414,8 @@ extension FeedbackClient {
     /// Validates an untrusted `downloadUrl` string returned by an upload PUT response:
     /// - Accepts relative paths resolved against `configuration.baseURL`.
     /// - Accepts absolute `http`/`https` URLs whose host matches `configuration.baseURL.host`
-    ///   or shares its root domain (e.g. CDN hosts or apex domain).
+    ///   or shares its registrable domain (e.g. CDN subdomains or the apex of the
+    ///   same domain; public-suffix and multi-tenant siblings never match).
     /// - Returns `nil` for off-origin, protocol-relative, or disallowed-scheme URLs.
     private func resolvedDownloadURL(from downloadUrl: String?) -> URL? {
         guard let downloadUrl else { return nil }
@@ -422,5 +443,27 @@ extension FeedbackClient {
         }
 
         return configuration.baseURL.appending(path: trimmed)
+    }
+
+    /// Maps upload session lifecycle error envelopes on PUT (API-13):
+    /// session expiry and invalidation codes return typed errors so callers
+    /// can instruct users to re-attach instead of showing signed-in HTTP 401 copy.
+    static func uploadSessionLifecycleTypedError(
+        statusCode: Int,
+        code: String?,
+        envelopeMessage: String?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        switch (statusCode, code) {
+        case (401, "session_expired"),
+             (401, "session_invalid_or_expired"):
+            return .uploadSessionExpired(message: envelopeMessage, requestId: requestId)
+        case (401, "session_invalid"),
+             (409, "session_not_pending"),
+             (409, "already_uploaded"):
+            return .uploadSessionInvalid(message: envelopeMessage, requestId: requestId)
+        default:
+            return nil
+        }
     }
 }

@@ -16,8 +16,9 @@ public struct WhatsNewView: View {
 
     @State private var state: WhatsNewViewState
     @State private var isSubscribePresented = false
-    /// The remembered subscription email; drives the entry-point copy.
-    @State private var subscribedEmail: String?
+    /// The remembered subscription with its double-opt-in phase; drives the
+    /// entry-point copy (issue #273).
+    @State private var subscription: ChangelogSubscriptionRecord?
     /// Whether a request sent right now could carry the signed-in identity's
     /// bearer token (resolved on every load — issue #297). `false` until the
     /// first load resolved it, so an undecided verdict never renders the
@@ -117,20 +118,20 @@ public struct WhatsNewView: View {
             // Re-read the remembered subscription when the sheet closes so the
             // entry points reflect a subscription made inside it.
             if !isPresented {
-                subscribedEmail = subscriptionStore.subscribedEmail()
+                subscription = subscriptionStore.subscriptionRecord()
             }
         }
         .refreshable {
             guard isChangelogPermitted else { return }
             await loadEntries()
         }
-        .task {
+        .task(id: isChangelogPermitted) {
             await resolveAuthenticationAccess()
             guard isChangelogPermitted else {
-                state.handlePermissionDenied()
+                state.handlePermissionDenied(generation: state.loadGeneration)
                 return
             }
-            subscribedEmail = subscriptionStore.subscribedEmail()
+            subscription = subscriptionStore.subscriptionRecord()
             await loadEntries()
         }
         .sdkSurface(client: client, feature: .changelog)
@@ -141,7 +142,7 @@ public struct WhatsNewView: View {
     private var cardScroll: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                if isLoading && !hasLoadedOnce {
+                if isLoading && (!hasLoadedOnce || entries.isEmpty) {
                     SkeletonCardList()
                 } else if let loadError {
                     LoadErrorView(message: loadError) {
@@ -157,7 +158,7 @@ public struct WhatsNewView: View {
                     ForEach(entries) { entry in
                         ChangelogEntryCard(entry: entry)
                     }
-                    SubscribeFooterCard(subscribedEmail: subscribedEmail) {
+                    SubscribeFooterCard(subscription: subscription) {
                         isSubscribePresented = true
                     }
                 }
@@ -169,7 +170,7 @@ public struct WhatsNewView: View {
     // tvOS: plain list rows keep the focus engine happy.
     private var tvList: some View {
         List {
-            if isLoading && !hasLoadedOnce {
+            if isLoading && (!hasLoadedOnce || entries.isEmpty) {
                 ProgressView()
                     .frame(maxWidth: .infinity)
             } else if let loadError {
@@ -221,18 +222,38 @@ public struct WhatsNewView: View {
 
     // MARK: Entry-point labels
 
+    /// Entry-point title for the remembered address regardless of phase —
+    /// the pre-#273 mapping kept for callers that only hold a bare email
+    /// (treated as confirmed, matching the legacy-storage migration).
     nonisolated static func subscribeEntryTitle(subscribedEmail: String?) -> String {
         subscribedEmail == nil
             ? CupThreadStrings.tr("cupthread.whatsnew.subscribe_button")
             : CupThreadStrings.tr("cupthread.whatsnew.emails_on")
     }
 
+    /// Entry-point title by double-opt-in phase: a pending subscription
+    /// names the outstanding confirmation instead of claiming emails are on.
+    nonisolated static func subscribeEntryTitle(record: ChangelogSubscriptionRecord?) -> String {
+        switch record?.state {
+        case .confirmed:
+            CupThreadStrings.tr("cupthread.whatsnew.emails_on")
+        case .pending:
+            CupThreadStrings.tr("cupthread.whatsnew.pending_title")
+        case nil:
+            CupThreadStrings.tr("cupthread.whatsnew.subscribe_button")
+        }
+    }
+
     var subscribeEntryTitle: String {
-        Self.subscribeEntryTitle(subscribedEmail: subscribedEmail)
+        Self.subscribeEntryTitle(record: subscription)
     }
 
     private var subscribeEntryIcon: String {
-        subscribedEmail == nil ? "envelope" : "envelope.open"
+        switch subscription?.state {
+        case .pending: "envelope.open.badge.clock"
+        case .confirmed: "envelope.open"
+        case nil: "envelope"
+        }
     }
 
     // MARK: Actions
@@ -241,7 +262,7 @@ public struct WhatsNewView: View {
     func loadEntries() async {
         await resolveAuthenticationAccess()
         guard isChangelogPermitted else {
-            state.handlePermissionDenied()
+            state.handlePermissionDenied(generation: state.loadGeneration)
             return
         }
         rejectedByServer = false
@@ -251,6 +272,7 @@ public struct WhatsNewView: View {
         }
         do {
             guard let fetched = try await loadChangelogEntries(client: client, config: sdkAppConfig) else {
+                state.handlePermissionDenied(generation: generationAtStart)
                 return
             }
             state.handleSuccess(entries: fetched, generation: generationAtStart)
@@ -345,28 +367,46 @@ struct ChangelogEntryCard: View {
 // MARK: - Subscribe footer (card list entry point)
 
 private struct SubscribeFooterCard: View {
-    let subscribedEmail: String?
+    let subscription: ChangelogSubscriptionRecord?
     let action: () -> Void
+
+    private var icon: String {
+        switch subscription?.state {
+        case .pending: "envelope.open.badge.clock.fill"
+        case .confirmed: "envelope.open.fill"
+        case nil: "envelope"
+        }
+    }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: subscribedEmail == nil ? "envelope" : "envelope.open.fill")
+                Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 2) {
-                    if let subscribedEmail {
+                    switch subscription?.state {
+                    case .confirmed:
                         Text(CupThreadStrings.tr("cupthread.whatsnew.emails_on"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
                         Text(CupThreadStrings.tr(
-                            "cupthread.whatsnew.emails_on_destination", subscribedEmail
+                            "cupthread.whatsnew.emails_on_destination", subscription?.email ?? ""
                         ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    } else {
+                    case .pending:
+                        Text(CupThreadStrings.tr("cupthread.whatsnew.pending_title"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text(CupThreadStrings.tr(
+                            "cupthread.whatsnew.pending_destination", subscription?.email ?? ""
+                        ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    case nil:
                         Text(CupThreadStrings.tr("cupthread.whatsnew.get_emails"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
@@ -380,9 +420,22 @@ private struct SubscribeFooterCard: View {
             .requestCard()
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(subscribedEmail == nil
-            ? CupThreadStrings.tr("cupthread.whatsnew.subscribe_accessibility")
-            : CupThreadStrings.tr("cupthread.whatsnew.emails_on_accessibility", subscribedEmail ?? ""))
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        switch subscription?.state {
+        case .confirmed:
+            CupThreadStrings.tr(
+                "cupthread.whatsnew.emails_on_accessibility", subscription?.email ?? ""
+            )
+        case .pending:
+            CupThreadStrings.tr(
+                "cupthread.whatsnew.pending_accessibility", subscription?.email ?? ""
+            )
+        case nil:
+            CupThreadStrings.tr("cupthread.whatsnew.subscribe_accessibility")
+        }
     }
 }
 

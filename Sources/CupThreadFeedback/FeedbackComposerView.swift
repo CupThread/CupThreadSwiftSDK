@@ -1,3 +1,7 @@
+// swiftlint:disable file_length
+// One surface per file: the view's @State must stay file-private, so the
+// body is organized by MARK sections rather than split across files to fit
+// the size budget (same policy as the oversized test suites, .swiftlint.yml).
 import SwiftUI
 #if canImport(PhotosUI) && !os(tvOS)
 import PhotosUI
@@ -50,9 +54,7 @@ public struct FeedbackComposerView: View {
     @Environment(\.sdkAppConfig) private var sdkAppConfig
     @Environment(\.dismiss) private var dismiss
 
-    private var activeConfig: PublicAppConfig? {
-        config ?? sdkAppConfig
-    }
+    private var activeConfig: PublicAppConfig? { config ?? sdkAppConfig }
 
     private var submissionDenial: SdkSubmissionDenial {
         SdkSubmissionDenial.forFeedback(
@@ -84,8 +86,10 @@ public struct FeedbackComposerView: View {
     /// Creates the feedback form.
     ///
     /// The view enforces a minimum length (title ≥ 3, description ≥ 5
-    /// characters) before enabling the send button, shows an inline error
-    /// banner on failure, and swaps to a success screen on completion.
+    /// characters) before enabling the send button, applies the
+    /// ``IntakeTextLimits`` caps with near-cap character counters (BUG-18),
+    /// shows an inline error banner on failure, and swaps to a success
+    /// screen on completion.
     ///
     /// Wrap your hierarchy in ``CupThreadTheme`` or present the view through
     /// one of the SDK containers so console feature flags and theming apply.
@@ -109,7 +113,9 @@ public struct FeedbackComposerView: View {
     ///   - stripSensitiveMetadata: When `true` (the default), photo attachments selected
     ///     via the photo picker are re-encoded to strip GPS coordinates, camera details,
     ///     and sensitive EXIF metadata before upload. Multi-frame animations (such as GIF or
-    ///     animated WebP) are preserved intact without flattening to a still image.
+    ///     animated WebP) are preserved intact without flattening to a still image;
+    ///     container-embedded EXIF/XMP metadata (including GPS) is stripped from them
+    ///     at the byte level without re-encoding.
     ///     Set to `false` to upload original bytes for formats accepted as-is (PNG, JPEG, WebP, GIF);
     ///     note that HEIC/HEIF and unrecognized formats are always transcoded to JPEG per server media policy.
     ///   - uploadHandle: Optional ``FeedbackUploadHandle`` for cancelling the
@@ -235,12 +241,14 @@ public struct FeedbackComposerView: View {
                 #if canImport(UIKit)
                 .submitLabel(.next)
                 #endif
+            intakeCharacterCounter(draft.title, limit: IntakeTextLimits.maxTitleLength, styledAsFormRow: true)
             TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
                 .lineLimit(6...12)
                 .padding(.top, 2)
                 #if canImport(UIKit)
                 .submitLabel(.send)
                 #endif
+            intakeCharacterCounter(draft.description, limit: IntakeTextLimits.maxDescriptionLength, styledAsFormRow: true)
         } header: {
             Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
         } footer: {
@@ -251,12 +259,14 @@ public struct FeedbackComposerView: View {
     private var contactSection: some View {
         Section {
             TextField(CupThreadStrings.tr("cupthread.feedback.name_label"), text: $draft.reporterName)
+            intakeCharacterCounter(draft.reporterName, limit: IntakeTextLimits.maxNameLength, styledAsFormRow: true)
             TextField(CupThreadStrings.tr("cupthread.feedback.email_label"), text: $draft.reporterEmail)
                 #if canImport(UIKit)
                 .textInputAutocapitalization(.never)
                 .keyboardType(.emailAddress)
                 #endif
                 .feedbackEmailHint(draft.reporterEmail)
+            intakeCharacterCounter(draft.reporterEmail, limit: IntakeTextLimits.maxEmailLength, styledAsFormRow: true)
         } header: {
             Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
         } footer: {
@@ -401,14 +411,6 @@ public struct FeedbackComposerView: View {
         )
     }
 
-    /// A photo readied for the streaming upload path: the spooled temp file
-    /// plus the server-facing name and MIME type.
-    private struct PreparedPhotoUpload {
-        let fileURL: URL
-        let filename: String
-        let mimeType: String
-    }
-
     /// Prepares the picked photo and spools the upload-ready bytes to a
     /// temporary file so the upload streams from disk instead of holding a
     /// second in-memory copy for the whole network round-trip; the prepared
@@ -471,6 +473,14 @@ public struct FeedbackComposerView: View {
             }
         } catch {
             guard !error.isSdkCancellation else { return }
+            if Self.clearsConsumedAttachments(for: error) {
+                // The server rejected a duplicate attachment (#257): the upload ID was already
+                // finalized into another submission. Clear upload-bearing attachments from the
+                // draft so the user does not retry the same consumed IDs.
+                for attachment in draft.attachments where attachment.uploadId != nil {
+                    attachmentState.removeAttachment(id: attachment.id, draft: &draft)
+                }
+            }
             errorMessage = FriendlyError.message(for: error)
         }
     }
