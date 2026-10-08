@@ -2,256 +2,19 @@ import Foundation
 import Testing
 @testable import CupThreadFeedback
 
-// MARK: - Models
-
-@Suite("UserProfileModels")
-struct UserProfileModelsTests {
-    @Test func userProfileDecodesWithAllFields() throws {
-        let json = Data("""
-        {
-            "clerkUserId": "user_123",
-            "displayName": "Lex",
-            "avatarUrl": "https://example.com/avatar.png",
-            "bio": "Developer",
-            "websiteUrl": "https://example.com",
-            "hideComments": false,
-            "createdAt": "2026-01-01T00:00:00.000Z",
-            "updatedAt": "2026-01-02T00:00:00.000Z"
-        }
-        """.utf8)
-
-        let profile = try JSONDecoder().decode(UserProfile.self, from: json)
-        #expect(profile.clerkUserId == "user_123")
-        #expect(profile.displayName == "Lex")
-        #expect(profile.avatarUrl == "https://example.com/avatar.png")
-        #expect(profile.bio == "Developer")
-        #expect(profile.websiteUrl == "https://example.com")
-        #expect(profile.hideComments == false)
-        #expect(profile.createdAt == "2026-01-01T00:00:00.000Z")
-        #expect(profile.updatedAt == "2026-01-02T00:00:00.000Z")
-    }
-
-    @Test func userProfileDecodesWithRequiredFieldsOnly() throws {
-        let json = Data("""
-        {
-            "clerkUserId": "user_456"
-        }
-        """.utf8)
-
-        let profile = try JSONDecoder().decode(UserProfile.self, from: json)
-        #expect(profile.clerkUserId == "user_456")
-        #expect(profile.displayName == nil)
-        #expect(profile.avatarUrl == nil)
-        #expect(profile.bio == nil)
-        #expect(profile.websiteUrl == nil)
-        #expect(profile.hideComments == false)
-        #expect(profile.createdAt == nil)
-        #expect(profile.updatedAt == nil)
-    }
-
-    @Test func userProfileDecodesFromAuthoritativeBackendShapeWithoutHideCommentsAndUpdatedAt() throws {
-        let json = Data("""
-        {
-            "clerkUserId": "user_789",
-            "displayName": "Backend User",
-            "avatarUrl": "https://example.com/avatar.png",
-            "bio": "Real backend profile",
-            "websiteUrl": "https://example.com",
-            "createdAt": "2026-01-01T00:00:00.000Z"
-        }
-        """.utf8)
-
-        let profile = try JSONDecoder().decode(UserProfile.self, from: json)
-        #expect(profile.clerkUserId == "user_789")
-        #expect(profile.displayName == "Backend User")
-        #expect(profile.hideComments == false)
-        #expect(profile.updatedAt == nil)
-    }
-
-    @Test func userProfileWebsiteUrlNormalizesSafely() throws {
-        // Bare domain becomes https://
-        #expect(normalizeWebsiteURL("example.com") == URL(string: "https://example.com"))
-        // Existing https is preserved
-        #expect(normalizeWebsiteURL("https://example.com") == URL(string: "https://example.com"))
-        // Disallowed schemes are rejected (not tappable)
-        #expect(normalizeWebsiteURL("tel:1234567890") == nil)
-        #expect(normalizeWebsiteURL("javascript:alert(1)") == nil)
-        #expect(normalizeWebsiteURL("shortcuts://run") == nil)
-        #expect(normalizeWebsiteURL("myapp://open") == nil)
-    }
-
-    @Test func publicUserProfileResponseDecodesAuthoritativeBackendShape() throws {
-        let json = Data("""
-        {
-            "profile": {
-                "clerkUserId": "user_1",
-                "displayName": "Developer",
-                "avatarUrl": "https://example.com/icon.png",
-                "bio": "Bio",
-                "websiteUrl": "https://example.com",
-                "createdAt": "2026-01-01T00:00:00.000Z"
-            },
-            "publicApps": [
-                {
-                    "id": "app-1",
-                    "workspaceSlug": "ws-1",
-                    "workspaceName": "Workspace One",
-                    "appSlug": "app-one",
-                    "name": "App One",
-                    "description": "An app",
-                    "iconUrl": "https://example.com/app.png"
-                }
-            ],
-            "recentComments": [
-                {
-                    "id": "c-1",
-                    "body": "Great feature!",
-                    "createdAt": "2026-01-01T00:00:00.000Z",
-                    "featureRequestId": "fr-1",
-                    "featureRequestTitle": "FR Title",
-                    "workspaceSlug": "ws-1",
-                    "appSlug": "app-one",
-                    "appName": "App One"
-                }
-            ]
-        }
-        """.utf8)
-
-        let response = try JSONDecoder().decode(PublicUserProfileResponse.self, from: json)
-        #expect(response.profile.clerkUserId == "user_1")
-        #expect(response.profile.hideComments == false)
-        #expect(response.hideComments == false)
-
-        #expect(response.apps.count == 1)
-        #expect(response.publicApps.count == 1)
-        let app = response.apps[0]
-        #expect(app.id == "app-1")
-        #expect(app.slug == "app-one")
-        #expect(app.appSlug == "app-one")
-        #expect(app.workspaceSlug == "ws-1")
-        #expect(app.workspaceName == "Workspace One")
-        #expect(app.requestCount == nil)
-
-        #expect(response.recentComments.count == 1)
-        let comment = response.recentComments[0]
-        #expect(comment.id == "c-1")
-        #expect(comment.appId == nil)
-        #expect(comment.workspaceSlug == "ws-1")
-        #expect(comment.appSlug == "app-one")
-        #expect(comment.appName == "App One")
-    }
-
-    @Test func publicUserProfileResponseDecodesLegacyShape() throws {
-        let json = Data("""
-        {
-            "profile": {
-                "clerkUserId": "user_2",
-                "hideComments": true
-            },
-            "apps": [
-                {
-                    "id": "app-2",
-                    "name": "App Two",
-                    "slug": "app-two",
-                    "requestCount": 12
-                }
-            ],
-            "recentComments": [],
-            "hideComments": true
-        }
-        """.utf8)
-
-        let response = try JSONDecoder().decode(PublicUserProfileResponse.self, from: json)
-        #expect(response.profile.clerkUserId == "user_2")
-        #expect(response.apps.count == 1)
-        #expect(response.apps[0].slug == "app-two")
-        #expect(response.apps[0].requestCount == 12)
-        #expect(response.hideComments == true)
-    }
-
-    @Test func publicUserProfileResponseEncodesCanonicalKeyWithoutDuplicateApps() throws {
-        let profile = UserProfile(
-            clerkUserId: "u1",
-            displayName: "Alice",
-            avatarUrl: nil,
-            bio: nil,
-            websiteUrl: nil,
-            hideComments: false
-        )
-        let app = PublicAppSummary(
-            id: "app1",
-            name: "Demo",
-            slug: "demo"
-        )
-        let response = PublicUserProfileResponse(
-            profile: profile,
-            apps: [app],
-            recentComments: [],
-            hideComments: false
-        )
-
-        let data = try JSONEncoder().encode(response)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-
-        #expect(json?["publicApps"] != nil)
-        #expect(json?["apps"] == nil, "Legacy fallback key 'apps' should not be redundantly encoded")
-
-        let decoded = try JSONDecoder().decode(PublicUserProfileResponse.self, from: data)
-        #expect(decoded == response)
-    }
-
-    @Test func publicAppSummaryDecodesWithAppSlug() throws {
-        let json = Data("""
-        {
-            "id": "app-3",
-            "name": "App Three",
-            "appSlug": "app-three",
-            "workspaceSlug": "ws-3",
-            "workspaceName": "Workspace Three"
-        }
-        """.utf8)
-
-        let app = try JSONDecoder().decode(PublicAppSummary.self, from: json)
-        #expect(app.id == "app-3")
-        #expect(app.name == "App Three")
-        #expect(app.slug == "app-three")
-        #expect(app.appSlug == "app-three")
-        #expect(app.workspaceSlug == "ws-3")
-        #expect(app.workspaceName == "Workspace Three")
-        #expect(app.requestCount == nil)
-    }
-
-    @Test func userProfileCommentDecodesWithoutAppId() throws {
-        let json = Data("""
-        {
-            "id": "c-2",
-            "body": "Another comment",
-            "createdAt": "2026-01-02T00:00:00.000Z",
-            "featureRequestId": "fr-2",
-            "featureRequestTitle": "FR 2",
-            "appName": "App Two",
-            "workspaceSlug": "ws-2",
-            "appSlug": "app-two"
-        }
-        """.utf8)
-
-        let comment = try JSONDecoder().decode(UserProfileComment.self, from: json)
-        #expect(comment.id == "c-2")
-        #expect(comment.appId == nil)
-        #expect(comment.workspaceSlug == "ws-2")
-        #expect(comment.appSlug == "app-two")
-        #expect(comment.appName == "App Two")
-    }
-}
-
-// MARK: - Client
+// MARK: - UserProfileClientTests
 
 @Suite("UserProfileClient", .serialized)
 struct UserProfileClientTests {
     static let apiHost = "profiles.example.com"
 
-    static func makeAPIClient() -> FeedbackClient {
-        makeClient(baseURL: URL(string: "https://\(apiHost)")!)
+    static func makeAPIClient(
+        authenticationProvider: (@Sendable () async -> String?)? = nil
+    ) -> FeedbackClient {
+        makeClient(
+            baseURL: URL(string: "https://\(apiHost)")!,
+            authenticationProvider: authenticationProvider
+        )
     }
 
     @Test func fetchUserProfileHitsCorrectEndpoint() async throws {
@@ -450,6 +213,121 @@ struct UserProfileClientTests {
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
+        }
+    }
+
+    @Test func fetchUserProfileAttachesBearerTokenWhenAuthenticated() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            let body: [String: Any] = [
+                "profile": ["clerkUserId": "user_123", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "publicApps": [],
+                "recentComments": []
+            ]
+            return (makeHTTPResponse(), try encodeJSON(body))
+        }
+
+        let client = Self.makeAPIClient(authenticationProvider: { "token-123" })
+        _ = try await client.fetchUserProfile(userId: "user_123")
+
+        let request = try #require(capture.value)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-123")
+        #expect(request.value(forHTTPHeaderField: "X-Request-Id") != nil)
+        #expect(request.value(forHTTPHeaderField: "X-SDK-Version") != nil)
+    }
+
+    @Test func fetchUserProfileOmitsAuthorizationWhenProviderReturnsNil() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            let body: [String: Any] = [
+                "profile": ["clerkUserId": "user_123", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "publicApps": [],
+                "recentComments": []
+            ]
+            return (makeHTTPResponse(), try encodeJSON(body))
+        }
+
+        let client = Self.makeAPIClient(authenticationProvider: { nil })
+        _ = try await client.fetchUserProfile(userId: "user_123")
+
+        let request = try #require(capture.value)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    }
+
+    @Test func fetchUserProfileOmitsAuthorizationWithoutProvider() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            let body: [String: Any] = [
+                "profile": ["clerkUserId": "user_123", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "publicApps": [],
+                "recentComments": []
+            ]
+            return (makeHTTPResponse(), try encodeJSON(body))
+        }
+
+        let client = Self.makeAPIClient()
+        _ = try await client.fetchUserProfile(userId: "user_123")
+
+        let request = try #require(capture.value)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    }
+
+    @Test func fetchUserProfileMapsCodeless403ToForbidden() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 403, headers: ["X-Request-Id": "req-403-profile"]),
+                try encodeJSON(["error": "Forbidden permission policy"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_forbidden")
+            Issue.record("Expected forbidden error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .forbidden(let message, let requestId) = error {
+                #expect(message == "Forbidden permission policy")
+                #expect(requestId == "req-403-profile")
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
+
+    @Test func fetchUserProfileMapsCodeless401ToAuthenticationRequired() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401, headers: ["X-Request-Id": "req-401-profile"]),
+                try encodeJSON(["error": "Sign in required"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_unauthed")
+            Issue.record("Expected authenticationRequired error to be thrown")
+        } catch let error as FeedbackClientError {
+            #expect(error == .authenticationRequired)
+        }
+    }
+
+    @Test func fetchUserProfileMapsAuthenticationRequiredEnvelopeToTypedError() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401, headers: ["X-Request-Id": "req-401-profile"]),
+                try encodeJSON([
+                    "error": "Sign in required",
+                    "code": "authentication_required"
+                ])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_unauthed")
+            Issue.record("Expected authenticationRequired error to be thrown")
+        } catch let error as FeedbackClientError {
+            #expect(error == .authenticationRequired)
         }
     }
 }

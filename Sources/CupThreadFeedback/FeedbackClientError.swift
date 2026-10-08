@@ -26,12 +26,20 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// e.g. voting too fast, or a burst of uploads. Recoverable: wait for the
     /// rate-limit window before retrying.
     case rateLimited(message: String?, requestId: String?)
-    /// An upload was rejected by the media-type policy (HTTP 415) — e.g. SVG,
-    /// or bytes that do not match the declared MIME type. Only PNG, JPEG,
-    /// WebP, and GIF are accepted.
+    /// An upload was rejected by the media-type policy (HTTP 415 or HTTP 400
+    /// `unsupported_mime_type` / `executable_extension_prohibited`) — e.g. SVG,
+    /// executable extension, or bytes that do not match the declared MIME type.
+    /// Only PNG, JPEG, WebP, and GIF are accepted.
     case unsupportedMediaType(message: String?, requestId: String?)
     /// An upload exceeded the server's size limit (HTTP 413).
     case payloadTooLarge(message: String?, requestId: String?)
+    /// The submission's free-text content exceeded the client-side payload
+    /// budget and was rejected locally, before any network round trip
+    /// (BUG-18). Shorten the text — typically the description or comment
+    /// body — and submit again. The per-field caps live in
+    /// ``IntakeTextLimits``; the server's `413` for uploads keeps mapping to
+    /// ``FeedbackClientError/payloadTooLarge(message:requestId:)``.
+    case textTooLong
     /// No end-user identity could be presented where one is required
     /// (HTTP 400 `uploader_identity_required`) — upload sessions are always
     /// bound to an uploader identity.
@@ -121,7 +129,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
              .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified,
              .invalidParent, .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
-             .invalidSignature, .staleSignature:
+             .invalidSignature, .staleSignature, .textTooLong:
             return nil
         }
     }
@@ -204,7 +212,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
-        case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound:
+        case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound, .textTooLong:
             return nil
         }
     }
@@ -235,6 +243,9 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return CupThreadStrings.tr("cupthread.error.unsupported_media") + Self.requestIdSuffix(requestId)
         case .payloadTooLarge(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.payload_too_large") + Self.requestIdSuffix(requestId)
+        case .textTooLong:
+            // Rejected client-side, so there is no request id to quote.
+            return CupThreadStrings.tr("cupthread.error.text_too_long")
         case .uploaderIdentityRequired(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.uploader_identity_required") + Self.requestIdSuffix(requestId)
         case .uploaderMismatch(_, let requestId):

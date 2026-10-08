@@ -9,9 +9,9 @@
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
 	<!-- Required-reason APIs. UserDefaults is the only category the SDK
-	     touches (anonymous token storage, changelog seen-state, subscription
-	     state, last-good config cache). CA92.1: access user defaults to read
-	     or write information accessible only to the app itself. -->
+	     touches (changelog seen-state, last-good config cache, legacy
+	     migration). CA92.1: access user defaults to read or write information
+	     accessible only to the app itself. -->
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>

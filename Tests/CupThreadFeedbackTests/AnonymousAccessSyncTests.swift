@@ -29,6 +29,66 @@ struct AnonymousAccessSyncTests {
         }
     }
 
+    @Test func fetchVersionsMapsCodeLess401ToAuthenticationRequired() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401),
+                try encodeJSON(["error": "Sign in required to view versions"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchVersions()
+            Issue.record("Expected authenticationRequired")
+        } catch let error as FeedbackClientError {
+            #expect(error == .authenticationRequired)
+        }
+    }
+
+    @Test func fetchVersionsMaps403ToForbidden() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 403, headers: ["X-Request-Id": "req-versions-403"]),
+                try encodeJSON(["error": "Roadmap versions are disabled for this app"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchVersions()
+            Issue.record("Expected forbidden")
+        } catch let error as FeedbackClientError {
+            guard case .forbidden(let message, let requestId) = error else {
+                Issue.record("Expected forbidden, got \(error)")
+                return
+            }
+            #expect(message == "Roadmap versions are disabled for this app")
+            #expect(requestId == "req-versions-403")
+            #expect(error.requestId == "req-versions-403")
+            #expect(error.responseBody == nil)
+        }
+    }
+
+    @Test func fetchVersionsKeepsTurnstileRejectionOnTypedPath() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 403, headers: ["X-Request-Id": "req-versions-turnstile"]),
+                try encodeJSON(["error": "Human verification failed", "code": "turnstile_verification_failed"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchVersions()
+            Issue.record("Expected turnstileRequired")
+        } catch let error as FeedbackClientError {
+            guard case .turnstileRequired(let message, let requestId) = error else {
+                Issue.record("Expected turnstileRequired, got \(error)")
+                return
+            }
+            #expect(message == "Human verification failed")
+            #expect(requestId == "req-versions-turnstile")
+        }
+    }
+
     @Test func fetchColumnsMapsAuthenticationRequiredEnvelopeToTypedError() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
@@ -45,6 +105,45 @@ struct AnonymousAccessSyncTests {
             Issue.record("Expected authenticationRequired")
         } catch let error as FeedbackClientError {
             #expect(error == .authenticationRequired)
+        }
+    }
+
+    @Test func fetchColumnsMapsCodeLess401ToAuthenticationRequired() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401),
+                try encodeJSON(["error": "Sign in required to view columns"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchColumns()
+            Issue.record("Expected authenticationRequired")
+        } catch let error as FeedbackClientError {
+            #expect(error == .authenticationRequired)
+        }
+    }
+
+    @Test func fetchColumnsMaps403ToForbidden() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 403, headers: ["X-Request-Id": "req-columns-403"]),
+                try encodeJSON(["error": "Roadmap columns are disabled for this app"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().fetchColumns()
+            Issue.record("Expected forbidden")
+        } catch let error as FeedbackClientError {
+            guard case .forbidden(let message, let requestId) = error else {
+                Issue.record("Expected forbidden, got \(error)")
+                return
+            }
+            #expect(message == "Roadmap columns are disabled for this app")
+            #expect(requestId == "req-columns-403")
+            #expect(error.requestId == "req-columns-403")
+            #expect(error.responseBody == nil)
         }
     }
 

@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Subskrypcja aktywna";
 "cupthread.subscribe.manage_message" = "Aktualizacje e-mail będą wysyłane na adres %@. Aby zmienić adres lub zrezygnować, użyj linku w dowolnej aktualizacji e-mail.";
 "cupthread.subscribe.use_different_email" = "Użyj innego adresu e-mail";
+"cupthread.subscribe.pending_title" = "Potwierdzenie oczekuje";
+"cupthread.subscribe.pending_message" = "Wysłaliśmy link potwierdzający na adres %@. Otwórz go, aby zacząć otrzymywać aktualizacje e-mail.";
+"cupthread.subscribe.resend_button" = "Wyślij ponownie e-mail z potwierdzeniem";
+"cupthread.subscribe.resending_button" = "Ponowne wysyłanie…";
 "cupthread.whatsnew.emails_on" = "Aktualizacje e-mail włączone";
 "cupthread.whatsnew.emails_on_destination" = "Powiadomienia trafiają na %@.";
 "cupthread.whatsnew.get_emails" = "Otrzymuj aktualizacje e-mail";
 "cupthread.whatsnew.get_emails_caption" = "Otrzymaj powiadomienie, gdy ukaże się nowa wersja.";
 "cupthread.whatsnew.subscribe_accessibility" = "Subskrybuj aktualizacje e-mail";
 "cupthread.whatsnew.emails_on_accessibility" = "Aktualizacje e-mail są włączone dla %@";
+"cupthread.whatsnew.pending_title" = "Potwierdzenie oczekuje";
+"cupthread.whatsnew.pending_destination" = "Wysłaliśmy link potwierdzający na adres %@.";
+"cupthread.whatsnew.pending_accessibility" = "Oczekuje na potwierdzenie e-maila dla %@";
 "cupthread.whatsnew.version_accessibility" = "Wersja %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Wydane propozycje: %@";
 "cupthread.features.unavailable_feedback" = "Opinie niedostępne";
@@ -211,3 +218,7 @@
 "cupthread.attachment.oversized" = "Załącznik (%1$@) przekracza maksymalny dozwolony rozmiar %2$@.";
 "cupthread.attachment.unprocessable" = "Nie udało się przetworzyć wybranego zdjęcia do przesłania.";
 "cupthread.attachment.unsupported_type" = "Ten typ obrazu nie jest obsługiwany. Dołącz obraz PNG, JPEG, WebP lub GIF.";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Wiadomość jest za długa. Skróć ją i spróbuj ponownie.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld z %2$lld znaków";

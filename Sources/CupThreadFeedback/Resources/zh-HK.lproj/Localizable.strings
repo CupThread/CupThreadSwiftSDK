@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "已訂閱";
 "cupthread.subscribe.manage_message" = "更新電郵會傳送至 %@。想更改電郵地址或者取消訂閱，請使用任何更新電郵入面嘅連結。";
 "cupthread.subscribe.use_different_email" = "使用其他電郵";
+"cupthread.subscribe.pending_title" = "等待確認";
+"cupthread.subscribe.pending_message" = "我哋已將確認連結傳送至 %@。開啟連結就會開始收到更新電郵。";
+"cupthread.subscribe.resend_button" = "重新傳送確認電郵";
+"cupthread.subscribe.resending_button" = "正在重新傳送…";
 "cupthread.whatsnew.emails_on" = "更新電郵已開啟";
 "cupthread.whatsnew.emails_on_destination" = "通知會傳送至 %@。";
 "cupthread.whatsnew.get_emails" = "接收更新電郵";
 "cupthread.whatsnew.get_emails_caption" = "有新版本推出時接收通知。";
 "cupthread.whatsnew.subscribe_accessibility" = "訂閱更新電郵";
 "cupthread.whatsnew.emails_on_accessibility" = "%@ 已開啟更新電郵";
+"cupthread.whatsnew.pending_title" = "等待確認";
+"cupthread.whatsnew.pending_destination" = "我哋已將確認連結傳送至 %@。";
+"cupthread.whatsnew.pending_accessibility" = "%@ 嘅電郵確認尚未完成";
 "cupthread.whatsnew.version_accessibility" = "版本 %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "已交付嘅建議：%@";
 "cupthread.features.unavailable_feedback" = "反饋無法使用";
@@ -211,3 +218,7 @@
 "cupthread.attachment.oversized" = "附件（%1$@）超過咗允許嘅大小上限 %2$@。";
 "cupthread.attachment.unprocessable" = "所選相片無法處理，無法上載。";
 "cupthread.attachment.unsupported_type" = "不支援此圖片類型，請附上 PNG、JPEG、WebP 或 GIF 格式嘅圖片。";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "你的內容太長，請精簡後再試。";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "已輸入 %1$lld 個字元，上限 %2$lld 個";

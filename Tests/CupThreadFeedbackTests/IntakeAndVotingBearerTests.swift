@@ -300,7 +300,7 @@ struct IntakeAndVotingBearerTests {
         let client = FeedbackClient(
             configuration: config,
             session: makeMockSession(),
-            turnstileTokenProvider: { "turnstile-token" },
+            turnstileTokenProvider: { _ in "turnstile-token" },
             authenticationProvider: { "user-jwt-retry-token" }
         )
 
