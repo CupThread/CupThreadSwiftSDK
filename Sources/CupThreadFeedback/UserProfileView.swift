@@ -7,8 +7,8 @@ public struct UserProfileView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var profile: PublicUserProfileResponse?
-    @State private var isLoading = true
-    @State private var loadError: String?
+    /// First-load lifecycle and stale-write generation tracking (CONC-4).
+    @State private var loadState = SurfaceLoadState()
 
     public init(client: FeedbackClient, userId: String) {
         self.client = client
@@ -18,10 +18,10 @@ public struct UserProfileView: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                if isLoading {
+                if loadState.isLoading {
                     ProgressView()
                         .padding(.top, 32)
-                } else if let loadError {
+                } else if let loadError = loadState.loadError {
                     LoadErrorView(message: loadError) {
                         await loadProfile()
                     }
@@ -147,16 +147,24 @@ public struct UserProfileView: View {
 
     @MainActor
     private func loadProfile() async {
-        isLoading = true
-        loadError = nil
+        let generation = loadState.startLoading()
+        // The defer (not a trailing assignment) resets `isLoading`: a
+        // cancelled load (dismissal mid-fetch) returns early and must still
+        // leave the spinner (CONC-4).
+        defer { loadState.finishLoading(generation: generation) }
         do {
-            profile = try await client.fetchUserProfile(userId: userId)
+            let fetched = try await client.fetchUserProfile(userId: userId)
+            // A superseded load (pull-to-refresh racing the initial task,
+            // retry taps stacking up) must not clobber the newer run's
+            // profile.
+            guard loadState.isCurrent(generation: generation) else { return }
+            profile = fetched
         } catch {
-            // A cancelled load (dismissal mid-fetch) never reached a verdict
-            // — keep whatever profile state was rendered before.
-            guard !error.isSdkCancellation else { return }
-            loadError = FriendlyError.message(for: error)
+            // A cancelled load never reached a verdict — keep whatever
+            // profile state was rendered before. A superseded run must not
+            // write either; both leave the surface to the surviving load.
+            guard loadState.isCurrent(generation: generation), !error.isSdkCancellation else { return }
+            loadState.loadError = FriendlyError.message(for: error)
         }
-        isLoading = false
     }
 }
