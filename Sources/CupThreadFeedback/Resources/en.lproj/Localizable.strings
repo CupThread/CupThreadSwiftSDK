@@ -192,3 +192,8 @@
 "cupthread.error.signing_secret_not_configured" = "Payment details can't be reported because this app has no SDK signing secret configured.";
 "cupthread.error.invalid_signature" = "Payment details weren't updated: the report's signature didn't verify. Check the app's SDK signing secret.";
 "cupthread.error.stale_signature" = "Payment details weren't updated: the report's signature expired. Check the device clock and try again.";
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Your message is too long. Please shorten it and try again.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld of %2$lld characters";

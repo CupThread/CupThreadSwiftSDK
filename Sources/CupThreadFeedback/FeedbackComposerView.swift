@@ -50,9 +50,7 @@ public struct FeedbackComposerView: View {
     @Environment(\.sdkAppConfig) private var sdkAppConfig
     @Environment(\.dismiss) private var dismiss
 
-    private var activeConfig: PublicAppConfig? {
-        config ?? sdkAppConfig
-    }
+    private var activeConfig: PublicAppConfig? { config ?? sdkAppConfig }
 
     private var submissionDenial: SdkSubmissionDenial {
         SdkSubmissionDenial.forFeedback(
@@ -84,8 +82,10 @@ public struct FeedbackComposerView: View {
     /// Creates the feedback form.
     ///
     /// The view enforces a minimum length (title ≥ 3, description ≥ 5
-    /// characters) before enabling the send button, shows an inline error
-    /// banner on failure, and swaps to a success screen on completion.
+    /// characters) before enabling the send button, applies the
+    /// ``IntakeTextLimits`` caps with near-cap character counters (BUG-18),
+    /// shows an inline error banner on failure, and swaps to a success
+    /// screen on completion.
     ///
     /// Wrap your hierarchy in ``CupThreadTheme`` or present the view through
     /// one of the SDK containers so console feature flags and theming apply.
@@ -235,12 +235,14 @@ public struct FeedbackComposerView: View {
                 #if canImport(UIKit)
                 .submitLabel(.next)
                 #endif
+            intakeCharacterCounter(draft.title, limit: IntakeTextLimits.maxTitleLength, styledAsFormRow: true)
             TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
                 .lineLimit(6...12)
                 .padding(.top, 2)
                 #if canImport(UIKit)
                 .submitLabel(.send)
                 #endif
+            intakeCharacterCounter(draft.description, limit: IntakeTextLimits.maxDescriptionLength, styledAsFormRow: true)
         } header: {
             Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
         } footer: {
@@ -251,12 +253,14 @@ public struct FeedbackComposerView: View {
     private var contactSection: some View {
         Section {
             TextField(CupThreadStrings.tr("cupthread.feedback.name_label"), text: $draft.reporterName)
+            intakeCharacterCounter(draft.reporterName, limit: IntakeTextLimits.maxNameLength, styledAsFormRow: true)
             TextField(CupThreadStrings.tr("cupthread.feedback.email_label"), text: $draft.reporterEmail)
                 #if canImport(UIKit)
                 .textInputAutocapitalization(.never)
                 .keyboardType(.emailAddress)
                 #endif
                 .feedbackEmailHint(draft.reporterEmail)
+            intakeCharacterCounter(draft.reporterEmail, limit: IntakeTextLimits.maxEmailLength, styledAsFormRow: true)
         } header: {
             Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
         } footer: {

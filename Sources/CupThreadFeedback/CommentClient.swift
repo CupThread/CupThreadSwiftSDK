@@ -157,6 +157,9 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidParent(message:requestId:)`` when the
     ///   reply target is missing, hidden, or not on this feature request
     ///   (HTTP 400 `invalid_parent`),
+    ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds
+    ///   the client-side intake byte budget (BUG-18) — rejected locally with
+    ///   no network round trip; shorten the comment and post again,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse`` otherwise.
     public func postComment(
@@ -175,7 +178,7 @@ extension FeedbackClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
-        request.httpBody = try encoder.encode(payload)
+        request.httpBody = try encodedIntakeBody(payload)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {

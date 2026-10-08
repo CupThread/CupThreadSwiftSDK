@@ -193,3 +193,8 @@
 "cupthread.error.invalid_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten kunne ikke verifiseres. Sjekk appens SDK-signeringshemmelighet.";
 "cupthread.error.stale_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten er utløpt. Sjekk enhetens klokke og prøv på nytt.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Meldingen er for lang. Kort den ned og prøv igjen.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld av %2$lld tegn";

@@ -297,8 +297,11 @@ public struct FeedbackClient: Sendable {
     ///   feedback is disabled or the platform is outside the console's
     ///   allow-list (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for other
-    ///   server rejections (successful submissions accept HTTP 200, 201, and 202), or
-    ///   ``FeedbackClientError/invalidResponse`` when the response cannot be interpreted.
+    ///   server rejections (successful submissions accept HTTP 200, 201, and 202),
+    ///   ``FeedbackClientError/invalidResponse`` when the response cannot be interpreted, or
+    ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds the
+    ///   client-side intake byte budget (BUG-18) — rejected locally with no network
+    ///   round trip; shorten the free-text fields and submit again.
     public func submit(
         _ draft: FeedbackDraft,
         userToken: String? = nil
@@ -311,7 +314,7 @@ public struct FeedbackClient: Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             self.applyCorrelationHeaders(userToken: effectiveUserToken, requestID: requestID, to: &request)
             await self.applyBearerToken(to: &request)
-            request.httpBody = try self.encoder.encode(self.submissionPayload(
+            request.httpBody = try self.encodedIntakeBody(self.submissionPayload(
                 for: draft,
                 uploadIds: uploadIds,
                 turnstileToken: token
