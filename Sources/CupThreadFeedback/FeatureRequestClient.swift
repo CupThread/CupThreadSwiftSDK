@@ -120,13 +120,20 @@ extension FeedbackClient {
     ///   no network round trip; shorten the title/description and submit again.
     ///
     /// When the client was created with a `turnstileTokenProvider`, its token
-    /// is sent as `turnstileToken`; a Turnstile rejection (HTTP 403) asks the
-    /// provider for a fresh token and retries exactly once before throwing.
+    /// is sent as `turnstileToken`; the provider is consulted with the
+    /// ``TurnstileAction/featureRequest`` binding (the app key as `cdata`),
+    /// so render the widget under that exact action — a feedback-minted token
+    /// is rejected here. A Turnstile rejection (HTTP 403) asks the provider
+    /// for a fresh token under the same binding and retries exactly once
+    /// before throwing.
     public func submitFeatureRequest(
         _ draft: FeatureRequestDraft,
         userToken: String
     ) async throws -> FeatureRequestSubmissionResult {
-        let data = try await sendWithTurnstileRetry(accepted: [200, 201]) { token, requestID in
+        let data = try await sendWithTurnstileRetry(
+            accepted: [200, 201],
+            challenge: .featureRequest(appKey: configuration.appKey)
+        ) { token, requestID in
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

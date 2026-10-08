@@ -160,11 +160,14 @@ public struct FeedbackClient: Sendable {
     /// submissions cannot succeed without a token: hosts with their own
     /// verification flow — or a server-side exemption arrangement — supply it
     /// here. Called once per attempt (including the automatic single retry
-    /// after a turnstile rejection), so it can mint a fresh token each time.
-    /// When `nil` (the default), gated submissions throw
-    /// ``FeedbackClientError/turnstileRequired(message:requestId:)`` after a
-    /// single attempt.
-    let turnstileTokenProvider: (@Sendable () async -> String?)?
+    /// after a turnstile rejection) with the ``TurnstileChallenge`` naming the
+    /// exact `(action, cdata)` binding the endpoint validates — render the
+    /// widget (``TurnstileAction`` plus the app key as `cdata`) under that
+    /// binding so the minted token verifies; unbound or cross-action tokens
+    /// are rejected by the server. When `nil` (the default), gated submissions
+    /// throw ``FeedbackClientError/turnstileRequired(message:requestId:)``
+    /// after a single attempt.
+    let turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)?
     /// Resolves the signed-in end user's bearer token on demand.
     let authenticationProvider: (@Sendable () async -> String?)?
 
@@ -209,15 +212,20 @@ public struct FeedbackClient: Sendable {
     ///     them yourself if they can face untrusted redirects.
     ///   - turnstileTokenProvider: Async closure resolving a Cloudflare
     ///     Turnstile token for gated intake calls, `nil` when none is
-    ///     available. Called once per submission attempt, so it can mint a
-    ///     fresh token each time.
+    ///     available. Called with the ``TurnstileChallenge`` naming the
+    ///     `(action, cdata)` binding the endpoint validates — `feedback` for
+    ///     `POST /api/v1/feedback` and upload-session creation,
+    ///     `feature-request` for `POST /api/v1/feature-requests`, always with
+    ///     the app key as `cdata` — once per attempt, so it can mint a fresh
+    ///     token each time. Render the widget under that exact binding;
+    ///     unbound or cross-action tokens are rejected by the server.
     ///   - authenticationProvider: Async closure resolving the signed-in
     ///     user's bearer token, `nil` when signed out. Called once per
     ///     authenticated request, so it can refresh an expiring token.
     public init(
         configuration: FeedbackClientConfiguration,
         session: URLSession = FeedbackClient.defaultSession,
-        turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
+        turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) {
         self.init(
@@ -236,7 +244,7 @@ public struct FeedbackClient: Sendable {
         tokenStore: UserTokenStore? = nil,
         configStore: AppConfigStore? = nil,
         serverClock: ServerClock? = nil,
-        turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
+        turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) {
         self.configuration = configuration
@@ -271,10 +279,13 @@ public struct FeedbackClient: Sendable {
     /// request also carries the SDK's version in the `X-SDK-Version` header.
     ///
     /// When the client was created with a `turnstileTokenProvider`, its token
-    /// is sent as `turnstileToken`. Production intake is gated behind
-    /// Cloudflare Turnstile: if the server rejects the submission with the
-    /// human-verification gate (HTTP 403), the SDK asks the provider for a
-    /// fresh token and retries exactly once before throwing.
+    /// is sent as `turnstileToken`; the provider is consulted with the
+    /// ``TurnstileAction/feedback`` binding (the app key as `cdata`), so
+    /// render the widget under that exact action. Production intake is gated
+    /// behind Cloudflare Turnstile: if the server rejects the submission with
+    /// the human-verification gate (HTTP 403), the SDK asks the provider for
+    /// a fresh token under the same binding and retries exactly once before
+    /// throwing.
     ///
     /// ```swift
     /// var draft = FeedbackDraft.autofilled()
@@ -317,7 +328,10 @@ public struct FeedbackClient: Sendable {
     ) async throws -> FeedbackSubmissionResult {
         let uploadIds = draft.attachments.compactMap(\.uploadId).nilIfEmpty
         let effectiveUserToken = resolvedSubmitUserToken(userToken, hasAttachments: uploadIds != nil)
-        let data = try await sendWithTurnstileRetry(accepted: Self.acceptedSubmitStatuses) { token, requestID in
+        let data = try await sendWithTurnstileRetry(
+            accepted: Self.acceptedSubmitStatuses,
+            challenge: .feedback(appKey: configuration.appKey)
+        ) { token, requestID in
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feedback"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
