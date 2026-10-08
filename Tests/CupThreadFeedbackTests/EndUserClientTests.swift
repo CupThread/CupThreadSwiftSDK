@@ -10,13 +10,14 @@ import Testing
 struct EndUserClientTests {
     static let apiHost = "apisync-me.example.com"
 
-    /// Creates a `ChangelogSubscriptionStore` backed by an isolated
-    /// `UserDefaults` suite so tests never touch `.standard`.
+    /// Creates a `ChangelogSubscriptionStore` backed by an in-memory double and
+    /// an isolated `UserDefaults` suite so tests never touch `.standard` or system Keychain.
     func makeIsolatedSubscriptionStore(appKey: String = "app_\(UUID().uuidString)")
         -> (store: ChangelogSubscriptionStore, cleanup: () -> Void) {
         let suiteName = "test.changelogsubscription.erase.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
-        let store = ChangelogSubscriptionStore(appKey: appKey, userDefaults: defaults)
+        let storage = InMemorySubscriptionStorage()
+        let store = ChangelogSubscriptionStore(appKey: appKey, storage: storage, legacyUserDefaults: defaults)
         return (store, { defaults.removePersistentDomain(forName: suiteName) })
     }
 
@@ -158,7 +159,15 @@ struct EndUserClientTests {
         let storageKey = ChangelogSubscriptionStore.keyPrefix + appKey
         let standardDefaults = UserDefaults.standard
         standardDefaults.set("user@example.com", forKey: storageKey)
-        defer { standardDefaults.removeObject(forKey: storageKey) }
+        let keychainStorage = KeychainTokenStorage(
+            service: ChangelogSubscriptionStore.keychainService,
+            account: storageKey
+        )
+        keychainStorage.save("user@example.com")
+        defer {
+            standardDefaults.removeObject(forKey: storageKey)
+            keychainStorage.delete()
+        }
 
         let isolated = makeIsolatedTokenStore(appKey: appKey)
         defer { isolated.cleanup() }
@@ -168,6 +177,7 @@ struct EndUserClientTests {
 
         #expect(result.erased == true)
         #expect(standardDefaults.string(forKey: storageKey) == nil)
+        #expect(keychainStorage.load() == nil)
     }
 
     @Test func eraseWithStorePropagatesErrorsWithoutResetting() async throws {

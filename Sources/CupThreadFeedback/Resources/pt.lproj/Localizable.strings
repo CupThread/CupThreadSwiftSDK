@@ -200,3 +200,8 @@
 "cupthread.error.invalid_signature" = "Os dados de pagamento não foram atualizados: a assinatura do relatório não pôde ser verificada. Confira o segredo de assinatura do SDK do app.";
 "cupthread.error.stale_signature" = "Os dados de pagamento não foram atualizados: a assinatura do relatório expirou. Verifique o relógio do dispositivo e tente novamente.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "A mensagem é demasiado longa. Encurte-a e tente novamente.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld de %2$lld caracteres";

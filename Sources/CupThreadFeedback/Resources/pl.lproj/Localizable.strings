@@ -200,3 +200,8 @@
 "cupthread.error.invalid_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia nie przeszedł weryfikacji. Sprawdź tajny klucz podpisu SDK aplikacji.";
 "cupthread.error.stale_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia wygasł. Sprawdź zegar urządzenia i spróbuj ponownie.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Wiadomość jest za długa. Skróć ją i spróbuj ponownie.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld z %2$lld znaków";

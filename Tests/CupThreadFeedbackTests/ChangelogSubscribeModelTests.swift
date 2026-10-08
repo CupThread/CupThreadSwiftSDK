@@ -176,23 +176,52 @@ struct ChangelogSubscribeModelTests {
         #expect(model.trimmedEmail == "user@example.com")
     }
 
+    /// Regression suite for issue #281: the shape check previously let
+    /// multiple-`@` addresses and empty/trailing-dot domain labels through to
+    /// the subscribe endpoint, where they were guaranteed to fail with a
+    /// generic 400. Every entry here must fail the shape check *and* keep
+    /// the form's primary button disabled.
     @Test func emailValidationRejectsMalformedShapes() {
         var model = makeModel(in: .form)
 
-        model.email = "user@example.com"
-        #expect(model.isValidEmail)
+        let malformed = [
+            "user@@gmail.com",   // multiple @ signs
+            "a@b@c.com",         // multiple @ signs
+            "user@.",            // empty domain after the @
+            "user@.com",         // empty leading domain label
+            "user@gmail.",       // trailing-dot domain
+            "user@a..b",         // doubled dot inside the domain
+            "@example.com",      // missing local part
+            "user@",             // missing domain
+            "user@example .com", // embedded whitespace
+            "us er@example.com", // embedded whitespace
+            "user@example",      // dotless single-label domain (#283)
+            "user@localhost",    // dotless single-label domain (#283)
+            ""                  // empty
+        ]
+        for email in malformed {
+            model.email = email
+            #expect(!model.isValidEmail, "\(email) must fail the shape check")
+            #expect(model.isPrimaryDisabled, "\(email) must not be submittable from the form phase")
+        }
+    }
 
-        model.email = "user@example" // no dot after the @
-        #expect(!model.isValidEmail)
+    /// The check stays shape-only and shared with the feedback composer's
+    /// warn-only hint (#283): real multi-label domains pass, including
+    /// local-part tags and deep subdomains the server remains authoritative
+    /// over.
+    @Test func emailValidationAcceptsPlausibleShapes() {
+        var model = makeModel(in: .form)
 
-        model.email = "@example.com" // missing local part
-        #expect(!model.isValidEmail)
-
-        model.email = "user@" // missing domain
-        #expect(!model.isValidEmail)
-
-        model.email = "user@example .com" // embedded whitespace
-        #expect(!model.isValidEmail)
+        let plausible = [
+            "user@example.com",
+            "user.name+tag@sub.example.co"
+        ]
+        for email in plausible {
+            model.email = email
+            #expect(model.isValidEmail, "\(email) is shape-plausible and must pass")
+            #expect(!model.isPrimaryDisabled, "\(email) must be submittable from the form phase")
+        }
     }
 
     // MARK: - State machine

@@ -200,3 +200,8 @@
 "cupthread.error.invalid_signature" = "Ödeme bilgileri güncellenmedi: raporun imzası doğrulanamadı. Uygulamanın SDK imza gizli anahtarını kontrol edin.";
 "cupthread.error.stale_signature" = "Ödeme bilgileri güncellenmedi: raporun imzasının süresi doldu. Cihaz saatini kontrol edip yeniden deneyin.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Mesajınız çok uzun. Lütfen kısaltıp tekrar deneyin.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "kullanılan %1$lld ／ sınır %2$lld karakter";

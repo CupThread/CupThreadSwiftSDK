@@ -82,27 +82,94 @@ public enum UserAttributesSigner {
         }
     }
 
-    /// Renders a numeric value with round-half-even IEEE 754 double formatting
-    /// (`toFixed(2)` semantics), then strips trailing zeros and a trailing decimal point.
+    /// Renders a numeric value with ECMA-262 `Number.prototype.toFixed(2)` semantics
+    /// evaluated on the exact binary double, then strips trailing zeros and a trailing
+    /// decimal point — byte-identical to the server's JavaScript canonicalization
+    /// (`v.toFixed(2)` + trailing-zero strip, DATA-03).
+    ///
+    /// The rounding is performed on the *exact* binary value the server receives, not on
+    /// the shortest round-trip decimal string: `9.995` is stored as
+    /// `9.99499999999999957…` and therefore canonicalizes to `"9.99"`, while `1200.005`
+    /// is stored as `1200.00500000000010…` and carries to `"1200.01"`. Exact half-way
+    /// values (e.g. `1.125`, which is exactly representable) round away from zero on
+    /// both signs, matching the observable `toFixed` behavior of the JS runtimes the
+    /// server verifies with (`1.125 → "1.13"`, `-1.125 → "-1.13"`).
+    ///
+    /// Behavior at the domain edges:
+    /// - `-0.0` canonicalizes to `"0"`, like `(-0).toFixed(2)` (`"0.00"`).
+    /// - A negative value that rounds below one cent keeps its sign (`-0.004 → "-0"`),
+    ///   matching Node's `"-0.00"` after the strip.
+    /// - `|value| ≥ 1e21` mirrors ECMA's switch to `ToString` and returns the shortest
+    ///   round-trip decimal/exponential string. MRR cannot reach this boundary; the
+    ///   check also keeps the fixed-point integer path overflow-free.
+    /// - Non-finite values fall back to Swift's default description. JSON cannot carry
+    ///   NaN or infinity, so this is defensive only.
     ///
     /// - Parameter value: The numeric amount (e.g. MRR).
     /// - Returns: The formatted canonical representation (e.g. `1200`, `99.5`, `12.34`, `0`).
     public static func canonicalNumber(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        formatter.roundingMode = .halfEven
-        formatter.usesGroupingSeparator = false
-        guard let formatted = formatter.string(from: NSNumber(value: value)) else {
-            return "\(value)"
+        guard value.isFinite else { return "\(value)" }
+        if value == 0 { return "0" }
+        if value.magnitude >= 1e21 { return "\(value)" }
+
+        // n is the decimal integer such that n / 100 is |value| rounded to two
+        // fraction digits; its digits render with two implied fraction places.
+        var digits = fixedPointCentiles(for: value)
+        if digits.count < 3 {
+            digits = String(repeating: "0", count: 3 - digits.count) + digits
         }
-        var string = formatted
-        while string.contains(".") && (string.hasSuffix("0") || string.hasSuffix(".")) {
-            string.removeLast()
+        let integerPart = String(digits.dropLast(2))
+        var fraction = String(digits.suffix(2))
+        while fraction.hasSuffix("0") { fraction.removeLast() }
+        var result = fraction.isEmpty ? integerPart : integerPart + "." + fraction
+        if value < 0 { result = "-" + result }
+        return result
+    }
+
+    /// Returns the decimal digits of `n` where `n / 100` is `|value|` rounded to
+    /// nearest with exact halves away from zero, computed exactly on the binary
+    /// double via IEEE 754 decomposition and 64-bit integer arithmetic.
+    private static func fixedPointCentiles(for value: Double) -> String {
+        // Decompose |value| = significand × 2^binaryExponent with an integer significand.
+        let magnitude = value.magnitude
+        let rawExponent = magnitude.exponent
+        let significandBits = magnitude.significandBitPattern
+        let significand: UInt64
+        let binaryExponent: Int
+        if rawExponent == -1022 && significandBits != 0 {
+            // Subnormal: no implicit leading bit.
+            significand = significandBits
+            binaryExponent = -1074
+        } else {
+            significand = significandBits | (1 << 52)
+            binaryExponent = rawExponent - 52
         }
-        return string
+        // scaled = |value| × 100 exactly: significand < 2^53 so scaled < 2^60.
+        let scaled = significand * 100
+
+        if binaryExponent >= 0 {
+            // Integer-valued double: n = scaled × 2^binaryExponent exactly.
+            if binaryExponent <= scaled.leadingZeroBitCount {
+                return String(scaled << binaryExponent)
+            }
+            var decimal = Decimal(scaled)
+            for _ in 0..<binaryExponent { decimal *= 2 }
+            return "\(decimal)"
+        }
+
+        // n = scaled / 2^shift rounded to nearest, exact halves away from zero.
+        let shift = -binaryExponent
+        let quotient: UInt64
+        let roundUp: Bool
+        if shift <= 59 {
+            quotient = scaled >> shift
+            let remainder = scaled & ((UInt64(1) << shift) - 1)
+            roundUp = remainder >= (UInt64(1) << (shift - 1))
+        } else {
+            quotient = 0
+            roundUp = shift <= 61 && scaled >= (UInt64(1) << (shift - 1))
+        }
+        return String(quotient + (roundUp ? 1 : 0))
     }
 
     /// Assembles the canonical string for a user-attribute update request from arguments.

@@ -110,9 +110,11 @@ struct FeatureRequestComposeView: View {
                     text: $draft.title,
                     prompt: Text(CupThreadStrings.tr("cupthread.feedback.short_summary"))
                 )
+                intakeCharacterCounter(draft.title, limit: IntakeTextLimits.maxTitleLength, styledAsFormRow: true)
                 TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
                     .lineLimit(5...10)
                     .padding(.top, 2)
+                intakeCharacterCounter(draft.description, limit: IntakeTextLimits.maxDescriptionLength, styledAsFormRow: true)
             } header: {
                 Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
             } footer: {
@@ -121,6 +123,7 @@ struct FeatureRequestComposeView: View {
 
             Section {
                 TextField(CupThreadStrings.tr("cupthread.features.compose_name_prompt"), text: $draft.requesterName)
+                intakeCharacterCounter(draft.requesterName, limit: IntakeTextLimits.maxNameLength, styledAsFormRow: true)
             } header: {
                 Text(CupThreadStrings.tr("cupthread.feedback.section_contact"))
             } footer: {
@@ -151,7 +154,8 @@ struct FeatureRequestComposeView: View {
 
     private var canSubmit: Bool {
         draft.title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
-        draft.description.trimmingCharacters(in: .whitespacesAndNewlines).count >= 5
+        draft.description.trimmingCharacters(in: .whitespacesAndNewlines).count >= 5 &&
+        IntakeTextLimits.overLimitField(in: draft) == nil
     }
 
     @MainActor

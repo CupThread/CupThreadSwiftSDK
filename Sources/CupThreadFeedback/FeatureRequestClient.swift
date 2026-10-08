@@ -14,6 +14,10 @@ private struct FeatureRequestSubmitPayload: Encodable, Sendable {
 private struct VotePayload: Encodable, Sendable {
     let appKey: String
     let userToken: String
+    /// Omitted from the encoded JSON when `nil` (synthesized `Encodable`
+    /// skips absent optionals), so the default vote payload keeps its exact
+    /// historical shape.
+    let shipNotifyEmail: String?
 }
 
 // MARK: - FeedbackClient extension
@@ -114,22 +118,32 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
     ///   feedback is disabled for the app (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse``.
+    ///   or ``FeedbackClientError/invalidResponse``, or
+    ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds
+    ///   the client-side intake byte budget (BUG-18) — rejected locally with
+    ///   no network round trip; shorten the title/description and submit again.
     ///
     /// When the client was created with a `turnstileTokenProvider`, its token
-    /// is sent as `turnstileToken`; a Turnstile rejection (HTTP 403) asks the
-    /// provider for a fresh token and retries exactly once before throwing.
+    /// is sent as `turnstileToken`; the provider is consulted with the
+    /// ``TurnstileAction/featureRequest`` binding (the app key as `cdata`),
+    /// so render the widget under that exact action — a feedback-minted token
+    /// is rejected here. A Turnstile rejection (HTTP 403) asks the provider
+    /// for a fresh token under the same binding and retries exactly once
+    /// before throwing.
     public func submitFeatureRequest(
         _ draft: FeatureRequestDraft,
         userToken: String
     ) async throws -> FeatureRequestSubmissionResult {
-        let data = try await sendWithTurnstileRetry(accepted: [200, 201]) { token, requestID in
+        let data = try await sendWithTurnstileRetry(
+            accepted: [200, 201],
+            challenge: .featureRequest(appKey: configuration.appKey)
+        ) { token, requestID in
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
             await self.applyBearerToken(to: &request)
-            request.httpBody = try self.encoder.encode(FeatureRequestSubmitPayload(
+            request.httpBody = try self.encodedIntakeBody(FeatureRequestSubmitPayload(
                 appKey: self.configuration.appKey,
                 title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
                 description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -154,17 +168,31 @@ extension FeedbackClient {
     /// the SDK surfaces as a friendly "try again in a minute" message rather
     /// than retrying in a tight loop.
     ///
+    /// The vote request doubles as the ship-notification opt-in: when
+    /// `shipNotifyEmail` is provided it enrolls the address in double-opt-in
+    /// ship notifications — CupThread emails a single-use confirmation link,
+    /// and only confirmed addresses are ever mailed when the request ships.
+    /// The endpoint stays idempotent, so re-posting an existing vote with a
+    /// `shipNotifyEmail` only processes the opt-in; callers can therefore
+    /// offer an "email me when this ships" prompt after a successful vote
+    /// without toggling anything. The value is trimmed, and a whitespace-only
+    /// value is treated as `nil` (the field is omitted from the JSON body).
+    ///
     /// On boards that require signed-in voting, the server accepts a
-    /// `shipNotifyEmail` on the vote only when it is one of the signed-in
-    /// session's verified addresses; a mismatched address still records the
-    /// vote but answers with a ``VoteResult/warning``
+    /// `shipNotifyEmail` only when it is one of the signed-in session's
+    /// verified addresses; a mismatched address still records the vote but
+    /// answers with a ``VoteResult/warning``
     /// (``VoteWarning/isEmailNotVerified``) and stores no ship-notification
-    /// consent. The SDK never sends `shipNotifyEmail`, so its built-in vote
-    /// flow never receives a warning; the field is decoded for schema parity
-    /// with the public API.
+    /// consent. The built-in ``FeatureRequestsView`` flow never sends the
+    /// field, so it never receives a warning; the warning is decoded for
+    /// callers that opt in through this method or post votes through their
+    /// own transport.
     /// - Parameters:
     ///   - featureRequestId: Id of the request to vote on.
     ///   - userToken: A stable UUID string identifying this user.
+    ///   - shipNotifyEmail: Optional email address (max 254 characters) to
+    ///     enroll in ship notifications for this request; `nil` keeps the
+    ///     payload unchanged and sends no opt-in.
     /// - Returns: The new vote state, the request's authoritative vote count,
     ///   and any non-fatal warning the server attached.
     /// - Throws: ``FeedbackClientError/rateLimited`` on HTTP 429,
@@ -175,9 +203,17 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidResponse``.
     public func toggleVote(
         featureRequestId: String,
-        userToken: String
+        userToken: String,
+        shipNotifyEmail: String? = nil
     ) async throws -> VoteResult {
-        let payload = VotePayload(appKey: configuration.appKey, userToken: userToken)
+        let normalizedShipNotifyEmail = shipNotifyEmail?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+        let payload = VotePayload(
+            appKey: configuration.appKey,
+            userToken: userToken,
+            shipNotifyEmail: normalizedShipNotifyEmail
+        )
 
         var request = URLRequest(
             url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(featureRequestId)/vote")

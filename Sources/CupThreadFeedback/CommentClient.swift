@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Private payload types
 
@@ -38,7 +39,15 @@ extension FeedbackClient {
     /// deleted comments excluded), not a single page's length. Callers that
     /// want one page, or the authoritative `total`, can use
     /// ``fetchComments(featureRequestId:limit:cursor:)``.
-    /// - Parameter featureRequestId: Id of the feature request.
+    ///
+    /// The walk stops safely upon reaching `maxPages` (defaults to
+    /// ``FeedbackClient/defaultMaxPages``, 100) to guarantee termination against
+    /// runaway backends, proxy loops, or shifting keyset cursors. When the cap is
+    /// reached, comments collected so far are returned and a warning diagnostic is logged.
+    /// - Parameters:
+    ///   - featureRequestId: Id of the feature request.
+    ///   - maxPages: Maximum number of cursor pages to fetch before stopping;
+    ///     defaults to ``FeedbackClient/defaultMaxPages`` (100).
     /// - Returns: The visible comments, oldest first.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
     ///   access is disabled for the app (HTTP 401 `authentication_required`),
@@ -47,11 +56,17 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor) or
     ///   ``FeedbackClientError/invalidResponse``.
-    public func fetchComments(featureRequestId: String) async throws -> [FeatureRequestComment] {
+    public func fetchComments(
+        featureRequestId: String,
+        maxPages: Int = Self.defaultMaxPages
+    ) async throws -> [FeatureRequestComment] {
+        let effectiveMaxPages = max(1, maxPages)
         var collected: [FeatureRequestComment] = []
         var seenIDs = Set<String>()
         var cursor: String?
-        while true {
+        var pagesFetched = 0
+        while pagesFetched < effectiveMaxPages {
+            pagesFetched += 1
             let page = try await fetchComments(
                 featureRequestId: featureRequestId,
                 limit: Self.commentsMaxPageSize,
@@ -68,6 +83,10 @@ extension FeedbackClient {
             }
             cursor = nextCursor
         }
+        paginationLogger.warning(
+            "Comments pagination reached maximum page cap (\(effectiveMaxPages, privacy: .public)) for app '\(self.configuration.appKey, privacy: .public)' on request '\(featureRequestId, privacy: .public)'; returning \(collected.count, privacy: .public) collected comments."
+        )
+        return collected
     }
 
     /// Fetches one page of comments on a feature request, oldest first.
@@ -157,6 +176,9 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidParent(message:requestId:)`` when the
     ///   reply target is missing, hidden, or not on this feature request
     ///   (HTTP 400 `invalid_parent`),
+    ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds
+    ///   the client-side intake byte budget (BUG-18) — rejected locally with
+    ///   no network round trip; shorten the comment and post again,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse`` otherwise.
     public func postComment(
@@ -175,7 +197,7 @@ extension FeedbackClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
-        request.httpBody = try encoder.encode(payload)
+        request.httpBody = try encodedIntakeBody(payload)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
