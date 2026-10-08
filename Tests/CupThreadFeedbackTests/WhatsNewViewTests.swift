@@ -141,6 +141,77 @@ struct WhatsNewViewTests {
         #expect(state.loadError == nil)
     }
 
+    @Test func handlePermissionDeniedRespectsGeneration() {
+        var state = WhatsNewViewState()
+        let gen = state.startLoading()
+
+        // Older generation denial must be ignored and leave loading in flight
+        state.handlePermissionDenied(generation: gen - 1)
+        #expect(state.isLoading)
+        #expect(!state.hasLoadedOnce)
+
+        // Matching generation clears loading, marks loaded once, and increments generation
+        state.handlePermissionDenied(generation: gen)
+        #expect(!state.isLoading)
+        #expect(state.hasLoadedOnce)
+        #expect(state.loadError == nil)
+        #expect(state.loadGeneration == gen + 1)
+    }
+
+    @Test func staleLoadCannotWriteAfterNewerDenial() {
+        var state = WhatsNewViewState()
+        let gen = state.startLoading()
+
+        // Denial invalidates the in-flight load by bumping generation
+        state.handlePermissionDenied(generation: gen)
+        #expect(!state.isLoading)
+        #expect(state.hasLoadedOnce)
+
+        // Stale fetch completion from generation `gen` must be dropped
+        let staleEntries = [makeEntry(id: "e1", title: "Version 1.0 (Stale)")]
+        state.handleSuccess(entries: staleEntries, generation: gen)
+        state.finishLoading(generation: gen)
+
+        #expect(state.entries.isEmpty)
+    }
+
+    @Test func staleFailureCannotWriteAfterNewerDenial() {
+        var state = WhatsNewViewState()
+        let gen = state.startLoading()
+
+        state.handlePermissionDenied(generation: gen)
+
+        // Stale failure from generation `gen` must be dropped
+        state.handleFailure(error: URLError(.timedOut), generation: gen)
+
+        #expect(state.loadError == nil)
+    }
+
+    @Test func permissionDeniedClearsPriorLoadError() {
+        var state = WhatsNewViewState()
+        let gen = state.startLoading()
+        state.handleFailure(error: URLError(.timedOut), generation: gen)
+        #expect(state.loadError != nil)
+
+        state.handlePermissionDenied(generation: gen)
+        #expect(!state.isLoading)
+        #expect(state.hasLoadedOnce)
+        #expect(state.loadError == nil)
+    }
+
+    @Test func denialArrivingWhileNewerLoadInFlightDoesNotClearLoading() {
+        var state = WhatsNewViewState()
+        let gen1 = state.startLoading()
+        let gen2 = state.startLoading()
+        #expect(gen2 == 2)
+
+        // Denial for older generation arrives while gen2 is running
+        state.handlePermissionDenied(generation: gen1)
+        #expect(state.isLoading)
+        #expect(!state.hasLoadedOnce)
+        #expect(state.loadGeneration == 2)
+    }
+
     @Test func loadCycleIncrementsGenerationMonotonically() {
         var state = WhatsNewViewState()
         #expect(state.loadGeneration == 0)
@@ -222,6 +293,35 @@ struct WhatsNewViewTests {
         #expect(!view.isLoading)
         #expect(!view.hasLoadedOnce)
         #expect(view.loadError == "Network connection lost")
+    }
+
+    @Test @MainActor func whatsNewViewRendersSkeletonWhenLoadingEvenIfHasLoadedOnceWhenEntriesEmpty() {
+        let client = makeTestClient()
+        let view = WhatsNewView(
+            client: client,
+            userToken: "test_token",
+            state: WhatsNewViewState(entries: [], isLoading: true, hasLoadedOnce: true)
+        )
+
+        _ = view.body
+        #expect(view.isLoading)
+        #expect(view.hasLoadedOnce)
+        #expect(view.entries.isEmpty)
+    }
+
+    @Test @MainActor func whatsNewViewPreservesEntriesWhenReloading() {
+        let client = makeTestClient()
+        let entries = [makeEntry(id: "e1", title: "Version 1.0")]
+        let view = WhatsNewView(
+            client: client,
+            userToken: "test_token",
+            state: WhatsNewViewState(entries: entries, isLoading: true, hasLoadedOnce: true)
+        )
+
+        _ = view.body
+        #expect(view.isLoading)
+        #expect(view.hasLoadedOnce)
+        #expect(view.entries.count == 1)
     }
 
     // MARK: - Multi-page regression test (PERF-4)
