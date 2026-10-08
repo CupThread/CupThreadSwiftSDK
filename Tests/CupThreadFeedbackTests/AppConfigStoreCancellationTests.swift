@@ -66,8 +66,13 @@ struct AppConfigStoreCancellationTests {
             counter.record(path: request.url?.path ?? "")
             started.signal()
             // Park until the test releases the fetch. Runs on a URLSession
-            // queue, so the blocking wait does not hold the main actor.
-            _ = gate.wait(timeout: .now() + 5)
+            // queue, so the blocking wait does not hold the main actor. The
+            // budget is generous: on a loaded CI runner the test-side
+            // handshake can be starved for tens of seconds by the CPU-bound
+            // image-decode suites running in parallel, and the park expiring
+            // early would complete the fetch before the caller is cancelled,
+            // voiding the test's premise.
+            _ = gate.wait(timeout: .now() + 30)
             return (makeHTTPResponse(status: status), payload)
         }
     }
@@ -82,7 +87,10 @@ struct AppConfigStoreCancellationTests {
     /// wait runs on a background thread via a synchronous seam
     /// (`DispatchSemaphore.wait` is unavailable in async contexts, even
     /// inside a detached task's closure). Bounded so a broken handshake fails
-    /// fast instead of stalling the run.
+    /// instead of stalling the run — but generously: on a loaded CI runner
+    /// the request can be starved for tens of seconds by the CPU-bound
+    /// parallel suites before it reaches the mock handler, and a tight budget
+    /// here fails the handshake even though nothing is broken.
     private func awaitSignal(_ semaphore: DispatchSemaphore, what: String) async throws {
         let result = await Task.detached(priority: .userInitiated) {
             Self.blockingWait(semaphore)
@@ -93,7 +101,7 @@ struct AppConfigStoreCancellationTests {
     private nonisolated static func blockingWait(
         _ semaphore: DispatchSemaphore
     ) -> DispatchTimeoutResult {
-        semaphore.wait(timeout: .now() + 5)
+        semaphore.wait(timeout: .now() + 30)
     }
 
     /// Starts a cached read and suspends until its request is genuinely in
