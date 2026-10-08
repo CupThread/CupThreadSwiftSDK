@@ -201,6 +201,23 @@
 "cupthread.error.stale_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur er udløbet. Tjek enhedens ur, og prøv igen.";
 
 
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Feedbackserveren returnerede et ugyldigt svar.";
+"cupthread.error.unreadable_upload_response" = "Feedbackserveren returnerede et ulæseligt uploadsvar.";
+"cupthread.error.auth_required" = "Denne handling er kun tilgængelig for brugere, der er logget ind.";
+"cupthread.error.scan_rejected" = "Den refererede vedhæftede fil blev afvist ved indholdskontrol og kunne ikke uploades.";
+"cupthread.error.unsupported_media" = "Denne billedtype understøttes ikke. Vedhæft et billede i PNG, JPEG, WebP eller GIF.";
+"cupthread.error.payload_too_large" = "Den fil er for stor til at uploade.";
+"cupthread.error.uploader_identity_required" = "Upload kræver en slutbrugeridentitet. Angiv et userToken (se UserTokenStore), når du uploader vedhæftede filer.";
+"cupthread.error.uploader_mismatch" = "Denne vedhæftede fil blev uploadet med en anden identitet. Fjern den og vedhæft den igen, og prøv så igen.";
+"cupthread.error.quota_exceeded" = "Denne app har nået sin indsendelsesgrænse for denne måned. Prøv igen senere.";
+"cupthread.error.subscription_inactive" = "Indsendelser er ikke tilgængelige for denne app lige nu. Prøv igen senere.";
+"cupthread.error.profile_not_found" = "Denne brugerprofil er ikke længere tilgængelig.";
+"cupthread.error.comments_unavailable" = "Kommentarer er ikke tilgængelige for denne funktionsanmodning.";
+"cupthread.error.email_not_verified" = "Brug e-mailadressen på din loggede konto for at abonnere.";
+"cupthread.attachment.oversized" = "Vedhæftet fil (%1$@) overskrider den maksimalt tilladte størrelse på %2$@.";
+"cupthread.attachment.unprocessable" = "Det valgte foto kunne ikke behandles til upload.";
+"cupthread.attachment.unsupported_type" = "Denne billedtype understøttes ikke. Vedhæft et billede i PNG, JPEG, WebP eller GIF.";
 /* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
 "cupthread.error.text_too_long" = "Beskeden er for lang. Forkort den og prøv igen.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";

@@ -201,6 +201,23 @@
 "cupthread.error.stale_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts ist abgelaufen. Prüfen Sie die Geräteuhr und versuchen Sie es erneut.";
 
 
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Der Feedback-Server hat eine ungültige Antwort zurückgegeben.";
+"cupthread.error.unreadable_upload_response" = "Der Feedback-Server hat eine unlesbare Upload-Antwort zurückgegeben.";
+"cupthread.error.auth_required" = "Diese Aktion ist nur für angemeldete Benutzer verfügbar.";
+"cupthread.error.scan_rejected" = "Der referenzierte Anhang wurde bei der Inhaltsprüfung abgelehnt und konnte nicht hochgeladen werden.";
+"cupthread.error.unsupported_media" = "Dieser Bildtyp wird nicht unterstützt. Bitte hängen Sie ein PNG, JPEG, WebP oder GIF an.";
+"cupthread.error.payload_too_large" = "Diese Datei ist zu gross zum Hochladen.";
+"cupthread.error.uploader_identity_required" = "Uploads erfordern eine Endbenutzer-Identität. Übergeben Sie beim Hochladen von Anhängen einen userToken (siehe UserTokenStore).";
+"cupthread.error.uploader_mismatch" = "Dieser Anhang wurde mit einer anderen Identität hochgeladen. Bitte entfernen Sie ihn, hängen Sie ihn erneut an und versuchen Sie es erneut.";
+"cupthread.error.quota_exceeded" = "Diese App hat ihr Einreichungslimit für diesen Monat erreicht. Bitte versuchen Sie es später erneut.";
+"cupthread.error.subscription_inactive" = "Einreichungen sind für diese App derzeit nicht möglich. Bitte versuchen Sie es später erneut.";
+"cupthread.error.profile_not_found" = "Dieses Benutzerprofil ist nicht mehr verfügbar.";
+"cupthread.error.comments_unavailable" = "Kommentare sind für diese Funktionsanfrage nicht verfügbar.";
+"cupthread.error.email_not_verified" = "Bitte verwenden Sie die E-Mail-Adresse Ihres angemeldeten Kontos, um sich zu abonnieren.";
+"cupthread.attachment.oversized" = "Anhang (%1$@) überschreitet die maximal erlaubte Grösse von %2$@.";
+"cupthread.attachment.unprocessable" = "Das ausgewählte Foto konnte für den Upload nicht verarbeitet werden.";
+"cupthread.attachment.unsupported_type" = "Dieser Bildtyp wird nicht unterstützt. Bitte hängen Sie ein PNG, JPEG, WebP oder GIF an.";
 /* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
 "cupthread.error.text_too_long" = "Ihr Text ist zu lang. Bitte kürzen Sie ihn und versuchen Sie es erneut.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";

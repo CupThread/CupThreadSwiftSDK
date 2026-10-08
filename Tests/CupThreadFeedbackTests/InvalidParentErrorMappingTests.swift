@@ -102,7 +102,8 @@ struct InvalidParentErrorMappingTests {
             message: "<html>raw server error</html>",
             requestId: "req-com-1"
         )
-        let expected = "The comment you are replying to is no longer available. (request id: req-com-1)"
+        let expected = CupThreadStrings.tr("cupthread.comments.invalid_parent")
+            + " (request id: req-com-1)"
         #expect(error.errorDescription == expected)
         #expect(!error.errorDescription!.contains("<html>"))
         #expect(!error.errorDescription!.contains("Parent comment is not available"))
@@ -112,7 +113,7 @@ struct InvalidParentErrorMappingTests {
     @Test func invalidParentDescriptionOmitsRequestIdWhenAbsent() throws {
         let error = FeedbackClientError.invalidParent(message: "gone", requestId: nil)
         let desc = try #require(error.errorDescription)
-        #expect(desc == "The comment you are replying to is no longer available.")
+        #expect(desc == CupThreadStrings.tr("cupthread.comments.invalid_parent"))
         #expect(!desc.contains("request id"))
         #expect(!desc.contains("cupthread.comments.invalid_parent"))
     }
