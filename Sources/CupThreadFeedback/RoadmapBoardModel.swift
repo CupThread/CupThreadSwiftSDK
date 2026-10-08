@@ -88,8 +88,12 @@ struct RoadmapBoardLoadState: Equatable, Sendable {
 
     /// Ends the load cycle for `generation`. A superseded load leaves the
     /// flags alone — the newer load (or denial) owns them.
-    mutating func finishLoading(generation: Int) {
-        guard loadGeneration == generation else { return }
+    ///
+    /// A load whose task was cancelled, or whose generation a newer load has
+    /// replaced, never reached a verdict: nothing is written, so the indicator
+    /// and skeleton ownership stay with the load that is actually current.
+    mutating func finishLoading(generation: Int, wasCancelled: Bool = false) {
+        guard loadGeneration == generation, !wasCancelled else { return }
         isLoading = false
         hasLoadedOnce = true
     }

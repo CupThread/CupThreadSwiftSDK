@@ -50,6 +50,7 @@ func collectAllRequests(
     var cursor: String?
     var pagesFetched = 0
     while pagesFetched < effectiveMaxPages {
+        try Task.checkCancellation()
         pagesFetched += 1
         let page = try await fetchPage(cursor)
         let freshItems = page.requests.filter { seenIDs.insert($0.id).inserted }
