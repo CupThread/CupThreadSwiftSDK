@@ -155,6 +155,166 @@ struct SearchRequestThrottleTests {
         #expect(await throttle.waitForAdmission(key: "k3"))
         #expect(clock.elapsedMilliseconds == 60_000)
     }
+
+    @Test func recordingCountsAgainstTheWindow() async {
+        let (throttle, clock) = makeThrottle(minimumInterval: .zero, windowCapacity: 28)
+        for index in 0..<26 {
+            #expect(await throttle.waitForAdmission(key: "typed-\(index)"))
+        }
+        await throttle.recordQueryFetch()
+        await throttle.recordQueryFetch()
+        #expect(clock.elapsedMilliseconds == 0)
+        #expect(await throttle.admittedCount == 28)
+
+        // 29th admission must wait until the oldest admission leaves the 60 s window
+        #expect(await throttle.waitForAdmission(key: "typed-26"))
+        #expect(clock.elapsedMilliseconds == 60_000)
+    }
+
+    @Test func recordingNeverDelaysTheRecorder() async {
+        let (throttle, clock) = makeThrottle(minimumInterval: .zero, windowCapacity: 3)
+        // Overfill capacity using recordQueryFetch
+        for index in 0..<10 {
+            await throttle.recordQueryFetch(key: "fetch-\(index)")
+        }
+        #expect(clock.elapsedMilliseconds == 0, "recording must never delay or suspend the caller")
+        #expect(await throttle.admittedCount == 10)
+    }
+
+    @Test func cooldownInterplayDoesNotClearOrExtendCooldown() async {
+        let (throttle, clock) = makeThrottle()
+        #expect(await throttle.waitForAdmission(key: "features|before|"))
+        await throttle.enterCooldown()
+
+        // Recording during cooldown does not clear cooldownEnd
+        await throttle.recordQueryFetch(key: "features|bypass|")
+        #expect(await throttle.waitForAdmission(key: "features|during|") == false)
+        #expect(clock.elapsedMilliseconds == 0)
+
+        // Advancing clock past 60 s expires cooldown normally (it was not extended)
+        clock.advance(by: .seconds(61))
+        #expect(await throttle.waitForAdmission(key: "features|during|"))
+    }
+
+    @Test func regressionGuardForInterleavedAdmissionsAndRecordedFetches() async {
+        let (throttle, clock) = makeThrottle(minimumInterval: .seconds(1.5), windowCapacity: 28)
+        var allEvents: [Int64] = []
+
+        // Interleave 20 typed admissions and 15 recorded fetches over time
+        for index in 0..<35 {
+            if index % 3 == 0 {
+                await throttle.recordQueryFetch()
+                allEvents.append(clock.elapsedMilliseconds)
+            } else {
+                let admitted = await throttle.waitForAdmission(key: "key-\(index)")
+                #expect(admitted)
+                allEvents.append(clock.elapsedMilliseconds)
+            }
+        }
+
+        // Assert that for every point in time from the typing perspective,
+        // admissions within any 60 s sliding window never exceed windowCapacity
+        for (index, start) in allEvents.enumerated() {
+            let windowCount = allEvents.filter { $0 >= start && $0 < start + 60_000 }.count
+            #expect(windowCount <= 28, "window starting at event \(index) had \(windowCount) admissions")
+        }
+    }
+
+    private static func makeMockItem(id: String, title: String) -> [String: Any] {
+        [
+            "id": id,
+            "appId": "app-1",
+            "title": title,
+            "description": "",
+            "status": "planned",
+            "voteCount": 0,
+            "hasVoted": false,
+            "commentCount": 0,
+            "createdAt": "2026-01-01T00:00:00.000Z"
+        ]
+    }
+
+    private static func makeThreePageMockHandler() -> @Sendable (URLRequest) throws -> (HTTPURLResponse, Data) {
+        { request in
+            if request.url?.path.contains("/columns/") == true {
+                let columnJSON: [String: Any] = [
+                    "id": "col-1",
+                    "appId": "app-1",
+                    "name": "Planned",
+                    "slug": "planned",
+                    "position": 0,
+                    "isVisible": true,
+                    "isSystem": true,
+                    "kind": "normal",
+                    "createdAt": "2026-01-01T00:00:00.000Z",
+                    "updatedAt": "2026-01-01T00:00:00.000Z"
+                ]
+                return (makeHTTPResponse(), try encodeJSON(["columns": [columnJSON]]))
+            }
+            let urlString = request.url?.absoluteString ?? ""
+            if !urlString.contains("cursor=") {
+                let items = [makeMockItem(id: "fr-1", title: "First")]
+                return (makeHTTPResponse(), try encodeJSON([
+                    "requests": items, "total": 3, "hasMore": true, "nextCursor": "page-2"
+                ]))
+            } else if urlString.contains("cursor=page-2") {
+                let items = [makeMockItem(id: "fr-2", title: "Second")]
+                return (makeHTTPResponse(), try encodeJSON([
+                    "requests": items, "total": 3, "hasMore": true, "nextCursor": "page-3"
+                ]))
+            } else {
+                let items = [makeMockItem(id: "fr-3", title: "Third")]
+                return (makeHTTPResponse(), try encodeJSON([
+                    "requests": items, "total": 3, "hasMore": false
+                ]))
+            }
+        }
+    }
+
+    @Test func roadmapPaginationRecordsOncePerEmittedQueryPage() async throws {
+        let (throttle, _) = makeThrottle()
+        let host = "test-roadmap-accounting.example.com"
+        MockURLProtocol.setHandler(forHost: host, Self.makeThreePageMockHandler())
+
+        let client = makeClient(
+            baseURL: URL(string: "https://\(host)")!,
+            searchThrottle: throttle
+        )
+
+        let result = try await loadRoadmapGroups(
+            client: client,
+            userToken: "tok",
+            query: "swift",
+            config: nil
+        )
+        #expect(result != nil)
+        #expect(await throttle.admittedCount == 3, "3 query pages fetched must record exactly 3 times in the throttle")
+    }
+
+    @Test func emptyQueryLoadsRecordNothingInThrottle() async throws {
+        let (throttle, _) = makeThrottle()
+        let host = "test-empty-query.example.com"
+        MockURLProtocol.setHandler(forHost: host) { request in
+            if request.url?.path.contains("/columns/") == true {
+                return (makeHTTPResponse(), try encodeJSON(["columns": []]))
+            }
+            return (makeHTTPResponse(), try encodeJSON(["requests": [], "total": 0, "hasMore": false]))
+        }
+
+        let client = makeClient(
+            baseURL: URL(string: "https://\(host)")!,
+            searchThrottle: throttle
+        )
+
+        let result = try await loadRoadmapGroups(
+            client: client,
+            userToken: "tok",
+            query: nil,
+            config: nil
+        )
+        #expect(result != nil)
+        #expect(await throttle.admittedCount == 0, "plain listing without query must not record in throttle")
+    }
 }
 
 @Suite("SearchReloadOutcome")

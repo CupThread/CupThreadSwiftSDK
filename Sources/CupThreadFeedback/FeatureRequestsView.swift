@@ -208,7 +208,8 @@ public struct FeatureRequestsView: View {
                 }
                 return
             }
-            await loadFeatureRequests()
+            // Admission already recorded this query's fetch slot (CONC-9).
+            await loadFeatureRequests(recordsThrottle: false)
         }
         .task(id: showSubmittedBanner) {
             guard showSubmittedBanner else { return }
@@ -357,9 +358,9 @@ public struct FeatureRequestsView: View {
 
 // MARK: - Actions
 
-extension FeatureRequestsView {
+private extension FeatureRequestsView {
     @MainActor
-    private func loadVersions() async {
+    func loadVersions() async {
         versionFilterState.loadStarted()
         do {
             versionFilterState.loadFinished(try await client.fetchVersions())
@@ -369,7 +370,7 @@ extension FeatureRequestsView {
     }
 
     @MainActor
-    private func loadFeatureRequests() async {
+    private func loadFeatureRequests(recordsThrottle: Bool = true) async {
         isAuthenticated = await client.resolveAuthenticatedAccess()
         let generationAtStart = loadState.startLoading()
         loadError = nil
@@ -382,6 +383,9 @@ extension FeatureRequestsView {
             // here would fabricate the empty state while the replacement load
             // is still in flight (issue #286).
             loadState.finishLoading(generation: generationAtStart, wasCancelled: Task.isCancelled)
+        }
+        if recordsThrottle && !trimmedSearchText.isEmpty {
+            await client.searchThrottle.recordQueryFetch(key: filterKey)
         }
         do {
             let result = try await client.fetchFeatureRequests(
@@ -420,6 +424,9 @@ extension FeatureRequestsView {
         isLoadingNextPage = true
         defer { isLoadingNextPage = false }
         do {
+            if !trimmedSearchText.isEmpty {
+                await client.searchThrottle.recordQueryFetch()
+            }
             let result = try await client.fetchFeatureRequests(
                 userToken: userToken,
                 versionId: selectedVersionID,
