@@ -123,42 +123,47 @@ func image(for url: URL) async throws -> PlatformImage {
             throw failure.error
         }
         if let existing = inFlight[url] {
-            return try await existing.value
+            return try await awaitJoinedTask(existing)
         }
 
         // Detached so decode happens off the MainActor. Deliberately not
         // cancelled when a subscriber goes away: the image lands in the cache
-        // either way, so the next appearance resolves instantly.
-        let task: Task<PlatformImage, Error> = Task.detached { [session, maxResponseBytes, maxDecodedPixelEdge] in
-            let (data, response) = try await session.data(from: url)
-            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                throw URLError(.badServerResponse)
+        // either way, so the next appearance resolves instantly (issue #174).
+        // Completion handling (cache storage and in-flight cleanup) is owned by
+        // the detached task so caller cancellation never drops cache warming or
+        // prematurely clears the in-flight coalescing entry.
+        let task: Task<PlatformImage, Error> = Task.detached { [session, maxResponseBytes, maxDecodedPixelEdge, weak self] in
+            do {
+                let (data, response) = try await session.data(from: url)
+                if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                    throw URLError(.badServerResponse)
+                }
+                // A server mistake must not turn an avatar fetch into a memory
+                // spike even before the pixel bound applies; the failure replays
+                // through the negative cache like any other.
+                guard data.count <= maxResponseBytes else {
+                    throw URLError(.cannotDecodeContentData)
+                }
+                let image = try Self.decodeBoundedImage(from: data, maxPixelEdge: maxDecodedPixelEdge)
+                await self?.recordCompletedImage(image, for: url)
+                return image
+            } catch {
+                await self?.recordCompletedFailure(error, for: url)
+                throw error
             }
-            // A server mistake must not turn an avatar fetch into a memory
-            // spike even before the pixel bound applies; the failure replays
-            // through the negative cache like any other.
-            guard data.count <= maxResponseBytes else {
-                throw URLError(.cannotDecodeContentData)
-            }
-            return try Self.decodeBoundedImage(from: data, maxPixelEdge: maxDecodedPixelEdge)
         }
         inFlight[url] = task
 
-        defer { inFlight.removeValue(forKey: url) }
-        do {
-            let image = try await task.value
-            cache.setObject(image, forKey: url as NSURL, cost: Self.cacheCost(of: image))
-            recentFailures.removeValue(forKey: url)
-            return image
-        } catch {
-            recordFailure(error, for: url)
-            throw error
-        }
+        return try await awaitJoinedTask(task)
     }
 
     /// Number of URLs currently remembered as recently failed; internal so
     /// tests can assert the ledger stays bounded.
     var recentFailureCount: Int { recentFailures.count }
+
+    /// Number of downloads currently in flight; internal so tests can verify
+    /// background task completion and table cleanup.
+    var inFlightCount: Int { inFlight.count }
 
     /// The cached image for `url`, if any; internal so tests can inspect the
     /// cache without going back through the network path.
@@ -267,6 +272,97 @@ func image(for url: URL) async throws -> PlatformImage {
         recentFailures[url] = FailedFetch(date: currentTime, error: error)
         let cutoff = currentTime.addingTimeInterval(-failureRetryInterval)
         recentFailures = recentFailures.filter { $0.value.date > cutoff }
+    }
+
+    /// Finalizes a successful download from inside the detached background task,
+    /// storing the decoded bitmap in cache and clearing the in-flight entry so
+    /// cache warming succeeds even if the caller task was cancelled (issue #174).
+    @MainActor
+    private func recordCompletedImage(_ image: PlatformImage, for url: URL) {
+        inFlight.removeValue(forKey: url)
+        cache.setObject(image, forKey: url as NSURL, cost: Self.cacheCost(of: image))
+        recentFailures.removeValue(forKey: url)
+    }
+
+    /// Finalizes a failed download from inside the detached background task,
+    /// cleaning up the in-flight entry and recording genuine failures in the
+    /// negative cache while ignoring task cancellations.
+    @MainActor
+    private func recordCompletedFailure(_ error: any Error, for url: URL) {
+        inFlight.removeValue(forKey: url)
+        if !error.isSdkCancellation {
+            recordFailure(error, for: url)
+        }
+    }
+
+    /// Thread-safe coordinator for awaiting a background task with caller
+    /// cancellation support, allowing the caller to disconnect immediately on
+    /// cancellation while the background task runs to completion (issue #174).
+    private final class TaskJoinState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<PlatformImage, Error>?
+        private var result: Result<PlatformImage, Error>?
+
+        func setContinuation(_ continuation: CheckedContinuation<PlatformImage, Error>) {
+            lock.lock()
+            if let result {
+                lock.unlock()
+                continuation.resume(with: result)
+                return
+            }
+            self.continuation = continuation
+            lock.unlock()
+        }
+
+        func resume(returning value: PlatformImage) {
+            lock.lock()
+            guard result == nil else {
+                lock.unlock()
+                return
+            }
+            result = .success(value)
+            let cont = continuation
+            continuation = nil
+            lock.unlock()
+            cont?.resume(returning: value)
+        }
+
+        func resume(throwing error: any Error) {
+            lock.lock()
+            guard result == nil else {
+                lock.unlock()
+                return
+            }
+            result = .failure(error)
+            let cont = continuation
+            continuation = nil
+            lock.unlock()
+            cont?.resume(throwing: error)
+        }
+    }
+
+    /// Awaits `task` while propagating caller cancellation immediately, so a
+    /// cancelled caller (e.g. view dismissal or scroll-away) disconnects with
+    /// `CancellationError` without waiting for the slow download, while the
+    /// detached background task continues running to warm the cache (issue #174).
+    private func awaitJoinedTask(_ task: Task<PlatformImage, Error>) async throws -> PlatformImage {
+        try Task.checkCancellation()
+        let state = TaskJoinState()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                state.setContinuation(continuation)
+                Task {
+                    do {
+                        let image = try await task.value
+                        state.resume(returning: image)
+                    } catch {
+                        state.resume(throwing: error)
+                    }
+                }
+            }
+        } onCancel: {
+            state.resume(throwing: CancellationError())
+        }
     }
 }
 
