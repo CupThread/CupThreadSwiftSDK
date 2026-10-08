@@ -1,177 +1,4 @@
 import Foundation
-import Security
-
-/// Persistent storage mechanism for user tokens.
-protocol TokenStorage: Sendable {
-    /// Loads the stored token, or returns `nil` if no token has been saved.
-    func load() -> String?
-
-    /// Persists the specified token.
-    ///
-    /// Best-effort: write failures may be ignored. Call paths that must not
-    /// lose an identity (first mint, one-shot legacy adoption) use
-    /// ``saveConfirmed(_:)`` instead.
-    func save(_ token: String)
-
-    /// Persists the token and reports whether the write was confirmed durable.
-    ///
-    /// The default delegates to ``save(_:)`` and reports success, which is
-    /// accurate for storages that cannot fail. Backing stores that can
-    /// observe write failures (the Keychain) override this. One-shot flags
-    /// must only be committed after this returns `true`.
-    @discardableResult
-    func saveConfirmed(_ token: String) -> Bool
-
-    /// Deletes any stored token.
-    func delete()
-}
-
-extension TokenStorage {
-    func saveConfirmed(_ token: String) -> Bool {
-        save(token)
-        return true
-    }
-}
-
-/// Token storage backed by `UserDefaults`.
-///
-/// Used for backwards-compatible test suites and suite isolation.
-final class UserDefaultsTokenStorage: TokenStorage, @unchecked Sendable {
-    private let userDefaults: UserDefaults
-    private let key: String
-
-    init(userDefaults: UserDefaults = .standard, key: String = UserTokenStore.defaultKey) {
-        self.userDefaults = userDefaults
-        self.key = key
-    }
-
-    func load() -> String? {
-        guard let value = userDefaults.string(forKey: key), !value.isEmpty else {
-            return nil
-        }
-        return value
-    }
-
-    func save(_ token: String) {
-        userDefaults.set(token, forKey: key)
-    }
-
-    func delete() {
-        userDefaults.removeObject(forKey: key)
-    }
-}
-
-/// Token storage backed by the Apple Keychain (`kSecClassGenericPassword`).
-///
-/// Scoped to this device (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`) and isolated from
-/// unencrypted device backups.
-final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
-    /// The default Keychain service identifier used by the SDK.
-    static let defaultService = "com.cupthread.userToken"
-
-    /// Test seam standing in for `SecItemAdd`.
-    typealias SecItemAddOperation = @Sendable (CFDictionary) -> OSStatus
-    /// Test seam standing in for `SecItemUpdate`.
-    typealias SecItemUpdateOperation = @Sendable (CFDictionary, CFDictionary) -> OSStatus
-
-    let service: String
-    let account: String
-    let accessibility: CFString
-    private let addItem: SecItemAddOperation
-    private let updateItem: SecItemUpdateOperation
-
-    init(
-        service: String = KeychainTokenStorage.defaultService,
-        account: String = UserTokenStore.defaultKey,
-        accessibility: CFString = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    ) {
-        self.service = service
-        self.account = account
-        self.accessibility = accessibility
-        self.addItem = { SecItemAdd($0, nil) }
-        self.updateItem = { SecItemUpdate($0, $1) }
-    }
-
-    /// Scripts `SecItemAdd`/`SecItemUpdate` outcomes so the write-status
-    /// handling is unit-testable without touching the real Keychain.
-    init(
-        service: String,
-        account: String,
-        accessibility: CFString,
-        addItem: @escaping SecItemAddOperation,
-        updateItem: @escaping SecItemUpdateOperation
-    ) {
-        self.service = service
-        self.account = account
-        self.accessibility = accessibility
-        self.addItem = addItem
-        self.updateItem = updateItem
-    }
-
-    func load() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let token = String(data: data, encoding: .utf8),
-              !token.isEmpty else {
-            return nil
-        }
-        return token
-    }
-
-    func save(_ token: String) {
-        _ = saveConfirmed(token)
-    }
-
-    /// Persists the token and reports whether the Keychain confirmed it.
-    ///
-    /// Returns `false` for every `SecItemAdd` status other than
-    /// `errSecSuccess` (including inaccessible-Keychain failures such as
-    /// `errSecInteractionNotAllowed`), and for the duplicate-item path when
-    /// `SecItemUpdate` does not return `errSecSuccess`.
-    @discardableResult
-    func saveConfirmed(_ token: String) -> Bool {
-        guard let data = token.data(using: .utf8) else { return false }
-
-        let baseQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-
-        var addAttributes = baseQuery
-        addAttributes[kSecValueData as String] = data
-        addAttributes[kSecAttrAccessible as String] = accessibility
-
-        let status = addItem(addAttributes as CFDictionary)
-        guard status == errSecDuplicateItem else {
-            return status == errSecSuccess
-        }
-        let updateAttributes: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: accessibility
-        ]
-        return updateItem(baseQuery as CFDictionary, updateAttributes as CFDictionary) == errSecSuccess
-    }
-
-    func delete() {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        SecItemDelete(query as CFDictionary)
-    }
-}
 
 /// Persists a stable anonymous user token across app launches.
 /// Used to track vote state and own pending requests without requiring authentication.
@@ -339,8 +166,15 @@ public final class UserTokenStore: @unchecked Sendable {
     /// storage cannot confirm a write (e.g. an inaccessible Keychain before first
     /// unlock), the returned token is ephemeral: nothing is persisted, the adoption
     /// flag is left untouched, and the next read retries so the identity never rotates.
+    ///
+    /// The same holds when the backing storage cannot be *read* (SEC-7): an
+    /// inaccessible read does not prove the store is empty, so no write is
+    /// attempted at all — a confirmed write could only land on top of the
+    /// stored item (`errSecDuplicateItem` → `SecItemUpdate`) and would
+    /// permanently replace the end user's identity with a fresh UUID. The
+    /// stored identity wins again as soon as the store becomes readable.
     public var token: String {
-        if let existing = storage.load(), !existing.isEmpty {
+        if let existing = readableStoredToken() {
             removeLegacyPlaintextIfOwned()
             return existing
         }
@@ -348,9 +182,17 @@ public final class UserTokenStore: @unchecked Sendable {
         Self.processLock.lock()
         defer { Self.processLock.unlock() }
 
-        if let existing = storage.load(), !existing.isEmpty {
+        let readAfterLock = storage.loadResult()
+        if case .found(let existing) = readAfterLock, !existing.isEmpty {
             removeLegacyPlaintextIfOwned()
             return existing
+        }
+
+        if case .inaccessible = readAfterLock {
+            // The item is present but unreadable (locked Keychain, transient
+            // status, undecodable contents). Never write behind its back;
+            // serve an ephemeral token and let the next read retry.
+            return UUID().uuidString
         }
 
         if let inherited = adoptLegacyIdentityOnce() {
@@ -367,6 +209,16 @@ public final class UserTokenStore: @unchecked Sendable {
         markAdoptionComplete()
         removeLegacyPlaintextIfOwned()
         return new
+    }
+
+    /// The stored token when the backing storage reports a readable,
+    /// non-empty one, or `nil` when the store answered "absent" or could not
+    /// be read (SEC-7).
+    private func readableStoredToken() -> String? {
+        if case .found(let existing) = storage.loadResult(), !existing.isEmpty {
+            return existing
+        }
+        return nil
     }
 
     /// Copies the legacy global identity into this store exactly once.
