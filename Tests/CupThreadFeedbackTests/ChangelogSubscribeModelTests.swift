@@ -401,7 +401,13 @@ struct ChangelogSubscribeModelTests {
         let suiteName = "test.subscribe_pending_reopen.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = ChangelogSubscriptionStore(appKey: "app_pending_reopen", userDefaults: defaults)
+        // A per-run app key keeps the real-Keychain write off a fixed account,
+        // so reruns cannot observe a previous run's leftover record.
+        let store = ChangelogSubscriptionStore(
+            appKey: "app_pending_reopen_\(UUID().uuidString)",
+            userDefaults: defaults
+        )
+        defer { store.clear() }
 
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (makeHTTPResponse(status: 201), try encodeJSON(["subscribed": true]))
