@@ -189,11 +189,13 @@ struct PhotoAttachmentPreparationTests {
         #expect(prepared.fileExtension == "jpg")
     }
 
-    @Test func prepareForUploadSurfacesOversizedWhenTranscodedBytesCannotFitLimit() async throws {
-        // BUG-6 companion: when even the post-transcode downscale cannot fit
-        // the bytes (tiny limit, quality floor reached), the pipeline fails
-        // with `oversized` measured against the transcoded size, not a
-        // silent pass-through.
+    @Test func prepareForUploadNeverReturnsOverLimitBytesAfterTranscodeInflation() async throws {
+        // BUG-6 companion, pinned as an invariant because the outcome depends
+        // on the host's encoders: with a limit just above the HEIC size, the
+        // post-transcode rescue either re-encodes within the limit (some
+        // hosts reach a fitting quality floor) or fails with `oversized`
+        // measured against the transcoded size — never a silent pass-through
+        // of over-limit bytes and never a stale size.
         guard let image = createPhotoLikeTestImage(width: 60, height: 40),
               let heic = createHEICFixture(cgImage: image),
               let transcoded = PhotoAttachmentHelper.jpegRepresentationResampled(from: heic) else {
@@ -205,8 +207,9 @@ struct PhotoAttachmentPreparationTests {
         }
 
         do {
-            _ = try await PhotoAttachmentHelper.prepareForUpload(heic, limit: limit, stripSensitiveMetadata: false)
-            Issue.record("Expected oversized failure when the transcoded bytes cannot fit")
+            let prepared = try await PhotoAttachmentHelper.prepareForUpload(heic, limit: limit, stripSensitiveMetadata: false)
+            #expect(prepared.data.count <= limit)
+            #expect(prepared.data.starts(with: [0xFF, 0xD8, 0xFF]))
         } catch let error as AttachmentValidationError {
             #expect(error == .oversized(size: transcoded.count, limit: limit))
         } catch {
