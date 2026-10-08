@@ -33,18 +33,8 @@ struct UserAttributesSigningTests {
         #expect(UserAttributesSigner.canonicalNumber(0.05) == "0.05")
     }
 
-    @Test func canonicalNumberAppliesRoundHalfEven() {
-        // 1.125 -> 2 is even -> rounds to 1.12
-        #expect(UserAttributesSigner.canonicalNumber(1.125) == "1.12")
-        // 1.135 -> 3 is odd -> rounds to 1.14
-        #expect(UserAttributesSigner.canonicalNumber(1.135) == "1.14")
-        // 1.145 -> 4 is even -> rounds to 1.14
-        #expect(UserAttributesSigner.canonicalNumber(1.145) == "1.14")
-        // 12.555 -> 5 is odd -> rounds to 12.56
-        #expect(UserAttributesSigner.canonicalNumber(12.555) == "12.56")
-        // 12.545 -> 4 is even -> rounds to 12.54
-        #expect(UserAttributesSigner.canonicalNumber(12.545) == "12.54")
-    }
+    // Rounding/canonicalization semantics for canonicalNumber are pinned in
+    // UserAttributesCanonicalNumberTests.swift against the server's toFixed(2).
 
     // MARK: - Canonical String Generation
 
