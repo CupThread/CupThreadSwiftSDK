@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "La sessione di caricamento è scaduta. Rimuovi il file, allegalo di nuovo e riprova.";
 "cupthread.error.upload_session_invalid" = "La sessione di caricamento non è valida o non è più attiva. Rimuovi il file, allegalo di nuovo e riprova.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Questa app ha raggiunto il limite di caricamenti di oggi. Riprova più tardi.";

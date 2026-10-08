@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "Die Upload-Sitzung ist abgelaufen. Entfernen Sie die Datei, hängen Sie sie erneut an und versuchen Sie es noch einmal.";
 "cupthread.error.upload_session_invalid" = "Die Upload-Sitzung ist ungültig oder nicht mehr aktiv. Entfernen Sie die Datei, hängen Sie sie erneut an und versuchen Sie es noch einmal.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Diese App hat ihr heutiges Upload-Limit erreicht. Bitte versuchen Sie es später noch einmal.";

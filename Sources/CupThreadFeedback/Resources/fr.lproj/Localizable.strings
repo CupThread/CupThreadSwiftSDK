@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "La session de téléversement a expiré. Supprimez le fichier, joignez-le à nouveau, puis réessayez.";
 "cupthread.error.upload_session_invalid" = "La session de téléversement est invalide ou n'est plus active. Supprimez le fichier, joignez-le à nouveau, puis réessayez.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Cette app a atteint sa limite de téléversement du jour. Réessayez plus tard.";

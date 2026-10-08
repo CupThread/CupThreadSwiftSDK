@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "上传会话已过期。请移除文件后重新附加，再试一次。";
 "cupthread.error.upload_session_invalid" = "上传会话无效或已失效。请移除文件后重新附加，再试一次。";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "此应用已达今日上传上限，请稍后再试。";

@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "Opplastingsøkten har utløpt. Fjern filen, legg den ved på nytt og prøv igjen.";
 "cupthread.error.upload_session_invalid" = "Opplastingsøkten er ugyldig eller ikke lenger aktiv. Fjern filen, legg den ved på nytt og prøv igjen.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Denne appen har nådd dagens opplastingsgrense. Prøv igjen senere.";

@@ -25,7 +25,9 @@ extension FeedbackClient {
     ///     `POST /api/v1/feedback`.
     /// - Returns: The session, including bearer token and pre-allocated slots.
     /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
-    ///   identity could be presented, ``FeedbackClientError/rateLimited`` on
+    ///   identity could be presented, ``FeedbackClientError/dailyStorageQuotaExceeded``
+    ///   when the workspace has exceeded its daily upload storage limit (HTTP 429
+    ///   `daily_storage_quota_exceeded`), ``FeedbackClientError/rateLimited`` on
     ///   HTTP 429, ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
     ///   disables feedback attachments (HTTP 401/403),
@@ -220,7 +222,9 @@ extension FeedbackClient {
     ///   when no identity could be presented,
     ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
     ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
-    ///   lifecycle failures, or
+    ///   lifecycle failures,
+    ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
+    ///   has exceeded its daily upload limit, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
     ///   other server failures.
     public func uploadAttachment(
@@ -270,7 +274,9 @@ extension FeedbackClient {
     ///   when no identity could be presented,
     ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
     ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
-    ///   lifecycle failures, or
+    ///   lifecycle failures,
+    ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
+    ///   has exceeded its daily upload limit, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
     ///   other server failures.
     public func uploadAttachment(

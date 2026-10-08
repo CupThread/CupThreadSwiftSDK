@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "Yükleme oturumunun süresi doldu. Lütfen dosyayı kaldırıp yeniden ekleyin ve tekrar deneyin.";
 "cupthread.error.upload_session_invalid" = "Yükleme oturumu geçersiz veya artık etkin değil. Lütfen dosyayı kaldırıp yeniden ekleyin ve tekrar deneyin.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Bu uygulama bugünkü yükleme sınırına ulaştı. Lütfen daha sonra tekrar deneyin.";

@@ -58,6 +58,11 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// accepted. Submissions succeed again once the workspace's subscription
     /// is reactivated.
     case subscriptionInactive(message: String?, requestId: String?)
+    /// The app's workspace reached its daily upload storage quota
+    /// (HTTP 429 `daily_storage_quota_exceeded`) and the upload session was
+    /// not created. Sessions succeed again once the quota resets or the
+    /// workspace's storage limit is upgraded in the developer console.
+    case dailyStorageQuotaExceeded(message: String?, requestId: String?)
     /// The server's Cloudflare Turnstile human-verification gate rejected the
     /// submission (HTTP 403) and no fresh token could be presented. Create
     /// the client with a `turnstileTokenProvider` — or arrange a server-side
@@ -143,8 +148,9 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
              .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
-             .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified,
-             .invalidParent, .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
+             .subscriptionInactive, .dailyStorageQuotaExceeded, .turnstileRequired,
+             .commentsUnavailable, .emailNotVerified, .invalidParent,
+             .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
              .alreadyFinalized, .textTooLong:
             return nil
@@ -208,6 +214,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .submissionQuotaExceeded(_, let requestId):
             return requestId
         case .subscriptionInactive(_, let requestId):
+            return requestId
+        case .dailyStorageQuotaExceeded(_, let requestId):
             return requestId
         case .turnstileRequired(_, let requestId):
             return requestId
@@ -277,6 +285,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return CupThreadStrings.tr("cupthread.error.quota_exceeded") + Self.requestIdSuffix(requestId)
         case .subscriptionInactive(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.subscription_inactive") + Self.requestIdSuffix(requestId)
+        case .dailyStorageQuotaExceeded(_, let requestId):
+            return CupThreadStrings.tr("cupthread.error.daily_storage_quota_exceeded") + Self.requestIdSuffix(requestId)
         case .userProfileNotFound:
             return CupThreadStrings.tr("cupthread.error.profile_not_found")
         case .commentsUnavailable(_, let requestId):
@@ -350,6 +360,11 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``subscriptionInactive(message:requestId:)`` with no request id.
     static func subscriptionInactive(message: String? = nil) -> FeedbackClientError {
         .subscriptionInactive(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``dailyStorageQuotaExceeded(message:requestId:)`` with no request id.
+    static func dailyStorageQuotaExceeded(message: String? = nil) -> FeedbackClientError {
+        .dailyStorageQuotaExceeded(message: message, requestId: nil)
     }
 
     /// Convenience constructor for ``forbidden(message:requestId:)`` with no request id.

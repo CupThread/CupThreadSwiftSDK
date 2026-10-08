@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "업로드 세션이 만료되었습니다. 파일을 제거한 후 다시 첨부하여 다시 시도해 주세요.";
 "cupthread.error.upload_session_invalid" = "업로드 세션이 유효하지 않거나 더 이상 활성 상태가 아닙니다. 파일을 제거한 후 다시 첨부하여 다시 시도해 주세요.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "이 앱은 오늘의 업로드 한도에 도달했습니다. 나중에 다시 시도해 주세요.";

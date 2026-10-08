@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "Phiên tải lên đã hết hạn. Hãy gỡ tệp ra, đính kèm lại rồi thử lại.";
 "cupthread.error.upload_session_invalid" = "Phiên tải lên không hợp lệ hoặc không còn hoạt động. Hãy gỡ tệp ra, đính kèm lại rồi thử lại.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Ứng dụng đã đạt giới hạn tải lên trong hôm nay. Vui lòng thử lại sau.";

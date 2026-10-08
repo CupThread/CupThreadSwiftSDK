@@ -228,3 +228,6 @@
 /* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
 "cupthread.error.upload_session_expired" = "A sessão de envio expirou. Remova o arquivo, anexe-o novamente e tente outra vez.";
 "cupthread.error.upload_session_invalid" = "A sessão de envio é inválida ou não está mais ativa. Remova o arquivo, anexe-o novamente e tente outra vez.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Este app atingiu o limite de envios de hoje. Tente novamente mais tarde.";
