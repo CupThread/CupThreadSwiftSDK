@@ -177,6 +177,10 @@ extension FeedbackClient {
             return badRequestTypedError(code: code, envelopeMessage: envelopeMessage, requestId: requestId)
         case (403, "email_not_verified"):
             return .emailNotVerified(message: envelopeMessage, requestId: requestId)
+        case (409, "already_finalized"):
+            // A concurrent or retried submission already finalized the referenced
+            // uploadId (#257, SaaS #579). No duplicate submission was created.
+            return .alreadyFinalized(message: envelopeMessage, requestId: requestId)
         default:
             return signatureTypedError(
                 statusCode: statusCode,

@@ -104,6 +104,13 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// device clock skew. Ensure the device clock is set correctly and let the
     /// SDK retry with a fresh signature.
     case staleSignature(message: String?, requestId: String?)
+    /// A feedback submission referenced an attachment upload ID that was already
+    /// finalized into another submission (HTTP 409 `already_finalized`).
+    /// The losing request creates no duplicate submission and consumes no monthly quota.
+    /// Callers must not retry with the same upload IDs; remove consumed attachments
+    /// or treat the submission as already completed. `message` carries the raw server
+    /// text for diagnostics; it is never shown to end users.
+    case alreadyFinalized(message: String?, requestId: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -129,7 +136,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
              .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified,
              .invalidParent, .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
-             .invalidSignature, .staleSignature, .textTooLong:
+             .invalidSignature, .staleSignature, .alreadyFinalized, .textTooLong:
             return nil
         }
     }
@@ -210,6 +217,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .staleSignature(_, let requestId):
             return requestId
+        case .alreadyFinalized(_, let requestId):
+            return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound, .textTooLong:
@@ -272,6 +281,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return CupThreadStrings.tr("cupthread.error.invalid_signature") + Self.requestIdSuffix(requestId)
         case .staleSignature(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.stale_signature") + Self.requestIdSuffix(requestId)
+        case .alreadyFinalized(_, let requestId):
+            // Raw server body stays off the user-facing copy (#257); callers
+            // can read the associated `message` programmatically.
+            return CupThreadStrings.tr("cupthread.error.already_finalized") + Self.requestIdSuffix(requestId)
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
@@ -364,5 +377,10 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``staleSignature(message:requestId:)`` with no request id.
     static func staleSignature(message: String? = nil) -> FeedbackClientError {
         .staleSignature(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``alreadyFinalized(message:requestId:)`` with no request id.
+    static func alreadyFinalized(message: String? = nil) -> FeedbackClientError {
+        .alreadyFinalized(message: message, requestId: nil)
     }
 }

@@ -200,6 +200,8 @@
 "cupthread.error.invalid_signature" = "支付信息未更新：报告的签名校验未通过，请检查应用的 SDK 签名密钥。";
 "cupthread.error.stale_signature" = "支付信息未更新：报告的签名已过期，请检查设备时间后重试。";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "此反馈或附件已被提交。";
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "反馈服务器返回了无效的响应。";

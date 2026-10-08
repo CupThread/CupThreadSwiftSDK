@@ -188,6 +188,7 @@ struct FriendlyErrorTests {
         #expect(FeedbackClientError.commentsUnavailable(message: "details", requestId: "r").responseBody == nil)
         #expect(FeedbackClientError.emailNotVerified(message: "details", requestId: "r").responseBody == nil)
         #expect(FeedbackClientError.invalidParent(message: "details", requestId: "r").responseBody == nil)
+        #expect(FeedbackClientError.alreadyFinalized(message: "details", requestId: "r").responseBody == nil)
     }
 
     @Test func commentsUnavailableAndEmailNotVerifiedRenderSafeCopy() {

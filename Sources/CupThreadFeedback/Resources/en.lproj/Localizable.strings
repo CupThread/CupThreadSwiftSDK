@@ -199,6 +199,8 @@
 "cupthread.error.signing_secret_not_configured" = "Payment details can't be reported because this app has no SDK signing secret configured.";
 "cupthread.error.invalid_signature" = "Payment details weren't updated: the report's signature didn't verify. Check the app's SDK signing secret.";
 "cupthread.error.stale_signature" = "Payment details weren't updated: the report's signature expired. Check the device clock and try again.";
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "This feedback or attachment has already been submitted.";
 
 /* Issue #266: typed error & attachment-validation copy — every errorDescription resolves through the catalog */
 "cupthread.error.invalid_response" = "The feedback server returned an invalid response.";

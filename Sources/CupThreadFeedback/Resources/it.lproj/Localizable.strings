@@ -200,6 +200,8 @@
 "cupthread.error.invalid_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report non è stata verificata. Controlla il segreto di firma SDK dell'app.";
 "cupthread.error.stale_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report è scaduta. Controlla l'orologio del dispositivo e riprova.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Questo feedback o allegato è già stato inviato.";
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Il server di feedback ha restituito una risposta non valida.";

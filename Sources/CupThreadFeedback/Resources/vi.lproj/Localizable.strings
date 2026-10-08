@@ -200,6 +200,8 @@
 "cupthread.error.invalid_signature" = "Thông tin thanh toán chưa được cập nhật: chữ ký của báo cáo không xác minh được. Hãy kiểm tra khóa ký SDK của ứng dụng.";
 "cupthread.error.stale_signature" = "Thông tin thanh toán chưa được cập nhật: chữ ký của báo cáo đã hết hạn. Hãy kiểm tra đồng hồ thiết bị và thử lại.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Phản hồi hoặc tệp đính kèm này đã được gửi.";
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Máy chủ phản hồi đã trả về một phản hồi không hợp lệ.";

@@ -200,6 +200,8 @@
 "cupthread.error.invalid_signature" = "Os dados de pagamento não foram atualizados: a assinatura do relatório não pôde ser verificada. Confira o segredo de assinatura do SDK do app.";
 "cupthread.error.stale_signature" = "Os dados de pagamento não foram atualizados: a assinatura do relatório expirou. Verifique o relógio do dispositivo e tente novamente.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Este feedback ou anexo já foi enviado.";
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "O servidor de feedback retornou uma resposta inválida.";

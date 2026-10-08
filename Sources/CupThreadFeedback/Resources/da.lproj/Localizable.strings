@@ -200,6 +200,8 @@
 "cupthread.error.invalid_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur kunne ikke verificeres. Tjek appens SDK-signeringshemmelighed.";
 "cupthread.error.stale_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur er udløbet. Tjek enhedens ur, og prøv igen.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Denne feedback eller vedhæftede fil er allerede indsendt.";
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Feedbackserveren returnerede et ugyldigt svar.";

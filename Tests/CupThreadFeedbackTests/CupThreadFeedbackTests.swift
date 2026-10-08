@@ -473,6 +473,9 @@ struct FeedbackClientErrorTests {
         let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: reqId)
         #expect(invalidParent.requestId == reqId)
 
+        let alreadyFinalized = FeedbackClientError.alreadyFinalized(message: "fin", requestId: reqId)
+        #expect(alreadyFinalized.requestId == reqId)
+
         let unexpected = FeedbackClientError.unexpectedStatus(code: 500, message: "err", requestId: reqId)
         #expect(unexpected.requestId == reqId)
 
@@ -518,6 +521,10 @@ struct FeedbackClientErrorTests {
         let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: reqId)
         let invalidParentDesc = try #require(invalidParent.errorDescription)
         #expect(invalidParentDesc.contains("(request id: \(reqId))"))
+
+        let alreadyFinalized = FeedbackClientError.alreadyFinalized(message: "fin", requestId: reqId)
+        let alreadyFinalizedDesc = try #require(alreadyFinalized.errorDescription)
+        #expect(alreadyFinalizedDesc.contains("(request id: \(reqId))"))
     }
 
     @Test func typedErrorsDescriptionOmitsRequestIdWhenAbsent() throws {
@@ -548,6 +555,10 @@ struct FeedbackClientErrorTests {
         let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: nil)
         let invalidParentDesc = try #require(invalidParent.errorDescription)
         #expect(!invalidParentDesc.contains("request id"))
+
+        let alreadyFinalized = FeedbackClientError.alreadyFinalized(message: "fin", requestId: nil)
+        let alreadyFinalizedDesc = try #require(alreadyFinalized.errorDescription)
+        #expect(!alreadyFinalizedDesc.contains("request id"))
     }
 
     @Test func typedErrorsConvenienceConstructorsDefaultToNilRequestId() {
@@ -564,6 +575,8 @@ struct FeedbackClientErrorTests {
         #expect(FeedbackClientError.uploaderMismatch(message: "test").requestId == nil)
         #expect(FeedbackClientError.invalidParent().requestId == nil)
         #expect(FeedbackClientError.invalidParent(message: "test").requestId == nil)
+        #expect(FeedbackClientError.alreadyFinalized().requestId == nil)
+        #expect(FeedbackClientError.alreadyFinalized(message: "test").requestId == nil)
     }
 
     @Test func typedErrorsEquatableConsidersRequestId() {

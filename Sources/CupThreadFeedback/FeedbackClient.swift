@@ -313,6 +313,10 @@ public struct FeedbackClient: Sendable {
     ///   server's Turnstile gate rejects the submission and no fresh token could
     ///   be presented (HTTP 403),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/alreadyFinalized(message:requestId:)`` when an attachment
+    ///   referenced in the submission was already finalized into another submission
+    ///   (HTTP 409 `already_finalized`); the losing request creates no duplicate submission
+    ///   and consumes no quota — callers must not retry with the same upload IDs (#256, #257, CupThread/SaaS#579),
     ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
     ///   feedback is disabled or the platform is outside the console's

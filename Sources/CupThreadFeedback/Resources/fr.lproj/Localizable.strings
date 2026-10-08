@@ -200,6 +200,8 @@
 "cupthread.error.invalid_signature" = "Les informations de paiement n’ont pas été mises à jour : la signature du rapport n’a pas pu être vérifiée. Vérifiez le secret de signature SDK de l’app.";
 "cupthread.error.stale_signature" = "Les informations de paiement n’ont pas été mises à jour : la signature du rapport a expiré. Vérifiez l’horloge de l’appareil et réessayez.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Ce retour ou cette pièce jointe a déjà été envoyé.";
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Le serveur de retour a renvoyé une réponse invalide.";
