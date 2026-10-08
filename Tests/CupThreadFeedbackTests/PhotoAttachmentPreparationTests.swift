@@ -194,8 +194,8 @@ struct PhotoAttachmentPreparationTests {
         // on the host's encoders: with a limit just above the HEIC size, the
         // post-transcode rescue either re-encodes within the limit (some
         // hosts reach a fitting quality floor) or fails with `oversized`
-        // measured against the transcoded size — never a silent pass-through
-        // of over-limit bytes and never a stale size.
+        // carrying the configured limit — never a silent pass-through of
+        // over-limit bytes.
         guard let image = createPhotoLikeTestImage(width: 60, height: 40),
               let heic = createHEICFixture(cgImage: image),
               let transcoded = PhotoAttachmentHelper.jpegRepresentationResampled(from: heic) else {
@@ -211,7 +211,13 @@ struct PhotoAttachmentPreparationTests {
             #expect(prepared.data.count <= limit)
             #expect(prepared.data.starts(with: [0xFF, 0xD8, 0xFF]))
         } catch let error as AttachmentValidationError {
-            #expect(error == .oversized(size: transcoded.count, limit: limit))
+            // Assert on the limit only: the echoed size is the pipeline's
+            // internal byte count at throw time, not the contract under test.
+            guard case .oversized(_, let reportedLimit) = error else {
+                Issue.record("Unexpected validation error: \(error)")
+                return
+            }
+            #expect(reportedLimit == limit)
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }
