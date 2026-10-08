@@ -141,7 +141,10 @@ extension FeedbackClient {
     ///   defaults to ``FeedbackClient/defaultMaxPages`` (100).
     /// - Returns: All published entries, newest first.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   changelog access is disabled, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   changelog access is disabled, ``FeedbackClientError/rateLimited``
+    ///   when the shared per-client read budget is exhausted (HTTP 429 —
+    ///   retryable after a short back-off),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   for other HTTP failures, or ``FeedbackClientError/invalidResponse``.
     public func fetchChangelog(maxPages: Int = Self.defaultMaxPages) async throws -> [ChangelogEntry] {
         let effectiveMaxPages = max(1, maxPages)
@@ -189,7 +192,10 @@ extension FeedbackClient {
     /// - Returns: The page's entries plus `hasMore`/`nextCursor` paging
     ///   metadata.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   changelog access is disabled, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   changelog access is disabled, ``FeedbackClientError/rateLimited``
+    ///   when the shared per-client read budget is exhausted (HTTP 429 —
+    ///   retryable after a short back-off),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   for other HTTP failures (including 400 on a malformed cursor), or
     ///   ``FeedbackClientError/invalidResponse``.
     public func fetchChangelog(

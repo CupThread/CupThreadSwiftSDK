@@ -53,6 +53,8 @@ extension FeedbackClient {
     ///   access is disabled for the app (HTTP 401 `authentication_required`),
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
     ///   comments are not available or disabled (HTTP 404),
+    ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
+    ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor) or
     ///   ``FeedbackClientError/invalidResponse``.
@@ -109,6 +111,8 @@ extension FeedbackClient {
     ///   access is disabled for the app (HTTP 401 `authentication_required`),
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
     ///   comments are not available or disabled (HTTP 404),
+    ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
+    ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor) or
     ///   ``FeedbackClientError/invalidResponse``.
