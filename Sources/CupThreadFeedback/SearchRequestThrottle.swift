@@ -123,6 +123,13 @@ actor SearchRequestThrottle {
         lastAdmittedKey = nil
     }
 
+    /// Clears the recorded last admitted key, allowing the subsequent query to be
+    /// admitted even if it matches the previously searched key (e.g. after the user
+    /// cleared the search field or refreshed the listing).
+    func resetLastAdmittedKey() {
+        lastAdmittedKey = nil
+    }
+
     private func sleepUntilAllowingCancel(_ deadline: ContinuousClock.Instant) async -> Bool {
         do {
             try await sleepUntil(deadline)

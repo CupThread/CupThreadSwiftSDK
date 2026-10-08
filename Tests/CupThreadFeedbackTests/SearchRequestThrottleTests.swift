@@ -156,6 +156,54 @@ struct SearchRequestThrottleTests {
         #expect(clock.elapsedMilliseconds == 60_000)
     }
 
+    @Test func clearingQueryResetsDuplicateGateForSubsequentSearches() async {
+        let (throttle, clock) = makeThrottle()
+
+        // Initial search
+        #expect(await throttle.waitForAdmission(key: "features|swift|"))
+
+        // Immediate duplicate is correctly suppressed
+        #expect(await throttle.waitForAdmission(key: "features|swift|") == false)
+
+        // User clears search bar and loads plain listing
+        await throttle.resetLastAdmittedKey()
+
+        // Advance virtual clock past minimum interval
+        clock.advance(by: .seconds(2))
+
+        // User re-enters "swift" -> must be admitted
+        #expect(await throttle.waitForAdmission(key: "features|swift|"))
+    }
+
+    @Test func resetLastAdmittedKeyStillRespectsMinimumInterval() async {
+        let (throttle, clock) = makeThrottle()
+
+        #expect(await throttle.waitForAdmission(key: "features|swift|"))
+
+        // Reset the duplicate gate immediately
+        await throttle.resetLastAdmittedKey()
+
+        // Admitting the same key again immediately must wait for minimumInterval (1.5 s)
+        let admitted = await throttle.waitForAdmission(key: "features|swift|")
+        #expect(admitted)
+        #expect(clock.elapsedMilliseconds == 1500)
+    }
+
+    @Test func resetLastAdmittedKeyDuringCooldownDoesNotBypassCooldown() async {
+        let (throttle, clock) = makeThrottle()
+
+        #expect(await throttle.waitForAdmission(key: "features|before|"))
+        await throttle.enterCooldown()
+
+        // Resetting last admitted key during an active cooldown must not bypass the 429 block
+        await throttle.resetLastAdmittedKey()
+        #expect(await throttle.waitForAdmission(key: "features|before|") == false)
+
+        // After cooldown expires, the query admits
+        clock.advance(by: .seconds(61))
+        #expect(await throttle.waitForAdmission(key: "features|before|"))
+    }
+
     @Test func recordingCountsAgainstTheWindow() async {
         let (throttle, clock) = makeThrottle(minimumInterval: .zero, windowCapacity: 28)
         for index in 0..<26 {
