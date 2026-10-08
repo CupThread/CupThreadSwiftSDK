@@ -195,3 +195,40 @@ struct SearchReloadOutcomeTests {
         #expect(SearchReloadOutcome.outcome(for: error, hasExistingContent: false) == .fullScreenError(message))
     }
 }
+
+@Suite("SearchAdmissionOutcome")
+struct SearchAdmissionOutcomeTests {
+    @Test func deniedAdmissionWithExistingContentPresentsInlineNotice() {
+        let expected = CupThreadStrings.tr("cupthread.search.rate_limited")
+        #expect(!expected.isEmpty)
+        #expect(SearchAdmissionOutcome.outcome(isCancelled: false, hasExistingContent: true) == .inlineNotice(expected))
+        #expect(
+            SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: false, hasExistingContent: true)
+                == .inlineNotice(expected)
+        )
+    }
+
+    @Test func deniedAdmissionWithoutExistingContentPresentsFullScreenError() {
+        let expected = CupThreadStrings.tr("cupthread.search.rate_limited")
+        #expect(!expected.isEmpty)
+        #expect(SearchAdmissionOutcome.outcome(isCancelled: false, hasExistingContent: false) == .fullScreenError(expected))
+        #expect(
+            SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: false, hasExistingContent: false)
+                == .fullScreenError(expected)
+        )
+    }
+
+    @Test func cancellationIsSuppressedRegardlessOfExistingContent() {
+        #expect(SearchAdmissionOutcome.outcome(isCancelled: true, hasExistingContent: true) == nil)
+        #expect(SearchAdmissionOutcome.outcome(isCancelled: true, hasExistingContent: false) == nil)
+        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: true, hasExistingContent: true) == nil)
+        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: true, hasExistingContent: false) == nil)
+    }
+
+    @Test func admittedFetchProducesNoDenialOutcome() {
+        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: true, isCancelled: false, hasExistingContent: true) == nil)
+        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: true, isCancelled: false, hasExistingContent: false) == nil)
+        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: true, isCancelled: true, hasExistingContent: true) == nil)
+        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: true, isCancelled: true, hasExistingContent: false) == nil)
+    }
+}

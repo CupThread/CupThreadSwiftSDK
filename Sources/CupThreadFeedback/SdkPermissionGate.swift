@@ -142,7 +142,7 @@ func loadRoadmapGroups(
         return nil
     }
     async let columns = client.fetchColumns()
-    let requests = try await collectAllRequests { cursor in
+    let requests = try await collectAllRequests(appKey: client.configuration.appKey) { cursor in
         try await client.fetchFeatureRequests(
             userToken: userToken,
             limit: 200,

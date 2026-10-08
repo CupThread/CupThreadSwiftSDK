@@ -193,3 +193,8 @@
 "cupthread.error.invalid_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts konnte nicht verifiziert werden. Prüfen Sie das SDK-Signatur-Geheimnis der App.";
 "cupthread.error.stale_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts ist abgelaufen. Prüfen Sie die Geräteuhr und versuchen Sie es erneut.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Ihr Text ist zu lang. Bitte kürzen Sie ihn und versuchen Sie es erneut.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld von %2$lld Zeichen";

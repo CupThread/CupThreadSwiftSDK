@@ -223,9 +223,13 @@ public enum PhotoAttachmentHelper {
     /// Re-encodes image data to strip sensitive metadata (EXIF, GPS location, device serials, TIFF, IPTC),
     /// while preserving image pixels, visual orientation, and container format compatibility.
     ///
-    /// Multi-frame animated images (such as animated GIF or animated WebP) carry animation frame timing
-    /// and sequences rather than photographic metadata (EXIF/GPS/IPTC). Their frames and timing properties
-    /// are preserved intact rather than being flattened to a single static frame.
+    /// Multi-frame animated images (such as animated GIF or animated WebP) are never flattened:
+    /// their container-level metadata (WebP `EXIF`/`XMP ` RIFF chunks, GIF EXIF/XMP application
+    /// extensions and comment blocks — invisible to ImageIO's property API) is removed at the
+    /// byte level instead, so every animation frame and its timing survives intact. Containers
+    /// that carry no such metadata pass through byte-identical; containers whose structure
+    /// cannot be safely parsed fall back to a single-frame re-encode, so unverified bytes are
+    /// never returned (SEC-10).
     ///
     /// - Parameter data: The raw image data.
     /// - Returns: Sanitized image bytes, or `nil` if the data is corrupt or cannot be decoded.
@@ -237,14 +241,15 @@ public enum PhotoAttachmentHelper {
         }
 
         // Multi-frame animated inputs (e.g. animated GIF, animated WebP):
-        // ImageIO exposes no EXIF/GPS/IPTC dictionaries on GIF or animated WebP frames
-        // (properties carry only palette, loop count, and frame delay timing data).
-        // Returning the original data preserves animation frames and timing intact instead of
-        // silently flattening the image to a single static frame (#85).
-        // Non-animated multi-frame containers (such as Apple HDR gain-map JPEGs, MPF JPEGs,
-        // or multi-frame HEIC/TIFF) must not bypass stripping (#205).
-        if CGImageSourceGetCount(source) > 1 && isAnimatedImageContainer(source: source, data: data) {
-            return data
+        // ImageIO exposes no EXIF/GPS/IPTC dictionaries on their frames, but
+        // the container bytes can still carry EXIF/XMP chunks the property
+        // API never surfaces (SEC-10). Strip those chunks in place so frames
+        // and timing stay intact (#85); nil means the container could not be
+        // sanitized safely and falls through to the re-encode below.
+        let frameCount = CGImageSourceGetCount(source)
+        if frameCount > 1 && isAnimatedImageContainer(source: source, data: data),
+           let sanitized = sanitizedAnimatedContainerBytes(for: data, sourceFrameCount: frameCount) {
+            return sanitized
         }
 
         let thumbnailOptions: [CFString: Any] = [
@@ -475,14 +480,17 @@ public struct FeedbackAttachmentStateMachine: Sendable {
 
     /// Validates whether the feedback form can currently be submitted.
     ///
-    /// Submission is rejected while an attachment is uploading, or when title/description length requirements are unmet.
+    /// Submission is rejected while an attachment is uploading, when
+    /// title/description length requirements are unmet, or when any free-text
+    /// field is over its ``IntakeTextLimits`` cap (BUG-18).
     /// - Parameter draft: The draft to inspect.
     /// - Returns: `true` if the form is ready to submit.
     public func canSubmit(draft: FeedbackDraft) -> Bool {
         guard !isUploading else { return false }
         let titleTrimmed = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let descriptionTrimmed = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
-        return titleTrimmed.count >= 3 && descriptionTrimmed.count >= 5
+        guard titleTrimmed.count >= 3, descriptionTrimmed.count >= 5 else { return false }
+        return IntakeTextLimits.overLimitField(in: draft) == nil
     }
 
     /// Removes an existing attachment from the draft by identifier.

@@ -107,6 +107,69 @@ struct LenientDecodingTests {
         #expect(dict["allowedPlatforms"] as? [String] == ["ios", "visionos"])
     }
 
+    // MARK: - PublicAppConfig.allowedEmbedOrigins
+
+    @Test func fetchAppConfigDecodesAllowedEmbedOriginsWhenPresent() async throws {
+        // #253: the config may carry the portal frame-ancestors allowlist when
+        // the tenant configured at least one embed origin.
+        var payload = makeConfigJSON()
+        payload["allowedEmbedOrigins"] = ["https://docs.example.com", "https://app.partner.com:8443"]
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(), try encodeJSON(payload))
+        }
+
+        let config = try await Self.makeAPIClient().fetchAppConfig()
+
+        #expect(config.allowedEmbedOrigins == ["https://docs.example.com", "https://app.partner.com:8443"])
+    }
+
+    @Test func fetchAppConfigLeavesAllowedEmbedOriginsNilWhenAbsent() async throws {
+        // #253: the field appears only when configured; absence means portal
+        // embedding is disabled everywhere (the server never returns an empty
+        // array), so it must decode as nil rather than an empty list.
+        var payload = makeConfigJSON()
+        payload.removeValue(forKey: "allowedEmbedOrigins")
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(), try encodeJSON(payload))
+        }
+
+        let config = try await Self.makeAPIClient().fetchAppConfig()
+
+        #expect(config.allowedEmbedOrigins == nil)
+    }
+
+    @Test func publicAppConfigRoundTripsAllowedEmbedOrigins() throws {
+        let json = try encodeJSON([
+            "appId": "app-1",
+            "appKey": "app_testkey123456",
+            "slug": "demo-app",
+            "name": "Demo App",
+            "allowedEmbedOrigins": ["https://docs.example.com"]
+        ])
+        let decoded = try JSONDecoder().decode(PublicAppConfig.self, from: json)
+        #expect(decoded.allowedEmbedOrigins == ["https://docs.example.com"])
+
+        let dict = try #require(parseJSONDict(try JSONEncoder().encode(decoded)))
+        #expect(dict["allowedEmbedOrigins"] as? [String] == ["https://docs.example.com"])
+    }
+
+    @Test func publicAppConfigOmitsAllowedEmbedOriginsKeyWhenNil() throws {
+        // #253: nil must encode as key absence (matching the server, which
+        // never emits the field when unconfigured) and a legacy cache payload
+        // written without the key keeps decoding.
+        let json = try encodeJSON([
+            "appId": "app-1",
+            "appKey": "app_testkey123456",
+            "slug": "demo-app",
+            "name": "Demo App"
+        ])
+        let decoded = try JSONDecoder().decode(PublicAppConfig.self, from: json)
+        #expect(decoded.allowedEmbedOrigins == nil)
+
+        let dict = try #require(parseJSONDict(try JSONEncoder().encode(decoded)))
+        #expect(dict["allowedEmbedOrigins"] == nil)
+    }
+
     // MARK: - BoardColumn.Kind fallback
 
     @Test func fetchColumnsFallsBackToNormalKindForUnknownColumnKind() async throws {

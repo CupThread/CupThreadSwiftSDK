@@ -7,11 +7,11 @@ extension FeedbackClient {
     /// created with a `turnstileTokenProvider`.
     var canPresentTurnstileToken: Bool { turnstileTokenProvider != nil }
 
-    /// Resolves a Turnstile token from the configured provider, trimming
-    /// empty results to `nil`.
-    func resolvedTurnstileToken() async -> String? {
+    /// Resolves a Turnstile token from the configured provider for the given
+    /// widget binding, trimming empty results to `nil`.
+    func resolvedTurnstileToken(for challenge: TurnstileChallenge) async -> String? {
         guard let provider = turnstileTokenProvider else { return nil }
-        return (await provider())?.nilIfEmpty
+        return (await provider(challenge))?.nilIfEmpty
     }
 
     /// Sends a Turnstile-gated intake request, retrying exactly once with a
@@ -20,6 +20,9 @@ extension FeedbackClient {
     ///
     /// - Parameters:
     ///   - accepted: Status codes that mean success for the endpoint.
+    ///   - challenge: The widget binding the endpoint validates — consulted
+    ///     tokens are minted (or rendered) for this exact `(action, cdata)`
+    ///     pair, and the retry asks for the same binding again.
     ///   - makeRequest: Builds the request for a `(turnstileToken, requestID)`
     ///     pair — called once per attempt so the retry re-encodes the payload
     ///     with the fresh token and a new correlation id.
@@ -30,9 +33,10 @@ extension FeedbackClient {
     ///   the endpoint's usual errors.
     func sendWithTurnstileRetry(
         accepted: Set<Int>,
+        challenge: TurnstileChallenge,
         makeRequest: (String?, String) async throws -> URLRequest
     ) async throws -> Data {
-        let firstToken = await resolvedTurnstileToken()
+        let firstToken = await resolvedTurnstileToken(for: challenge)
         do {
             return try await sendTurnstileAttempt(
                 accepted: accepted,
@@ -44,8 +48,9 @@ extension FeedbackClient {
                 throw error
             }
             // The gate rejected the first attempt and a token provider is
-            // configured: mint a fresh token and retry exactly once.
-            guard let retryToken = await resolvedTurnstileToken() else {
+            // configured: mint a fresh token bound to the same action and
+            // retry exactly once.
+            guard let retryToken = await resolvedTurnstileToken(for: challenge) else {
                 throw error
             }
             return try await sendTurnstileAttempt(

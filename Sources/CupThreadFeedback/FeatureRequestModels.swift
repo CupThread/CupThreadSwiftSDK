@@ -309,7 +309,7 @@ public struct VoteWarning: Decodable, Equatable, Sendable {
     }
 }
 
-/// Response to ``FeedbackClient/toggleVote(featureRequestId:userToken:)``.
+/// Response to ``FeedbackClient/toggleVote(featureRequestId:userToken:shipNotifyEmail:)``.
 public struct VoteResult: Decodable, Equatable, Sendable {
     /// The user's vote state after the toggle.
     public let voted: Bool
@@ -322,10 +322,11 @@ public struct VoteResult: Decodable, Equatable, Sendable {
     /// The vote itself always succeeds when one is attached. The server emits
     /// a warning on boards that require signed-in voting when a
     /// `shipNotifyEmail` was sent that is not one of the signed-in session's
-    /// verified addresses. The SDK's own vote payload never sends that field,
-    /// so built-in ``FeatureRequestsView`` flows never receive one; the field
-    /// is decoded for schema parity with the public API and for clients that
-    /// post votes through their own transport. Branch on
+    /// verified addresses. Built-in ``FeatureRequestsView`` flows never send
+    /// that field, so they never receive one; the field is decoded for
+    /// callers that opt in via
+    /// ``FeedbackClient/toggleVote(featureRequestId:userToken:shipNotifyEmail:)``
+    /// or that post votes through their own transport. Branch on
     /// ``VoteWarning/code`` (see ``VoteWarning/isEmailNotVerified``).
     public let warning: VoteWarning?
 

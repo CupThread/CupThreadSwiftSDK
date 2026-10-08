@@ -193,3 +193,8 @@
 "cupthread.error.invalid_signature" = "결제 정보가 업데이트되지 않았습니다: 보고서의 서명을 확인하지 못했습니다. 앱의 SDK 서명 시크릿을 확인해 주세요.";
 "cupthread.error.stale_signature" = "결제 정보가 업데이트되지 않았습니다: 보고서의 서명이 만료되었습니다. 기기의 시계를 확인한 후 다시 시도해 주세요.";
 
+
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "메시지가 너무 깁니다. 줄인 후에 다시 시도해 주세요.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "입력 %1$lld자 ／ 최대 %2$lld자";
