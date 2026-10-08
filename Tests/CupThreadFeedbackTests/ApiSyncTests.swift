@@ -314,7 +314,7 @@ struct FeatureRequestPagingTests {
                 Issue.record("Unexpected error type: \(error)")
                 return
             }
-            #expect(error.errorDescription?.contains("try again in a minute") == true)
+            #expect(error.errorDescription == CupThreadStrings.tr("cupthread.error.http_rate_limited"))
         }
     }
 
@@ -336,7 +336,7 @@ struct FeatureRequestPagingTests {
                 return
             }
             #expect(message == "Too many searches. Please try again shortly.")
-            #expect(error.errorDescription?.contains("try again in a minute") == true)
+            #expect(error.errorDescription == CupThreadStrings.tr("cupthread.error.http_rate_limited"))
         }
     }
 

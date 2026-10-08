@@ -238,3 +238,65 @@ struct RemoteImageURLValidationTests {
         #expect(emptyAvatar.resolvedURL == nil)
     }
 }
+
+// MARK: - Download Host Validation (SEC-8)
+
+@Suite("DownloadHostValidation")
+struct DownloadHostValidationTests {
+    @Test func isAllowedDownloadHostAcceptsExactAndSameRegistrableHosts() {
+        // Exact match, including case and surrounding whitespace normalization
+        #expect(isAllowedDownloadHost("api.cupthread.com", baseHost: "api.cupthread.com"))
+        #expect(isAllowedDownloadHost("API.CupThread.COM", baseHost: "api.cupthread.com"))
+        #expect(isAllowedDownloadHost("  api.cupthread.com  ", baseHost: "api.cupthread.com"))
+
+        // Sibling subdomains and the apex of the same registrable domain
+        #expect(isAllowedDownloadHost("cdn.cupthread.com", baseHost: "api.cupthread.com"))
+        #expect(isAllowedDownloadHost("downloads.cdn.cupthread.com", baseHost: "api.cupthread.com"))
+        #expect(isAllowedDownloadHost("cupthread.com", baseHost: "api.cupthread.com"))
+        #expect(isAllowedDownloadHost("api.cupthread.com", baseHost: "cupthread.com"))
+
+        // Apex ↔ subdomain under a second-level public suffix
+        #expect(isAllowedDownloadHost("downloads.example.co.uk", baseHost: "api.example.co.uk"))
+        #expect(isAllowedDownloadHost("example.co.uk", baseHost: "downloads.example.co.uk"))
+
+        // Trailing-dot FQDN spelling normalizes away
+        #expect(isAllowedDownloadHost("cdn.cupthread.com.", baseHost: "api.cupthread.com"))
+    }
+
+    @Test func isAllowedDownloadHostRejectsPublicSuffixAndMultiTenantSiblings() {
+        // A bare TLD is never an allowed parent of the base host (SEC-8 "com" case)
+        #expect(isAllowedDownloadHost("com", baseHost: "api.cupthread.com") == false)
+        #expect(isAllowedDownloadHost("com", baseHost: "cupthread.com") == false)
+
+        // Hosts under a shared public suffix have no shared operator
+        #expect(isAllowedDownloadHost("attacker.co.uk", baseHost: "api.example.co.uk") == false)
+        #expect(isAllowedDownloadHost("co.uk", baseHost: "api.example.co.uk") == false)
+        #expect(isAllowedDownloadHost("evil.example.co.uk", baseHost: "api.other.co.uk") == false)
+
+        // Multi-tenant hosting suffixes behave the same way
+        #expect(isAllowedDownloadHost("evil.github.io", baseHost: "org.github.io") == false)
+        #expect(isAllowedDownloadHost("github.io", baseHost: "org.github.io") == false)
+        #expect(isAllowedDownloadHost("evil.herokuapp.com", baseHost: "org.herokuapp.com") == false)
+
+        // Unrelated hosts keep failing closed
+        #expect(isAllowedDownloadHost("evil.example", baseHost: "api.cupthread.com") == false)
+        #expect(isAllowedDownloadHost("notcupthread.com", baseHost: "cupthread.com") == false)
+        #expect(isAllowedDownloadHost("evilcupthread.com", baseHost: "api.cupthread.com") == false)
+        #expect(isAllowedDownloadHost("api.cupthread.com.evil.com", baseHost: "api.cupthread.com") == false)
+    }
+
+    @Test func isAllowedDownloadHostFailsClosedForDegenerateHosts() {
+        // IP-literal base hosts establish no registrable-domain relationship
+        #expect(isAllowedDownloadHost("203.0.113.10", baseHost: "203.0.113.5") == false)
+        #expect(isAllowedDownloadHost("evil.example", baseHost: "203.0.113.5") == false)
+
+        // Empty and whitespace hosts are rejected outright
+        #expect(isAllowedDownloadHost("", baseHost: "api.cupthread.com") == false)
+        #expect(isAllowedDownloadHost("cdn.cupthread.com", baseHost: "") == false)
+        #expect(isAllowedDownloadHost("   ", baseHost: "api.cupthread.com") == false)
+
+        // Single-label bases never accept a different host
+        #expect(isAllowedDownloadHost("evil.localhost", baseHost: "localhost") == false)
+        #expect(isAllowedDownloadHost("localhost", baseHost: "localhost"))
+    }
+}

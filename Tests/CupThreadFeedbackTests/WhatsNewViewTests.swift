@@ -3,7 +3,7 @@ import SwiftUI
 import Testing
 @testable import CupThreadFeedback
 
-@Suite("WhatsNewView and WhatsNewViewState Tests")
+@Suite("WhatsNewView and WhatsNewViewState Tests", .serialized)
 struct WhatsNewViewTests {
     private func makeEntry(id: String = "entry-1", title: String = "Version 1.0") -> ChangelogEntry {
         ChangelogEntry(
@@ -322,5 +322,71 @@ struct WhatsNewViewTests {
         #expect(view.isLoading)
         #expect(view.hasLoadedOnce)
         #expect(view.entries.count == 1)
+    }
+
+    // MARK: - Multi-page regression test (PERF-4)
+
+    @Test @MainActor func whatsNewViewLoadEntriesWalksMultiplePagesWhenHasMoreIsTrue() async throws {
+        let apiHost = "whatsnew-pages.example.com"
+        let client = makeClient(
+            baseURL: URL(string: "https://\(apiHost)")!,
+            appKey: "app_whatsnew_paging_test"
+        )
+        let capturedRequests = CaptureBox<[URLRequest]>()
+        capturedRequests.value = []
+
+        let page1: [String: Any] = [
+            "entries": [
+                [
+                    "id": "e_p1",
+                    "title": "Version 2.0",
+                    "body": "Page 1 notes",
+                    "versionLabel": "2.0.0",
+                    "publishedAt": "2026-03-01T00:00:00.000Z",
+                    "linkedRequests": []
+                ]
+            ],
+            "hasMore": true,
+            "nextCursor": "cursor_page_2"
+        ]
+
+        let page2: [String: Any] = [
+            "entries": [
+                [
+                    "id": "e_p2",
+                    "title": "Version 1.0",
+                    "body": "Page 2 notes",
+                    "versionLabel": "1.0.0",
+                    "publishedAt": "2026-01-01T00:00:00.000Z",
+                    "linkedRequests": []
+                ]
+            ],
+            "hasMore": false
+        ]
+
+        let requestCounter = CaptureBox<Int>()
+        requestCounter.value = 0
+
+        MockURLProtocol.setHandler(forHost: apiHost) { request in
+            capturedRequests.value?.append(request)
+            let count = (requestCounter.value ?? 0) + 1
+            requestCounter.value = count
+            if count == 1 {
+                return (makeHTTPResponse(), try encodeJSON(page1))
+            } else {
+                return (makeHTTPResponse(), try encodeJSON(page2))
+            }
+        }
+
+        let view = WhatsNewView(
+            client: client,
+            userToken: "test_token",
+            state: WhatsNewViewState()
+        )
+
+        await view.loadEntries()
+
+        let changelogRequests = (capturedRequests.value ?? []).filter { $0.url?.path.contains("/changelog") == true }
+        #expect(changelogRequests.count == 2)
     }
 }

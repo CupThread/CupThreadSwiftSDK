@@ -290,7 +290,7 @@ struct UserAttributesTests {
         #expect(json["timestamp"] == nil)
     }
 
-    @Test func updateUserAttributesClearingOnlyCurrencyDoesNotSign() async throws {
+    @Test func updateUserAttributesClearingOnlyCurrencySignsWhenSecretConfigured() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
@@ -299,6 +299,51 @@ struct UserAttributesTests {
 
         let token = "user-uuid-currency-null"
         let client = Self.makeSigningClient()
+        let fixedTimestamp: Int64 = 1773600300
+
+        _ = try await client.updateUserAttributes(
+            currency: .null,
+            userToken: token,
+            timestamp: fixedTimestamp
+        )
+
+        let request = try #require(capture.value)
+        let rawData = try #require(bodyData(from: request))
+        let json = try #require(parseJSONDict(rawData))
+
+        #expect(json["isPaying"] == nil)
+        #expect(json["plan"] == nil)
+        #expect(json["mrr"] == nil)
+        #expect(json["currency"] is NSNull)
+
+        let signature = try #require(json["signature"] as? String)
+        let timestamp = try #require(json["timestamp"] as? Int64)
+        #expect(timestamp == fixedTimestamp)
+
+        let expectedCanonical = UserAttributesSigner.canonicalString(
+            for: .init(
+                appKey: Self.testAppKey,
+                userToken: token,
+                isPaying: .unset,
+                plan: .unset,
+                mrr: .unset,
+                currency: .null,
+                timestamp: fixedTimestamp
+            )
+        )
+        let expectedSignature = UserAttributesSigner.signature(for: expectedCanonical, secret: Self.testSecret)
+        #expect(signature == expectedSignature)
+    }
+
+    @Test func updateUserAttributesClearingOnlyCurrencyWithoutSecretSendsUnsigned() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["ok": true, "updatedAt": "2026-09-26T00:00:00.000Z"]))
+        }
+
+        let token = "user-uuid-currency-null-no-secret"
+        let client = Self.makeSigningClient(secret: nil)
 
         _ = try await client.updateUserAttributes(
             currency: .null,

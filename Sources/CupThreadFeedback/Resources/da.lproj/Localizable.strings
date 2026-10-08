@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Du abonnerer";
 "cupthread.subscribe.manage_message" = "Opdateringsmails sendes til %@. For at ændre adressen eller opsige abonnementet skal du bruge linket i en opdateringsmail.";
 "cupthread.subscribe.use_different_email" = "Brug en anden e-mailadresse";
+"cupthread.subscribe.pending_title" = "Bekræftelse afventer";
+"cupthread.subscribe.pending_message" = "Vi har sendt et bekræftelseslink til %@. Åbn det for at begynde at modtage opdateringsmails.";
+"cupthread.subscribe.resend_button" = "Send bekræftelsesmailen igen";
+"cupthread.subscribe.resending_button" = "Sender igen…";
 "cupthread.whatsnew.emails_on" = "Opdateringsmails slået til";
 "cupthread.whatsnew.emails_on_destination" = "Notifikationer går til %@.";
 "cupthread.whatsnew.get_emails" = "Modtag opdateringsmails";
 "cupthread.whatsnew.get_emails_caption" = "Få besked, når en ny version udkommer.";
 "cupthread.whatsnew.subscribe_accessibility" = "Abonnér på opdateringsmails";
 "cupthread.whatsnew.emails_on_accessibility" = "Opdateringsmails er slået til for %@";
+"cupthread.whatsnew.pending_title" = "Bekræftelse afventer";
+"cupthread.whatsnew.pending_destination" = "Vi har sendt et bekræftelseslink til %@.";
+"cupthread.whatsnew.pending_accessibility" = "E-mailbekræftelse afventer for %@";
 "cupthread.whatsnew.version_accessibility" = "Version %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Udsendte ønsker: %@";
 "cupthread.features.unavailable_feedback" = "Feedback utilgængelig";
@@ -193,3 +200,25 @@
 "cupthread.error.invalid_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur kunne ikke verificeres. Tjek appens SDK-signeringshemmelighed.";
 "cupthread.error.stale_signature" = "Betalingsoplysningerne blev ikke opdateret: rapportens signatur er udløbet. Tjek enhedens ur, og prøv igen.";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Feedbackserveren returnerede et ugyldigt svar.";
+"cupthread.error.unreadable_upload_response" = "Feedbackserveren returnerede et ulæseligt uploadsvar.";
+"cupthread.error.auth_required" = "Denne handling er kun tilgængelig for brugere, der er logget ind.";
+"cupthread.error.scan_rejected" = "Den refererede vedhæftede fil blev afvist ved indholdskontrol og kunne ikke uploades.";
+"cupthread.error.unsupported_media" = "Denne billedtype understøttes ikke. Vedhæft et billede i PNG, JPEG, WebP eller GIF.";
+"cupthread.error.payload_too_large" = "Den fil er for stor til at uploade.";
+"cupthread.error.uploader_identity_required" = "Upload kræver en slutbrugeridentitet. Angiv et userToken (se UserTokenStore), når du uploader vedhæftede filer.";
+"cupthread.error.uploader_mismatch" = "Denne vedhæftede fil blev uploadet med en anden identitet. Fjern den og vedhæft den igen, og prøv så igen.";
+"cupthread.error.quota_exceeded" = "Denne app har nået sin indsendelsesgrænse for denne måned. Prøv igen senere.";
+"cupthread.error.subscription_inactive" = "Indsendelser er ikke tilgængelige for denne app lige nu. Prøv igen senere.";
+"cupthread.error.profile_not_found" = "Denne brugerprofil er ikke længere tilgængelig.";
+"cupthread.error.comments_unavailable" = "Kommentarer er ikke tilgængelige for denne funktionsanmodning.";
+"cupthread.error.email_not_verified" = "Brug e-mailadressen på din loggede konto for at abonnere.";
+"cupthread.attachment.oversized" = "Vedhæftet fil (%1$@) overskrider den maksimalt tilladte størrelse på %2$@.";
+"cupthread.attachment.unprocessable" = "Det valgte foto kunne ikke behandles til upload.";
+"cupthread.attachment.unsupported_type" = "Denne billedtype understøttes ikke. Vedhæft et billede i PNG, JPEG, WebP eller GIF.";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Beskeden er for lang. Forkort den og prøv igen.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld af %2$lld tegn";

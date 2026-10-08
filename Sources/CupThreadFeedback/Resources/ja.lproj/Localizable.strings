@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "購読中です";
 "cupthread.subscribe.manage_message" = "更新メールは %@ に送信されます。アドレスの変更や購読の解除は、更新メール内のリンクから行えます。";
 "cupthread.subscribe.use_different_email" = "別のメールアドレスを使う";
+"cupthread.subscribe.pending_title" = "確認待ち";
+"cupthread.subscribe.pending_message" = "%@ に確認リンクを送信しました。リンクを開くと、更新メールの受信が始まります。";
+"cupthread.subscribe.resend_button" = "確認メールを再送信";
+"cupthread.subscribe.resending_button" = "再送信中…";
 "cupthread.whatsnew.emails_on" = "更新メールオン";
 "cupthread.whatsnew.emails_on_destination" = "通知は %@ に送信されます。";
 "cupthread.whatsnew.get_emails" = "更新メールを受け取る";
 "cupthread.whatsnew.get_emails_caption" = "新しいバージョンがリリースされると通知されます。";
 "cupthread.whatsnew.subscribe_accessibility" = "更新メールを購読";
 "cupthread.whatsnew.emails_on_accessibility" = "%@ で更新メールが有効です";
+"cupthread.whatsnew.pending_title" = "確認待ち";
+"cupthread.whatsnew.pending_destination" = "%@ に確認リンクを送信しました。";
+"cupthread.whatsnew.pending_accessibility" = "%@ のメール確認が未完了です";
 "cupthread.whatsnew.version_accessibility" = "バージョン %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "リリース済みのリクエスト: %@";
 "cupthread.features.unavailable_feedback" = "フィードバックは利用できません";
@@ -193,3 +200,25 @@
 "cupthread.error.invalid_signature" = "支払い情報は更新されませんでした：レポートの署名を検証できませんでした。アプリの SDK 署名シークレットを確認してください。";
 "cupthread.error.stale_signature" = "支払い情報は更新されませんでした：レポートの署名の有効期限が切れています。端末の時刻を確認して、もう一度お試しください。";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "フィードバックサーバーが無効な応答を返しました。";
+"cupthread.error.unreadable_upload_response" = "フィードバックサーバーが判読できないアップロード応答を返しました。";
+"cupthread.error.auth_required" = "この操作はサインイン済みのユーザーのみ利用できます。";
+"cupthread.error.scan_rejected" = "参照された添付ファイルはコンテンツ検査で拒否されたため、アップロードできませんでした。";
+"cupthread.error.unsupported_media" = "この画像の種類はサポートされていません。PNG、JPEG、WebP、GIF のいずれかを添付してください。";
+"cupthread.error.payload_too_large" = "そのファイルは大きすぎるためアップロードできません。";
+"cupthread.error.uploader_identity_required" = "アップロードにはエンドユーザーの ID が必要です。添付ファイルのアップロード時には userToken を渡してください（UserTokenStore を参照）。";
+"cupthread.error.uploader_mismatch" = "この添付ファイルは別の ID でアップロードされています。削除して添付し直してから、もう一度お試しください。";
+"cupthread.error.quota_exceeded" = "このアプリは今月の送信上限に達しました。しばらくしてからもう一度お試しください。";
+"cupthread.error.subscription_inactive" = "このアプリは現在フィードバックを送信できません。しばらくしてからもう一度お試しください。";
+"cupthread.error.profile_not_found" = "このユーザープロフィールは利用できなくなりました。";
+"cupthread.error.comments_unavailable" = "この機能リクエストではコメントを利用できません。";
+"cupthread.error.email_not_verified" = "購読にはサインイン済みアカウントのメールアドレスを使用してください。";
+"cupthread.attachment.oversized" = "添付ファイル（%1$@）が最大許容サイズ %2$@ を超えています。";
+"cupthread.attachment.unprocessable" = "選択した写真を処理できず、アップロードできませんでした。";
+"cupthread.attachment.unsupported_type" = "この画像の種類はサポートされていません。PNG、JPEG、WebP、GIF のいずれかを添付してください。";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "メッセージが長すぎます。短くしてからもう一度お試しください。";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "入力 %1$lld 文字 ／ 上限 %2$lld 文字";

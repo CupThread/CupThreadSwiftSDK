@@ -127,7 +127,12 @@ struct FeedbackAttachmentManagerTests {
         } catch let error as AttachmentValidationError {
             #expect(error == .oversized(size: 25_000_000, limit: 20_000_000))
             let description = error.errorDescription ?? ""
-            #expect(description.contains("exceeds the maximum allowed size"))
+            let size = ByteCountFormatter.string(fromByteCount: 25_000_000, countStyle: .file)
+            let limit = ByteCountFormatter.string(fromByteCount: 20_000_000, countStyle: .file)
+            #expect(
+                description == CupThreadStrings.tr("cupthread.attachment.oversized", size, limit),
+                "Unexpected oversized copy: \(description)"
+            )
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }

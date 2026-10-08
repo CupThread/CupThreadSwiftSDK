@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "已订阅";
 "cupthread.subscribe.manage_message" = "更新邮件将发送至 %@。如需更改邮箱或取消订阅，请使用任意更新邮件中的链接。";
 "cupthread.subscribe.use_different_email" = "使用其他邮箱";
+"cupthread.subscribe.pending_title" = "等待确认";
+"cupthread.subscribe.pending_message" = "我们已向 %@ 发送确认链接。打开链接即可开始接收更新邮件。";
+"cupthread.subscribe.resend_button" = "重新发送确认邮件";
+"cupthread.subscribe.resending_button" = "正在重新发送…";
 "cupthread.whatsnew.emails_on" = "更新邮件已开启";
 "cupthread.whatsnew.emails_on_destination" = "通知将发送至 %@。";
 "cupthread.whatsnew.get_emails" = "接收更新邮件";
 "cupthread.whatsnew.get_emails_caption" = "新版本发布时获得通知。";
 "cupthread.whatsnew.subscribe_accessibility" = "订阅更新邮件";
 "cupthread.whatsnew.emails_on_accessibility" = "%@ 已开启更新邮件";
+"cupthread.whatsnew.pending_title" = "等待确认";
+"cupthread.whatsnew.pending_destination" = "我们已向 %@ 发送确认链接。";
+"cupthread.whatsnew.pending_accessibility" = "%@ 的邮件确认尚未完成";
 "cupthread.whatsnew.version_accessibility" = "版本 %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "已交付的需求：%@";
 "cupthread.features.unavailable_feedback" = "反馈不可用";
@@ -193,3 +200,25 @@
 "cupthread.error.invalid_signature" = "支付信息未更新：报告的签名校验未通过，请检查应用的 SDK 签名密钥。";
 "cupthread.error.stale_signature" = "支付信息未更新：报告的签名已过期，请检查设备时间后重试。";
 
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "反馈服务器返回了无效的响应。";
+"cupthread.error.unreadable_upload_response" = "反馈服务器返回了无法解读的上传响应。";
+"cupthread.error.auth_required" = "此操作仅限已登录用户使用。";
+"cupthread.error.scan_rejected" = "引用的附件未通过内容安全检查，无法上传。";
+"cupthread.error.unsupported_media" = "不支持该图片类型，请附上 PNG、JPEG、WebP 或 GIF 格式的图片。";
+"cupthread.error.payload_too_large" = "文件过大，无法上传。";
+"cupthread.error.uploader_identity_required" = "上传需要终端用户身份：上传附件时请传入 userToken（参见 UserTokenStore）。";
+"cupthread.error.uploader_mismatch" = "此附件使用了其他身份上传，请移除后重新添加，然后再试一次。";
+"cupthread.error.quota_exceeded" = "此应用已达本月提交上限，请稍后再试。";
+"cupthread.error.subscription_inactive" = "此应用当前无法提交内容，请稍后再试。";
+"cupthread.error.profile_not_found" = "该用户资料已不存在。";
+"cupthread.error.comments_unavailable" = "此功能请求暂不支持评论。";
+"cupthread.error.email_not_verified" = "请使用已登录账号的邮箱地址进行订阅。";
+"cupthread.attachment.oversized" = "附件（%1$@）超出了允许的最大大小 %2$@。";
+"cupthread.attachment.unprocessable" = "所选照片无法处理，无法上传。";
+"cupthread.attachment.unsupported_type" = "不支持该图片类型，请附上 PNG、JPEG、WebP 或 GIF 格式的图片。";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "您的内容太长，请精简后再试。";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "已输入 %1$lld 个字符，上限 %2$lld 个";
