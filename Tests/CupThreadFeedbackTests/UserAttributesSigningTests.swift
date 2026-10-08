@@ -3,6 +3,7 @@ import Testing
 @testable import CupThreadFeedback
 
 @Suite("UserAttributesSigning", .serialized)
+// swiftlint:disable:next type_body_length
 struct UserAttributesSigningTests {
     static let apiHost = "user-attributes-signing.example.com"
     static let testSecret = "sec_test_secret_key_12345"
@@ -259,18 +260,88 @@ struct UserAttributesSigningTests {
         #expect(signature == expectedSignature)
     }
 
-    @Test func updateUserAttributesOmitsSignatureWhenNoPaymentAttributes() async throws {
+    @Test func updateUserAttributesOmitsSignatureWhenIdentityOnly() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             return (makeHTTPResponse(), try encodeJSON(["ok": true, "updatedAt": "2026-09-16T00:00:00.000Z"]))
         }
 
-        // Even though client has a secret configured, identity/currency-only requests remain unsigned
+        // Even though client has a secret configured, identity-only requests remain unsigned
         let client = Self.makeSigningClient()
         _ = try await client.updateUserAttributes(
+            userToken: "user-uuid-only-identity"
+        )
+
+        let request = try #require(capture.value)
+        let rawData = try #require(bodyData(from: request))
+        let json = try #require(parseJSONDict(rawData))
+
+        #expect(json["signature"] == nil)
+        #expect(json["timestamp"] == nil)
+        #expect(json["isPaying"] == nil)
+        #expect(json["plan"] == nil)
+        #expect(json["mrr"] == nil)
+        #expect(json["currency"] == nil)
+    }
+
+    @Test func updateUserAttributesSignsWhenCurrencyOnlyWithSecretConfigured() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["ok": true, "updatedAt": "2026-09-16T00:00:00.000Z"]))
+        }
+
+        let token = "user-uuid-currency-signed"
+        let client = Self.makeSigningClient()
+        let fixedTimestamp: Int64 = 1773600200
+
+        let result = try await client.updateUserAttributes(
+            currency: "EUR",
+            userToken: token,
+            timestamp: fixedTimestamp
+        )
+
+        let request = try #require(capture.value)
+        let rawData = try #require(bodyData(from: request))
+        let json = try #require(parseJSONDict(rawData))
+
+        #expect(json["currency"] as? String == "EUR")
+        #expect(json["isPaying"] == nil)
+        #expect(json["plan"] == nil)
+        #expect(json["mrr"] == nil)
+
+        let signature = try #require(json["signature"] as? String)
+        let timestamp = try #require(json["timestamp"] as? Int64)
+        #expect(timestamp == fixedTimestamp)
+
+        let expectedCanonical = UserAttributesSigner.canonicalString(
+            for: .init(
+                appKey: Self.testAppKey,
+                userToken: token,
+                isPaying: nil,
+                plan: nil,
+                mrr: nil,
+                currency: "EUR",
+                timestamp: fixedTimestamp
+            )
+        )
+        let expectedSignature = UserAttributesSigner.signature(for: expectedCanonical, secret: Self.testSecret)
+        #expect(signature == expectedSignature)
+        #expect(result.ok == true)
+    }
+
+    @Test func updateUserAttributesCurrencyOnlySendsUnsignedWhenNoSecretConfigured() async throws {
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["ok": true, "updatedAt": "2026-09-16T00:00:00.000Z"]))
+        }
+
+        let client = Self.makeSigningClient(secret: nil)
+        _ = try await client.updateUserAttributes(
             currency: "USD",
-            userToken: "user-uuid-only-currency"
+            userToken: "user-uuid-no-secret-currency"
         )
 
         let request = try #require(capture.value)

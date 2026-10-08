@@ -51,9 +51,9 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///
     /// Obtain this secret from the CupThread developer console:
     /// *App Access → App Credentials → SDK signing secret*.
-    /// When `nil`, requests reporting payment attributes (`isPaying`, `plan`, `mrr`)
+    /// When `nil`, requests reporting payment attributes (`isPaying`, `plan`, `mrr`, `currency`)
     /// are sent unsigned and will be rejected by the server. Requests without
-    /// payment attributes (identity or `currency`-only updates) do not require a secret.
+    /// payment attributes (identity-only updates) do not require a secret.
     public let signingSecret: String?
 
     /// Creates a configuration for a CupThread app.
@@ -66,7 +66,7 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///   - requestID: Optional stable `X-Request-Id` sent with every request;
     ///     defaults to a per-request UUID.
     ///   - signingSecret: Optional SDK signing secret for HMAC-SHA256 request
-    ///     signing when reporting paying-user attributes (`isPaying`, `plan`, `mrr`).
+    ///     signing when reporting paying-user attributes (`isPaying`, `plan`, `mrr`, `currency`).
     public init(
         baseURL: URL,
         appKey: String,
