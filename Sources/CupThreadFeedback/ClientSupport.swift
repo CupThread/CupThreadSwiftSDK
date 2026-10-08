@@ -9,29 +9,6 @@ struct APIErrorEnvelope: Decodable, Sendable {
     let code: String?
 }
 
-/// The correlation-id grammar shared by both directions of the
-/// `X-Request-Id` header (OPS-01): requests send ids matching
-/// `^[A-Za-z0-9._-]{8,64}$`, the server honors exactly those ids and
-/// replaces anything else, and echoed response headers are only propagated
-/// when they conform (SEC-12). Any other echo value — HTML from a captive
-/// portal, a phishing nudge injected by a TLS proxy, oversized junk from a
-/// gateway — is not a correlation id and must never reach user-facing
-/// error copy.
-enum RequestIDGrammar {
-    static let minLength = 8
-    static let maxLength = 64
-
-    /// Whether `value` matches the `^[A-Za-z0-9._-]{8,64}$` grammar.
-    static func isValid(_ value: String) -> Bool {
-        guard (minLength...maxLength).contains(value.count) else { return false }
-        return value.allSatisfy { character in
-            guard character.isASCII else { return false }
-            return character.isLetter || character.isNumber
-                || character == "." || character == "_" || character == "-"
-        }
-    }
-}
-
 extension HTTPURLResponse {
     /// The `X-Request-Id` correlation header (OPS-01) the server attaches to
     /// every response — the caller's request id when format-valid, otherwise
@@ -48,6 +25,17 @@ extension HTTPURLResponse {
             return nil
         }
         return value
+    }
+
+    /// The response's `Date` header (API-19), parsed as the server's time —
+    /// the observation the SDK corrects its clock with so signed
+    /// payment-attribute reports survive device clock skew. `nil` when the
+    /// header is absent or not RFC 1123.
+    var cupthreadServerDate: Date? {
+        guard let value = value(forHTTPHeaderField: "Date"), !value.isEmpty else {
+            return nil
+        }
+        return ServerClock.httpDate(value)
     }
 }
 
@@ -95,6 +83,10 @@ extension FeedbackClient {
         accepted: Set<Int>,
         mapsPermissionErrors: Bool = false
     ) throws {
+        // Every response carries the server's clock (API-19); observe it on
+        // successes and failures alike — a stale-signature 401's own `Date`
+        // header is what the signature retry below corrects with.
+        observeServerClock(httpResponse)
         let statusCode = httpResponse.statusCode
         guard !accepted.contains(statusCode) else { return }
         let requestId = httpResponse.cupthreadRequestID
@@ -137,6 +129,15 @@ extension FeedbackClient {
             throw FeedbackClientError.payloadTooLarge(message: envelope?.error, requestId: requestId)
         default:
             throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message, requestId: requestId)
+        }
+    }
+
+    /// Records the response's `Date` header as a server-clock observation
+    /// (API-19), so signed payment-attribute reports correct for device
+    /// clock skew. No-op when the header is absent or unparseable.
+    private func observeServerClock(_ httpResponse: HTTPURLResponse) {
+        if let serverDate = httpResponse.cupthreadServerDate {
+            serverClock.record(serverDate: serverDate)
         }
     }
 

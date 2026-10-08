@@ -99,6 +99,8 @@ struct ChangelogSubscribeModelTests {
             "user@",             // missing domain
             "user@example .com", // embedded whitespace
             "us er@example.com", // embedded whitespace
+            "user@example",      // dotless single-label domain (#283)
+            "user@localhost",    // dotless single-label domain (#283)
             ""                  // empty
         ]
         for email in malformed {
@@ -108,18 +110,16 @@ struct ChangelogSubscribeModelTests {
         }
     }
 
-    /// The check stays shape-only: a dotless single-label domain is not an
-    /// unambiguous malformation, so it keeps passing locally and remains the
-    /// server's call (`user@example` was rejected before #281 tightened the
-    /// check to label-level; the loosening is deliberate).
+    /// The check stays shape-only and shared with the feedback composer's
+    /// warn-only hint (#283): real multi-label domains pass, including
+    /// local-part tags and deep subdomains the server remains authoritative
+    /// over.
     @Test func emailValidationAcceptsPlausibleShapes() {
         var model = makeModel(in: .form)
 
         let plausible = [
             "user@example.com",
-            "user.name+tag@sub.example.co",
-            "user@localhost",
-            "user@example"
+            "user.name+tag@sub.example.co"
         ]
         for email in plausible {
             model.email = email

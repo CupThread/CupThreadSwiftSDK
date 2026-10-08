@@ -10,6 +10,7 @@
 "cupthread.feedback.section_contact_footer" = "任意 — フィードバックの確認・返信にのみ使用されます。";
 "cupthread.feedback.name_label" = "お名前";
 "cupthread.feedback.email_label" = "メールアドレス";
+"cupthread.feedback.email_invalid_hint" = "有効なメールアドレスではないようです — 返信できない場合があります。";
 "cupthread.feedback.section_attachments" = "添付ファイル";
 "cupthread.feedback.section_attachments_footer" = "問題の特定に役立つスクリーンショットやログを添付してください。";
 "cupthread.feedback.add_attachment" = "画像 / スクリーンショットを追加";

@@ -50,21 +50,10 @@ struct ChangelogSubscribeModel: Equatable, Sendable {
 
     /// Lightweight shape check — full validation happens server-side.
     ///
-    /// Guarantees (and only these): exactly one `@` separating a non-empty
-    /// local part from a domain whose dot-separated labels are all non-empty
-    /// — no empty domain, no leading/trailing/doubled dots — with no
-    /// embedded whitespace. Dotless single-label domains (`user@localhost`)
-    /// pass; whether they deliver is the server's call.
+    /// Delegates to the shared `EmailShape` helper (#283), which also rejects
+    /// the multiple-`@`, empty-label, and trailing-dot shapes #281 documented.
     var isValidEmail: Bool {
-        let trimmed = trimmedEmail
-        let parts = trimmed.split(separator: "@", omittingEmptySubsequences: false)
-        guard parts.count == 2,
-              !parts[0].isEmpty else {
-            return false
-        }
-        let labels = parts[1].split(separator: ".", omittingEmptySubsequences: false)
-        return !labels.isEmpty && labels.allSatisfy { !$0.isEmpty }
-            && !trimmed.contains(where: \.isWhitespace)
+        EmailShape.isPlausible(email)
     }
 
     /// A dismissal affordance is rendered in **every** phase, so users on

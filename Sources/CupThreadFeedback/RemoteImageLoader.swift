@@ -23,8 +23,11 @@ typealias PlatformImage = NSImage
 /// in-flight de-duplication, so every `Lazy*` cell re-creation re-downloads the
 /// same URL and flashes its placeholder. The loader instead keeps decoded
 /// images in an `NSCache` and coalesces concurrent requests for one URL into a
-/// single download; failures are never cached, so a transient error is retried
-/// on the next appearance.
+/// single download. Failures are remembered in a short-lived negative cache:
+/// a URL that just failed replays its error without contacting the network
+/// until `failureRetryInterval` elapses, so a permanently dead avatar or icon
+/// is not re-requested on every scroll re-appearance, while a transient outage
+/// recovers automatically once the window lapses.
 ///
 /// MainActor-isolated so cached images are only touched from one isolation
 /// domain; the download itself (including bitmap decoding) runs detached to
@@ -34,16 +37,35 @@ final class RemoteImageLoader {
     /// Process-wide loader used by `CachedRemoteImage`.
     static let shared = RemoteImageLoader()
 
+    /// A download failure worth replaying inside the negative-cache window.
+    private struct FailedFetch {
+        let date: Date
+        let error: any Error
+    }
+
     private let session: URLSession
     private let cache = NSCache<NSURL, PlatformImage>()
+    private let failureRetryInterval: TimeInterval
+    private let now: @Sendable () -> Date
     private var inFlight: [URL: Task<PlatformImage, Error>] = [:]
+    private var recentFailures: [URL: FailedFetch] = [:]
 
     /// - Parameters:
     ///   - session: Session used for downloads; inject a test session to
     ///     intercept requests.
     ///   - cacheCountLimit: Maximum number of decoded images retained.
-    init(session: URLSession = .shared, cacheCountLimit: Int = 500) {
+    ///   - failureRetryInterval: How long a failed fetch is remembered before
+    ///     the URL becomes eligible for a new download attempt.
+    ///   - now: Clock used for the negative-cache window; inject for tests.
+    init(
+        session: URLSession = .shared,
+        cacheCountLimit: Int = 500,
+        failureRetryInterval: TimeInterval = 60,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
         self.session = session
+        self.failureRetryInterval = failureRetryInterval
+        self.now = now
         cache.countLimit = cacheCountLimit
     }
 
@@ -53,12 +75,18 @@ final class RemoteImageLoader {
     /// URLs are validated against `isAllowedSecureImageURL(_:)`; non-HTTPS or disallowed schemes
     /// (`http:`, `file:`, `data:`, `javascript:`, etc.) immediately throw `URLError(.badURL)`
     /// without contacting the network or consulting the cache.
+    ///
+    /// A download that fails is remembered for `failureRetryInterval`; calls
+    /// inside that window rethrow the recorded error without a network request.
     func image(for url: URL) async throws -> PlatformImage {
         guard isAllowedSecureImageURL(url) else {
             throw URLError(.badURL)
         }
         if let cached = cache.object(forKey: url as NSURL) {
             return cached
+        }
+        if let failure = recentFailure(for: url) {
+            throw failure.error
         }
         if let existing = inFlight[url] {
             return try await existing.value
@@ -80,9 +108,39 @@ final class RemoteImageLoader {
         inFlight[url] = task
 
         defer { inFlight.removeValue(forKey: url) }
-        let image = try await task.value
-        cache.setObject(image, forKey: url as NSURL)
-        return image
+        do {
+            let image = try await task.value
+            cache.setObject(image, forKey: url as NSURL)
+            recentFailures.removeValue(forKey: url)
+            return image
+        } catch {
+            recordFailure(error, for: url)
+            throw error
+        }
+    }
+
+    /// Number of URLs currently remembered as recently failed; internal so
+    /// tests can assert the ledger stays bounded.
+    var recentFailureCount: Int { recentFailures.count }
+
+    /// Returns the failure remembered for `url` while it is still inside the
+    /// retry window, pruning the entry once its window has lapsed.
+    private func recentFailure(for url: URL) -> FailedFetch? {
+        guard let failure = recentFailures[url] else { return nil }
+        if now().timeIntervalSince(failure.date) < failureRetryInterval {
+            return failure
+        }
+        recentFailures.removeValue(forKey: url)
+        return nil
+    }
+
+    /// Records a download failure for `url` and opportunistically prunes
+    /// expired entries so the ledger stays bounded to one retry window.
+    private func recordFailure(_ error: any Error, for url: URL) {
+        let currentTime = now()
+        recentFailures[url] = FailedFetch(date: currentTime, error: error)
+        let cutoff = currentTime.addingTimeInterval(-failureRetryInterval)
+        recentFailures = recentFailures.filter { $0.value.date > cutoff }
     }
 }
 
@@ -95,7 +153,9 @@ enum RemoteImagePhase {
     case empty
     /// The image, ready to render.
     case success(Image)
-    /// The download or decode failed; not cached, retried on next appearance.
+    /// The download or decode failed; the loader remembers the failure for a
+    /// short negative-cache window (replaying it without a network request)
+    /// and retries the download on the next appearance after it lapses.
     case failure
 }
 
