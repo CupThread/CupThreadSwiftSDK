@@ -114,14 +114,14 @@ public struct FeedbackAttachmentStateMachine: Sendable {
     ///
     /// - Parameters:
     ///   - id: The task token that failed.
-    ///   - error: The underlying failure. `CancellationError` resets state to `.idle` without an error banner.
+    ///   - error: The underlying failure. Task and network cancellation (``Error/isSdkCancellation``) resets state to `.idle` without an error banner.
     /// - Returns: `true` if the failure matched the active upload, or `false` if ignored.
     @discardableResult
     public mutating func uploadFailed(id: UUID, error: Error) -> Bool {
         guard case .uploading(let currentId) = state, currentId == id else {
             return false
         }
-        if error is CancellationError {
+        if error.isSdkCancellation {
             state = .idle
         } else {
             state = .failed(id: id, message: FriendlyError.message(for: error))

@@ -161,3 +161,42 @@ struct SubmitCancellationSuppressionTests {
         }
     }
 }
+
+/// BUG-3 / issue #182: attachment upload cancellation (represented as
+/// `CancellationError` or `URLError(.cancelled)`) must cleanly reset
+/// `FeedbackAttachmentStateMachine` to `.idle` with no error message, and
+/// `FeedbackComposerView` must route `isSdkCancellation` to cancel the upload
+/// rather than recording an upload failure banner.
+@Suite("UploadCancellationSuppression")
+struct UploadCancellationSuppressionTests {
+    @Test func uploadFailedSuppressesBothCancellationErrorAndURLErrorCancelled() {
+        var machine = FeedbackAttachmentStateMachine()
+        let uploadId1 = machine.startUpload()
+        #expect(machine.isUploading)
+        let handled1 = machine.uploadFailed(id: uploadId1, error: CancellationError())
+        #expect(handled1)
+        #expect(machine.state == .idle)
+        #expect(machine.currentErrorMessage == nil)
+
+        let uploadId2 = machine.startUpload()
+        #expect(machine.isUploading)
+        let handled2 = machine.uploadFailed(id: uploadId2, error: URLError(.cancelled))
+        #expect(handled2)
+        #expect(machine.state == .idle)
+        #expect(machine.currentErrorMessage == nil)
+    }
+
+    @Test func uploadFailedStillRecordsRealErrorsAsFailedState() {
+        var machine = FeedbackAttachmentStateMachine()
+        let uploadId = machine.startUpload()
+        let networkError = URLError(.timedOut)
+        let handled = machine.uploadFailed(id: uploadId, error: networkError)
+        #expect(handled)
+        if case .failed(let id, let message) = machine.state {
+            #expect(id == uploadId)
+            #expect(message == FriendlyError.message(for: networkError))
+        } else {
+            Issue.record("Expected failed state for real network error")
+        }
+    }
+}

@@ -284,6 +284,17 @@ struct FeedbackAttachmentManagerTests {
         #expect(stateMachine.currentErrorMessage == nil)
     }
 
+    @Test func uploadFailedWithURLErrorCancelledResetsToIdleWithoutError() {
+        var stateMachine = FeedbackAttachmentStateMachine()
+        let uploadId = stateMachine.startUpload()
+        #expect(stateMachine.isUploading)
+
+        let handled = stateMachine.uploadFailed(id: uploadId, error: URLError(.cancelled))
+        #expect(handled == true)
+        #expect(stateMachine.state == .idle)
+        #expect(stateMachine.currentErrorMessage == nil)
+    }
+
     // MARK: - State Machine: Reset after success
 
     @Test func resetRestoresCleanDraftAndIdleState() {

@@ -233,7 +233,7 @@ struct FeedbackUploadCompletionContractTests {
 
         let client = makeClient(baseURL: URL(string: "https://\(host)")!)
         var machine = FeedbackAttachmentStateMachine()
-        var draft = FeedbackDraft.autofilled(platform: .ios)
+        let draft = FeedbackDraft.autofilled(platform: .ios)
         let uploadId = machine.startUpload()
 
         let task = Task {
@@ -260,6 +260,13 @@ struct FeedbackUploadCompletionContractTests {
         #expect(machine.state == .idle)
         #expect(machine.currentErrorMessage == nil)
         #expect(draft.attachments.isEmpty)
+
+        // Same contract holds when URLSession throws URLError(.cancelled)
+        let secondUploadId = machine.startUpload()
+        let recordedURLError = machine.uploadFailed(id: secondUploadId, error: URLError(.cancelled))
+        #expect(recordedURLError)
+        #expect(machine.state == .idle)
+        #expect(machine.currentErrorMessage == nil)
     }
 
     @Test func offOriginSlotUploadURLThrowsAndRecordsZeroRequestsToForeignHost() async throws {
