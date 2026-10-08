@@ -1,3 +1,7 @@
+// swiftlint:disable file_length
+// One surface per file: the view's @State must stay file-private, so the
+// body is organized by MARK sections rather than split across files to fit
+// the size budget (same policy as the oversized test suites, .swiftlint.yml).
 #if canImport(UIKit)
 import UIKit
 #endif

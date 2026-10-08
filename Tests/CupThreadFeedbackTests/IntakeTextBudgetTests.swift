@@ -61,7 +61,9 @@ struct IntakeTextBudgetTests {
         }
     }
 
-    func makeClient(turnstileTokenProvider: (@Sendable () async -> String?)? = nil) -> FeedbackClient {
+    func makeClient(
+        turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil
+    ) -> FeedbackClient {
         FeedbackClient(
             configuration: FeedbackClientConfiguration(
                 baseURL: Self.baseURL,
@@ -96,7 +98,7 @@ struct IntakeTextBudgetTests {
 
     @Test func oversizedFeedbackPayloadRejectsWithoutNetworkEvenWithTurnstileProvider() async {
         let recorder = makeRecordingHandler()
-        let client = makeClient(turnstileTokenProvider: { "tok-1234567890" })
+        let client = makeClient(turnstileTokenProvider: { _ in "tok-1234567890" })
         let draft = FeedbackDraft(
             title: "Crash log attached below",
             description: Self.multibyteOverBudgetBody,
