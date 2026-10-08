@@ -70,7 +70,16 @@ public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
     /// Server-assigned identifier for the upload. For session uploads this
     /// equals ``uploadId``; kept for display fallbacks and legacy references.
     public let key: String
-    /// URL where the file can be fetched.
+    /// URL associated with the attachment's bytes — not a public fetch
+    /// location. When the upload response carries a server-issued
+    /// `downloadUrl`, this is that URL after the SDK's host validation: the
+    /// authorized download endpoint, usable once the feedback submission
+    /// finalizes. Otherwise (uploads are stored as private attachments and
+    /// the response carries no delivery fields) it falls back to the
+    /// session's opaque slot upload URL. Treat the value as opaque either
+    /// way: private attachments are retrievable only through the authorized,
+    /// signed download flow after finalization, never as a publicly
+    /// fetchable asset.
     public let url: URL
     /// Original filename, when one was provided with the upload.
     public let filename: String?
@@ -87,7 +96,8 @@ public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
     ///   - kind: The storage backend holding the file.
     ///   - uploadId: Upload-session id binding the attachment to its bytes.
     ///   - key: Server-assigned storage key.
-    ///   - url: URL where the file can be fetched.
+    ///   - url: Server-issued download URL or the opaque slot upload URL
+    ///     fallback; never a publicly fetchable location.
     ///   - filename: Original filename, if any.
     ///   - mimeType: MIME type of the file, if known.
     ///   - size: File size in bytes, if known.
