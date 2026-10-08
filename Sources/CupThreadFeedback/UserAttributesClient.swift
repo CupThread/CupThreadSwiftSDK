@@ -98,11 +98,11 @@ extension FeedbackClient {
     /// Reports end-user attributes (paying status, plan, MRR, currency) to
     /// `PUT /api/v1/public/apps/{appKey}/user`.
     ///
-    /// When reporting paying-user attributes (`isPaying`, `plan`, or `mrr`),
+    /// When reporting paying-user attributes (`isPaying`, `plan`, `mrr`, or `currency`),
     /// the request must be HMAC-SHA256 signed using the app's SDK signing secret
     /// (configured on ``FeedbackClientConfiguration/signingSecret`` or provided
     /// via the `signingSecret` parameter). Requests without payment attributes
-    /// (identity or `currency`-only updates) do not require a signature and are
+    /// (identity-only updates) do not require a signature and are
     /// sent unsigned.
     ///
     /// To explicitly clear an attribute server-side (such as a churned subscription
@@ -124,7 +124,7 @@ extension FeedbackClient {
     ///   - isPaying: Whether the user is on a paid plan.
     ///   - plan: Host-app plan name (e.g. `"pro"`).
     ///   - mrr: Monthly recurring revenue attributable to this user.
-    ///   - currency: Three-letter ISO 4217 code for `mrr` (the backend defaults to `"USD"`).
+    ///   - currency: Three-letter ISO 4217 code for `mrr` (an omitted currency preserves the stored value).
     ///   - userToken: Anonymous user token sent as `X-User-Token`.
     ///   - signingSecret: Optional override for the SDK signing secret configured
     ///     on ``FeedbackClientConfiguration/signingSecret``.
@@ -257,7 +257,7 @@ extension FeedbackClient {
         signingSecret: String? = nil,
         timestamp: Int64? = nil
     ) async throws -> UserAttributesUpdateResult {
-        let hasPaymentAttributes = isPaying != .unset || plan != .unset || mrr != .unset
+        let hasPaymentAttributes = isPaying != .unset || plan != .unset || mrr != .unset || currency != .unset
 
         func signedPayload(epochSeconds: Int64, secret: String) -> UserAttributesPayload {
             let canonical = UserAttributesSigner.canonicalString(
