@@ -173,11 +173,12 @@ final class AppConfigStore: @unchecked Sendable {
     /// Returns the configuration through the cache: the TTL entry when fresh,
     /// otherwise joining the single in-flight fetch or starting one.
     ///
-    /// The fetch runs in an unstructured task, so a caller that is cancelled
-    /// while waiting neither aborts the shared request nor strands its
-    /// co-waiters — the completed response still warms the cache for the next
-    /// presentation. `fetch` is only invoked by the caller that starts the
-    /// request; co-waiters' closures are ignored.
+    /// The fetch runs in an unstructured task that records its own outcome
+    /// when it completes, so a caller that is cancelled while waiting neither
+    /// aborts the shared request nor strands its co-waiters — the completed
+    /// response still warms the cache for the next presentation. `fetch` is
+    /// only invoked by the caller that starts the request; co-waiters'
+    /// closures are ignored.
     /// - Parameter fetch: The authoritative network read, normally
     ///   ``FeedbackClient/fetchAppConfig()``.
     func config(
@@ -191,7 +192,7 @@ final class AppConfigStore: @unchecked Sendable {
     ///
     /// Joins an in-flight fetch when one is running (its result is fresh by
     /// construction — a fresh TTL entry never starts one), otherwise starts a
-    /// new request and installs the result as the cached entry.
+    /// new request whose task installs the result as the cached entry.
     /// - Parameter fetch: The authoritative network read, normally
     ///   ``FeedbackClient/fetchAppConfig()``.
     func forceRefresh(
@@ -219,46 +220,49 @@ final class AppConfigStore: @unchecked Sendable {
     // unavailable from async contexts)
 
     /// Awaits the single in-flight fetch, starting it when the caller is the
-    /// first reader. Only the reader that started the request records the
-    /// outcome (TTL entry + last-good persistence).
+    /// first reader. The fetch task itself records the outcome (TTL entry +
+    /// last-good persistence) when it completes, so a cancelled waiter can
+    /// neither drop the result nor strand its co-waiters.
     private func awaitJoinedFetch(
         _ fetch: @escaping @Sendable () async throws -> PublicAppConfig
     ) async throws -> PublicAppConfig {
-        let (task, created) = joinOrCreateFetch(fetch)
-        do {
-            let config = try await task.value
-            if created {
-                finish(with: .success(config))
+        try await joinOrCreateFetch(fetch).value
+    }
+
+    /// Returns the in-flight fetch to join, or — when the caller is the first
+    /// reader — starts one. The spawned task is self-finalizing: it owns the
+    /// state transition when the fetch settles, independent of whichever
+    /// caller is awaiting it, so a cancelled waiter can never run it.
+    private func joinOrCreateFetch(
+        _ fetch: @escaping @Sendable () async throws -> PublicAppConfig
+    ) -> Task<PublicAppConfig, Error> {
+        lock.lock()
+        defer { lock.unlock() }
+        if let inFlight { return inFlight }
+        // `lastGood` is captured strongly so a store deallocated mid-flight
+        // still persists the successful read for the next instance with the
+        // same app key; the weak store reference keeps the task from holding
+        // the store (and its in-flight slot) alive.
+        let task = Task { [weak self, lastGood] in
+            do {
+                let config = try await fetch()
+                self?.finish(with: .success(config))
                 lastGood.store(
                     appearance: config.sdk,
                     maxAttachmentBytes: config.maxAttachmentBytes
                 )
+                return config
+            } catch {
+                self?.finish(with: .failure(error))
+                throw error
             }
-            return config
-        } catch {
-            if created { finish(with: .failure(error)) }
-            throw error
         }
-    }
-
-    // MARK: Lock-guarded sections (kept synchronous: `NSLock.unlock` is
-    // unavailable from async contexts)
-
-    /// Returns the in-flight fetch to join, or — when the caller is the first
-    /// reader — starts one and reports `created: true`.
-    private func joinOrCreateFetch(
-        _ fetch: @escaping @Sendable () async throws -> PublicAppConfig
-    ) -> (task: Task<PublicAppConfig, Error>, created: Bool) {
-        lock.lock()
-        defer { lock.unlock() }
-        if let inFlight { return (inFlight, false) }
-        let task = Task { try await fetch() }
         inFlight = task
-        return (task, true)
+        return task
     }
 
-    /// Records the outcome of the fetch the caller started: installs the TTL
-    /// entry on success, always releases the in-flight slot.
+    /// Records the outcome of the fetch task: installs the TTL entry on
+    /// success, always releases the in-flight slot.
     private func finish(with result: Result<PublicAppConfig, Error>) {
         lock.lock()
         defer { lock.unlock() }
