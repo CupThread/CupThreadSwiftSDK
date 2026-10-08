@@ -73,6 +73,8 @@ public struct FeatureRequestsView: View {
     var isLoading: Bool { loadState.isLoading }
     var hasLoadedOnce: Bool { loadState.hasLoadedOnce }
     var loadGeneration: Int { loadState.loadGeneration }
+    /// Whether the post-submit success banner is presented (issue #270).
+    var isSubmittedBannerVisible: Bool { showSubmittedBanner }
 
     /// The query actually sent to the server, trimmed to match the throttle's
     /// duplicate detection.
@@ -122,6 +124,14 @@ public struct FeatureRequestsView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .searchable(text: $searchText, prompt: Text(CupThreadStrings.tr("cupthread.features.search_prompt")))
+        // Post-submit confirmation as a top overlay (issue #270), mirroring
+        // RoadmapBoardView's reloadNotice: it composes above both layouts and
+        // every content state, so an empty or failed post-submit reload never
+        // replaces the success banner — and tvOS's list, which has no inline
+        // banner slot, still shows the confirmation.
+        .overlay(alignment: .top) {
+            featureRequestsSubmittedBanner(isVisible: showSubmittedBanner)
+        }
         .toolbar {
             versionFilterToolbarItem
             composeToolbarItem
@@ -225,10 +235,6 @@ public struct FeatureRequestsView: View {
                     emptyState
                         .padding(.top, 48)
                 } else {
-                    if showSubmittedBanner {
-                        SubmittedBanner()
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
                     if let voteNotice {
                         InlineNoticeBanner(message: voteNotice)
                             .transition(.opacity.combined(with: .move(edge: .top)))
@@ -489,11 +495,13 @@ extension FeatureRequestsView {
         client: FeedbackClient,
         userToken: String,
         listState: FeatureRequestsListState,
-        loadState: FeatureRequestsLoadState
+        loadState: FeatureRequestsLoadState,
+        showsSubmittedBanner: Bool = false
     ) {
         self.client = client
         self.userToken = userToken
         _listState = State(initialValue: listState)
         _loadState = State(initialValue: loadState)
+        _showSubmittedBanner = State(initialValue: showsSubmittedBanner)
     }
 }
