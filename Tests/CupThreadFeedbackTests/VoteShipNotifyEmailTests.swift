@@ -61,6 +61,26 @@ struct VoteShipNotifyEmailTests {
         #expect(dict.count == 3)
     }
 
+    @Test func castVoteSendsShipNotifyEmailWhenProvided() async throws {
+        let capture = CaptureBox<Data>()
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            capture.value = bodyData(from: request)
+            return (makeHTTPResponse(status: 200), try encodeJSON(["voted": true, "voteCount": 7]))
+        }
+        defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
+
+        _ = try await Self.makeAPIClient().castVote(
+            featureRequestId: "fr-1",
+            userToken: "tok-1",
+            shipNotifyEmail: "voter@example.com"
+        )
+
+        let data = try #require(capture.value)
+        let dict = try #require(parseJSONDict(data))
+        #expect(dict["shipNotifyEmail"] as? String == "voter@example.com")
+        #expect(dict.count == 3)
+    }
+
     @Test func toggleVoteTrimsShipNotifyEmail() async throws {
         let capture = CaptureBox<Data>()
         MockURLProtocol.setHandler(forHost: Self.host) { request in

@@ -309,11 +309,13 @@ public struct VoteWarning: Decodable, Equatable, Sendable {
     }
 }
 
-/// Response to ``FeedbackClient/toggleVote(featureRequestId:userToken:shipNotifyEmail:)``.
+/// Response to ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:)``,
+/// ``FeedbackClient/removeVote(featureRequestId:userToken:)``, or
+/// ``FeedbackClient/toggleVote(featureRequestId:userToken:shipNotifyEmail:)``.
 public struct VoteResult: Decodable, Equatable, Sendable {
-    /// The user's vote state after the toggle.
+    /// The user's vote state after the operation.
     public let voted: Bool
-    /// The request's authoritative vote count after the toggle.
+    /// The request's authoritative vote count after the operation.
     public let voteCount: Int
     /// Historical votes copied from an external source provider at import time, when any.
     public let importedVotes: Int?
@@ -325,15 +327,15 @@ public struct VoteResult: Decodable, Equatable, Sendable {
     /// verified addresses. Built-in ``FeatureRequestsView`` flows never send
     /// that field, so they never receive one; the field is decoded for
     /// callers that opt in via
-    /// ``FeedbackClient/toggleVote(featureRequestId:userToken:shipNotifyEmail:)``
+    /// ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:)``
     /// or that post votes through their own transport. Branch on
     /// ``VoteWarning/code`` (see ``VoteWarning/isEmailNotVerified``).
     public let warning: VoteWarning?
 
     /// Creates a vote result.
     /// - Parameters:
-    ///   - voted: The user's vote state after the toggle.
-    ///   - voteCount: The request's authoritative vote count after the toggle.
+    ///   - voted: The user's vote state after the operation.
+    ///   - voteCount: The request's authoritative vote count after the operation.
     ///   - importedVotes: Historical votes copied from an external source provider at import time, if any.
     ///   - warning: Non-fatal server warning, if any.
     public init(voted: Bool, voteCount: Int, importedVotes: Int? = nil, warning: VoteWarning? = nil) {
