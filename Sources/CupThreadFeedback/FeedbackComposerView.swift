@@ -372,13 +372,9 @@ public struct FeedbackComposerView: View {
             }
             guard attachmentState.activeUploadId == uploadId else { return }
             _ = attachmentState.uploadSucceeded(id: uploadId, attachment: uploaded, draft: &draft)
-        } catch is CancellationError {
-            if attachmentState.activeUploadId == uploadId {
-                attachmentState.cancelUpload()
-            }
         } catch {
             guard attachmentState.activeUploadId == uploadId else { return }
-            if Task.isCancelled {
+            if error.isSdkCancellation || Task.isCancelled {
                 attachmentState.cancelUpload()
             } else {
                 _ = attachmentState.uploadFailed(id: uploadId, error: error)
