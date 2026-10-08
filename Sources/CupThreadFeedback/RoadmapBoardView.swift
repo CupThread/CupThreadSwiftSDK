@@ -181,7 +181,7 @@ public struct RoadmapBoardView: View {
                         hasEmittedAdmissionNotice = true
                     }
                 case .fullScreenError(let message):
-                    loadError = message
+                    loadState.loadError = message
                 }
                 return
             }
