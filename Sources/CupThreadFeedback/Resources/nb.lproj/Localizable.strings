@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "Meldingen er for lang. Kort den ned og prøv igjen.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld av %2$lld tegn";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "Opplastingsøkten har utløpt. Fjern filen, legg den ved på nytt og prøv igjen.";
+"cupthread.error.upload_session_invalid" = "Opplastingsøkten er ugyldig eller ikke lenger aktiv. Fjern filen, legg den ved på nytt og prøv igjen.";

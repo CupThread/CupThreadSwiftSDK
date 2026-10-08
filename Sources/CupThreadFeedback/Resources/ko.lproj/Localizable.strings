@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "메시지가 너무 깁니다. 줄인 후에 다시 시도해 주세요.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "입력 %1$lld자 ／ 최대 %2$lld자";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "업로드 세션이 만료되었습니다. 파일을 제거한 후 다시 첨부하여 다시 시도해 주세요.";
+"cupthread.error.upload_session_invalid" = "업로드 세션이 유효하지 않거나 더 이상 활성 상태가 아닙니다. 파일을 제거한 후 다시 첨부하여 다시 시도해 주세요.";

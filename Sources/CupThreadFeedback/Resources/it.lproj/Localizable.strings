@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "Il messaggio è troppo lungo. Accorcialo e riprova.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld di %2$lld caratteri";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "La sessione di caricamento è scaduta. Rimuovi il file, allegalo di nuovo e riprova.";
+"cupthread.error.upload_session_invalid" = "La sessione di caricamento non è valida o non è più attiva. Rimuovi il file, allegalo di nuovo e riprova.";

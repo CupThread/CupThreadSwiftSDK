@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "您的內容太長，請精簡後再試。";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "已輸入 %1$lld 個字元，上限 %2$lld 個";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "上傳工作階段已過期。請移除檔案後重新附加，再試一次。";
+"cupthread.error.upload_session_invalid" = "上傳工作階段無效或已失效。請移除檔案後重新附加，再試一次。";

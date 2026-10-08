@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "您的内容太长，请精简后再试。";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "已输入 %1$lld 个字符，上限 %2$lld 个";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "上传会话已过期。请移除文件后重新附加，再试一次。";
+"cupthread.error.upload_session_invalid" = "上传会话无效或已失效。请移除文件后重新附加，再试一次。";

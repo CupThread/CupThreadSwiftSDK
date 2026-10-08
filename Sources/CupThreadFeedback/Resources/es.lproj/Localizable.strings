@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "Tu mensaje es demasiado largo. Acórtalo e inténtalo de nuevo.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld de %2$lld caracteres";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "La sesión de subida ha caducado. Quita el archivo, vuelve a adjuntarlo e inténtalo de nuevo.";
+"cupthread.error.upload_session_invalid" = "La sesión de subida no es válida o ya no está activa. Quita el archivo, vuelve a adjuntarlo e inténtalo de nuevo.";

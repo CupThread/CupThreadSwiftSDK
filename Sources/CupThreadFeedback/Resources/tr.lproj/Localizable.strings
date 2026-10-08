@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "Mesajınız çok uzun. Lütfen kısaltıp tekrar deneyin.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "kullanılan %1$lld ／ sınır %2$lld karakter";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "Yükleme oturumunun süresi doldu. Lütfen dosyayı kaldırıp yeniden ekleyin ve tekrar deneyin.";
+"cupthread.error.upload_session_invalid" = "Yükleme oturumu geçersiz veya artık etkin değil. Lütfen dosyayı kaldırıp yeniden ekleyin ve tekrar deneyin.";

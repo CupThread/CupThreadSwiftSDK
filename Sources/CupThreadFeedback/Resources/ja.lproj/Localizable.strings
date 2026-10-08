@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "メッセージが長すぎます。短くしてからもう一度お試しください。";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "入力 %1$lld 文字 ／ 上限 %2$lld 文字";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "アップロードセッションの有効期限が切れました。ファイルを削除して再度添付し、もう一度お試しください。";
+"cupthread.error.upload_session_invalid" = "アップロードセッションが無効か、すでに終了しています。ファイルを削除して再度添付し、もう一度お試しください。";

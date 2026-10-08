@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "Ihr Text ist zu lang. Bitte kürzen Sie ihn und versuchen Sie es erneut.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld von %2$lld Zeichen";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "Die Upload-Sitzung ist abgelaufen. Entfernen Sie die Datei, hängen Sie sie erneut an und versuchen Sie es noch einmal.";
+"cupthread.error.upload_session_invalid" = "Die Upload-Sitzung ist ungültig oder nicht mehr aktiv. Entfernen Sie die Datei, hängen Sie sie erneut an und versuchen Sie es noch einmal.";

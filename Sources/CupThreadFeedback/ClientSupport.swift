@@ -182,7 +182,12 @@ extension FeedbackClient {
             // uploadId (#257, SaaS #579). No duplicate submission was created.
             return .alreadyFinalized(message: envelopeMessage, requestId: requestId)
         default:
-            return signatureTypedError(
+            return uploadSessionLifecycleTypedError(
+                statusCode: statusCode,
+                code: code,
+                envelopeMessage: envelopeMessage,
+                requestId: requestId
+            ) ?? signatureTypedError(
                 statusCode: statusCode,
                 code: code,
                 envelopeMessage: envelopeMessage,

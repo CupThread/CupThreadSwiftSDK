@@ -223,3 +223,7 @@
 "cupthread.error.text_too_long" = "Your message is too long. Please shorten it and try again.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld of %2$lld characters";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "The upload session has expired. Please remove and re-attach the file, then try again.";
+"cupthread.error.upload_session_invalid" = "The upload session is invalid or no longer active. Please remove and re-attach the file, then try again.";

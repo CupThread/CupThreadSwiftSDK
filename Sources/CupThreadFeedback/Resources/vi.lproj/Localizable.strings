@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "Nội dung quá dài. Vui lòng rút gọn rồi thử lại.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "Đã nhập %1$lld trên %2$lld ký tự";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "Phiên tải lên đã hết hạn. Hãy gỡ tệp ra, đính kèm lại rồi thử lại.";
+"cupthread.error.upload_session_invalid" = "Phiên tải lên không hợp lệ hoặc không còn hoạt động. Hãy gỡ tệp ra, đính kèm lại rồi thử lại.";

@@ -104,6 +104,15 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// device clock skew. Ensure the device clock is set correctly and let the
     /// SDK retry with a fresh signature.
     case staleSignature(message: String?, requestId: String?)
+    /// The upload session expired before the file could be uploaded
+    /// (HTTP 401 `session_expired` / `session_invalid_or_expired`). Remove
+    /// and re-attach the file to create a fresh upload session and try again.
+    case uploadSessionExpired(message: String?, requestId: String?)
+    /// The upload session was invalid, unknown, or no longer pending
+    /// (HTTP 401 `session_invalid`, HTTP 409 `session_not_pending` /
+    /// `already_uploaded`). Remove and re-attach the file to create a fresh
+    /// upload session and try again.
+    case uploadSessionInvalid(message: String?, requestId: String?)
     /// A feedback submission referenced an attachment upload ID that was already
     /// finalized into another submission (HTTP 409 `already_finalized`).
     /// The losing request creates no duplicate submission and consumes no monthly quota.
@@ -136,7 +145,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
              .subscriptionInactive, .turnstileRequired, .commentsUnavailable, .emailNotVerified,
              .invalidParent, .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
-             .invalidSignature, .staleSignature, .alreadyFinalized, .textTooLong:
+             .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
+             .alreadyFinalized, .textTooLong:
             return nil
         }
     }
@@ -217,6 +227,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .staleSignature(_, let requestId):
             return requestId
+        case .uploadSessionExpired(_, let requestId):
+            return requestId
+        case .uploadSessionInvalid(_, let requestId):
+            return requestId
         case .alreadyFinalized(_, let requestId):
             return requestId
         case .unexpectedStatus(_, _, let requestId):
@@ -281,6 +295,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return CupThreadStrings.tr("cupthread.error.invalid_signature") + Self.requestIdSuffix(requestId)
         case .staleSignature(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.stale_signature") + Self.requestIdSuffix(requestId)
+        case .uploadSessionExpired(_, let requestId):
+            return CupThreadStrings.tr("cupthread.error.upload_session_expired") + Self.requestIdSuffix(requestId)
+        case .uploadSessionInvalid(_, let requestId):
+            return CupThreadStrings.tr("cupthread.error.upload_session_invalid") + Self.requestIdSuffix(requestId)
         case .alreadyFinalized(_, let requestId):
             // Raw server body stays off the user-facing copy (#257); callers
             // can read the associated `message` programmatically.
@@ -377,6 +395,16 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``staleSignature(message:requestId:)`` with no request id.
     static func staleSignature(message: String? = nil) -> FeedbackClientError {
         .staleSignature(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``uploadSessionExpired(message:requestId:)`` with no request id.
+    static func uploadSessionExpired(message: String? = nil) -> FeedbackClientError {
+        .uploadSessionExpired(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``uploadSessionInvalid(message:requestId:)`` with no request id.
+    static func uploadSessionInvalid(message: String? = nil) -> FeedbackClientError {
+        .uploadSessionInvalid(message: message, requestId: nil)
     }
 
     /// Convenience constructor for ``alreadyFinalized(message:requestId:)`` with no request id.

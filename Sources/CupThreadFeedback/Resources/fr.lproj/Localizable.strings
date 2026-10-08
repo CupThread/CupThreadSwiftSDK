@@ -224,3 +224,7 @@
 "cupthread.error.text_too_long" = "Votre message est trop long. Raccourcissez-le et réessayez.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld caractères sur %2$lld";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "La session de téléversement a expiré. Supprimez le fichier, joignez-le à nouveau, puis réessayez.";
+"cupthread.error.upload_session_invalid" = "La session de téléversement est invalide ou n'est plus active. Supprimez le fichier, joignez-le à nouveau, puis réessayez.";
