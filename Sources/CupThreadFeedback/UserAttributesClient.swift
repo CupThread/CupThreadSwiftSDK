@@ -78,12 +78,52 @@ struct UserAttributesPayload: Encodable, Sendable {
         }
     }
 
+    /// Encodes a string attribute with the same CR/LF sanitization the
+    /// canonical string applies (SEC-3). The server verifies the HMAC against
+    /// the values it receives, so the wire value must be the sanitized line —
+    /// sending the raw string would make every signed report carrying a
+    /// newline in `plan`/`currency` fail signature verification.
+    private func encodeTextField(
+        _ field: UserAttributesSigner.Field<String>,
+        forKey key: CodingKeys,
+        into container: inout KeyedEncodingContainer<CodingKeys>
+    ) throws {
+        switch field {
+        case .unset:
+            break
+        case .null:
+            try container.encodeNil(forKey: key)
+        case .value(let value):
+            try container.encode(UserAttributesSigner.sanitizedLine(value), forKey: key)
+        }
+    }
+
+    /// Encodes a numeric attribute, coercing non-finite doubles to `0` (SEC-3):
+    /// `JSONEncoder` refuses NaN/infinity outright, which would abort the whole
+    /// update before any bytes reach the network, and
+    /// ``UserAttributesSigner/canonicalNumber(_:)`` already renders those
+    /// values as `"0"` for the signature.
+    private func encodeFiniteNumberField(
+        _ field: UserAttributesSigner.Field<Double>,
+        forKey key: CodingKeys,
+        into container: inout KeyedEncodingContainer<CodingKeys>
+    ) throws {
+        switch field {
+        case .unset:
+            break
+        case .null:
+            try container.encodeNil(forKey: key)
+        case .value(let value):
+            try container.encode(value.isFinite ? value : 0, forKey: key)
+        }
+    }
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try encodeField(isPaying, forKey: .isPaying, into: &container)
-        try encodeField(plan, forKey: .plan, into: &container)
-        try encodeField(mrr, forKey: .mrr, into: &container)
-        try encodeField(currency, forKey: .currency, into: &container)
+        try encodeTextField(plan, forKey: .plan, into: &container)
+        try encodeFiniteNumberField(mrr, forKey: .mrr, into: &container)
+        try encodeTextField(currency, forKey: .currency, into: &container)
         try container.encodeIfPresent(signature, forKey: .signature)
         try container.encodeIfPresent(timestamp, forKey: .timestamp)
     }

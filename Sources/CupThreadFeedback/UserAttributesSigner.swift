@@ -102,13 +102,14 @@ public enum UserAttributesSigner {
     /// - `|value| ≥ 1e21` mirrors ECMA's switch to `ToString` and returns the shortest
     ///   round-trip decimal/exponential string. MRR cannot reach this boundary; the
     ///   check also keeps the fixed-point integer path overflow-free.
-    /// - Non-finite values fall back to Swift's default description. JSON cannot carry
-    ///   NaN or infinity, so this is defensive only.
+    /// - Non-finite values (`NaN`, `±infinity`) canonicalize to `"0"`: JSON cannot
+    ///   carry them, and the wire encoder coerces them to `0` so the signed
+    ///   canonical string and the transmitted payload always agree (SEC-3).
     ///
     /// - Parameter value: The numeric amount (e.g. MRR).
     /// - Returns: The formatted canonical representation (e.g. `1200`, `99.5`, `12.34`, `0`).
     public static func canonicalNumber(_ value: Double) -> String {
-        guard value.isFinite else { return "\(value)" }
+        guard value.isFinite else { return "0" }
         if value == 0 { return "0" }
         if value.magnitude >= 1e21 { return "\(value)" }
 
@@ -172,6 +173,23 @@ public enum UserAttributesSigner {
         return String(quotient + (roundUp ? 1 : 0))
     }
 
+    /// Replaces CR/LF sequences in a host-supplied string with single spaces so
+    /// it can never inject additional lines into the newline-delimited
+    /// canonical string (SEC-3): a plan of `"pro\n1200\nUSD\n1773600000"` would
+    /// otherwise shift every following field and desynchronize — or forge —
+    /// the HMAC. ``UserAttributesPayload``'s encoder applies the same
+    /// replacement to the values it sends, so the server's canonicalization of
+    /// the received payload always reconstructs the signed string.
+    ///
+    /// - Parameter string: The raw field value (e.g. a plan name).
+    /// - Returns: A single-line rendering of the value.
+    static func sanitizedLine(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+    }
+
     /// Assembles the canonical string for a user-attribute update request from arguments.
     ///
     /// Canonical format (newline-joined, no trailing newline):
@@ -186,13 +204,17 @@ public enum UserAttributesSigner {
     /// <timestamp: epochSeconds>
     /// ```
     ///
+    /// `appKey`, `userToken`, and string field values are newline-sanitized
+    /// (SEC-3): CR/LF sequences in host-supplied strings become single spaces,
+    /// so the canonical form always contains exactly the eight lines above.
+    ///
     /// - Parameter arguments: The arguments specifying each field value.
     /// - Returns: The exact canonical string to be HMAC-signed.
     public static func canonicalString(for arguments: Arguments) -> String {
         let lines = [
             prefix,
-            arguments.appKey,
-            arguments.userToken,
+            sanitizedLine(arguments.appKey),
+            sanitizedLine(arguments.userToken),
             arguments.isPaying.canonicalRepresentation,
             arguments.plan.canonicalRepresentation,
             arguments.mrr.canonicalRepresentation,
@@ -238,7 +260,9 @@ extension UserAttributesSigner.Field where T == String {
         case .null:
             return "null"
         case .value(let string):
-            return string
+            // A raw value must never carry the record's "\n" delimiter onto a
+            // line of its own (SEC-3).
+            return UserAttributesSigner.sanitizedLine(string)
         }
     }
 }
