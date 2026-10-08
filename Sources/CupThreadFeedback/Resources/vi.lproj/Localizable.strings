@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Bạn đã đăng ký";
 "cupthread.subscribe.manage_message" = "Email cập nhật sẽ được gửi đến %@. Để đổi địa chỉ hoặc hủy đăng ký, hãy dùng liên kết trong bất kỳ email cập nhật nào.";
 "cupthread.subscribe.use_different_email" = "Dùng email khác";
+"cupthread.subscribe.pending_title" = "Đang chờ xác nhận";
+"cupthread.subscribe.pending_message" = "Chúng tôi đã gửi liên kết xác nhận đến %@. Hãy mở liên kết để bắt đầu nhận email cập nhật.";
+"cupthread.subscribe.resend_button" = "Gửi lại email xác nhận";
+"cupthread.subscribe.resending_button" = "Đang gửi lại…";
 "cupthread.whatsnew.emails_on" = "Email cập nhật đang bật";
 "cupthread.whatsnew.emails_on_destination" = "Thông báo gửi đến %@.";
 "cupthread.whatsnew.get_emails" = "Nhận email cập nhật";
 "cupthread.whatsnew.get_emails_caption" = "Nhận thông báo khi có phiên bản mới.";
 "cupthread.whatsnew.subscribe_accessibility" = "Đăng ký nhận email cập nhật";
 "cupthread.whatsnew.emails_on_accessibility" = "Email cập nhật đang bật cho %@";
+"cupthread.whatsnew.pending_title" = "Đang chờ xác nhận";
+"cupthread.whatsnew.pending_destination" = "Chúng tôi đã gửi liên kết xác nhận đến %@.";
+"cupthread.whatsnew.pending_accessibility" = "Đang chờ xác nhận email cho %@";
 "cupthread.whatsnew.version_accessibility" = "Phiên bản %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Yêu cầu đã phát hành: %@";
 "cupthread.features.unavailable_feedback" = "Phản hồi không khả dụng";
@@ -195,3 +202,25 @@
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Phản hồi hoặc tệp đính kèm này đã được gửi.";
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Máy chủ phản hồi đã trả về một phản hồi không hợp lệ.";
+"cupthread.error.unreadable_upload_response" = "Máy chủ phản hồi đã trả về một phản hồi tải lên không thể đọc được.";
+"cupthread.error.auth_required" = "Thao tác này chỉ khả dụng cho người dùng đã đăng nhập.";
+"cupthread.error.scan_rejected" = "Tệp đính kèm được tham chiếu đã bị từ chối khi kiểm tra nội dung và không thể tải lên.";
+"cupthread.error.unsupported_media" = "Không hỗ trợ loại hình ảnh này. Vui lòng đính kèm ảnh PNG, JPEG, WebP hoặc GIF.";
+"cupthread.error.payload_too_large" = "Tệp đó quá lớn để tải lên.";
+"cupthread.error.uploader_identity_required" = "Tải lên cần có danh tính người dùng cuối. Hãy truyền userToken (xem UserTokenStore) khi tải tệp đính kèm.";
+"cupthread.error.uploader_mismatch" = "Tệp đính kèm này được tải lên bằng danh tính khác. Vui lòng gỡ bỏ và đính kèm lại, rồi thử lại.";
+"cupthread.error.quota_exceeded" = "Ứng dụng này đã đạt giới hạn gửi trong tháng này. Vui lòng thử lại sau.";
+"cupthread.error.subscription_inactive" = "Hiện không thể gửi nội dung cho ứng dụng này. Vui lòng thử lại sau.";
+"cupthread.error.profile_not_found" = "Hồ sơ người dùng này không còn khả dụng.";
+"cupthread.error.comments_unavailable" = "Tính năng bình luận không khả dụng cho yêu cầu tính năng này.";
+"cupthread.error.email_not_verified" = "Vui lòng dùng địa chỉ email của tài khoản đã đăng nhập để đăng ký.";
+"cupthread.attachment.oversized" = "Tệp đính kèm (%1$@) vượt quá kích thước tối đa cho phép là %2$@.";
+"cupthread.attachment.unprocessable" = "Không thể xử lý ảnh đã chọn để tải lên.";
+"cupthread.attachment.unsupported_type" = "Không hỗ trợ loại hình ảnh này. Vui lòng đính kèm ảnh PNG, JPEG, WebP hoặc GIF.";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Nội dung quá dài. Vui lòng rút gọn rồi thử lại.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "Đã nhập %1$lld trên %2$lld ký tự";

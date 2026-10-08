@@ -308,6 +308,9 @@ extension FeedbackClient {
 
     /// Presents the latest changelog overlay using copy and limits from the console.
     ///
+    /// Fetches the app configuration and a single page of newest entries sized
+    /// to the console-configured entry count, then displays the overlay using the
+    /// configured presenter.
     /// Returns `false` when changelog is hidden, sign-in is required but no
     /// usable bearer token can be presented, there is no host window to present
     /// from, or there are no published entries. Throws if the network request fails.
@@ -317,7 +320,7 @@ extension FeedbackClient {
     /// - Parameter onlyIfUnseen: When `true`, suppresses presentation if the newest
     ///   version has already been marked as seen via ``hasSeenChangelog(version:)``.
     /// - Returns: Whether the overlay was actually presented.
-    /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
+    /// - Throws: The same errors as ``fetchChangelog(limit:cursor:)`` and ``fetchAppConfig()``
     ///   when either network call fails.
     @MainActor
     @discardableResult
@@ -339,6 +342,9 @@ extension FeedbackClient {
     /// published, or when `onlyIfUnseen` is true and the latest release was
     /// already seen.
     ///
+    /// Fetches a single page of newest entries sized to the console-configured
+    /// `entryCount` (clamped to 1...10) rather than walking full changelog history.
+    ///
     /// Pair the result with ``ChangelogOverlayView`` for custom presentation:
     ///
     /// ```swift
@@ -358,7 +364,7 @@ extension FeedbackClient {
     ///   was already marked as seen.
     /// - Returns: Newest entries (capped by the console's entry count) plus
     ///   the appearance, or `nil` when the overlay should stay hidden.
-    /// - Throws: The same errors as ``fetchChangelog()`` and ``fetchAppConfig()``
+    /// - Throws: The same errors as ``fetchChangelog(limit:cursor:)`` and ``fetchAppConfig()``
     ///   when either network call fails.
     public func prepareChangelogOverlay(
         onlyIfUnseen: Bool = false
@@ -369,9 +375,10 @@ extension FeedbackClient {
             config: config,
             supportsAuthentication: await resolveAuthenticatedAccess()
         ) == .load else { return nil }
-        let all: [ChangelogEntry]
+        let limit = max(1, config.sdk.changelogOverlay.entryCount)
+        let page: ListChangelogResult
         do {
-            all = try await fetchChangelog()
+            page = try await fetchChangelog(limit: limit)
         } catch {
             // The preflight resolved a token but the server still answered
             // 401 (e.g. it expired between the check and the send): the
@@ -379,7 +386,7 @@ extension FeedbackClient {
             if isSdkPermissionRejection(error) { return nil }
             throw error
         }
-        let entries = Array(all.prefix(config.sdk.changelogOverlay.entryCount))
+        let entries = Array(page.entries.prefix(config.sdk.changelogOverlay.entryCount))
         guard let latest = entries.first else { return nil }
 
         if onlyIfUnseen {

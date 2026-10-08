@@ -24,9 +24,11 @@ import Foundation
 ///   during which query-bearing admissions are denied; the next emission
 ///   after the cooldown resumes searching.
 ///
-/// Plain listings (no query) bypass the throttle — the backend does not
-/// rate-limit them. User-initiated loads (pull-to-refresh, retry buttons)
-/// bypass it too, so the throttle can never strand a deliberate action.
+/// Plain listings (no query) bypass the throttle completely — the backend does not
+/// rate-limit them. User-initiated loads (pull-to-refresh, retry buttons, deep pagination)
+/// bypass waiting so the throttle can never strand a deliberate action, but query-bearing
+/// fetches are recorded (via ``recordQueryFetch(key:)``) so the sliding window accurately
+/// tracks them against the per-IP budget.
 actor SearchRequestThrottle {
     private let minimumInterval: Duration
     private let windowPeriod: Duration
@@ -94,6 +96,23 @@ actor SearchRequestThrottle {
             admittedTimes.append(admittedAt)
             return true
         }
+    }
+
+    /// Records a query-bearing fetch that already happened (or is about to)
+    /// without suspending — user-initiated loads are never delayed, but they
+    /// still spend the per-IP budget, so the window must reflect them.
+    func recordQueryFetch(key: String? = nil) {
+        admittedTimes.removeAll { now() - $0 >= windowPeriod }
+        admittedTimes.append(now())
+        if let key {
+            lastAdmittedKey = key
+            lastAdmittedAt = now()
+        }
+    }
+
+    /// Number of admitted query-bearing fetches currently within the sliding window.
+    var admittedCount: Int {
+        admittedTimes.filter { now() - $0 < windowPeriod }.count
     }
 
     /// Starts the post-429 cooldown and clears the duplicate gate, so the
@@ -168,5 +187,56 @@ enum SearchReloadOutcome: Equatable {
             message = FriendlyError.message(for: error)
         }
         return hasExistingContent ? .inlineNotice(message) : .fullScreenError(message)
+    }
+}
+
+// MARK: - Search admission outcome presentation
+
+/// How a denied search-throttle admission should be presented.
+///
+/// When the throttle denies a query-bearing fetch (active 429 cooldown,
+/// duplicate search, or window exhaustion), the surface must explain to the
+/// user why the search did not run instead of silently leaving stale results
+/// on screen.
+///
+/// When previous results are visible, the denial becomes a transient inline
+/// notice; on a fresh surface with nothing to show, it presents the full-screen
+/// error view so the user does not see a bare skeleton or empty state.
+///
+/// Cancellation is not a denial: superseded keystrokes and dismissed views
+/// must remain completely silent (``outcome(isCancelled:hasExistingContent:)``
+/// returns `nil`).
+enum SearchAdmissionOutcome: Equatable {
+    /// Previous results stay visible; show this message as a transient notice.
+    case inlineNotice(String)
+    /// Nothing to show — present the full-screen error view with this message.
+    case fullScreenError(String)
+
+    /// Derives the presentation for an admission denial.
+    ///
+    /// - Parameters:
+    ///   - isCancelled: Whether the calling task was cancelled (superseded keystroke).
+    ///   - hasExistingContent: Whether the surface already shows results.
+    /// - Returns: `nil` when `isCancelled` is `true`; otherwise the outcome for the denial.
+    static func outcome(isCancelled: Bool, hasExistingContent: Bool) -> SearchAdmissionOutcome? {
+        guard !isCancelled else { return nil }
+        let message = CupThreadStrings.tr("cupthread.search.rate_limited")
+        return hasExistingContent ? .inlineNotice(message) : .fullScreenError(message)
+    }
+
+    /// Derives the presentation for an admission verdict.
+    ///
+    /// - Parameters:
+    ///   - wasAdmitted: Whether the throttle admitted the fetch.
+    ///   - isCancelled: Whether the calling task was cancelled (superseded keystroke).
+    ///   - hasExistingContent: Whether the surface already shows results.
+    /// - Returns: `nil` if admitted or cancelled; otherwise the outcome for the denial.
+    static func outcome(
+        wasAdmitted: Bool,
+        isCancelled: Bool,
+        hasExistingContent: Bool
+    ) -> SearchAdmissionOutcome? {
+        guard !wasAdmitted else { return nil }
+        return outcome(isCancelled: isCancelled, hasExistingContent: hasExistingContent)
     }
 }

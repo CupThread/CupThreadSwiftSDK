@@ -75,9 +75,18 @@ struct WhatsNewViewState: Equatable, Sendable {
         self.loadError = FriendlyError.message(for: error)
     }
 
-    /// Handles the case where changelog access is disallowed by console permissions.
-    mutating func handlePermissionDenied() {
+    /// Handles the case where changelog access is disallowed by console permissions for a specific generation.
+    /// Invalidates stale in-flight loads by bumping the generation counter.
+    mutating func handlePermissionDenied(generation: Int) {
+        guard loadGeneration == generation else { return }
         self.isLoading = false
         self.hasLoadedOnce = true
+        self.loadError = nil
+        self.loadGeneration += 1
+    }
+
+    /// Handles the case where changelog access is disallowed by console permissions.
+    mutating func handlePermissionDenied() {
+        handlePermissionDenied(generation: loadGeneration)
     }
 }

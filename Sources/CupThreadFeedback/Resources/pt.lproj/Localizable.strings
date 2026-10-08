@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Você está inscrito";
 "cupthread.subscribe.manage_message" = "Os e-mails de novidades serão enviados para %@. Para alterar o endereço ou cancelar a inscrição, use o link em qualquer e-mail de novidades.";
 "cupthread.subscribe.use_different_email" = "Usar outro e-mail";
+"cupthread.subscribe.pending_title" = "Confirmação pendente";
+"cupthread.subscribe.pending_message" = "Enviamos um link de confirmação para %@. Abra-o para começar a receber as novidades por e-mail.";
+"cupthread.subscribe.resend_button" = "Reenviar e-mail de confirmação";
+"cupthread.subscribe.resending_button" = "Reenviando…";
 "cupthread.whatsnew.emails_on" = "E-mails de novidades ativados";
 "cupthread.whatsnew.emails_on_destination" = "As notificações vão para %@.";
 "cupthread.whatsnew.get_emails" = "Receber e-mails de novidades";
 "cupthread.whatsnew.get_emails_caption" = "Seja avisado quando uma nova versão for lançada.";
 "cupthread.whatsnew.subscribe_accessibility" = "Inscrever-se para e-mails de novidades";
 "cupthread.whatsnew.emails_on_accessibility" = "Os e-mails de novidades estão ativados para %@";
+"cupthread.whatsnew.pending_title" = "Confirmação pendente";
+"cupthread.whatsnew.pending_destination" = "Enviamos um link de confirmação para %@.";
+"cupthread.whatsnew.pending_accessibility" = "Confirmação por e-mail pendente para %@";
 "cupthread.whatsnew.version_accessibility" = "Versão %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Sugestões lançadas: %@";
 "cupthread.features.unavailable_feedback" = "Feedback indisponível";
@@ -195,3 +202,25 @@
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Este feedback ou anexo já foi enviado.";
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "O servidor de feedback retornou uma resposta inválida.";
+"cupthread.error.unreadable_upload_response" = "O servidor de feedback retornou uma resposta de upload ilegível.";
+"cupthread.error.auth_required" = "Esta ação está disponível apenas para usuários conectados.";
+"cupthread.error.scan_rejected" = "O anexo referenciado foi rejeitado pela inspeção de conteúdo e não pôde ser enviado.";
+"cupthread.error.unsupported_media" = "Não há suporte para esse tipo de imagem. Anexe uma imagem PNG, JPEG, WebP ou GIF.";
+"cupthread.error.payload_too_large" = "Esse arquivo é grande demais para ser enviado.";
+"cupthread.error.uploader_identity_required" = "Os uploads exigem uma identidade de usuário final. Passe um userToken (veja UserTokenStore) ao enviar anexos.";
+"cupthread.error.uploader_mismatch" = "Este anexo foi enviado com uma identidade diferente. Remova-o, anexe-o novamente e tente de novo.";
+"cupthread.error.quota_exceeded" = "Este app atingiu o limite de envios deste mês. Tente novamente mais tarde.";
+"cupthread.error.subscription_inactive" = "Os envios estão indisponíveis para este app no momento. Tente novamente mais tarde.";
+"cupthread.error.profile_not_found" = "Este perfil de usuário não está mais disponível.";
+"cupthread.error.comments_unavailable" = "Os comentários não estão disponíveis para esta solicitação de recurso.";
+"cupthread.error.email_not_verified" = "Use o endereço de e-mail da sua conta conectada para se inscrever.";
+"cupthread.attachment.oversized" = "O anexo (%1$@) excede o tamanho máximo permitido de %2$@.";
+"cupthread.attachment.unprocessable" = "Não foi possível processar a foto selecionada para envio.";
+"cupthread.attachment.unsupported_type" = "Não há suporte para esse tipo de imagem. Anexe uma imagem PNG, JPEG, WebP ou GIF.";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "A mensagem é demasiado longa. Encurte-a e tente novamente.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld de %2$lld caracteres";

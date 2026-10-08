@@ -223,4 +223,48 @@ struct RoadmapPaginationTests {
             }
         }
     }
+
+    // MARK: - Page cap bounds and termination safety
+
+    private final class SafeCounter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+
+        func increment() -> Int {
+            lock.lock()
+            defer { lock.unlock() }
+            count += 1
+            return count
+        }
+
+        var value: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return count
+        }
+    }
+
+    @Test func terminatesAtMaxPagesWhenServerContinuesAdvertisingMore() async throws {
+        let counter = SafeCounter()
+        let collected = try await collectAllRequests(appKey: "app-test", maxPages: 3) { _ in
+            let pageIndex = counter.increment()
+            let start = (pageIndex - 1) * 10 + 1
+            let end = pageIndex * 10
+            let ids = (start...end).map { "req-\($0)" }
+            return makePage(ids, total: 0, hasMore: true, nextCursor: "cursor-\(pageIndex)")
+        }
+
+        #expect(counter.value == 3)
+        #expect(collected.count == 30)
+        #expect(collected.first?.id == "req-1")
+        #expect(collected.last?.id == "req-30")
+    }
+
+    @Test func defaultMaxPagesIsComfortablySizedForProductionBoards() {
+        #expect(RoadmapPaginationDefaults.defaultMaxPages == 100)
+        #expect(FeedbackClient.defaultMaxPages == 100)
+        // At 200 items per page, 100 pages covers 20,000 items.
+        let maxSupportedItems = RoadmapPaginationDefaults.defaultMaxPages * 200
+        #expect(maxSupportedItems >= 20_000)
+    }
 }

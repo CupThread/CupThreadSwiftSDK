@@ -18,14 +18,20 @@ extension FeedbackClient {
     ///   - userToken: Anonymous end-user token sent as `X-User-Token`.
     ///   - turnstileToken: Optional Turnstile token for apps that require one.
     ///     When `nil`, the client's `turnstileTokenProvider` is consulted as a
-    ///     fallback, so one provider configuration covers attachments and
-    ///     submission alike.
+    ///     fallback — with the ``TurnstileAction/feedback`` binding — so one
+    ///     provider configuration covers attachments and submission alike.
+    ///     Render the token under that binding (the app key as `cdata`);
+    ///     upload sessions deliberately share the feedback action with
+    ///     `POST /api/v1/feedback`.
     /// - Returns: The session, including bearer token and pre-allocated slots.
     /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
     ///   identity could be presented, ``FeedbackClientError/rateLimited`` on
     ///   HTTP 429, ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
-    ///   disables feedback attachments (HTTP 401/403), or
+    ///   disables feedback attachments (HTTP 401/403),
+    ///   ``FeedbackClientError/unsupportedMediaType(message:requestId:)``
+    ///   when a declared MIME type or executable extension is rejected
+    ///   (HTTP 400 `unsupported_mime_type` / `executable_extension_prohibited`), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   / ``FeedbackClientError/invalidResponse`` for other failures.
     public func createUploadSession(
@@ -50,7 +56,9 @@ extension FeedbackClient {
         )
         var effectiveTurnstileToken = turnstileToken?.nilIfEmpty
         if effectiveTurnstileToken == nil {
-            effectiveTurnstileToken = await resolvedTurnstileToken()
+            effectiveTurnstileToken = await resolvedTurnstileToken(
+                for: .feedback(appKey: configuration.appKey)
+            )
         }
         await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(CreateSessionPayload(
@@ -388,7 +396,8 @@ extension FeedbackClient {
     /// Validates an untrusted `downloadUrl` string returned by an upload PUT response:
     /// - Accepts relative paths resolved against `configuration.baseURL`.
     /// - Accepts absolute `http`/`https` URLs whose host matches `configuration.baseURL.host`
-    ///   or shares its root domain (e.g. CDN hosts or apex domain).
+    ///   or shares its registrable domain (e.g. CDN subdomains or the apex of the
+    ///   same domain; public-suffix and multi-tenant siblings never match).
     /// - Returns `nil` for off-origin, protocol-relative, or disallowed-scheme URLs.
     private func resolvedDownloadURL(from downloadUrl: String?) -> URL? {
         guard let downloadUrl else { return nil }

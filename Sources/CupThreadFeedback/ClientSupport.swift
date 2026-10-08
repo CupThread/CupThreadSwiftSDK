@@ -192,7 +192,7 @@ extension FeedbackClient {
     }
 
     /// Maps status 400 failure envelopes to typed errors (uploader identity/mismatch,
-    /// invalid parent comment). Returns `nil` for any other 400 code.
+    /// invalid parent comment, disallowed MIME / executable extension).
     private static func badRequestTypedError(
         code: String?,
         envelopeMessage: String?,
@@ -205,6 +205,8 @@ extension FeedbackClient {
             return .uploaderMismatch(message: envelopeMessage, requestId: requestId)
         case "invalid_parent":
             return .invalidParent(message: envelopeMessage, requestId: requestId)
+        case "unsupported_mime_type", "executable_extension_prohibited":
+            return .unsupportedMediaType(message: envelopeMessage, requestId: requestId)
         default:
             return nil
         }

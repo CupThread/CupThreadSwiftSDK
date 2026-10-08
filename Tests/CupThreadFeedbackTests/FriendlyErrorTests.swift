@@ -22,7 +22,7 @@ struct FriendlyErrorTests {
     @Test func userProfileNotFoundHidesServerMessage() throws {
         let error = FeedbackClientError.userProfileNotFound(message: htmlBody)
         let desc = try #require(error.errorDescription)
-        #expect(desc == "This user profile is no longer available.")
+        #expect(desc == CupThreadStrings.tr("cupthread.error.profile_not_found"))
         #expect(!desc.contains("<"))
         #expect(!desc.lowercased().contains("html"))
     }
@@ -30,7 +30,7 @@ struct FriendlyErrorTests {
     @Test func scanRejectedHTMLBodyNeverReachesErrorDescriptionOrFriendlyError() throws {
         let error = FeedbackClientError.scanRejected(message: htmlBody, requestId: nil)
         let desc = try #require(error.errorDescription)
-        let expected = "The referenced attachment could not be uploaded due to content inspection rejection."
+        let expected = CupThreadStrings.tr("cupthread.error.scan_rejected")
         #expect(desc == expected)
         #expect(!desc.contains("<"))
         #expect(!desc.lowercased().contains("html"))
@@ -45,7 +45,7 @@ struct FriendlyErrorTests {
             requestId: "req-scan-99"
         )
         let desc = try #require(error.errorDescription)
-        let expected = "The referenced attachment could not be uploaded due to content inspection rejection. (request id: req-scan-99)"
+        let expected = CupThreadStrings.tr("cupthread.error.scan_rejected") + " (request id: req-scan-99)"
         #expect(desc == expected)
         #expect(!desc.contains("rule 42"))
         #expect(!desc.contains("forbidden executable"))
@@ -196,15 +196,18 @@ struct FriendlyErrorTests {
             message: "<html>raw server error</html>",
             requestId: "req-com-1"
         )
-        #expect(commentsError.errorDescription == "Comments are not available for this feature request. (request id: req-com-1)")
+        let expectedCommentsMessage = CupThreadStrings.tr("cupthread.error.comments_unavailable")
+            + " (request id: req-com-1)"
+        #expect(commentsError.errorDescription == expectedCommentsMessage)
         #expect(!commentsError.errorDescription!.contains("<html>"))
-        #expect(FriendlyError.message(for: commentsError) == "Comments are not available for this feature request. (request id: req-com-1)")
+        #expect(FriendlyError.message(for: commentsError) == expectedCommentsMessage)
 
         let emailError = FeedbackClientError.emailNotVerified(
             message: "<html>raw verification error</html>",
             requestId: "req-email-1"
         )
-        let expectedEmailMessage = "Please use your signed-in account email address to subscribe. (request id: req-email-1)"
+        let expectedEmailMessage = CupThreadStrings.tr("cupthread.error.email_not_verified")
+            + " (request id: req-email-1)"
         #expect(emailError.errorDescription == expectedEmailMessage)
         #expect(!emailError.errorDescription!.contains("<html>"))
         #expect(FriendlyError.message(for: emailError) == expectedEmailMessage)

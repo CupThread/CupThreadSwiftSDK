@@ -72,7 +72,7 @@ struct TurnstileRetryTests {
     }
 
     func makeClient(
-        turnstileTokenProvider: (@Sendable () async -> String?)? = nil
+        turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil
     ) -> FeedbackClient {
         FeedbackClient(
             configuration: FeedbackClientConfiguration(
@@ -125,7 +125,7 @@ struct TurnstileRetryTests {
             return (makeHTTPResponse(status: 200), try encodeJSON(feedbackReceipt))
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         let result = try await client.submit(
             FeedbackDraft(title: "Title", description: "Description", platform: .ios)
         )
@@ -156,7 +156,7 @@ struct TurnstileRetryTests {
             return (makeHTTPResponse(status: 201), try encodeJSON(featureRequestReceipt))
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         let result = try await client.submitFeatureRequest(
             FeatureRequestDraft(title: "Title", description: "Description"),
             userToken: "user-1"
@@ -199,7 +199,7 @@ struct TurnstileRetryTests {
             return try Self.turnstileRejection()
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         do {
             _ = try await client.submit(
                 FeedbackDraft(title: "Title", description: "Description", platform: .ios)
@@ -223,7 +223,7 @@ struct TurnstileRetryTests {
             return try Self.turnstileRejection()
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         do {
             _ = try await client.submit(
                 FeedbackDraft(title: "Title", description: "Description", platform: .ios)
@@ -249,7 +249,7 @@ struct TurnstileRetryTests {
             return (makeHTTPResponse(status: 201), try Self.uploadSessionJSON())
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         _ = try await client.createUploadSession(
             files: [FeedbackUploadFileSpec(
                 clientFileId: "file-1",
@@ -273,7 +273,7 @@ struct TurnstileRetryTests {
             return (makeHTTPResponse(status: 201), try Self.uploadSessionJSON())
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         _ = try await client.createUploadSession(
             files: [FeedbackUploadFileSpec(
                 clientFileId: "file-1",

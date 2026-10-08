@@ -64,8 +64,9 @@ extension PhotoAttachmentHelper {
     /// Runs the composer-side preparation pipeline over picked photo bytes:
     /// oversized photos are downscaled to fit `limit`, SVG is rejected
     /// locally, sensitive metadata is optionally stripped, HEIC/HEIF and
-    /// unrecognized containers are transcoded to JPEG, and the final bytes
-    /// are validated against `limit`.
+    /// unrecognized containers are transcoded to JPEG, a transcode that
+    /// inflates the bytes back over `limit` gets a downscale attempt too,
+    /// and the final bytes are validated against `limit`.
     ///
     /// The function is nonisolated async, so under Swift 6 executor semantics
     /// the CPU-bound ImageIO decode and encode passes run on the global
@@ -138,6 +139,20 @@ extension PhotoAttachmentHelper {
                     : AttachmentValidationError.unsupportedType
             }
             data = jpeg
+        }
+
+        // The JPEG transcode can inflate the bytes past `limit` (#52, BUG-6):
+        // HEIC is far more compact than the quality-0.9 JPEG re-encode, so a
+        // photo that arrived under the limit may no longer fit after
+        // transcoding. Give those a downscale attempt too, instead of letting
+        // the size validation deterministically reject a savable photo. The
+        // fresh encode drops metadata by construction, so no strip pass is
+        // needed after it.
+        if data.count > limit {
+            guard let downscaled = downscaledImageData(data, limit: limit) else {
+                throw AttachmentValidationError.oversized(size: data.count, limit: limit)
+            }
+            data = downscaled
         }
 
         try validateAttachmentSize(data.count, limit: limit)
