@@ -94,6 +94,31 @@ struct TurnstileRetryTests {
         return (response, try encodeJSON(["error": "Human verification (Turnstile) is required"]))
     }
 
+    static func uploadSessionTurnstileRejection(requestId: String = "req-ts-upload-1") throws -> (HTTPURLResponse, Data) {
+        let response = HTTPURLResponse(
+            url: URL(string: "https://\(host)/api/v1/uploads/sessions")!,
+            statusCode: 403,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json", "X-Request-Id": requestId]
+        )!
+        return (response, try encodeJSON([
+            "error": "Turnstile verification failed",
+            "code": "turnstile_verification_failed"
+        ]))
+    }
+
+    static func uploadSessionForbidden(requestId: String = "req-forbidden-1") throws -> (HTTPURLResponse, Data) {
+        let response = HTTPURLResponse(
+            url: URL(string: "https://\(host)/api/v1/uploads/sessions")!,
+            statusCode: 403,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json", "X-Request-Id": requestId]
+        )!
+        return (response, try encodeJSON([
+            "error": "Public feedback is disabled for this app"
+        ]))
+    }
+
     static func uploadSessionJSON() throws -> Data {
         try encodeJSON([
             "session": [
@@ -238,9 +263,11 @@ struct TurnstileRetryTests {
             #expect(provider.callCount == 2)
         }
     }
+}
 
-    // MARK: Upload-session provider fallback
+// MARK: - Upload-session provider fallback & retry
 
+extension TurnstileRetryTests {
     @Test func createUploadSessionFallsBackToProviderToken() async throws {
         let provider = TokenProvider(["tok-1234567890"])
         let log = RequestLog()
@@ -289,5 +316,135 @@ struct TurnstileRetryTests {
         let json = try #require(parseJSONDict(rawBody))
         #expect(json["turnstileToken"] as? String == "tok-explicit-123456")
         #expect(provider.callCount == 0)
+    }
+
+    @Test func createUploadSessionRetriesOnceWhenTurnstileVerificationFails() async throws {
+        let provider = TokenProvider(["tok-upload-1", "tok-upload-2"])
+        let log = RequestLog()
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            log.append(request)
+            if log.allRequests.count == 1 {
+                return try Self.uploadSessionTurnstileRejection(requestId: "req-upload-attempt-1")
+            }
+            return (makeHTTPResponse(status: 201), try Self.uploadSessionJSON())
+        }
+
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
+        let session = try await client.createUploadSession(
+            files: [FeedbackUploadFileSpec(
+                clientFileId: "file-1",
+                filename: "f.png",
+                contentType: "image/png",
+                sizeBytes: 5
+            )],
+            userToken: "user-1"
+        )
+
+        #expect(session.session.sessionId == "sess-1")
+        #expect(log.allRequests.count == 2)
+        #expect(provider.callCount == 2)
+
+        let req1 = log.allRequests[0]
+        let req2 = log.allRequests[1]
+        let id1 = try #require(req1.value(forHTTPHeaderField: "X-Request-Id"))
+        let id2 = try #require(req2.value(forHTTPHeaderField: "X-Request-Id"))
+        #expect(id1 != id2)
+
+        let body1 = try #require(parseJSONDict(log.allBodies[0]))
+        let body2 = try #require(parseJSONDict(log.allBodies[1]))
+        #expect(body1["turnstileToken"] as? String == "tok-upload-1")
+        #expect(body2["turnstileToken"] as? String == "tok-upload-2")
+    }
+
+    @Test func createUploadSessionExplicitTokenFallsBackToProviderOnRetry() async throws {
+        let provider = TokenProvider(["tok-provider-fresh"])
+        let log = RequestLog()
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            log.append(request)
+            if log.allRequests.count == 1 {
+                return try Self.uploadSessionTurnstileRejection(requestId: "req-upload-attempt-1")
+            }
+            return (makeHTTPResponse(status: 201), try Self.uploadSessionJSON())
+        }
+
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
+        let session = try await client.createUploadSession(
+            files: [FeedbackUploadFileSpec(
+                clientFileId: "file-1",
+                filename: "f.png",
+                contentType: "image/png",
+                sizeBytes: 5
+            )],
+            userToken: "user-1",
+            turnstileToken: "tok-explicit-stale"
+        )
+
+        #expect(session.session.sessionId == "sess-1")
+        #expect(log.allRequests.count == 2)
+        #expect(provider.callCount == 1)
+
+        let body1 = try #require(parseJSONDict(log.allBodies[0]))
+        let body2 = try #require(parseJSONDict(log.allBodies[1]))
+        #expect(body1["turnstileToken"] as? String == "tok-explicit-stale")
+        #expect(body2["turnstileToken"] as? String == "tok-provider-fresh")
+    }
+
+    @Test func createUploadSessionWithoutProviderThrowsTurnstileRequiredImmediately() async throws {
+        let log = RequestLog()
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            log.append(request)
+            return try Self.uploadSessionTurnstileRejection(requestId: "req-no-prov-1")
+        }
+
+        let client = makeClient(turnstileTokenProvider: nil)
+        do {
+            _ = try await client.createUploadSession(
+                files: [FeedbackUploadFileSpec(
+                    clientFileId: "file-1",
+                    filename: "f.png",
+                    contentType: "image/png",
+                    sizeBytes: 5
+                )],
+                userToken: "user-1",
+                turnstileToken: "tok-invalid"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .turnstileRequired = error else {
+                Issue.record("Unexpected error: \(error)")
+                return
+            }
+            #expect(log.allRequests.count == 1)
+        }
+    }
+
+    @Test func createUploadSessionPermissionDenialDoesNotRetry() async throws {
+        let provider = TokenProvider(["tok-upload-1", "tok-upload-2"])
+        let log = RequestLog()
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            log.append(request)
+            return try Self.uploadSessionForbidden(requestId: "req-forbidden-1")
+        }
+
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
+        do {
+            _ = try await client.createUploadSession(
+                files: [FeedbackUploadFileSpec(
+                    clientFileId: "file-1",
+                    filename: "f.png",
+                    contentType: "image/png",
+                    sizeBytes: 5
+                )],
+                userToken: "user-1"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .forbidden = error else {
+                Issue.record("Unexpected error: \(error)")
+                return
+            }
+            #expect(log.allRequests.count == 1)
+            #expect(provider.callCount == 1)
+        }
     }
 }

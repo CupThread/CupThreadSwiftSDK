@@ -22,13 +22,18 @@ extension FeedbackClient {
     ///     provider configuration covers attachments and submission alike.
     ///     Render the token under that binding (the app key as `cdata`);
     ///     upload sessions deliberately share the feedback action with
-    ///     `POST /api/v1/feedback`.
+    ///     `POST /api/v1/feedback`. If the server rejects the attempt with a
+    ///     human-verification gate (HTTP 403), the SDK requests a fresh token
+    ///     from the provider and retries exactly once before throwing.
     /// - Returns: The session, including bearer token and pre-allocated slots.
     /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
     ///   identity could be presented, ``FeedbackClientError/dailyStorageQuotaExceeded``
     ///   when the workspace has exceeded its daily upload storage limit (HTTP 429
     ///   `daily_storage_quota_exceeded`), ``FeedbackClientError/rateLimited`` on
-    ///   HTTP 429, ``FeedbackClientError/authenticationRequired`` or
+    ///   HTTP 429, ``FeedbackClientError/turnstileRequired(message:requestId:)``
+    ///   when the server's Turnstile gate rejects the session creation and no
+    ///   fresh token could be presented (HTTP 403 `turnstile_verification_failed`),
+    ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
     ///   disables feedback attachments (HTTP 401/403),
     ///   ``FeedbackClientError/unsupportedMediaType(message:requestId:)``
@@ -48,33 +53,30 @@ extension FeedbackClient {
             let files: [FeedbackUploadFileSpec]
         }
 
-        var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/uploads/sessions"))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyCorrelationHeaders(
-            userToken: resolvedIdentity(userToken),
-            requestID: nextRequestID(),
-            to: &request
-        )
-        var effectiveTurnstileToken = turnstileToken?.nilIfEmpty
-        if effectiveTurnstileToken == nil {
-            effectiveTurnstileToken = await resolvedTurnstileToken(
-                for: .feedback(appKey: configuration.appKey)
+        let effectiveIdentity = resolvedIdentity(userToken)
+        let data = try await sendWithTurnstileRetry(
+            accepted: [201],
+            challenge: .feedback(appKey: configuration.appKey),
+            initialToken: turnstileToken
+        ) { token, requestID in
+            var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/uploads/sessions"))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            self.applyCorrelationHeaders(
+                userToken: effectiveIdentity,
+                requestID: requestID,
+                to: &request
             )
+            await self.applyBearerToken(to: &request)
+            request.httpBody = try self.encoder.encode(CreateSessionPayload(
+                appKey: self.configuration.appKey,
+                purpose: "feedback_attachment",
+                turnstileToken: token,
+                files: files
+            ))
+            return request
         }
-        await applyBearerToken(to: &request)
-        request.httpBody = try encoder.encode(CreateSessionPayload(
-            appKey: configuration.appKey,
-            purpose: "feedback_attachment",
-            turnstileToken: effectiveTurnstileToken,
-            files: files
-        ))
 
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw FeedbackClientError.invalidResponse
-        }
-        try validateResponse(httpResponse, data: data, accepted: [201], mapsPermissionErrors: true)
         return try decoder.decode(FeedbackUploadSession.self, from: data)
     }
 
