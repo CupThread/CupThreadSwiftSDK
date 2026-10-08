@@ -125,10 +125,10 @@ public struct WhatsNewView: View {
             guard isChangelogPermitted else { return }
             await loadEntries()
         }
-        .task {
+        .task(id: isChangelogPermitted) {
             await resolveAuthenticationAccess()
             guard isChangelogPermitted else {
-                state.handlePermissionDenied()
+                state.handlePermissionDenied(generation: state.loadGeneration)
                 return
             }
             subscription = subscriptionStore.subscriptionRecord()
@@ -142,7 +142,7 @@ public struct WhatsNewView: View {
     private var cardScroll: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                if isLoading && !hasLoadedOnce {
+                if isLoading && (!hasLoadedOnce || entries.isEmpty) {
                     SkeletonCardList()
                 } else if let loadError {
                     LoadErrorView(message: loadError) {
@@ -170,7 +170,7 @@ public struct WhatsNewView: View {
     // tvOS: plain list rows keep the focus engine happy.
     private var tvList: some View {
         List {
-            if isLoading && !hasLoadedOnce {
+            if isLoading && (!hasLoadedOnce || entries.isEmpty) {
                 ProgressView()
                     .frame(maxWidth: .infinity)
             } else if let loadError {
@@ -262,7 +262,7 @@ public struct WhatsNewView: View {
     func loadEntries() async {
         await resolveAuthenticationAccess()
         guard isChangelogPermitted else {
-            state.handlePermissionDenied()
+            state.handlePermissionDenied(generation: state.loadGeneration)
             return
         }
         rejectedByServer = false
@@ -272,6 +272,7 @@ public struct WhatsNewView: View {
         }
         do {
             guard let fetched = try await loadChangelogEntries(client: client, config: sdkAppConfig) else {
+                state.handlePermissionDenied(generation: generationAtStart)
                 return
             }
             state.handleSuccess(entries: fetched, generation: generationAtStart)

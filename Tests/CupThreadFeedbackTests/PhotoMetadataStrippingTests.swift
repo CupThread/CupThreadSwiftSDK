@@ -211,7 +211,7 @@ struct PhotoMetadataStrippingTests {
         #expect(PhotoAttachmentHelper.strippingSensitiveMetadata(from: Data()) == nil)
 
         let error = AttachmentValidationError.unprocessableImage
-        #expect(error.errorDescription?.contains("processed") == true)
+        #expect(error.errorDescription == CupThreadStrings.tr("cupthread.attachment.unprocessable"))
     }
 
     @Test func strippingMetadataFromPNGPassesLosslessly() {

@@ -186,7 +186,8 @@ struct AnonymousAccessSyncTests {
             #expect(requestId == "req-comment-404")
             #expect(error.requestId == "req-comment-404")
             #expect(error.responseBody == nil)
-            let expectedMsg = "Comments are not available for this feature request. (request id: req-comment-404)"
+            let expectedMsg = CupThreadStrings.tr("cupthread.error.comments_unavailable")
+                + " (request id: req-comment-404)"
             #expect(error.errorDescription == expectedMsg)
             #expect(FriendlyError.message(for: error) == expectedMsg)
         }
@@ -250,7 +251,8 @@ struct AnonymousAccessSyncTests {
             #expect(requestId == "req-sub-403")
             #expect(error.requestId == "req-sub-403")
             #expect(error.responseBody == nil)
-            let expectedMsg = "Please use your signed-in account email address to subscribe. (request id: req-sub-403)"
+            let expectedMsg = CupThreadStrings.tr("cupthread.error.email_not_verified")
+                + " (request id: req-sub-403)"
             #expect(error.errorDescription == expectedMsg)
             #expect(FriendlyError.message(for: error) == expectedMsg)
         }
@@ -260,11 +262,11 @@ struct AnonymousAccessSyncTests {
         let commentsError = FeedbackClientError.commentsUnavailable(message: "unavailable")
         #expect(commentsError == .commentsUnavailable(message: "unavailable", requestId: nil))
         #expect(commentsError.requestId == nil)
-        #expect(commentsError.errorDescription == "Comments are not available for this feature request.")
+        #expect(commentsError.errorDescription == CupThreadStrings.tr("cupthread.error.comments_unavailable"))
 
         let emailError = FeedbackClientError.emailNotVerified(message: "not verified")
         #expect(emailError == .emailNotVerified(message: "not verified", requestId: nil))
         #expect(emailError.requestId == nil)
-        #expect(emailError.errorDescription == "Please use your signed-in account email address to subscribe.")
+        #expect(emailError.errorDescription == CupThreadStrings.tr("cupthread.error.email_not_verified"))
     }
 }

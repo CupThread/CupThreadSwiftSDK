@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 184, "Expected 184 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 204, "Expected 204 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -405,6 +405,17 @@ struct LocalizationTests {
                 "Missing cupthread.feedback.email_invalid_hint for \(lang)"
             )
             #expect(!value.isEmpty, "\(lang) has empty cupthread.feedback.email_invalid_hint")
+        }
+    }
+
+    /// Feedback attachment duplicate finalization copy ships in every locale (issue #257).
+    @Test func alreadyFinalizedStringResolvesAcrossAllLanguages() throws {
+        let key = "cupthread.error.already_finalized"
+        for lang in Self.targetLanguages {
+            let dict = try loadStrings(for: lang)
+            let value = try #require(dict[key], "Missing \(key) for \(lang)")
+            #expect(!value.isEmpty, "\(lang) has empty \(key)")
+            #expect(value != key, "\(lang) has unlocalized raw key for \(key)")
         }
     }
 }

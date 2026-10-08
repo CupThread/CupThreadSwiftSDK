@@ -186,7 +186,8 @@ public struct RoadmapBoardView: View {
                 }
                 return
             }
-            await load()
+            // Admission already recorded this query's fetch slot (CONC-9).
+            await load(alreadyAdmitted: true)
         }
         .task(id: reloadNotice) {
             guard reloadNotice != nil else { return }
@@ -405,7 +406,7 @@ extension RoadmapBoardView {
     }
 
     @MainActor
-    private func load() async {
+    private func load(alreadyAdmitted: Bool = false) async {
         await resolveAuthenticationAccess()
         guard isRoadmapPermitted else {
             settlePermissionDeniedState()
@@ -426,7 +427,8 @@ extension RoadmapBoardView {
                 client: client,
                 userToken: userToken,
                 query: query,
-                config: sdkAppConfig
+                config: sdkAppConfig,
+                skipInitialAdmissionRecord: alreadyAdmitted
             ) {
                 // A newer load or a permission denial owns the board now.
                 guard loadState.isCurrent(generation: generation) else { return }

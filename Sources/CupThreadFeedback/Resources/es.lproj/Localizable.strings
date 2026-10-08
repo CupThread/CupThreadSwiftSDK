@@ -200,8 +200,34 @@
 "cupthread.error.invalid_signature" = "Los datos de pago no se actualizaron: la firma del informe no se pudo verificar. Comprueba el secreto de firma del SDK de la app.";
 "cupthread.error.stale_signature" = "Los datos de pago no se actualizaron: la firma del informe ha caducado. Comprueba el reloj del dispositivo e inténtalo de nuevo.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Estos comentarios o archivos adjuntos ya se han enviado.";
 
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "El servidor de feedback devolvió una respuesta no válida.";
+"cupthread.error.unreadable_upload_response" = "El servidor de feedback devolvió una respuesta de subida ilegible.";
+"cupthread.error.auth_required" = "Esta acción solo está disponible para usuarios con la sesión iniciada.";
+"cupthread.error.scan_rejected" = "El archivo adjunto indicado fue rechazado por la inspección de contenido y no se pudo subir.";
+"cupthread.error.unsupported_media" = "No se admite ese tipo de imagen. Adjunta una imagen PNG, JPEG, WebP o GIF.";
+"cupthread.error.payload_too_large" = "Ese archivo es demasiado grande para subirlo.";
+"cupthread.error.uploader_identity_required" = "Las subidas requieren una identidad de usuario final. Pasa un userToken (ver UserTokenStore) al subir adjuntos.";
+"cupthread.error.uploader_mismatch" = "Este adjunto se subió con otra identidad. Elimínalo y adjúntalo de nuevo, e inténtalo otra vez.";
+"cupthread.error.quota_exceeded" = "Esta app alcanzó su límite de envíos de este mes. Inténtalo de nuevo más tarde.";
+"cupthread.error.subscription_inactive" = "Los envíos no están disponibles para esta app en este momento. Inténtalo de nuevo más tarde.";
+"cupthread.error.profile_not_found" = "Este perfil de usuario ya no está disponible.";
+"cupthread.error.comments_unavailable" = "Los comentarios no están disponibles para esta solicitud de función.";
+"cupthread.error.email_not_verified" = "Usa la dirección de correo de tu cuenta con la sesión iniciada para suscribirte.";
+"cupthread.attachment.oversized" = "El adjunto (%1$@) supera el tamaño máximo permitido de %2$@.";
+"cupthread.attachment.unprocessable" = "No se pudo procesar la foto seleccionada para subirla.";
+"cupthread.attachment.unsupported_type" = "No se admite ese tipo de imagen. Adjunta una imagen PNG, JPEG, WebP o GIF.";
 /* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
 "cupthread.error.text_too_long" = "Tu mensaje es demasiado largo. Acórtalo e inténtalo de nuevo.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld de %2$lld caracteres";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "La sesión de subida ha caducado. Quita el archivo, vuelve a adjuntarlo e inténtalo de nuevo.";
+"cupthread.error.upload_session_invalid" = "La sesión de subida no es válida o ya no está activa. Quita el archivo, vuelve a adjuntarlo e inténtalo de nuevo.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Esta app ha alcanzado su límite de subidas de hoy. Inténtalo de nuevo más tarde.";

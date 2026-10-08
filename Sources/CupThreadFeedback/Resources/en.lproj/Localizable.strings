@@ -199,8 +199,34 @@
 "cupthread.error.signing_secret_not_configured" = "Payment details can't be reported because this app has no SDK signing secret configured.";
 "cupthread.error.invalid_signature" = "Payment details weren't updated: the report's signature didn't verify. Check the app's SDK signing secret.";
 "cupthread.error.stale_signature" = "Payment details weren't updated: the report's signature expired. Check the device clock and try again.";
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "This feedback or attachment has already been submitted.";
 
+/* Issue #266: typed error & attachment-validation copy — every errorDescription resolves through the catalog */
+"cupthread.error.invalid_response" = "The feedback server returned an invalid response.";
+"cupthread.error.unreadable_upload_response" = "The feedback server returned an unreadable upload response.";
+"cupthread.error.auth_required" = "This action is only available to signed-in users.";
+"cupthread.error.scan_rejected" = "The referenced attachment could not be uploaded due to content inspection rejection.";
+"cupthread.error.unsupported_media" = "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF.";
+"cupthread.error.payload_too_large" = "That file is too large to upload.";
+"cupthread.error.uploader_identity_required" = "Uploads require an end-user identity. Pass a userToken (see UserTokenStore) when uploading attachments.";
+"cupthread.error.uploader_mismatch" = "This attachment was uploaded with a different identity. Please remove and re-attach it, then try again.";
+"cupthread.error.quota_exceeded" = "This app has reached its submission limit for this month. Please try again later.";
+"cupthread.error.subscription_inactive" = "Submissions are unavailable for this app right now. Please try again later.";
+"cupthread.error.profile_not_found" = "This user profile is no longer available.";
+"cupthread.error.comments_unavailable" = "Comments are not available for this feature request.";
+"cupthread.error.email_not_verified" = "Please use your signed-in account email address to subscribe.";
+"cupthread.attachment.oversized" = "Attachment (%1$@) exceeds the maximum allowed size of %2$@.";
+"cupthread.attachment.unprocessable" = "The selected photo could not be processed for upload.";
+"cupthread.attachment.unsupported_type" = "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF.";
 /* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
 "cupthread.error.text_too_long" = "Your message is too long. Please shorten it and try again.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld of %2$lld characters";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "The upload session has expired. Please remove and re-attach the file, then try again.";
+"cupthread.error.upload_session_invalid" = "The upload session is invalid or no longer active. Please remove and re-attach the file, then try again.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "This app has reached its upload limit for today. Please try again later.";

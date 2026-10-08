@@ -200,8 +200,34 @@
 "cupthread.error.invalid_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia nie przeszedł weryfikacji. Sprawdź tajny klucz podpisu SDK aplikacji.";
 "cupthread.error.stale_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia wygasł. Sprawdź zegar urządzenia i spróbuj ponownie.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Ta opinia lub załącznik zostały już przesłane.";
 
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Serwer opinii zwrócił nieprawidłową odpowiedź.";
+"cupthread.error.unreadable_upload_response" = "Serwer opinii zwrócił nieczytelną odpowiedź przesyłania.";
+"cupthread.error.auth_required" = "Ta czynność jest dostępna tylko dla zalogowanych użytkowników.";
+"cupthread.error.scan_rejected" = "Wskazany załącznik został odrzucony podczas inspekcji zawartości i nie mógł zostać przesłany.";
+"cupthread.error.unsupported_media" = "Ten typ obrazu nie jest obsługiwany. Dołącz obraz PNG, JPEG, WebP lub GIF.";
+"cupthread.error.payload_too_large" = "Ten plik jest zbyt duży, aby go przesłać.";
+"cupthread.error.uploader_identity_required" = "Przesyłanie wymaga tożsamości użytkownika końcowego. Przekaż userToken (patrz UserTokenStore) podczas przesyłania załączników.";
+"cupthread.error.uploader_mismatch" = "Ten załącznik został przesłany z innej tożsamości. Usuń go, dołącz ponownie i spróbuj jeszcze raz.";
+"cupthread.error.quota_exceeded" = "Ta aplikacja osiągnęła miesięczny limit zgłoszeń. Spróbuj ponownie później.";
+"cupthread.error.subscription_inactive" = "Zgłoszenia są obecnie niedostępne dla tej aplikacji. Spróbuj ponownie później.";
+"cupthread.error.profile_not_found" = "Ten profil użytkownika nie jest już dostępny.";
+"cupthread.error.comments_unavailable" = "Komentarze nie są dostępne dla tej propozycji funkcji.";
+"cupthread.error.email_not_verified" = "Aby subskrybować, użyj adresu e-mail zalogowanego konta.";
+"cupthread.attachment.oversized" = "Załącznik (%1$@) przekracza maksymalny dozwolony rozmiar %2$@.";
+"cupthread.attachment.unprocessable" = "Nie udało się przetworzyć wybranego zdjęcia do przesłania.";
+"cupthread.attachment.unsupported_type" = "Ten typ obrazu nie jest obsługiwany. Dołącz obraz PNG, JPEG, WebP lub GIF.";
 /* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
 "cupthread.error.text_too_long" = "Wiadomość jest za długa. Skróć ją i spróbuj ponownie.";
 "cupthread.common.character_count" = "%1$lld/%2$lld";
 "cupthread.common.character_count_accessibility" = "%1$lld z %2$lld znaków";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "Sesja przesyłania wygasła. Usuń plik, dołącz go ponownie i spróbuj jeszcze raz.";
+"cupthread.error.upload_session_invalid" = "Sesja przesyłania jest nieprawidłowa lub już nieaktywna. Usuń plik, dołącz go ponownie i spróbuj jeszcze raz.";
+
+/* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
+"cupthread.error.daily_storage_quota_exceeded" = "Ta aplikacja osiągnęła dzisiejszy limit przesyłania. Spróbuj ponownie później.";

@@ -399,14 +399,14 @@ struct FeedbackClientErrorTests {
     @Test func scanRejectedHasLocalizedDescriptionWithoutMessage() {
         let error = FeedbackClientError.scanRejected(message: "")
         let desc = error.errorDescription
-        #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
+        #expect(desc == CupThreadStrings.tr("cupthread.error.scan_rejected"))
     }
 
     @Test func scanRejectedHidesRawMessageFromErrorDescription() throws {
         let reason = "Upload object upl_123 was rejected by content scan: malware detected"
         let error = FeedbackClientError.scanRejected(message: reason)
         let desc = try #require(error.errorDescription)
-        #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
+        #expect(desc == CupThreadStrings.tr("cupthread.error.scan_rejected"))
         #expect(!desc.contains(reason))
         #expect(error.scanDetail == reason)
     }
@@ -422,32 +422,31 @@ struct FeedbackClientErrorTests {
     @Test func rateLimitedHasFriendlyDescription() {
         let error = FeedbackClientError.rateLimited(message: "Too many votes. Please try again shortly.")
         let desc = error.errorDescription
-        #expect(desc == "You're doing that too often. Please try again in a minute.")
+        #expect(desc == CupThreadStrings.tr("cupthread.error.http_rate_limited"))
     }
 
     @Test func unsupportedMediaTypeHasFriendlyDescription() {
         let error = FeedbackClientError.unsupportedMediaType(message: "image/svg+xml is not accepted")
         let desc = error.errorDescription
-        #expect(desc?.contains("PNG, JPEG, WebP, or GIF") == true)
+        #expect(desc == CupThreadStrings.tr("cupthread.error.unsupported_media"))
     }
 
     @Test func payloadTooLargeHasFriendlyDescription() {
         let error = FeedbackClientError.payloadTooLarge(message: nil)
         let desc = error.errorDescription
-        #expect(desc?.contains("too large") == true)
+        #expect(desc == CupThreadStrings.tr("cupthread.error.payload_too_large"))
     }
 
     @Test func uploaderMismatchHasReattachGuidance() {
         let error = FeedbackClientError.uploaderMismatch(message: "Upload session was created by a different uploader")
         let desc = error.errorDescription
-        #expect(desc?.contains("different identity") == true)
-        #expect(desc?.contains("re-attach") == true)
+        #expect(desc == CupThreadStrings.tr("cupthread.error.uploader_mismatch"))
     }
 
     @Test func uploaderIdentityRequiredNamesUserToken() {
         let error = FeedbackClientError.uploaderIdentityRequired(message: nil)
         let desc = error.errorDescription
-        #expect(desc?.contains("userToken") == true)
+        #expect(desc == CupThreadStrings.tr("cupthread.error.uploader_identity_required"))
     }
 
     @Test func typedErrorsExposeRequestIdProperty() {
@@ -473,6 +472,9 @@ struct FeedbackClientErrorTests {
 
         let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: reqId)
         #expect(invalidParent.requestId == reqId)
+
+        let alreadyFinalized = FeedbackClientError.alreadyFinalized(message: "fin", requestId: reqId)
+        #expect(alreadyFinalized.requestId == reqId)
 
         let unexpected = FeedbackClientError.unexpectedStatus(code: 500, message: "err", requestId: reqId)
         #expect(unexpected.requestId == reqId)
@@ -519,6 +521,10 @@ struct FeedbackClientErrorTests {
         let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: reqId)
         let invalidParentDesc = try #require(invalidParent.errorDescription)
         #expect(invalidParentDesc.contains("(request id: \(reqId))"))
+
+        let alreadyFinalized = FeedbackClientError.alreadyFinalized(message: "fin", requestId: reqId)
+        let alreadyFinalizedDesc = try #require(alreadyFinalized.errorDescription)
+        #expect(alreadyFinalizedDesc.contains("(request id: \(reqId))"))
     }
 
     @Test func typedErrorsDescriptionOmitsRequestIdWhenAbsent() throws {
@@ -549,6 +555,10 @@ struct FeedbackClientErrorTests {
         let invalidParent = FeedbackClientError.invalidParent(message: "gone", requestId: nil)
         let invalidParentDesc = try #require(invalidParent.errorDescription)
         #expect(!invalidParentDesc.contains("request id"))
+
+        let alreadyFinalized = FeedbackClientError.alreadyFinalized(message: "fin", requestId: nil)
+        let alreadyFinalizedDesc = try #require(alreadyFinalized.errorDescription)
+        #expect(!alreadyFinalizedDesc.contains("request id"))
     }
 
     @Test func typedErrorsConvenienceConstructorsDefaultToNilRequestId() {
@@ -565,6 +575,8 @@ struct FeedbackClientErrorTests {
         #expect(FeedbackClientError.uploaderMismatch(message: "test").requestId == nil)
         #expect(FeedbackClientError.invalidParent().requestId == nil)
         #expect(FeedbackClientError.invalidParent(message: "test").requestId == nil)
+        #expect(FeedbackClientError.alreadyFinalized().requestId == nil)
+        #expect(FeedbackClientError.alreadyFinalized(message: "test").requestId == nil)
     }
 
     @Test func typedErrorsEquatableConsidersRequestId() {
@@ -1126,7 +1138,7 @@ struct FeedbackClientSubmitTests {
             #expect(message.contains("upl_scan_123"))
             #expect(message.contains("malware signature detected"))
             let desc = try #require(error.errorDescription)
-            #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
+            #expect(desc == CupThreadStrings.tr("cupthread.error.scan_rejected"))
             #expect(!desc.contains("malware signature detected"))
             #expect(error.scanDetail == message)
         }
@@ -1624,7 +1636,7 @@ struct FeedbackClientUploadTests {
                 #expect(message.contains("upl_bad_file"))
                 #expect(message.contains("prohibited file type"))
                 let desc = try #require(error.errorDescription)
-                #expect(desc == "The referenced attachment could not be uploaded due to content inspection rejection.")
+                #expect(desc == CupThreadStrings.tr("cupthread.error.scan_rejected"))
                 #expect(!desc.contains("prohibited file type"))
                 #expect(error.scanDetail == message)
             } else {

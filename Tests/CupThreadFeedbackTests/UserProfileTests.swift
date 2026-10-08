@@ -102,7 +102,8 @@ struct UserProfileClientTests {
                 #expect(message == "Too many requests. Please try again shortly.")
                 #expect(requestId == "req-429-profile")
                 #expect(
-                    error.errorDescription == "You're doing that too often. Please try again in a minute. (request id: req-429-profile)"
+                    error.errorDescription
+                        == CupThreadStrings.tr("cupthread.error.http_rate_limited") + " (request id: req-429-profile)"
                 )
                 #expect(error.responseBody == nil)
             } else {
@@ -172,7 +173,7 @@ struct UserProfileClientTests {
                 // the displayed copy is the friendly fallback.
                 #expect(message == "User profile not found")
                 #expect(error.responseBody == "User profile not found")
-                #expect(error.errorDescription == "This user profile is no longer available.")
+                #expect(error.errorDescription == CupThreadStrings.tr("cupthread.error.profile_not_found"))
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
@@ -190,7 +191,7 @@ struct UserProfileClientTests {
         } catch let error as FeedbackClientError {
             if case .userProfileNotFound(let message) = error {
                 #expect(message == nil)
-                #expect(error.errorDescription == "This user profile is no longer available.")
+                #expect(error.errorDescription == CupThreadStrings.tr("cupthread.error.profile_not_found"))
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
