@@ -177,6 +177,10 @@ extension FeedbackClient {
             return badRequestTypedError(code: code, envelopeMessage: envelopeMessage, requestId: requestId)
         case (403, "email_not_verified"):
             return .emailNotVerified(message: envelopeMessage, requestId: requestId)
+        case (409, "already_finalized"):
+            // A concurrent or retried submission already finalized the referenced
+            // uploadId (#257, SaaS #579). No duplicate submission was created.
+            return .alreadyFinalized(message: envelopeMessage, requestId: requestId)
         default:
             return uploadSessionLifecycleTypedError(
                 statusCode: statusCode,
@@ -192,6 +196,8 @@ extension FeedbackClient {
         }
     }
 
+    /// Maps status 400 failure envelopes to typed errors (uploader identity/mismatch,
+    /// invalid parent comment, disallowed MIME / executable extension).
     private static func badRequestTypedError(
         code: String?,
         envelopeMessage: String?,
@@ -203,10 +209,9 @@ extension FeedbackClient {
         case "uploader_mismatch":
             return .uploaderMismatch(message: envelopeMessage, requestId: requestId)
         case "invalid_parent":
-            // The reply target is missing, hidden, or not on this feature
-            // request — the composer composed a stale reply (moderation
-            // changed the parent between reply and submit).
             return .invalidParent(message: envelopeMessage, requestId: requestId)
+        case "unsupported_mime_type", "executable_extension_prohibited":
+            return .unsupportedMediaType(message: envelopeMessage, requestId: requestId)
         default:
             return nil
         }
@@ -225,20 +230,12 @@ extension FeedbackClient {
     ) -> FeedbackClientError? {
         switch (statusCode, code) {
         case (422, "payment_attributes_require_signature"):
-            // A payment-attribute report arrived without the required HMAC
-            // signature — the host must configure the SDK signing secret.
             return .paymentAttributesRequireSignature(message: envelopeMessage, requestId: requestId)
         case (422, "sdk_signing_secret_not_configured"):
-            // The app has no SDK signing secret in the console, so signed
-            // payment attributes can never be accepted.
             return .sdkSigningSecretNotConfigured(message: envelopeMessage, requestId: requestId)
         case (401, "invalid_signature"):
-            // The signature did not verify — the signing secret the SDK used
-            // does not match the console's.
             return .invalidSignature(message: envelopeMessage, requestId: requestId)
         case (401, "stale_signature"):
-            // The signature timestamp fell outside the freshness window —
-            // typically device clock skew.
             return .staleSignature(message: envelopeMessage, requestId: requestId)
         default:
             return nil

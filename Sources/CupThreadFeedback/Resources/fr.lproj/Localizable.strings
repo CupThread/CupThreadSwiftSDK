@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Vous êtes abonné";
 "cupthread.subscribe.manage_message" = "Les mises à jour seront envoyées à %@. Pour changer d'adresse ou vous désabonner, utilisez le lien présent dans n'importe quel e-mail de mise à jour.";
 "cupthread.subscribe.use_different_email" = "Utiliser une autre adresse e-mail";
+"cupthread.subscribe.pending_title" = "Confirmation en attente";
+"cupthread.subscribe.pending_message" = "Nous avons envoyé un lien de confirmation à %@. Ouvrez-le pour commencer à recevoir les e-mails de mise à jour.";
+"cupthread.subscribe.resend_button" = "Renvoyer l'e-mail de confirmation";
+"cupthread.subscribe.resending_button" = "Renvoi en cours…";
 "cupthread.whatsnew.emails_on" = "Mises à jour par e-mail activées";
 "cupthread.whatsnew.emails_on_destination" = "Les notifications arrivent sur %@.";
 "cupthread.whatsnew.get_emails" = "Recevoir les mises à jour par e-mail";
 "cupthread.whatsnew.get_emails_caption" = "Soyez averti dès qu'une nouvelle version est disponible.";
 "cupthread.whatsnew.subscribe_accessibility" = "S'abonner aux e-mails de mise à jour";
 "cupthread.whatsnew.emails_on_accessibility" = "Les mises à jour par e-mail sont activées pour %@";
+"cupthread.whatsnew.pending_title" = "Confirmation en attente";
+"cupthread.whatsnew.pending_destination" = "Nous avons envoyé un lien de confirmation à %@.";
+"cupthread.whatsnew.pending_accessibility" = "Confirmation d'e-mail en attente pour %@";
 "cupthread.whatsnew.version_accessibility" = "Version %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Demandes livrées : %@";
 "cupthread.features.unavailable_feedback" = "Feedback indisponible";
@@ -193,3 +200,31 @@
 "cupthread.error.invalid_signature" = "Les informations de paiement n’ont pas été mises à jour : la signature du rapport n’a pas pu être vérifiée. Vérifiez le secret de signature SDK de l’app.";
 "cupthread.error.stale_signature" = "Les informations de paiement n’ont pas été mises à jour : la signature du rapport a expiré. Vérifiez l’horloge de l’appareil et réessayez.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Ce retour ou cette pièce jointe a déjà été envoyé.";
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Le serveur de retour a renvoyé une réponse invalide.";
+"cupthread.error.unreadable_upload_response" = "Le serveur de retour a renvoyé une réponse de téléversement illisible.";
+"cupthread.error.auth_required" = "Cette action est réservée aux utilisateurs connectés.";
+"cupthread.error.scan_rejected" = "La pièce jointe référencée a été rejetée par l’inspection du contenu et n’a pas pu être envoyée.";
+"cupthread.error.unsupported_media" = "Ce type d’image n’est pas pris en charge. Veuillez joindre une image PNG, JPEG, WebP ou GIF.";
+"cupthread.error.payload_too_large" = "Ce fichier est trop volumineux pour être envoyé.";
+"cupthread.error.uploader_identity_required" = "Les envois exigent une identité d’utilisateur final. Transmettez un userToken (voir UserTokenStore) lors de l’envoi de pièces jointes.";
+"cupthread.error.uploader_mismatch" = "Cette pièce jointe a été envoyée avec une autre identité. Veuillez la retirer, la joindre à nouveau, puis réessayer.";
+"cupthread.error.quota_exceeded" = "Cette app a atteint sa limite d’envois pour ce mois. Veuillez réessayer plus tard.";
+"cupthread.error.subscription_inactive" = "Les envois sont indisponibles pour cette app pour le moment. Veuillez réessayer plus tard.";
+"cupthread.error.profile_not_found" = "Ce profil utilisateur n’est plus disponible.";
+"cupthread.error.comments_unavailable" = "Les commentaires ne sont pas disponibles pour cette demande de fonctionnalité.";
+"cupthread.error.email_not_verified" = "Veuillez utiliser l’adresse e-mail de votre compte connecté pour vous abonner.";
+"cupthread.attachment.oversized" = "La pièce jointe (%1$@) dépasse la taille maximale autorisée de %2$@.";
+"cupthread.attachment.unprocessable" = "La photo sélectionnée n’a pas pu être traitée pour l’envoi.";
+"cupthread.attachment.unsupported_type" = "Ce type d’image n’est pas pris en charge. Veuillez joindre une image PNG, JPEG, WebP ou GIF.";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Votre message est trop long. Raccourcissez-le et réessayez.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld caractères sur %2$lld";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "La session de téléversement a expiré. Supprimez le fichier, joignez-le à nouveau, puis réessayez.";
+"cupthread.error.upload_session_invalid" = "La session de téléversement est invalide ou n'est plus active. Supprimez le fichier, joignez-le à nouveau, puis réessayez.";

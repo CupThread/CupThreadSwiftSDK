@@ -51,6 +51,37 @@ struct UserAttributesSignatureErrorTests {
         }
     }
 
+    @Test func currencyOnlySignatureRequiredEnvelopeSurfacesTypedError() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 422, headers: ["X-Request-Id": "req-422-currency-sign"]),
+                try encodeJSON([
+                    "error": "Payment attributes require signature",
+                    "code": "payment_attributes_require_signature"
+                ])
+            )
+        }
+
+        let client = Self.makeSigningClient(secret: nil)
+        do {
+            _ = try await client.updateUserAttributes(
+                currency: "EUR",
+                userToken: "user-uuid-currency-err"
+            )
+            Issue.record("Expected paymentAttributesRequireSignature error")
+        } catch let error as FeedbackClientError {
+            guard case .paymentAttributesRequireSignature(let message, let requestId) = error else {
+                Issue.record("Expected .paymentAttributesRequireSignature, got \(error)")
+                return
+            }
+            #expect(message == "Payment attributes require signature")
+            #expect(requestId == "req-422-currency-sign")
+            #expect(error.errorDescription?.contains("req-422-currency-sign") == true)
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
     @Test func signingSecretNotConfiguredEnvelopeSurfacesTypedError() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (

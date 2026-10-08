@@ -136,12 +136,19 @@
 "cupthread.subscribe.manage_title" = "Sei iscritto";
 "cupthread.subscribe.manage_message" = "Le email di aggiornamento verranno inviate a %@. Per cambiare indirizzo o annullare l'iscrizione, usa il link presente in qualsiasi email di aggiornamento.";
 "cupthread.subscribe.use_different_email" = "Usa un altro indirizzo email";
+"cupthread.subscribe.pending_title" = "Conferma in attesa";
+"cupthread.subscribe.pending_message" = "Abbiamo inviato un link di conferma a %@. Aprilo per iniziare a ricevere gli aggiornamenti via email.";
+"cupthread.subscribe.resend_button" = "Reinvia l'email di conferma";
+"cupthread.subscribe.resending_button" = "Reinvio in corso…";
 "cupthread.whatsnew.emails_on" = "Email di aggiornamento attive";
 "cupthread.whatsnew.emails_on_destination" = "Le notifiche arrivano su %@.";
 "cupthread.whatsnew.get_emails" = "Ricevi email di aggiornamento";
 "cupthread.whatsnew.get_emails_caption" = "Ricevi un avviso quando viene rilasciata una nuova versione.";
 "cupthread.whatsnew.subscribe_accessibility" = "Iscriviti alle email di aggiornamento";
 "cupthread.whatsnew.emails_on_accessibility" = "Le email di aggiornamento sono attive per %@";
+"cupthread.whatsnew.pending_title" = "Conferma in attesa";
+"cupthread.whatsnew.pending_destination" = "Abbiamo inviato un link di conferma a %@.";
+"cupthread.whatsnew.pending_accessibility" = "Conferma email in attesa per %@";
 "cupthread.whatsnew.version_accessibility" = "Versione %@";
 "cupthread.whatsnew.shipped_requests_accessibility" = "Richieste rilasciate: %@";
 "cupthread.features.unavailable_feedback" = "Feedback non disponibile";
@@ -193,3 +200,31 @@
 "cupthread.error.invalid_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report non è stata verificata. Controlla il segreto di firma SDK dell'app.";
 "cupthread.error.stale_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report è scaduta. Controlla l'orologio del dispositivo e riprova.";
 
+/* Issue #257: duplicate attachment finalization — already submitted */
+"cupthread.error.already_finalized" = "Questo feedback o allegato è già stato inviato.";
+
+/* Issue #266: typed error & attachment-validation copy */
+"cupthread.error.invalid_response" = "Il server di feedback ha restituito una risposta non valida.";
+"cupthread.error.unreadable_upload_response" = "Il server di feedback ha restituito una risposta di caricamento illeggibile.";
+"cupthread.error.auth_required" = "Questa azione è disponibile solo per gli utenti che hanno effettuato l'accesso.";
+"cupthread.error.scan_rejected" = "L'allegato indicato è stato rifiutato dall'ispezione dei contenuti e non è stato possibile caricarlo.";
+"cupthread.error.unsupported_media" = "Questo tipo di immagine non è supportato. Allega un'immagine PNG, JPEG, WebP o GIF.";
+"cupthread.error.payload_too_large" = "Questo file è troppo grande per essere caricato.";
+"cupthread.error.uploader_identity_required" = "I caricamenti richiedono un'identità dell'utente finale. Passa un userToken (vedi UserTokenStore) durante il caricamento degli allegati.";
+"cupthread.error.uploader_mismatch" = "Questo allegato è stato caricato con un'identità diversa. Rimuovilo, allega di nuovo e riprova.";
+"cupthread.error.quota_exceeded" = "Questa app ha raggiunto il limite di invii di questo mese. Riprova più tardi.";
+"cupthread.error.subscription_inactive" = "Gli invii non sono disponibili per questa app al momento. Riprova più tardi.";
+"cupthread.error.profile_not_found" = "Questo profilo utente non è più disponibile.";
+"cupthread.error.comments_unavailable" = "I commenti non sono disponibili per questa richiesta di funzionalità.";
+"cupthread.error.email_not_verified" = "Usa l'indirizzo email del tuo account con accesso effettuato per iscriverti.";
+"cupthread.attachment.oversized" = "L'allegato (%1$@) supera la dimensione massima consentita di %2$@.";
+"cupthread.attachment.unprocessable" = "Impossibile elaborare la foto selezionata per il caricamento.";
+"cupthread.attachment.unsupported_type" = "Questo tipo di immagine non è supportato. Allega un'immagine PNG, JPEG, WebP o GIF.";
+/* BUG-18 (#278): client-side intake text budget — dedicated error copy and near-cap character counters */
+"cupthread.error.text_too_long" = "Il messaggio è troppo lungo. Accorcialo e riprova.";
+"cupthread.common.character_count" = "%1$lld/%2$lld";
+"cupthread.common.character_count_accessibility" = "%1$lld di %2$lld caratteri";
+
+/* API-13: upload PUT session lifecycle errors — session expiry and invalid session */
+"cupthread.error.upload_session_expired" = "La sessione di caricamento è scaduta. Rimuovi il file, allegalo di nuovo e riprova.";
+"cupthread.error.upload_session_invalid" = "La sessione di caricamento non è valida o non è più attiva. Rimuovi il file, allegalo di nuovo e riprova.";

@@ -206,6 +206,25 @@ struct ChangelogPaginationTests {
         #expect(script.requestedCursors == [nil, "c1"])
         #expect(entries.map(\.id) == ["e2", "e1"])
     }
+
+    @Test func fetchChangelogTerminatesAtMaxPagesWhenServerContinuesAdvertisingMore() async throws {
+        var requestCount = 0
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            requestCount += 1
+            let entryId = "cl-\(requestCount)"
+            let dateStr = "2026-01-0\(min(requestCount, 9))T00:00:00.000Z"
+            return page(
+                entries: [makePagedEntryJSON(id: entryId, publishedAt: dateStr)],
+                hasMore: true,
+                nextCursor: "cur-\(requestCount)"
+            )
+        }
+
+        let entries = try await Self.makePagedClient().fetchChangelog(maxPages: 3)
+
+        #expect(requestCount == 3)
+        #expect(entries.count == 3)
+    }
 }
 
 // MARK: - JSON fixtures

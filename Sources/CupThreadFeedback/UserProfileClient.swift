@@ -5,6 +5,10 @@ import Foundation
 extension FeedbackClient {
 
     /// Fetches the public profile for a given user.
+    ///
+    /// When configured with an authentication provider, the signed-in user's
+    /// bearer token is attached as `Authorization: Bearer …` so profiles
+    /// load when `allowAnonymousRoadmap = false`.
     /// - Parameter userId: App-scoped pseudonymous user identifier (as found
     ///   in `authorClerkId`, `replyToClerkId`, `requesterClerkId`, and
     ///   `recentCommenters[].clerkUserId` on public payloads); raw user IDs
@@ -16,6 +20,9 @@ extension FeedbackClient {
     ///   identifiers and an empty profile for users without a public profile.
     /// - Returns: The user's public profile data.
     /// - Throws: ``FeedbackClientError/userProfileNotFound(message:)``,
+    ///   ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when
+    ///   access is rejected by the server's permission policy (HTTP 401/403),
     ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the
     ///   per-client-IP rate limit is spent (HTTP 429 — back off and retry),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,
@@ -39,6 +46,7 @@ extension FeedbackClient {
         var request = URLRequest(url: profileURL)
         request.httpMethod = "GET"
         applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -51,7 +59,7 @@ extension FeedbackClient {
             let message = (trimmed?.isEmpty ?? true) ? nil : trimmed
             throw FeedbackClientError.userProfileNotFound(message: message)
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(PublicUserProfileResponse.self, from: data)
     }
 }

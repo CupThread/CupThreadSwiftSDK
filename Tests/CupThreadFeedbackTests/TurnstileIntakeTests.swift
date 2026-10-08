@@ -65,7 +65,7 @@ struct TurnstileIntakeTests {
     }
 
     func makeClient(
-        turnstileTokenProvider: (@Sendable () async -> String?)? = nil
+        turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil
     ) -> FeedbackClient {
         FeedbackClient(
             configuration: FeedbackClientConfiguration(
@@ -104,7 +104,7 @@ struct TurnstileIntakeTests {
             return (makeHTTPResponse(status: 200), try encodeJSON(feedbackReceipt))
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         _ = try await client.submit(FeedbackDraft(title: "Title", description: "Description", platform: .ios))
 
         let rawBody = try #require(log.allBodies.first)
@@ -135,7 +135,7 @@ struct TurnstileIntakeTests {
             return (makeHTTPResponse(status: 200), try encodeJSON(feedbackReceipt))
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         _ = try await client.submit(FeedbackDraft(title: "Title", description: "Description", platform: .ios))
 
         let rawBody = try #require(log.allBodies.first)
@@ -152,7 +152,7 @@ struct TurnstileIntakeTests {
             return (makeHTTPResponse(status: 201), try encodeJSON(featureRequestReceipt))
         }
 
-        let client = makeClient(turnstileTokenProvider: { await provider.next() })
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         _ = try await client.submitFeatureRequest(
             FeatureRequestDraft(title: "Title", description: "Description"),
             userToken: "user-1"

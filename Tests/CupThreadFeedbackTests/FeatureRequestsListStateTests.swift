@@ -307,4 +307,40 @@ struct FeatureRequestsListStateTests {
         #expect(state.nextCursor == nil)
         #expect(state.hasMorePages == false)
     }
+
+    @Test func lastExecutedQueryIsTrackedAcrossReplacements() {
+        var state = FeatureRequestsListState(lastExecutedQuery: "initial")
+        #expect(state.lastExecutedQuery == "initial")
+
+        // Replacement with executed query updates it
+        state.applyPage(
+            makePageResult([makeItem(id: "fr-1")]),
+            replacesExisting: true,
+            executedQuery: "swift"
+        )
+        #expect(state.lastExecutedQuery == "swift")
+
+        // Appending pages for pagination keeps the active executed query
+        state.applyPage(
+            makePageResult([makeItem(id: "fr-2")]),
+            replacesExisting: false,
+            executedQuery: "pagination"
+        )
+        #expect(state.lastExecutedQuery == "swift")
+
+        // Replacement without explicit executedQuery preserves current query
+        state.applyPage(
+            makePageResult([makeItem(id: "fr-1")]),
+            replacesExisting: true
+        )
+        #expect(state.lastExecutedQuery == "swift")
+
+        // Clearing search (empty query) updates it
+        state.applyPage(
+            makePageResult([makeItem(id: "fr-1")]),
+            replacesExisting: true,
+            executedQuery: ""
+        )
+        #expect(state.lastExecutedQuery.isEmpty)
+    }
 }

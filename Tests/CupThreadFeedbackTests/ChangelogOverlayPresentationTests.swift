@@ -48,6 +48,41 @@ struct ChangelogOverlayPresentationTests {
         return recordedPaths
     }
 
+    private func mockChangelogAPIWithRequests(
+        changelogEnabled: Bool = true,
+        allowAnonymousChangelog: Bool = true,
+        entryCount: Int = 3,
+        changelogHandler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))? = nil
+    ) -> (client: FeedbackClient, requests: CaptureBox<[URLRequest]>) {
+        var payload = makeConfigJSON()
+        payload["allowAnonymousChangelog"] = allowAnonymousChangelog
+        payload["sdk"] = [
+            "theme": "system",
+            "features": ["changelog": changelogEnabled],
+            "changelogOverlay": [
+                "title": "What's New",
+                "subtitle": "Latest updates",
+                "entryCount": entryCount,
+                "primaryButton": "Continue",
+                "closeButton": "Close"
+            ]
+        ]
+        let recordedRequests = CaptureBox<[URLRequest]>()
+        recordedRequests.value = []
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            recordedRequests.value?.append(request)
+            let path = request.url?.path ?? ""
+            if path.contains("/changelog") {
+                if let changelogHandler {
+                    return try changelogHandler(request)
+                }
+                return (makeHTTPResponse(), try encodeJSON(["entries": [makeDefaultEntry()]]))
+            }
+            return (makeHTTPResponse(), try encodeJSON(payload))
+        }
+        return (Self.makeChangelogClient(), recordedRequests)
+    }
+
     @Test func refusedPresentationReturnsFalse() async throws {
         mockChangelogAPI()
         let stub = await RefusedStubPresenter()
@@ -246,6 +281,90 @@ struct ChangelogOverlayPresentationTests {
         #expect(paths.contains { $0.contains("/config/") })
         #expect(!paths.contains { $0.contains("/changelog") })
     }
+
+    // MARK: - Single-page launch-path fetch (PERF-4)
+
+    @Test func prepareChangelogOverlayRequestsSinglePageWithConfiguredEntryCountLimit() async throws {
+        let (client, recorded) = mockChangelogAPIWithRequests(entryCount: 3)
+        let prepared = try await client.prepareChangelogOverlay(onlyIfUnseen: false)
+
+        #expect(prepared != nil)
+        #expect(prepared?.entries.map(\.id) == ["e_presentation_1"])
+        #expect(prepared?.appearance.changelogOverlay.entryCount == 3)
+
+        let changelogRequests = (recorded.value ?? []).filter { $0.url?.path.contains("/changelog") == true }
+        #expect(changelogRequests.count == 1)
+        let first = try #require(changelogRequests.first)
+        let query = queryItems(of: first)
+        #expect(query["limit"] == "3")
+        #expect(query["cursor"] == nil)
+    }
+
+    @Test func prepareChangelogOverlayWithCustomCapSizesLimitQuery() async throws {
+        let (client, recorded) = mockChangelogAPIWithRequests(entryCount: 10)
+        let prepared = try await client.prepareChangelogOverlay(onlyIfUnseen: false)
+
+        #expect(prepared != nil)
+        let changelogRequests = (recorded.value ?? []).filter { $0.url?.path.contains("/changelog") == true }
+        #expect(changelogRequests.count == 1)
+        let first = try #require(changelogRequests.first)
+        let query = queryItems(of: first)
+        #expect(query["limit"] == "10")
+        #expect(query["cursor"] == nil)
+    }
+
+    @Test func selfLoadedOverlayRequestsSinglePageWithConfiguredEntryCountLimit() async throws {
+        let (client, recorded) = mockChangelogAPIWithRequests(entryCount: 5)
+        let content = await ChangelogOverlayView.fetchSelfLoadedContent(in: client)
+
+        guard case .entries(let entries, let appearance)? = content else {
+            Issue.record("Expected .entries, got \(String(describing: content))")
+            return
+        }
+        #expect(entries.map(\.id) == ["e_presentation_1"])
+        #expect(appearance.changelogOverlay.entryCount == 5)
+
+        let changelogRequests = (recorded.value ?? []).filter { $0.url?.path.contains("/changelog") == true }
+        #expect(changelogRequests.count == 1)
+        let first = try #require(changelogRequests.first)
+        let query = queryItems(of: first)
+        #expect(query["limit"] == "5")
+        #expect(query["cursor"] == nil)
+    }
+
+    @Test func prepareAndSelfLoadedOverlayIsolateFailureOnSubsequentPages() async throws {
+        let pageCounter = CaptureBox<Int>()
+        pageCounter.value = 0
+        let (client, recorded) = mockChangelogAPIWithRequests(entryCount: 3) { _ in
+            let count = (pageCounter.value ?? 0) + 1
+            pageCounter.value = count
+            if count <= 2 {
+                // Page 1 for prepare and page 1 for selfLoaded both succeed
+                return (makeHTTPResponse(), try encodeJSON([
+                    "entries": [makeDefaultEntry()],
+                    "hasMore": true,
+                    "nextCursor": "hypothetical_page_2"
+                ]))
+            }
+            // A hypothetical second page would fail with 500
+            return (makeHTTPResponse(status: 500), try encodeJSON(["error": "hypothetical page 2 failure"]))
+        }
+
+        // prepareChangelogOverlay succeeds because it never fetches page 2
+        let prepared = try await client.prepareChangelogOverlay(onlyIfUnseen: false)
+        #expect(prepared?.entries.map(\.id) == ["e_presentation_1"])
+
+        // fetchSelfLoadedContent also succeeds and never fetches page 2
+        let content = await ChangelogOverlayView.fetchSelfLoadedContent(in: client)
+        guard case .entries(let entries, _)? = content else {
+            Issue.record("Expected .entries, got \(String(describing: content))")
+            return
+        }
+        #expect(entries.map(\.id) == ["e_presentation_1"])
+
+        let changelogRequests = (recorded.value ?? []).filter { $0.url?.path.contains("/changelog") == true }
+        #expect(changelogRequests.count == 2)
+    }
 }
 
 // MARK: - Stubs
@@ -339,4 +458,14 @@ private func withTimeout<T: Sendable>(
         group.cancelAll()
         return result
     }
+}
+
+private func queryItems(of request: URLRequest) -> [String: String] {
+    guard let url = request.url,
+          let items = URLComponents(url: url, resolvingAgainstBaseURL: true)?.queryItems else {
+        return [:]
+    }
+    return Dictionary(items.compactMap { item in
+        item.value.map { (item.name, $0) }
+    }, uniquingKeysWith: { first, _ in first })
 }

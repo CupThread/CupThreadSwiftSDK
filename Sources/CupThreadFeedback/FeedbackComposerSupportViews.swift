@@ -292,3 +292,25 @@ enum FeedbackComposerAttachmentLimit {
         config?.maxAttachmentBytes ?? lastKnownLimit
     }
 }
+
+// MARK: - Attachment Finalization Recovery
+
+extension FeedbackComposerView {
+    /// Whether a failed feedback submission means the referenced attachments were
+    /// already finalized (HTTP 409 `already_finalized`): another concurrent or retried
+    /// attempt already consumed the upload session. The composer clears consumed attachments
+    /// from the draft so the user does not retry the same upload IDs.
+    nonisolated static func clearsConsumedAttachments(for error: Error) -> Bool {
+        guard let clientError = error as? FeedbackClientError else { return false }
+        if case .alreadyFinalized = clientError { return true }
+        return false
+    }
+}
+
+/// A photo readied for the streaming upload path: the spooled temp file
+/// plus the server-facing name and MIME type.
+struct PreparedPhotoUpload {
+    let fileURL: URL
+    let filename: String
+    let mimeType: String
+}
