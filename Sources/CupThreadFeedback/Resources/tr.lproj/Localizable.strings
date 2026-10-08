@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "Sürümleri yeniden yüklemeyi dene";
 "cupthread.features.request_a_feature" = "Özellik Öner";
 "cupthread.features.request_a_feature_hint" = "Özellik talebi oluşturma ekranını açar";
+"cupthread.features.view_comments_hint" = "Bu özellik talebinin yorum dizisini ve ayrıntılarını açar.";
 "cupthread.features.empty_title" = "Özellik Talebi Yok";
 "cupthread.features.empty_description" = "Sizin gibi kullanıcıların fikirleri burada görünecektir.";
 "cupthread.features.empty_with_query" = "“%@” için sonuç bulunamadı.";

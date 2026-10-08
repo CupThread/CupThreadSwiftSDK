@@ -43,6 +43,53 @@ struct CommentsViewAccessibilityTests {
     }
 
     @MainActor
+    @Test func commentAvatarProfileLabelComposesAnonymousFallback() {
+        // The author avatar button labels itself with the same helper, using
+        // the anonymous display name when the comment has no author name —
+        // the same composition `authorHeader` renders as text.
+        let anonymous = CupThreadStrings.tr("cupthread.features.anonymous")
+        let label = CommentsView.viewProfileAccessibilityLabel(authorName: anonymous)
+        #expect(label == CupThreadStrings.tr("cupthread.comments.view_profile_of", anonymous))
+        #expect(label.contains(anonymous))
+        #expect(!label.contains("%@"))
+    }
+
+    @MainActor
+    @Test func commentRowEvaluatesAuthorAvatarButtonForClerkAndAnonymousAuthors() {
+        let client = makeClient()
+        let view = CommentsView(
+            client: client,
+            userToken: "token_123",
+            featureRequestId: "fr_123",
+            featureRequestTitle: "Title"
+        )
+
+        let namedComment = FeatureRequestComment(
+            id: "c-avatar-named",
+            featureRequestId: "fr_123",
+            authorName: "Ada",
+            authorClerkId: "clerk_ada",
+            body: "Hello",
+            isHidden: false,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        )
+        let anonymousComment = FeatureRequestComment(
+            id: "c-avatar-anonymous",
+            featureRequestId: "fr_123",
+            authorClerkId: "clerk_anon",
+            body: "Hi",
+            isHidden: false,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        )
+
+        // Both branches of the avatar button (labeled button vs. decorative
+        // avatar) must render without errors.
+        #expect(namedComment.displayModel.canOpenAuthorProfile)
+        _ = view.commentRow(namedComment)
+        _ = view.commentRow(anonymousComment)
+    }
+
+    @MainActor
     @Test func commentsViewBodyEvaluatesWithoutErrors() {
         let client = makeClient()
         let view = CommentsView(

@@ -14,6 +14,7 @@ struct FeatureRequestCardTests {
         hasVoted: Bool = false,
         requesterClerkId: String? = nil,
         recentCommenters: [RecentCommenter] = [],
+        hasMoreCommenters: Bool = false,
         releasedVersion: String? = nil
     ) -> FeatureRequestItem {
         FeatureRequestItem(
@@ -32,7 +33,7 @@ struct FeatureRequestCardTests {
             requesterAvatarUrl: nil,
             requesterClerkId: requesterClerkId,
             recentCommenters: recentCommenters,
-            hasMoreCommenters: false,
+            hasMoreCommenters: hasMoreCommenters,
             approved: true,
             voteCount: voteCount,
             hasVoted: hasVoted,
@@ -155,4 +156,78 @@ struct FeatureRequestCardTests {
         card.vote()
         #expect(didVote)
     }
+
+    // MARK: - Accessibility (A11Y-1)
+
+    @Test @MainActor func commenterProfileAccessibilityLabelIncludesCommenterName() {
+        let label = FeatureRequestCard.commenterProfileAccessibilityLabel(authorName: "Alice")
+        #expect(label == CupThreadStrings.tr("cupthread.comments.view_profile_of", "Alice"))
+        #expect(label.contains("Alice"))
+        #expect(!label.contains("%@"))
+    }
+
+    @Test @MainActor func commenterProfileAccessibilityLabelFallsBackToAnonymousForBlankNames() {
+        let anonymous = CupThreadStrings.tr("cupthread.features.anonymous")
+        let expected = CupThreadStrings.tr("cupthread.comments.view_profile_of", anonymous)
+
+        let nilNameLabel = FeatureRequestCard.commenterProfileAccessibilityLabel(authorName: nil)
+        let emptyNameLabel = FeatureRequestCard.commenterProfileAccessibilityLabel(authorName: "")
+
+        #expect(nilNameLabel == expected)
+        #expect(emptyNameLabel == expected)
+        #expect(!nilNameLabel.contains("%@"))
+    }
+
+    @Test @MainActor func cardActivationAccessibilityHintIsLocalized() {
+        let hint = FeatureRequestCard.cardActivationAccessibilityHint()
+        #expect(hint == CupThreadStrings.tr("cupthread.features.view_comments_hint"))
+        #expect(!hint.isEmpty)
+        #expect(hint != "cupthread.features.view_comments_hint")
+    }
+
+    @Test func cardActivationHintShipsInEveryShippedLocalization() throws {
+        #if SWIFT_PACKAGE
+        let sdkBundle = Bundle.module
+        #else
+        let sdkBundle = Bundle(for: CardTestBundleToken.self)
+        #endif
+        for language in sdkBundle.localizations {
+            let languageBundle = try #require(
+                sdkBundle.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:)),
+                "Missing \(language).lproj"
+            )
+            let hint = languageBundle.localizedString(
+                forKey: "cupthread.features.view_comments_hint", value: "", table: nil
+            )
+            #expect(!hint.isEmpty, "\(language) ships an empty view_comments_hint")
+        }
+    }
+
+    @Test @MainActor func cardEvaluatesBodyWithCommenterAvatarsAndHasMoreIndicator() {
+        let item = makeItem(
+            requesterClerkId: "clerk_author_1",
+            recentCommenters: [
+                RecentCommenter(authorName: "Alice", clerkUserId: "clerk_c1", avatarUrl: nil),
+                RecentCommenter(authorName: "", clerkUserId: "clerk_c2", avatarUrl: nil),
+                RecentCommenter(authorName: "NoClerk", clerkUserId: nil, avatarUrl: nil)
+            ],
+            hasMoreCommenters: true
+        )
+
+        let card = FeatureRequestCard(
+            item: item,
+            isVoteInFlight: false,
+            onSelectCard: {},
+            onSelectUser: { _ in },
+            vote: {}
+        )
+
+        _ = card.body
+        _ = card.cardContent
+        _ = card.metaRow
+    }
 }
+
+#if !SWIFT_PACKAGE
+private final class CardTestBundleToken {}
+#endif

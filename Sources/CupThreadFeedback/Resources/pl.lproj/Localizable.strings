@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "Ponów wczytywanie wersji";
 "cupthread.features.request_a_feature" = "Zaproponuj funkcję";
 "cupthread.features.request_a_feature_hint" = "Otwiera formularz propozycji funkcji";
+"cupthread.features.view_comments_hint" = "Otwiera wątek komentarzy i szczegóły tego zgłoszenia.";
 "cupthread.features.empty_title" = "Brak propozycji funkcji";
 "cupthread.features.empty_description" = "Pomysły użytkowników pojawią się w tym miejscu.";
 "cupthread.features.empty_with_query" = "Brak wyników dla „%@”.";

@@ -167,6 +167,13 @@ public struct CommentsView: View {
                 AvatarView(url: comment.authorAvatarUrl, size: 32)
             }
             .buttonStyle(.plain)
+            // AvatarView is accessibility-hidden, so the button has no
+            // content to derive a name from — label it directly.
+            .accessibilityLabel(
+                Self.viewProfileAccessibilityLabel(
+                    authorName: comment.authorName ?? CupThreadStrings.tr("cupthread.features.anonymous")
+                )
+            )
         } else {
             AvatarView(url: comment.authorAvatarUrl, size: 32)
         }

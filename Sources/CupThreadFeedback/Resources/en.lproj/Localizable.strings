@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "Retry Loading Versions";
 "cupthread.features.request_a_feature" = "Request a Feature";
 "cupthread.features.request_a_feature_hint" = "Opens the feature request composer";
+"cupthread.features.view_comments_hint" = "Opens the comment thread and details for this request.";
 "cupthread.features.empty_title" = "No Feature Requests";
 "cupthread.features.empty_description" = "Ideas from users like you will appear here.";
 "cupthread.features.empty_with_query" = "No results for “%@”.";
