@@ -109,7 +109,9 @@ public struct FeedbackComposerView: View {
     ///   - stripSensitiveMetadata: When `true` (the default), photo attachments selected
     ///     via the photo picker are re-encoded to strip GPS coordinates, camera details,
     ///     and sensitive EXIF metadata before upload. Multi-frame animations (such as GIF or
-    ///     animated WebP) are preserved intact without flattening to a still image.
+    ///     animated WebP) are preserved intact without flattening to a still image;
+    ///     container-embedded EXIF/XMP metadata (including GPS) is stripped from them
+    ///     at the byte level without re-encoding.
     ///     Set to `false` to upload original bytes for formats accepted as-is (PNG, JPEG, WebP, GIF);
     ///     note that HEIC/HEIF and unrecognized formats are always transcoded to JPEG per server media policy.
     ///   - uploadHandle: Optional ``FeedbackUploadHandle`` for cancelling the
