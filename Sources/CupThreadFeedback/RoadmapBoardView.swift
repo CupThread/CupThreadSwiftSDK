@@ -22,6 +22,11 @@ public struct RoadmapBoardView: View {
     @State private var loadError: String?
     @State private var selectedGroupID: String?
     @State private var searchText = ""
+    /// The search query that produced the currently loaded roadmap groups.
+    @State private var lastExecutedQuery = ""
+    /// Deduplicates admission-denial notices so repeated keystrokes during
+    /// cooldown do not continuously re-trigger or restart the notice banner.
+    @State private var hasEmittedAdmissionNotice = false
     /// Transient notice for a failed reload whose groups stay on screen
     /// (a reload failure never wipes already-rendered content).
     @State private var reloadNotice: String?
@@ -85,6 +90,7 @@ public struct RoadmapBoardView: View {
         self.client = client
         self.userToken = userToken
         _searchText = State(initialValue: initialSearchText)
+        _lastExecutedQuery = State(initialValue: "")
     }
 
     /// Internal initializer for tests and previews with preloaded groups.
@@ -97,6 +103,7 @@ public struct RoadmapBoardView: View {
         self.client = client
         self.userToken = userToken
         _searchText = State(initialValue: initialSearchText)
+        _lastExecutedQuery = State(initialValue: initialSearchText)
         if let initialGroups {
             _groups = State(initialValue: initialGroups)
             _hasLoadedOnce = State(initialValue: true)
@@ -142,6 +149,7 @@ public struct RoadmapBoardView: View {
             guard isRoadmapPermitted else { return }
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: unrate-limited, so no debounce/throttle.
+                hasEmittedAdmissionNotice = false
                 await load()
                 return
             }
@@ -150,7 +158,23 @@ public struct RoadmapBoardView: View {
             // fetches below the 30/min per-IP budget and skips duplicates.
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            guard await client.searchThrottle.waitForAdmission(key: "roadmap|\(trimmedSearchText)") else { return }
+            let admitted = await client.searchThrottle.waitForAdmission(key: "roadmap|\(trimmedSearchText)")
+            guard admitted else {
+                guard let outcome = SearchAdmissionOutcome.outcome(
+                    isCancelled: Task.isCancelled,
+                    hasExistingContent: !groups.isEmpty
+                ) else { return }
+                switch outcome {
+                case .inlineNotice(let message):
+                    if !hasEmittedAdmissionNotice {
+                        reloadNotice = message
+                        hasEmittedAdmissionNotice = true
+                    }
+                case .fullScreenError(let message):
+                    loadError = message
+                }
+                return
+            }
             await load()
         }
         .task(id: reloadNotice) {
@@ -171,7 +195,7 @@ public struct RoadmapBoardView: View {
             isLoading: isLoading,
             hasLoadedOnce: hasLoadedOnce,
             loadError: loadError,
-            searchText: searchText,
+            searchText: lastExecutedQuery,
             groups: groups
         )
     }
@@ -270,7 +294,7 @@ public struct RoadmapBoardView: View {
                     EmptyColumnView()
                 } else {
                     ForEach(group.requests) { item in
-                        RoadmapCard(item: item, highlightQuery: searchText)
+                        RoadmapCard(item: item, highlightQuery: lastExecutedQuery)
                     }
                 }
             }
@@ -301,7 +325,7 @@ public struct RoadmapBoardView: View {
                         .frame(maxWidth: .infinity)
                 case .board(let visibleGroups):
                     ForEach(visibleGroups) { group in
-                        ColumnCard(group: group, highlightQuery: searchText)
+                        ColumnCard(group: group, highlightQuery: lastExecutedQuery)
                     }
                 }
             }
@@ -328,7 +352,7 @@ public struct RoadmapBoardView: View {
                 ForEach(visibleGroups) { group in
                     Section(group.name) {
                         ForEach(group.requests) { item in
-                            RoadmapCard(item: item, highlightQuery: searchText)
+                            RoadmapCard(item: item, highlightQuery: lastExecutedQuery)
                                 #if !os(tvOS)
                                 .listRowSeparator(.hidden)
                                 #endif
@@ -348,7 +372,7 @@ public struct RoadmapBoardView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if searchText.isEmpty {
+        if lastExecutedQuery.isEmpty {
             ContentUnavailableView {
                 Label(CupThreadStrings.tr("cupthread.roadmap.no_columns_title"), systemImage: "square.grid.3x3")
             } description: {
@@ -356,11 +380,15 @@ public struct RoadmapBoardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ContentUnavailableView.search(text: searchText)
+            ContentUnavailableView.search(text: lastExecutedQuery)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
+}
 
+// MARK: - Actions
+
+extension RoadmapBoardView {
     /// Centers a full-height state view inside the pager's layout slot.
     private func stateContainer<V: View>(_ content: V) -> some View {
         content
@@ -393,6 +421,8 @@ public struct RoadmapBoardView: View {
                 config: sdkAppConfig
             ) {
                 groups = loaded
+                lastExecutedQuery = trimmedSearchText
+                hasEmittedAdmissionNotice = false
             }
         } catch {
             // A cancelled load (keystroke restart, dismissal) never reached a verdict: keep the board.
@@ -407,6 +437,7 @@ public struct RoadmapBoardView: View {
             }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()
+                hasEmittedAdmissionNotice = true
             }
             switch outcome {
             case .inlineNotice(let message):
