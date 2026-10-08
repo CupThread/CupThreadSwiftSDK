@@ -160,6 +160,7 @@ public struct RoadmapBoardView: View {
             guard !trimmedSearchText.isEmpty else {
                 // Plain listing: unrate-limited, so no debounce/throttle.
                 hasEmittedAdmissionNotice = false
+                await client.searchThrottle.resetLastAdmittedKey()
                 await load()
                 return
             }
@@ -229,11 +230,7 @@ public struct RoadmapBoardView: View {
                         .padding(16)
                 }
             case .error(let message):
-                stateContainer(
-                    LoadErrorView(message: message) {
-                        await load()
-                    }
-                )
+                stateContainer(LoadErrorView(message: message) { await refreshRoadmap() })
             case .emptySearch, .emptyBoard:
                 stateContainer(emptyState)
             case .board:
@@ -311,7 +308,7 @@ public struct RoadmapBoardView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .refreshable { await load() }
+        .refreshable { await refreshRoadmap() }
         .containerRelativeFrame(.horizontal)
     }
 
@@ -326,10 +323,8 @@ public struct RoadmapBoardView: View {
                         SkeletonColumn()
                     }
                 case .error(let message):
-                    LoadErrorView(message: message) {
-                        await load()
-                    }
-                    .frame(maxWidth: .infinity)
+                    LoadErrorView(message: message) { await refreshRoadmap() }
+                        .frame(maxWidth: .infinity)
                 case .emptySearch, .emptyBoard:
                     emptyState
                         .frame(maxWidth: .infinity)
@@ -352,10 +347,8 @@ public struct RoadmapBoardView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .error(let message):
-                LoadErrorView(message: message) {
-                    await load()
-                }
-                .frame(maxWidth: .infinity)
+                LoadErrorView(message: message) { await refreshRoadmap() }
+                    .frame(maxWidth: .infinity)
             case .emptySearch, .emptyBoard:
                 emptyState
             case .board(let visibleGroups):
@@ -375,7 +368,7 @@ public struct RoadmapBoardView: View {
                 }
             }
         }
-        .refreshable { await load() }
+        .refreshable { await refreshRoadmap() }
     }
 
     // MARK: Shared states
@@ -403,6 +396,12 @@ extension RoadmapBoardView {
     private func stateContainer<V: View>(_ content: V) -> some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @MainActor
+    private func refreshRoadmap() async {
+        await client.searchThrottle.resetLastAdmittedKey()
+        await load()
     }
 
     @MainActor

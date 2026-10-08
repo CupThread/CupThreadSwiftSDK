@@ -170,7 +170,7 @@ public struct FeatureRequestsView: View {
                 }
             }
         }
-        .refreshable { await loadFeatureRequests() }
+        .refreshable { await refreshFeatureRequests() }
         // Re-keyed on the anonymous-roadmap verdict (issue #285): versions
         // answers 401/403 while anonymous reads are disabled; re-attempt on
         // config transitions instead of staying stuck on the first failure.
@@ -182,6 +182,7 @@ public struct FeatureRequestsView: View {
                 // Plain listing: the backend does not rate-limit it, so no
                 // debounce or throttle admission is needed.
                 hasEmittedAdmissionNotice = false
+                await client.searchThrottle.resetLastAdmittedKey()
                 await loadFeatureRequests()
                 return
             }
@@ -231,10 +232,8 @@ public struct FeatureRequestsView: View {
                 if isLoading && !hasLoadedOnce {
                     SkeletonCardList()
                 } else if let loadError {
-                    LoadErrorView(message: loadError) {
-                        await loadFeatureRequests()
-                    }
-                    .padding(.top, 32)
+                    LoadErrorView(message: loadError) { await refreshFeatureRequests() }
+                        .padding(.top, 32)
                 } else if items.isEmpty {
                     emptyState
                         .padding(.top, 48)
@@ -282,10 +281,8 @@ public struct FeatureRequestsView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity)
             } else if let loadError {
-                LoadErrorView(message: loadError) {
-                    await loadFeatureRequests()
-                }
-                .frame(maxWidth: .infinity)
+                LoadErrorView(message: loadError) { await refreshFeatureRequests() }
+                    .frame(maxWidth: .infinity)
             } else if items.isEmpty {
                 Text(emptyStateText)
                     .foregroundStyle(.secondary)
@@ -324,7 +321,7 @@ public struct FeatureRequestsView: View {
                 }
             }
         }
-        .refreshable { await loadFeatureRequests() }
+        .refreshable { await refreshFeatureRequests() }
     }
 
     private var emptyState: some View {
@@ -366,6 +363,12 @@ extension FeatureRequestsView {
         } catch {
             versionFilterState.loadFailed(error)
         }
+    }
+
+    @MainActor
+    private func refreshFeatureRequests() async {
+        await client.searchThrottle.resetLastAdmittedKey()
+        await loadFeatureRequests()
     }
 
     @MainActor
