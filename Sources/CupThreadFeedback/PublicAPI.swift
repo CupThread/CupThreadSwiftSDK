@@ -29,6 +29,15 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     /// Whether the public web portal hides CupThread branding (logo/title).
     /// Native SDK surfaces are unaffected; mirrored for schema completeness.
     public let hideSiteBranding: Bool
+    /// External website origins allowed to embed the app's public portal
+    /// pages in an iframe (`frame-ancestors`), when the tenant configured at
+    /// least one; `nil` means portal embedding is disabled everywhere.
+    ///
+    /// Each entry is an exact `https://` origin (no path, query, fragment,
+    /// userinfo, or wildcard host; optional non-443 port), as enforced by the
+    /// console. This is a portal/web concern — native SDK behavior is
+    /// unaffected; mirrored so the config round-trips losslessly.
+    public let allowedEmbedOrigins: [String]?
     /// Whether the app's public pages (roadmap, changelog) are visible at all.
     ///
     /// Since the September 2026 API sync, the config endpoints answer a
@@ -69,6 +78,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         case iconUrl
         case websiteUrl
         case hideSiteBranding
+        case allowedEmbedOrigins
         case allowPublic
         case allowedPlatforms
         case maxAttachmentBytes
@@ -89,6 +99,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         iconUrl: URL? = nil,
         websiteUrl: URL? = nil,
         hideSiteBranding: Bool = false,
+        allowedEmbedOrigins: [String]? = nil,
         allowPublic: Bool = true,
         allowedPlatforms: [FeedbackPlatform]? = nil,
         allowedPlatformValues: [String] = [],
@@ -108,6 +119,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         self.iconUrl = iconUrl
         self.websiteUrl = websiteUrl
         self.hideSiteBranding = hideSiteBranding
+        self.allowedEmbedOrigins = allowedEmbedOrigins
         self.allowPublic = allowPublic
         if let allowedPlatforms {
             self.allowedPlatforms = allowedPlatforms
@@ -135,6 +147,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         iconUrl = try container.decodeIfPresent(URL.self, forKey: .iconUrl)
         websiteUrl = try container.decodeIfPresent(URL.self, forKey: .websiteUrl)
         hideSiteBranding = try container.decodeIfPresent(Bool.self, forKey: .hideSiteBranding) ?? false
+        allowedEmbedOrigins = try container.decodeIfPresent([String].self, forKey: .allowedEmbedOrigins)
         allowPublic = try container.decodeIfPresent(Bool.self, forKey: .allowPublic) ?? true
         let platformStrings = try container.decodeIfPresent([String].self, forKey: .allowedPlatforms) ?? []
         allowedPlatformValues = platformStrings
@@ -158,6 +171,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         try container.encodeIfPresent(iconUrl, forKey: .iconUrl)
         try container.encodeIfPresent(websiteUrl, forKey: .websiteUrl)
         try container.encode(hideSiteBranding, forKey: .hideSiteBranding)
+        try container.encodeIfPresent(allowedEmbedOrigins, forKey: .allowedEmbedOrigins)
         try container.encode(allowPublic, forKey: .allowPublic)
         try container.encode(allowedPlatformValues, forKey: .allowedPlatforms)
         try container.encode(maxAttachmentBytes, forKey: .maxAttachmentBytes)
@@ -318,12 +332,16 @@ extension FeedbackClient {
     /// bearer token is attached as `Authorization: Bearer …` so versions
     /// load when `allowAnonymousRoadmap = false`.
     /// - Returns: Released and planned versions, sorted by ``AppVersion/position``.
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   access is disabled for the app (HTTP 401 `authentication_required`),
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
+    ///   roadmap access is disabled for the app (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchVersions() async throws -> [AppVersion] {
-        let response: ListVersionsResponse = try await get("/api/v1/public/versions/\(configuration.appKey)")
+        let response: ListVersionsResponse = try await get(
+            "/api/v1/public/versions/\(configuration.appKey)",
+            mapsPermissionErrors: true
+        )
         return response.versions.sorted { $0.position < $1.position }
     }
 

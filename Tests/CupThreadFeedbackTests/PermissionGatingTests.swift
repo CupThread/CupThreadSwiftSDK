@@ -324,22 +324,18 @@ struct PermissionErrorMappingTests {
         }
     }
 
-    @Test func fetchVersionsDoesNotMap403ToForbidden() async throws {
-        // Versions is not a permission-gated intake endpoint — a 403 stays
-        // unexpectedStatus so we do not over-classify unrelated failures.
+    @Test func fetchVersionsMaps403ToForbidden() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (makeHTTPResponse(status: 403), try encodeJSON(["error": "nope"]))
+            (makeHTTPResponse(status: 403), try encodeJSON(["error": "Roadmap is private"]))
         }
         do {
             _ = try await Self.makeAPIClient().fetchVersions()
-            Issue.record("Expected unexpectedStatus")
+            Issue.record("Expected forbidden")
         } catch let error as FeedbackClientError {
-            guard case .unexpectedStatus(let code, let message, _) = error else {
+            guard case .forbidden = error else {
                 Issue.record("Unexpected error: \(error)")
                 return
             }
-            #expect(code == 403)
-            #expect(message == "nope")
         }
     }
 

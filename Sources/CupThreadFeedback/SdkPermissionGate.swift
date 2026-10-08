@@ -144,7 +144,7 @@ func loadRoadmapGroups(
     }
     let isQueryActive = query.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
     async let columns = client.fetchColumns()
-    let requests = try await collectAllRequests { cursor in
+    let requests = try await collectAllRequests(appKey: client.configuration.appKey) { cursor in
         if isQueryActive {
             if cursor == nil && skipInitialAdmissionRecord {
                 // The caller already committed an admission slot for the initial page via `waitForAdmission`.

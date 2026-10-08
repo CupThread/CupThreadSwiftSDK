@@ -177,6 +177,28 @@ struct SubmittedBanner: View {
     }
 }
 
+/// The post-submit success banner as the top-overlay content shared by both
+/// `FeatureRequestsView` layouts (card scroll and tvOS list).
+///
+/// Composed above the content state branches — not inside the populated-list
+/// branch — so the confirmation survives a post-submit reload that comes back
+/// empty or failed, and reaches tvOS, whose list layout has no inline banner
+/// slot (issue #270). The 4-second auto-dismiss lives in the view's
+/// `.task(id: showSubmittedBanner)`.
+///
+/// MainActor-isolated because the transition composition it returns is; every
+/// call site sits in `body`.
+@MainActor
+@ViewBuilder
+func featureRequestsSubmittedBanner(isVisible: Bool) -> some View {
+    if isVisible {
+        SubmittedBanner()
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+}
+
 // MARK: Empty state + compose toolbar (permission-aware)
 
 struct FeatureRequestsEmptyState: View {

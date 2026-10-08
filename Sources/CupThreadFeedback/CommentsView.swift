@@ -282,6 +282,9 @@ public struct CommentsView: View {
                     }
                 }
 
+                // BUG-18: the count appears once the body nears its cap.
+                intakeCharacterCounter(draft.body, limit: IntakeTextLimits.maxCommentLength)
+
                 HStack(alignment: .bottom, spacing: 12) {
                     #if os(tvOS)
                     TextField(CupThreadStrings.tr("cupthread.comments.compose_prompt"), text: $draft.body, axis: .vertical)
@@ -328,7 +331,8 @@ public struct CommentsView: View {
     }
 
     private var canSubmit: Bool {
-        !draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        IntakeTextLimits.overLimitField(in: draft) == nil
     }
 
     @MainActor
@@ -374,9 +378,11 @@ public struct CommentsView: View {
             submitError = FriendlyError.message(for: error)
         }
     }
+}
 
-    // MARK: - Reply-target recovery
+// MARK: - Reply-target recovery & accessibility helpers
 
+extension CommentsView {
     /// Whether a failed comment submission means the reply target is stale
     /// (HTTP 400 `invalid_parent`): the parent was hidden, soft-deleted, or
     /// is not on this feature request by the time the reply was submitted.
@@ -387,8 +393,6 @@ public struct CommentsView: View {
         if case .invalidParent = clientError { return true }
         return false
     }
-
-    // MARK: - Accessibility Helpers
 
     nonisolated static func submitAccessibilityLabel() -> String {
         CupThreadStrings.tr("cupthread.comments.submit")

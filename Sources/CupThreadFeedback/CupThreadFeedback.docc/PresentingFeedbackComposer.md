@@ -104,21 +104,28 @@ let attachment = try await client.uploadAttachment(
 
 The CupThread API gates feedback and feature-request submissions behind
 Cloudflare Turnstile, so a submission can only succeed when a verification
-token is presented. Create the client with a `turnstileTokenProvider` to
-supply one — the SDK sends it as `turnstileToken` on submissions and
-attachment upload sessions, and when the server still rejects the submission
-with the verification gate (HTTP 403), it asks the provider for a fresh
-token and retries exactly once before surfacing the typed
+token is presented. Every verification is bound to the widget `(action, cdata)`
+pair it was rendered with, so create the client with a `turnstileTokenProvider`
+and mint each token under the exact binding the SDK asks for — `feedback` for
+feedback submissions and attachment upload sessions, `feature-request` for
+feature-request submissions, always with the app key as `cdata`. A token
+minted without a binding, or under the other action, is rejected by the
+server. The SDK sends the token as `turnstileToken`, and when the server still
+rejects the submission with the verification gate (HTTP 403), it asks the
+provider for a fresh token under the same binding and retries exactly once
+before surfacing the typed
 ``FeedbackClientError/turnstileRequired(message:requestId:)`` error:
 
 ```swift
 let client = FeedbackClient(
     configuration: configuration,
-    turnstileTokenProvider: {
-        // Mint a fresh token with your own verification flow — e.g. a
-        // server-side arrangement with the app's operator or an embedded
-        // challenge you host yourself.
-        await MyVerificationCoordinator.currentToken()
+    turnstileTokenProvider: { challenge in
+        // `challenge.action` is TurnstileAction.feedback or
+        // TurnstileAction.featureRequest and `challenge.cdata` is the app
+        // key — render (or server-mint) the token under exactly this pair,
+        // e.g. turnstile.render({ action: challenge.action,
+        // cdata: challenge.cdata }).
+        await MyVerificationCoordinator.currentToken(for: challenge)
     }
 )
 ```

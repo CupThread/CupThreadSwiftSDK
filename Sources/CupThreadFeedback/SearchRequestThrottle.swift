@@ -189,3 +189,54 @@ enum SearchReloadOutcome: Equatable {
         return hasExistingContent ? .inlineNotice(message) : .fullScreenError(message)
     }
 }
+
+// MARK: - Search admission outcome presentation
+
+/// How a denied search-throttle admission should be presented.
+///
+/// When the throttle denies a query-bearing fetch (active 429 cooldown,
+/// duplicate search, or window exhaustion), the surface must explain to the
+/// user why the search did not run instead of silently leaving stale results
+/// on screen.
+///
+/// When previous results are visible, the denial becomes a transient inline
+/// notice; on a fresh surface with nothing to show, it presents the full-screen
+/// error view so the user does not see a bare skeleton or empty state.
+///
+/// Cancellation is not a denial: superseded keystrokes and dismissed views
+/// must remain completely silent (``outcome(isCancelled:hasExistingContent:)``
+/// returns `nil`).
+enum SearchAdmissionOutcome: Equatable {
+    /// Previous results stay visible; show this message as a transient notice.
+    case inlineNotice(String)
+    /// Nothing to show — present the full-screen error view with this message.
+    case fullScreenError(String)
+
+    /// Derives the presentation for an admission denial.
+    ///
+    /// - Parameters:
+    ///   - isCancelled: Whether the calling task was cancelled (superseded keystroke).
+    ///   - hasExistingContent: Whether the surface already shows results.
+    /// - Returns: `nil` when `isCancelled` is `true`; otherwise the outcome for the denial.
+    static func outcome(isCancelled: Bool, hasExistingContent: Bool) -> SearchAdmissionOutcome? {
+        guard !isCancelled else { return nil }
+        let message = CupThreadStrings.tr("cupthread.search.rate_limited")
+        return hasExistingContent ? .inlineNotice(message) : .fullScreenError(message)
+    }
+
+    /// Derives the presentation for an admission verdict.
+    ///
+    /// - Parameters:
+    ///   - wasAdmitted: Whether the throttle admitted the fetch.
+    ///   - isCancelled: Whether the calling task was cancelled (superseded keystroke).
+    ///   - hasExistingContent: Whether the surface already shows results.
+    /// - Returns: `nil` if admitted or cancelled; otherwise the outcome for the denial.
+    static func outcome(
+        wasAdmitted: Bool,
+        isCancelled: Bool,
+        hasExistingContent: Bool
+    ) -> SearchAdmissionOutcome? {
+        guard !wasAdmitted else { return nil }
+        return outcome(isCancelled: isCancelled, hasExistingContent: hasExistingContent)
+    }
+}

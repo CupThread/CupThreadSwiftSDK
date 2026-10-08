@@ -169,4 +169,77 @@ struct RoadmapBoardDisplayStateTests {
         // with two request-less columns instead of the empty-search state.
         #expect(state == .emptySearch(query: "nothing matches this"))
     }
+
+    @Test func whitespaceOnlySearchPreservesEmptyColumns() {
+        let columns = [
+            makeColumn(id: "col-1", name: "Planned"),
+            makeColumn(id: "col-2", name: "Shipped")
+        ]
+        let planned = makeItem(id: "req-1", columnId: "col-1")
+        let groups = makeGroups(columns: columns, requests: [planned])
+
+        let state = makeBoardDisplayState(
+            isLoading: false,
+            hasLoadedOnce: true,
+            loadError: nil,
+            searchText: "   ",
+            groups: groups
+        )
+
+        #expect(state == .board(groups))
+        if case let .board(visibleGroups) = state {
+            #expect(visibleGroups.count == 2)
+            #expect(visibleGroups[0].requests == [planned])
+            #expect(visibleGroups[1].requests.isEmpty)
+        }
+    }
+
+    @Test func whitespaceOnlySearchOnAllEmptyBoardYieldsEmptyBoard() {
+        let state = makeBoardDisplayState(
+            isLoading: false,
+            hasLoadedOnce: true,
+            loadError: nil,
+            searchText: " ",
+            groups: []
+        )
+
+        #expect(state == .emptyBoard)
+        #expect(state != .emptySearch(query: " "))
+    }
+
+    @Test func realQueriesStillFilterAndAllEmptyYieldsEmptySearch() {
+        let columns = [
+            makeColumn(id: "col-1", name: "Planned"),
+            makeColumn(id: "col-2", name: "Shipped")
+        ]
+        let matching = makeItem(id: "req-1", columnId: "col-2")
+        let groups = makeGroups(columns: columns, requests: [matching])
+
+        let state = makeBoardDisplayState(
+            isLoading: false,
+            hasLoadedOnce: true,
+            loadError: nil,
+            searchText: "dark mode",
+            groups: groups
+        )
+
+        if case let .board(visibleGroups) = state {
+            #expect(visibleGroups.count == 1)
+            #expect(visibleGroups[0].id == "col-2")
+            #expect(visibleGroups[0].requests == [matching])
+        } else {
+            Issue.record("Expected .board with only matching column, got \(state)")
+        }
+
+        let allEmptyGroups = makeGroups(columns: columns, requests: [])
+        let emptyState = makeBoardDisplayState(
+            isLoading: false,
+            hasLoadedOnce: true,
+            loadError: nil,
+            searchText: "dark mode",
+            groups: allEmptyGroups
+        )
+
+        #expect(emptyState == .emptySearch(query: "dark mode"))
+    }
 }

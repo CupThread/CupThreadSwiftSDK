@@ -51,9 +51,9 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///
     /// Obtain this secret from the CupThread developer console:
     /// *App Access → App Credentials → SDK signing secret*.
-    /// When `nil`, requests reporting payment attributes (`isPaying`, `plan`, `mrr`)
+    /// When `nil`, requests reporting payment attributes (`isPaying`, `plan`, `mrr`, `currency`)
     /// are sent unsigned and will be rejected by the server. Requests without
-    /// payment attributes (identity or `currency`-only updates) do not require a secret.
+    /// payment attributes (identity-only updates) do not require a secret.
     public let signingSecret: String?
 
     /// Creates a configuration for a CupThread app.
@@ -66,7 +66,7 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///   - requestID: Optional stable `X-Request-Id` sent with every request;
     ///     defaults to a per-request UUID.
     ///   - signingSecret: Optional SDK signing secret for HMAC-SHA256 request
-    ///     signing when reporting paying-user attributes (`isPaying`, `plan`, `mrr`).
+    ///     signing when reporting paying-user attributes (`isPaying`, `plan`, `mrr`, `currency`).
     public init(
         baseURL: URL,
         appKey: String,
@@ -124,6 +124,15 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 /// Same-origin redirects (e.g. relative `Location` paths on the API host) are
 /// followed normally.
 public struct FeedbackClient: Sendable {
+    /// The default maximum number of cursor pages to fetch during complete-data
+    /// walks before gracefully stopping (100).
+    ///
+    /// With standard page sizes (100–200 items per page), 100 pages covers
+    /// 10 000–20 000 items — comfortably above realistic public boards,
+    /// comments threads, and changelogs while defending against runaway
+    /// backends, shifting keyset cursors, or infinite pagination loops.
+    public static let defaultMaxPages = 100
+
     /// The configuration this client was created with.
     public let configuration: FeedbackClientConfiguration
     let session: URLSession
@@ -151,11 +160,14 @@ public struct FeedbackClient: Sendable {
     /// submissions cannot succeed without a token: hosts with their own
     /// verification flow — or a server-side exemption arrangement — supply it
     /// here. Called once per attempt (including the automatic single retry
-    /// after a turnstile rejection), so it can mint a fresh token each time.
-    /// When `nil` (the default), gated submissions throw
-    /// ``FeedbackClientError/turnstileRequired(message:requestId:)`` after a
-    /// single attempt.
-    let turnstileTokenProvider: (@Sendable () async -> String?)?
+    /// after a turnstile rejection) with the ``TurnstileChallenge`` naming the
+    /// exact `(action, cdata)` binding the endpoint validates — render the
+    /// widget (``TurnstileAction`` plus the app key as `cdata`) under that
+    /// binding so the minted token verifies; unbound or cross-action tokens
+    /// are rejected by the server. When `nil` (the default), gated submissions
+    /// throw ``FeedbackClientError/turnstileRequired(message:requestId:)``
+    /// after a single attempt.
+    let turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)?
     /// Resolves the signed-in end user's bearer token on demand.
     let authenticationProvider: (@Sendable () async -> String?)?
 
@@ -200,15 +212,20 @@ public struct FeedbackClient: Sendable {
     ///     them yourself if they can face untrusted redirects.
     ///   - turnstileTokenProvider: Async closure resolving a Cloudflare
     ///     Turnstile token for gated intake calls, `nil` when none is
-    ///     available. Called once per submission attempt, so it can mint a
-    ///     fresh token each time.
+    ///     available. Called with the ``TurnstileChallenge`` naming the
+    ///     `(action, cdata)` binding the endpoint validates — `feedback` for
+    ///     `POST /api/v1/feedback` and upload-session creation,
+    ///     `feature-request` for `POST /api/v1/feature-requests`, always with
+    ///     the app key as `cdata` — once per attempt, so it can mint a fresh
+    ///     token each time. Render the widget under that exact binding;
+    ///     unbound or cross-action tokens are rejected by the server.
     ///   - authenticationProvider: Async closure resolving the signed-in
     ///     user's bearer token, `nil` when signed out. Called once per
     ///     authenticated request, so it can refresh an expiring token.
     public init(
         configuration: FeedbackClientConfiguration,
         session: URLSession = FeedbackClient.defaultSession,
-        turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
+        turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) {
         self.init(
@@ -228,7 +245,7 @@ public struct FeedbackClient: Sendable {
         tokenStore: UserTokenStore? = nil,
         configStore: AppConfigStore? = nil,
         serverClock: ServerClock? = nil,
-        turnstileTokenProvider: (@Sendable () async -> String?)? = nil,
+        turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil,
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) {
         self.configuration = configuration
@@ -263,10 +280,13 @@ public struct FeedbackClient: Sendable {
     /// request also carries the SDK's version in the `X-SDK-Version` header.
     ///
     /// When the client was created with a `turnstileTokenProvider`, its token
-    /// is sent as `turnstileToken`. Production intake is gated behind
-    /// Cloudflare Turnstile: if the server rejects the submission with the
-    /// human-verification gate (HTTP 403), the SDK asks the provider for a
-    /// fresh token and retries exactly once before throwing.
+    /// is sent as `turnstileToken`; the provider is consulted with the
+    /// ``TurnstileAction/feedback`` binding (the app key as `cdata`), so
+    /// render the widget under that exact action. Production intake is gated
+    /// behind Cloudflare Turnstile: if the server rejects the submission with
+    /// the human-verification gate (HTTP 403), the SDK asks the provider for
+    /// a fresh token under the same binding and retries exactly once before
+    /// throwing.
     ///
     /// ```swift
     /// var draft = FeedbackDraft.autofilled()
@@ -298,21 +318,27 @@ public struct FeedbackClient: Sendable {
     ///   feedback is disabled or the platform is outside the console's
     ///   allow-list (HTTP 401/403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for other
-    ///   server rejections (successful submissions accept HTTP 200, 201, and 202), or
-    ///   ``FeedbackClientError/invalidResponse`` when the response cannot be interpreted.
+    ///   server rejections (successful submissions accept HTTP 200, 201, and 202),
+    ///   ``FeedbackClientError/invalidResponse`` when the response cannot be interpreted, or
+    ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds the
+    ///   client-side intake byte budget (BUG-18) — rejected locally with no network
+    ///   round trip; shorten the free-text fields and submit again.
     public func submit(
         _ draft: FeedbackDraft,
         userToken: String? = nil
     ) async throws -> FeedbackSubmissionResult {
         let uploadIds = draft.attachments.compactMap(\.uploadId).nilIfEmpty
         let effectiveUserToken = resolvedSubmitUserToken(userToken, hasAttachments: uploadIds != nil)
-        let data = try await sendWithTurnstileRetry(accepted: Self.acceptedSubmitStatuses) { token, requestID in
+        let data = try await sendWithTurnstileRetry(
+            accepted: Self.acceptedSubmitStatuses,
+            challenge: .feedback(appKey: configuration.appKey)
+        ) { token, requestID in
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feedback"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             self.applyCorrelationHeaders(userToken: effectiveUserToken, requestID: requestID, to: &request)
             await self.applyBearerToken(to: &request)
-            request.httpBody = try self.encoder.encode(self.submissionPayload(
+            request.httpBody = try self.encodedIntakeBody(self.submissionPayload(
                 for: draft,
                 uploadIds: uploadIds,
                 turnstileToken: token
