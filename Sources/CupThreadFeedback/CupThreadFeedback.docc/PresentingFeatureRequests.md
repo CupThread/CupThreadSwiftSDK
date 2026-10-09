@@ -92,6 +92,27 @@ In addition to comment creation, the authentication provider attaches the bearer
 
 When the provider resolves `nil` (signed out) or the client has none, ``CommentsView`` shows a deliberate signed-out notice instead of a composer that could never succeed, and direct ``FeedbackClient/postComment(featureRequestId:draft:userToken:)`` calls throw the typed error. The author's display name and avatar always resolve server-side from the signed-in profile. Avatar and app-icon URLs from the API are treated as untrusted and filtered by `WebURLPolicy` to require HTTPS and prevent outbound requests to insecure or disallowed schemes.
 
+## Human verification (Turnstile)
+
+Like feedback submission, feature-request submission is gated behind Cloudflare Turnstile in production: ``FeedbackClient/submitFeatureRequest(_:userToken:)`` can only succeed when the client presents a verification token. Browsing, search, voting, and comment threads are not gated, so the view works without any verification setup — but submitting a new request fails with ``FeedbackClientError/turnstileRequired(message:requestId:)`` until the client is created with a `turnstileTokenProvider`.
+
+The provider is consulted with the ``TurnstileAction/featureRequest`` binding (the app key as `cdata`), so render the widget — or mint the token server-side — under exactly that action. The bindings are endpoint-specific: the feedback action covers `POST /api/v1/feedback` and attachment upload sessions, and a feedback-minted token is rejected on feature-request submission. When the server rejects the submission with the verification gate (HTTP 403), the SDK asks the provider for a fresh token under the same binding and retries exactly once before surfacing the typed error:
+
+```swift
+let client = FeedbackClient(
+    configuration: configuration,
+    turnstileTokenProvider: { challenge in
+        // `challenge.action` is TurnstileAction.featureRequest and
+        // `challenge.cdata` is the app key — render (or server-mint) the
+        // token under exactly this pair, e.g. turnstile.render({
+        // action: challenge.action, cdata: challenge.cdata }).
+        await MyVerificationCoordinator.currentToken(for: challenge)
+    }
+)
+```
+
+Without a provider, a gated submission fails after a single attempt with a localized, user-safe message instead of the raw server response. The shared provider contract — bindings, retry semantics, and host verification flows — is described in <doc:PresentingFeedbackComposer>.
+
 ## See also
 
 - ``FeatureRequestsView``

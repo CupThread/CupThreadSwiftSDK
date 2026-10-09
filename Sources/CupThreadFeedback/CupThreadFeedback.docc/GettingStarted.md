@@ -43,6 +43,24 @@ let tokenStore = UserTokenStore(appKey: "app_xxx")
 let userToken = tokenStore.token
 ```
 
+### Human verification (Turnstile)
+
+Read-only use — the roadmap board, browsing and voting on feature requests, and the changelog — works with the bare client above. Writing is different: production intake (feedback submission, attachment upload sessions, and feature-request submission) is gated behind Cloudflare Turnstile, so every intake call fails with ``FeedbackClientError/turnstileRequired(message:requestId:)`` until the client is created with a `turnstileTokenProvider` that mints tokens under the widget binding the SDK asks for:
+
+```swift
+let client = FeedbackClient(
+    configuration: configuration,
+    turnstileTokenProvider: { challenge in
+        // `challenge.action` names the gated surface (feedback or
+        // feature-request) and `challenge.cdata` is the app key —
+        // render (or server-mint) the token under exactly this pair.
+        await MyVerificationCoordinator.currentToken(for: challenge)
+    }
+)
+```
+
+The provider contract — the `(action, cdata)` binding per endpoint and the automatic single retry after a gate rejection — is described in <doc:PresentingFeedbackComposer>.
+
 ### Network security: redirects never leave the API origin
 
 The default session refuses any HTTP redirect that leaves the configured `baseURL`'s origin (scheme, host, and effective port). URLSession would otherwise re-send every request header — including `Authorization: Bearer …` and the `X-User-Token` identity — and, on 307/308 redirects, the request body (e.g. attachment upload bytes) to whatever host the `Location` header names. A refused redirect surfaces the 3xx response itself as ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` instead of silently succeeding against the redirect target. Same-origin redirects are followed normally. This policy ships on the SDK's default session; if you inject your own `session:`, install an equivalent redirect policy on it.
