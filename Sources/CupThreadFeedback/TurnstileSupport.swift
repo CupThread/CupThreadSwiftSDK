@@ -23,6 +23,11 @@ extension FeedbackClient {
     ///   - challenge: The widget binding the endpoint validates — consulted
     ///     tokens are minted (or rendered) for this exact `(action, cdata)`
     ///     pair, and the retry asks for the same binding again.
+    ///   - initialToken: Optional caller-supplied explicit Turnstile token to
+    ///     use on the first attempt. When present, the configured token provider
+    ///     is not consulted prior to the initial request; if the server
+    ///     subsequently rejects the attempt, the provider is consulted for a
+    ///     fresh retry token.
     ///   - makeRequest: Builds the request for a `(turnstileToken, requestID)`
     ///     pair — called once per attempt so the retry re-encodes the payload
     ///     with the fresh token and a new correlation id.
@@ -34,9 +39,15 @@ extension FeedbackClient {
     func sendWithTurnstileRetry(
         accepted: Set<Int>,
         challenge: TurnstileChallenge,
+        initialToken: String? = nil,
         makeRequest: (String?, String) async throws -> URLRequest
     ) async throws -> Data {
-        let firstToken = await resolvedTurnstileToken(for: challenge)
+        let firstToken: String?
+        if let explicit = initialToken?.nilIfEmpty {
+            firstToken = explicit
+        } else {
+            firstToken = await resolvedTurnstileToken(for: challenge)
+        }
         do {
             return try await sendTurnstileAttempt(
                 accepted: accepted,
