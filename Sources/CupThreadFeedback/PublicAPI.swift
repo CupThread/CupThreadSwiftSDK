@@ -317,6 +317,8 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
     ///   roadmap access is disabled for the app (HTTP 401/403),
+    ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
+    ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchColumns() async throws -> [BoardColumn] {
@@ -335,6 +337,8 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
     ///   roadmap access is disabled for the app (HTTP 401/403),
+    ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
+    ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchVersions() async throws -> [AppVersion] {
