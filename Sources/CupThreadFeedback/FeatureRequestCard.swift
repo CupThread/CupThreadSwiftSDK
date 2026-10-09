@@ -31,6 +31,17 @@ struct FeatureRequestCard: View {
                     .onTapGesture {
                         onSelectCard?()
                     }
+                    // The card's only activation path is this tap gesture,
+                    // invisible to VoiceOver: combine the static content into
+                    // one button-activatable element. The interactive
+                    // descendants (requester, commenter avatars) live outside
+                    // cardContent, so nothing is merged away.
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction {
+                        onSelectCard?()
+                    }
+                    .accessibilityHint(Self.cardActivationAccessibilityHint())
 
                 metaRow
             }
@@ -156,9 +167,13 @@ struct FeatureRequestCard: View {
                         AvatarView(url: commenter.avatarUrl, size: 18)
                     }
                     .buttonStyle(.plain)
+                    // AvatarView is accessibility-hidden, so the button has
+                    // no content to derive a name from — label it directly.
+                    .accessibilityLabel(Self.commenterProfileAccessibilityLabel(authorName: commenter.authorName))
                     .zIndex(Double(3 - index))
                 } else {
                     AvatarView(url: commenter.avatarUrl, size: 18)
+                        .accessibilityHidden(true)
                         .zIndex(Double(3 - index))
                 }
             }
@@ -166,8 +181,26 @@ struct FeatureRequestCard: View {
                 Text("···")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
         }
-        .accessibilityLabel(CupThreadStrings.tr("cupthread.features.recent_commenters_accessibility"))
+    }
+}
+
+// MARK: - Accessibility helpers
+
+extension FeatureRequestCard {
+    /// Hint announcing what activating the card does.
+    static func cardActivationAccessibilityHint() -> String {
+        CupThreadStrings.tr("cupthread.features.view_comments_hint")
+    }
+
+    /// Label for a recent-commenter avatar button: announces whose profile
+    /// opens. Blank names fall back to the localized anonymous name, matching
+    /// the requester label's guard on the same card.
+    static func commenterProfileAccessibilityLabel(authorName: String?) -> String {
+        let resolvedName = authorName.flatMap { $0.isEmpty ? nil : $0 }
+            ?? CupThreadStrings.tr("cupthread.features.anonymous")
+        return CupThreadStrings.tr("cupthread.comments.view_profile_of", resolvedName)
     }
 }

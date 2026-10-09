@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "Thử tải lại các phiên bản";
 "cupthread.features.request_a_feature" = "Đề xuất tính năng";
 "cupthread.features.request_a_feature_hint" = "Mở khung soạn yêu cầu tính năng";
+"cupthread.features.view_comments_hint" = "Mở luồng bình luận và chi tiết của yêu cầu tính năng này.";
 "cupthread.features.empty_title" = "Chưa có yêu cầu tính năng nào";
 "cupthread.features.empty_description" = "Ý tưởng từ người dùng như bạn sẽ xuất hiện tại đây.";
 "cupthread.features.empty_with_query" = "Không tìm thấy kết quả nào cho “%@”.";

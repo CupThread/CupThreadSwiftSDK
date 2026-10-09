@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "버전 목록 다시 불러오기";
 "cupthread.features.request_a_feature" = "기능 제안하기";
 "cupthread.features.request_a_feature_hint" = "기능 제안 작성 창을 엽니다";
+"cupthread.features.view_comments_hint" = "이 기능 요청의 댓글 스레드와 세부 정보를 엽니다.";
 "cupthread.features.empty_title" = "기능 제안 없음";
 "cupthread.features.empty_description" = "사용자들의 아이디어가 여기에 표시됩니다.";
 "cupthread.features.empty_with_query" = "“%@”에 대한 검색 결과가 없습니다.";

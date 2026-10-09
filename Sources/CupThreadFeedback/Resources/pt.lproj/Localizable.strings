@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "Tentar carregar as versões novamente";
 "cupthread.features.request_a_feature" = "Sugerir recurso";
 "cupthread.features.request_a_feature_hint" = "Abre o formulário para sugerir um recurso";
+"cupthread.features.view_comments_hint" = "Abre os comentários e os detalhes deste pedido.";
 "cupthread.features.empty_title" = "Nenhuma sugestão ainda";
 "cupthread.features.empty_description" = "As ideias de usuários como você aparecerão aqui.";
 "cupthread.features.empty_with_query" = "Nenhum resultado para “%@”.";

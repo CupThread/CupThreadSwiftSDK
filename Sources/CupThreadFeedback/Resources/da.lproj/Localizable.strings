@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "Prøv at indlæse versionerne igen";
 "cupthread.features.request_a_feature" = "Foreslå funktion";
 "cupthread.features.request_a_feature_hint" = "Åbner formularen til at foreslå en funktion";
+"cupthread.features.view_comments_hint" = "Åbner kommentartråden og detaljerne for dette funktionsønske.";
 "cupthread.features.empty_title" = "Ingen funktionsønsker";
 "cupthread.features.empty_description" = "Idéer fra brugere som dig vil blive vist her.";
 "cupthread.features.empty_with_query" = "Ingen resultater for ”%@”.";

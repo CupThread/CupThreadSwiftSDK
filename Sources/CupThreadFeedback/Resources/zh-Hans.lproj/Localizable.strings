@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "重新加载版本列表";
 "cupthread.features.request_a_feature" = "提出新需求";
 "cupthread.features.request_a_feature_hint" = "打开需求建议提交面板";
+"cupthread.features.view_comments_hint" = "打开此功能请求的评论区和详情。";
 "cupthread.features.empty_title" = "暂无需求建议";
 "cupthread.features.empty_description" = "其他用户的建议与想法将显示在此处。";
 "cupthread.features.empty_with_query" = "未找到与“%@”相关的结果。";

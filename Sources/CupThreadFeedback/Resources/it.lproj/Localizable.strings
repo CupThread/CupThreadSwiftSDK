@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "Riprova a caricare le versioni";
 "cupthread.features.request_a_feature" = "Richiedi funzionalità";
 "cupthread.features.request_a_feature_hint" = "Apre la schermata per richiedere una funzionalità";
+"cupthread.features.view_comments_hint" = "Apre il thread dei commenti e i dettagli di questa richiesta.";
 "cupthread.features.empty_title" = "Nessuna richiesta di funzionalità";
 "cupthread.features.empty_description" = "Le idee e i suggerimenti degli utenti appariranno qui.";
 "cupthread.features.empty_with_query" = "Nessun risultato per \"%@\".";

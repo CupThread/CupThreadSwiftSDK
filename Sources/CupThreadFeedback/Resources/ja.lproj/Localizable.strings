@@ -33,6 +33,7 @@
 "cupthread.features.version_retry" = "バージョン一覧を再読み込み";
 "cupthread.features.request_a_feature" = "機能をリクエスト";
 "cupthread.features.request_a_feature_hint" = "機能リクエストの作成画面を開きます。";
+"cupthread.features.view_comments_hint" = "この機能リクエストのコメントスレッドと詳細を開きます。";
 "cupthread.features.empty_title" = "機能リクエストがありません";
 "cupthread.features.empty_description" = "ユーザーからのアイデアや提案がここに表示されます。";
 "cupthread.features.empty_with_query" = "「%@」に一致する結果は見つかりませんでした。";
