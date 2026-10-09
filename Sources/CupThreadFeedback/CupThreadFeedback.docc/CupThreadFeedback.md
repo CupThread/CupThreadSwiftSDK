@@ -92,6 +92,13 @@ Comment creation is signed-in-only on the CupThread API — create the client wi
 - ``AppVersion``: A released or planned app version.
 - ``FeedbackClientError``: Errors thrown by ``FeedbackClient``.
 
+## Public image delivery
+
+Public image assets (such as app icons and avatars) are delivered from `GET /api/v1/files/{key}`. Requests can include an optional documented thumbnail width hint, returning a WebP thumbnail or original image with a 5-minute cache lifetime:
+
+- ``PublicImageThumbnailWidth``: Supported square thumbnail width hints (`16`, `32`, `36`, `56`, `64`, `72`, `80`, `112`, `128`, or `160`).
+- ``publicImageThumbnailURL(for:width:)``: Construct or update a thumbnail URL with an optional width hint query parameter while preserving path and query string as opaque URLs, and original-image fallback.
+
 ## Agentic coding
 
 This SDK is engineered to be **Agentic Coding friendly** for LLMs and AI pair programmers with zero third-party dependencies, clean architecture, and comprehensive DocC documentation. Companion skills, CLI tools, and agent workflows are available at [CupThreadAgenticCoding](https://github.com/CupThread/CupThreadAgenticCoding).
