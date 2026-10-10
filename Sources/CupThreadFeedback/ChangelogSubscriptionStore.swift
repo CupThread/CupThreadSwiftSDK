@@ -159,35 +159,99 @@ final class ChangelogSubscriptionStore: @unchecked Sendable {
         )
     }
 
+    private final class MemoryCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var records: [String: ChangelogSubscriptionRecord] = [:]
+
+        func record(for key: String) -> ChangelogSubscriptionRecord? {
+            lock.lock()
+            defer { lock.unlock() }
+            return records[key]
+        }
+
+        func set(_ record: ChangelogSubscriptionRecord?, for key: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            if let record {
+                records[key] = record
+            } else {
+                records.removeValue(forKey: key)
+            }
+        }
+
+        func reset() {
+            lock.lock()
+            defer { lock.unlock() }
+            records.removeAll()
+        }
+    }
+
+    private static let cache = MemoryCache()
+
+    /// Resets the in-memory cache of subscription records (for test isolation).
+    static func resetMemoryCache() {
+        cache.reset()
+    }
+
+    private func cachedRecord() -> ChangelogSubscriptionRecord? {
+        Self.cache.record(for: storageKey)
+    }
+
+    private func updateMemoryCache(with record: ChangelogSubscriptionRecord?) {
+        Self.cache.set(record, for: storageKey)
+    }
+
     /// The remembered subscription with its double-opt-in phase, or `nil`
     /// when nothing is recorded.
     func subscriptionRecord() -> ChangelogSubscriptionRecord? {
         lock.lock()
         defer { lock.unlock() }
 
-        if let existing = storage.load(), !existing.isEmpty {
+        switch storage.loadResult() {
+        case .found(let existing) where !existing.isEmpty:
             // A bare address here was written by the phase-unaware Keychain
             // build (SEC-9 before #273); it reads back as confirmed.
             removeLegacyPlaintext()
-            return Self.record(fromStoredValue: existing)
-        }
-
-        if let legacy = legacyUserDefaults?.string(forKey: storageKey) {
-            // Pre-SEC-9 defaults: a bare address or a serialized record from
-            // the phase-aware defaults build (#273). Whitespace-only values
-            // are garbage, not a subscription: purge and report nothing.
-            let trimmed = legacy.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let record = Self.record(fromStoredValue: trimmed) else {
-                removeLegacyPlaintext()
-                return nil
-            }
-            if storage.saveConfirmed(trimmed) {
-                removeLegacyPlaintext()
-            }
+            let record = Self.record(fromStoredValue: existing)
+            updateMemoryCache(with: record)
             return record
-        }
 
-        return nil
+        case .found:
+            removeLegacyPlaintext()
+            updateMemoryCache(with: nil)
+            return nil
+
+        case .notFound:
+            if let legacy = legacyUserDefaults?.string(forKey: storageKey) {
+                // Pre-SEC-9 defaults: a bare address or a serialized record from
+                // the phase-aware defaults build (#273). Whitespace-only values
+                // are garbage, not a subscription: purge and report nothing.
+                let trimmed = legacy.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let record = Self.record(fromStoredValue: trimmed) else {
+                    removeLegacyPlaintext()
+                    updateMemoryCache(with: nil)
+                    return nil
+                }
+                if storage.saveConfirmed(trimmed) {
+                    removeLegacyPlaintext()
+                }
+                updateMemoryCache(with: record)
+                return record
+            }
+            updateMemoryCache(with: nil)
+            return nil
+
+        case .inaccessible:
+            // Backing storage is transiently unreadable (e.g. Keychain locked
+            // before first unlock). Do not purge legacy plaintext or commit writes.
+            if let legacy = legacyUserDefaults?.string(forKey: storageKey) {
+                let trimmed = legacy.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let record = Self.record(fromStoredValue: trimmed) {
+                    return record
+                }
+            }
+            return cachedRecord()
+        }
     }
 
     /// The remembered subscription address regardless of its phase, or `nil`
@@ -209,7 +273,10 @@ final class ChangelogSubscriptionStore: @unchecked Sendable {
         }
         lock.lock()
         defer { lock.unlock() }
-        storage.save(serialized)
+        guard storage.saveConfirmed(serialized) else {
+            return
+        }
+        updateMemoryCache(with: ChangelogSubscriptionRecord(email: trimmed, state: record.state))
         removeLegacyPlaintext()
     }
 
@@ -218,6 +285,7 @@ final class ChangelogSubscriptionStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         storage.delete()
+        updateMemoryCache(with: nil)
         removeLegacyPlaintext()
     }
 
@@ -226,11 +294,13 @@ final class ChangelogSubscriptionStore: @unchecked Sendable {
     }
 
     private static func record(fromStoredValue raw: String?) -> ChangelogSubscriptionRecord? {
-        guard let raw, !raw.isEmpty else { return nil }
-        if let data = raw.data(using: .utf8),
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let data = trimmed.data(using: .utf8),
            let decoded = try? JSONDecoder().decode(ChangelogSubscriptionRecord.self, from: data) {
             return decoded
         }
-        return ChangelogSubscriptionRecord(email: raw, state: .confirmed)
+        return ChangelogSubscriptionRecord(email: trimmed, state: .confirmed)
     }
 }

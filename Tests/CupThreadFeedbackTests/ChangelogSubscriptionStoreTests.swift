@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 @testable import CupThreadFeedback
 
@@ -300,5 +301,149 @@ struct ChangelogSubscriptionStoreTests {
         #expect(store.subscribedEmail() == nil)
         #expect(mockStorage.load() == nil)
         #expect(context.defaults.string(forKey: storageKey) == nil)
+    }
+
+    @Test func persistDoesNotPurgeLegacyDefaultsWhenKeychainWriteFails() throws {
+        let context = makeIsolatedDefaults()
+        defer { context.cleanup() }
+
+        let appKey = "app_persist_failed_\(UUID().uuidString)"
+        let storageKey = ChangelogSubscriptionStore.keyPrefix + appKey
+        let legacyEmail = "keep_me@example.com"
+        context.defaults.set(legacyEmail, forKey: storageKey)
+
+        final class FailingWriteStorage: ChangelogSubscriptionStorage, @unchecked Sendable {
+            func load() -> String? { nil }
+            func save(_ email: String) {}
+            func saveConfirmed(_ email: String) -> Bool { false }
+            func delete() {}
+        }
+
+        let store = ChangelogSubscriptionStore(
+            appKey: appKey,
+            storage: FailingWriteStorage(),
+            legacyUserDefaults: context.defaults
+        )
+
+        store.persist(record: ChangelogSubscriptionRecord(email: "new@example.com", state: .confirmed))
+
+        // The legacy record must remain intact in UserDefaults since the Keychain write was not confirmed durable
+        #expect(context.defaults.string(forKey: storageKey) == legacyEmail)
+    }
+
+    @Test func subscriptionRecordDoesNotPurgeLegacyDefaultsWhenStorageIsInaccessible() throws {
+        let context = makeIsolatedDefaults()
+        defer { context.cleanup() }
+
+        let appKey = "app_inaccessible_\(UUID().uuidString)"
+        let storageKey = ChangelogSubscriptionStore.keyPrefix + appKey
+        let legacyEmail = "legacy_fallback@example.com"
+        context.defaults.set(legacyEmail, forKey: storageKey)
+
+        final class InaccessibleStorage: ChangelogSubscriptionStorage, @unchecked Sendable {
+            func load() -> String? { nil }
+            func loadResult() -> TokenLoadResult { .inaccessible(errSecInteractionNotAllowed) }
+            func save(_ email: String) {}
+            func saveConfirmed(_ email: String) -> Bool { false }
+            func delete() {}
+        }
+
+        let store = ChangelogSubscriptionStore(
+            appKey: appKey,
+            storage: InaccessibleStorage(),
+            legacyUserDefaults: context.defaults
+        )
+
+        // Must return the legacy subscription and NOT wipe legacy defaults from UserDefaults
+        #expect(store.subscribedEmail() == legacyEmail)
+        #expect(
+            store.subscriptionRecord()
+                == ChangelogSubscriptionRecord(email: legacyEmail, state: .confirmed)
+        )
+        #expect(context.defaults.string(forKey: storageKey) == legacyEmail)
+    }
+
+    @Test func subscriptionRecordUsesMemoryCacheWhenStorageIsInaccessibleWithoutLegacyDefaults() throws {
+        let appKey = "app_inaccessible_cache_\(UUID().uuidString)"
+
+        final class FlakyStorage: ChangelogSubscriptionStorage, @unchecked Sendable {
+            var isInaccessible = false
+            var stored: String?
+
+            func load() -> String? { isInaccessible ? nil : stored }
+            func loadResult() -> TokenLoadResult {
+                if isInaccessible {
+                    return .inaccessible(errSecInteractionNotAllowed)
+                }
+                return stored.map(TokenLoadResult.found) ?? .notFound
+            }
+            func save(_ email: String) { stored = email }
+            func saveConfirmed(_ email: String) -> Bool {
+                guard !isInaccessible else { return false }
+                stored = email
+                return true
+            }
+            func delete() { stored = nil }
+        }
+
+        let storage = FlakyStorage()
+        let store = ChangelogSubscriptionStore(appKey: appKey, storage: storage, legacyUserDefaults: nil)
+
+        let record = ChangelogSubscriptionRecord(email: "cached@example.com", state: .confirmed)
+        store.persist(record: record)
+        #expect(store.subscriptionRecord() == record)
+
+        // Now simulate device locked before first unlock
+        storage.isInaccessible = true
+        #expect(store.subscriptionRecord() == record)
+        #expect(store.subscribedEmail() == "cached@example.com")
+    }
+
+    @Test func subscriptionRecordReturnsNilWhenStorageIsInaccessibleAndNoFallbackExists() throws {
+        let appKey = "app_inaccessible_empty_\(UUID().uuidString)"
+
+        final class InaccessibleEmptyStorage: ChangelogSubscriptionStorage, @unchecked Sendable {
+            func load() -> String? { nil }
+            func loadResult() -> TokenLoadResult { .inaccessible(errSecInteractionNotAllowed) }
+            func save(_ email: String) {}
+            func saveConfirmed(_ email: String) -> Bool { false }
+            func delete() {}
+        }
+
+        let store = ChangelogSubscriptionStore(
+            appKey: appKey,
+            storage: InaccessibleEmptyStorage(),
+            legacyUserDefaults: nil
+        )
+        #expect(store.subscriptionRecord() == nil)
+        #expect(store.subscribedEmail() == nil)
+    }
+
+    @Test func subscriptionRecordDoesNotPurgeWhitespaceInUserDefaultsWhenStorageIsInaccessible() throws {
+        let context = makeIsolatedDefaults()
+        defer { context.cleanup() }
+
+        let appKey = "app_inaccessible_whitespace_\(UUID().uuidString)"
+        let storageKey = ChangelogSubscriptionStore.keyPrefix + appKey
+        let whitespace = "   \n\t "
+        context.defaults.set(whitespace, forKey: storageKey)
+
+        final class InaccessibleStorage: ChangelogSubscriptionStorage, @unchecked Sendable {
+            func load() -> String? { nil }
+            func loadResult() -> TokenLoadResult { .inaccessible(errSecInteractionNotAllowed) }
+            func save(_ email: String) {}
+            func saveConfirmed(_ email: String) -> Bool { false }
+            func delete() {}
+        }
+
+        let store = ChangelogSubscriptionStore(
+            appKey: appKey,
+            storage: InaccessibleStorage(),
+            legacyUserDefaults: context.defaults
+        )
+
+        // Returns nil, but DOES NOT remove the key from UserDefaults because storage was inaccessible
+        #expect(store.subscriptionRecord() == nil)
+        #expect(context.defaults.string(forKey: storageKey) == whitespace)
     }
 }
