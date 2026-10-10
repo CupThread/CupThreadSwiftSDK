@@ -90,3 +90,17 @@ struct WhatsNewViewState: Equatable, Sendable {
         handlePermissionDenied(generation: loadGeneration)
     }
 }
+
+// MARK: - Load task key (issues #265, #364)
+
+/// The `.task` identity for ``WhatsNewView``'s load lifecycle (issues #265,
+/// #364): the config's `allowsAnonymousChangelog` switch. Keying on the
+/// *resolved permission verdict* made the task cancel and restart itself,
+/// because the task's first act — resolving authentication — flipped the
+/// verdict and with it the key mid-flight. The switch is external to the task
+/// (the task cannot mutate it), so a locked-down changelog resolves
+/// authentication inside one stable-key run; a switch-stable config refresh
+/// produces the same key and therefore no restart.
+func makeChangelogLoadTaskKey(allowsAnonymousChangelog: Bool) -> Bool {
+    allowsAnonymousChangelog
+}

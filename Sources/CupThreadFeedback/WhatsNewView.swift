@@ -1,3 +1,7 @@
+// swiftlint:disable file_length
+// One surface per file: the view's @State must stay file-private, so the
+// body is organized by MARK sections rather than split across files to fit
+// the size budget (same policy as the oversized test suites, .swiftlint.yml).
 import SwiftUI
 
 // MARK: - WhatsNewView
@@ -13,6 +17,9 @@ import SwiftUI
 public struct WhatsNewView: View {
     public let client: FeedbackClient
     public let userToken: String
+    /// Optional console configuration override (previews/tests); `nil` falls
+    /// back to the `sdkAppConfig` environment value.
+    let configOverride: PublicAppConfig?
 
     @State private var state: WhatsNewViewState
     @State private var isSubscribePresented = false
@@ -34,6 +41,10 @@ public struct WhatsNewView: View {
     @State private var rejectedByServer = false
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
+    private var activeConfig: PublicAppConfig? {
+        configOverride ?? sdkAppConfig
+    }
+
     var entries: [ChangelogEntry] { state.entries }
     var isLoading: Bool { state.isLoading }
     var hasLoadedOnce: Bool { state.hasLoadedOnce }
@@ -42,7 +53,7 @@ public struct WhatsNewView: View {
 
     private var isChangelogPermitted: Bool {
         changelogLoadPlan(
-            config: sdkAppConfig,
+            config: activeConfig,
             supportsAuthentication: isAuthenticated
         ) == .load
     }
@@ -51,7 +62,7 @@ public struct WhatsNewView: View {
     /// changelog access is allowed (the verdict cannot depend on
     /// authentication) or the resolved access state is in.
     private var isChangelogVerdictResolved: Bool {
-        hasResolvedAuthentication || (sdkAppConfig?.allowsAnonymousChangelog ?? true)
+        hasResolvedAuthentication || (activeConfig?.allowsAnonymousChangelog ?? true)
     }
 
     /// Whether the surface must render the permission placeholder: the
@@ -62,6 +73,21 @@ public struct WhatsNewView: View {
             verdictResolved: isChangelogVerdictResolved,
             permitted: isChangelogPermitted,
             rejectedByServer: rejectedByServer
+        )
+    }
+
+    /// Restarts the load lifecycle whenever the config's anonymous-changelog
+    /// switch transitions (issues #265, #364). Keyed on the resolved permission
+    /// verdict, the task cancelled and restarted itself: its first act —
+    /// `resolveAuthenticationAccess()` — flips `isAuthenticated`, which flipped
+    /// the verdict and therefore the key mid-flight (issue #364). The switch is
+    /// external to the task (the task cannot mutate it), so a locked-down
+    /// changelog resolves authentication inside one stable-key run and loads —
+    /// or settles denied — exactly once. A switch-stable config refresh keeps
+    /// the key — and the in-flight load — unchanged.
+    var loadTaskKey: Bool {
+        makeChangelogLoadTaskKey(
+            allowsAnonymousChangelog: activeConfig?.allowsAnonymousChangelog ?? true
         )
     }
 
@@ -77,14 +103,32 @@ public struct WhatsNewView: View {
     public init(client: FeedbackClient, userToken: String) {
         self.client = client
         self.userToken = userToken
+        self.configOverride = nil
         self._state = State(initialValue: WhatsNewViewState())
     }
 
     /// Internal initializer for tests with custom initial state.
-    init(client: FeedbackClient, userToken: String, state: WhatsNewViewState) {
+    ///
+    /// - Parameters:
+    ///   - configOverride: Console configuration override; `nil` falls back to
+    ///     the `sdkAppConfig` environment value.
+    ///   - preResolvedAuthentication: Injects the resolved access verdict for
+    ///     view-level tests — `nil` leaves the verdict unsettled so the surface
+    ///     resolves in `.task` (the production presentation), while
+    ///     `true`/`false` inject a settled verdict without awaiting `.task`.
+    init(
+        client: FeedbackClient,
+        userToken: String,
+        state: WhatsNewViewState = WhatsNewViewState(),
+        configOverride: PublicAppConfig? = nil,
+        preResolvedAuthentication: Bool? = nil
+    ) {
         self.client = client
         self.userToken = userToken
+        self.configOverride = configOverride
         self._state = State(initialValue: state)
+        self._isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
+        self._hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
     }
 
     public var body: some View {
@@ -125,7 +169,7 @@ public struct WhatsNewView: View {
             guard isChangelogPermitted else { return }
             await loadEntries()
         }
-        .task(id: isChangelogPermitted) {
+        .task(id: loadTaskKey) {
             await resolveAuthenticationAccess()
             guard isChangelogPermitted else {
                 state.handlePermissionDenied(generation: state.loadGeneration)
@@ -271,7 +315,7 @@ public struct WhatsNewView: View {
             state.finishLoading(generation: generationAtStart)
         }
         do {
-            guard let fetched = try await loadChangelogEntries(client: client, config: sdkAppConfig) else {
+            guard let fetched = try await loadChangelogEntries(client: client, config: activeConfig) else {
                 state.handlePermissionDenied(generation: generationAtStart)
                 return
             }
