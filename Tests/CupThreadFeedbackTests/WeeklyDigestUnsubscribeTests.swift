@@ -100,4 +100,55 @@ struct WeeklyDigestUnsubscribeTests {
             Issue.record("Unexpected error type: \(error)")
         }
     }
+
+    @Test func unsubscribeMaps403ToForbidden() async throws {
+        // Maps 403 (e.g. digest unsubscribe disabled) to FeedbackClientError.forbidden.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 403, headers: ["X-Request-Id": "req-digest-403"]),
+                try encodeJSON([
+                    "error": "Digest unsubscribe is disabled for this organization",
+                    "code": "forbidden"
+                ])
+            )
+        }
+
+        do {
+            _ = try await Self.makeDigestClient()
+                .unsubscribeFromWeeklyDigest(token: "digest-forbidden-token")
+            Issue.record("Expected forbidden error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .forbidden(let message, let requestId) = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(message == "Digest unsubscribe is disabled for this organization")
+            #expect(requestId == "req-digest-403")
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test func unsubscribeMaps401ToAuthenticationRequired() async throws {
+        // Maps 401 (e.g. invalid identity/token) to FeedbackClientError.authenticationRequired.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401, headers: ["X-Request-Id": "req-digest-401"]),
+                try encodeJSON(["error": "Authentication required", "code": "unauthorized"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeDigestClient()
+                .unsubscribeFromWeeklyDigest(token: "digest-expired-token")
+            Issue.record("Expected authenticationRequired error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .authenticationRequired = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
 }

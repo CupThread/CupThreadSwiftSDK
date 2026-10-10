@@ -31,6 +31,8 @@ extension FeedbackClient {
     /// - Returns: Whether the address was removed from the weekly digest.
     /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (status 400 when the token is missing, invalid, or expired),
+    ///   ``FeedbackClientError/authenticationRequired`` (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` (HTTP 403),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429, or
     ///   ``FeedbackClientError/invalidResponse``.
     public func unsubscribeFromWeeklyDigest(
@@ -57,7 +59,9 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        // Map 401 (invalid/expired identity token) and 403 (public surfaces
+        // or digest unsubscribes disabled) to typed permission errors (issue #372).
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(WeeklyDigestUnsubscribeResult.self, from: data)
     }
 }
