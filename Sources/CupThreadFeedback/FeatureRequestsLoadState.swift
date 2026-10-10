@@ -55,4 +55,14 @@ struct FeatureRequestsLoadState: Equatable, Sendable {
         isLoading = false
         hasLoadedOnce = true
     }
+
+    /// Settles the lifecycle for a permission denial (issue #363): the list
+    /// is no longer first-loading, and the generation bump invalidates any
+    /// in-flight permitted load so its success/failure writes cannot land
+    /// behind the permission placeholder.
+    mutating func settlePermissionDenied() {
+        loadGeneration += 1
+        isLoading = false
+        hasLoadedOnce = true
+    }
 }
