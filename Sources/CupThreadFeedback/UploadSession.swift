@@ -385,30 +385,35 @@ extension FeedbackClient {
             if trimmed.hasPrefix("//") {
                 throw FeedbackClientError.invalidResponse
             }
-            if let candidate = URL(string: trimmed), candidate.scheme != nil {
-                guard let scheme = candidate.scheme?.lowercased(),
-                      scheme == "http" || scheme == "https" else {
-                    throw FeedbackClientError.invalidResponse
-                }
-                if configuration.baseURL.scheme?.lowercased() == "https", scheme != "https" {
-                    throw FeedbackClientError.invalidResponse
-                }
-                guard let candidateHost = candidate.host?.trimmingCharacters(in: .whitespacesAndNewlines),
-                      !candidateHost.isEmpty,
-                      let baseHost = configuration.baseURL.host?.trimmingCharacters(in: .whitespacesAndNewlines),
-                      !baseHost.isEmpty,
-                      candidateHost.caseInsensitiveCompare(baseHost) == .orderedSame else {
-                    throw FeedbackClientError.invalidResponse
-                }
-                let basePort = configuration.baseURL.port ??
-                    (configuration.baseURL.scheme?.lowercased() == "http" ? 80 : 443)
-                let candidatePort = candidate.port ?? (scheme == "http" ? 80 : 443)
-                guard basePort == candidatePort else {
-                    throw FeedbackClientError.invalidResponse
-                }
-                return candidate
+            let candidate: URL
+            if let parsed = URL(string: trimmed), parsed.scheme != nil {
+                candidate = parsed
+            } else if let resolved = URL(string: trimmed, relativeTo: configuration.baseURL)?.absoluteURL {
+                candidate = resolved
+            } else {
+                throw FeedbackClientError.invalidResponse
             }
-            return configuration.baseURL.appending(path: trimmed)
+            guard let scheme = candidate.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" else {
+                throw FeedbackClientError.invalidResponse
+            }
+            if configuration.baseURL.scheme?.lowercased() == "https", scheme != "https" {
+                throw FeedbackClientError.invalidResponse
+            }
+            guard let candidateHost = candidate.host?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !candidateHost.isEmpty,
+                  let baseHost = configuration.baseURL.host?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !baseHost.isEmpty,
+                  candidateHost.caseInsensitiveCompare(baseHost) == .orderedSame else {
+                throw FeedbackClientError.invalidResponse
+            }
+            let basePort = configuration.baseURL.port ??
+                (configuration.baseURL.scheme?.lowercased() == "http" ? 80 : 443)
+            let candidatePort = candidate.port ?? (scheme == "http" ? 80 : 443)
+            guard basePort == candidatePort else {
+                throw FeedbackClientError.invalidResponse
+            }
+            return candidate
         }
         return configuration.baseURL.appending(path: "/api/v1/uploads")
     }
@@ -419,32 +424,37 @@ extension FeedbackClient {
     ///   or shares its registrable domain (e.g. CDN subdomains or the apex of the
     ///   same domain; public-suffix and multi-tenant siblings never match).
     /// - Returns `nil` for off-origin, protocol-relative, or disallowed-scheme URLs.
-    private func resolvedDownloadURL(from downloadUrl: String?) -> URL? {
+    func resolvedDownloadURL(from downloadUrl: String?) -> URL? {
         guard let downloadUrl else { return nil }
         let trimmed = downloadUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.hasPrefix("//") else { return nil }
 
-        if let candidate = URL(string: trimmed), candidate.scheme != nil {
-            guard let scheme = candidate.scheme?.lowercased(),
-                  scheme == "http" || scheme == "https" else {
-                return nil
-            }
-            if configuration.baseURL.scheme?.lowercased() == "https", scheme != "https" {
-                return nil
-            }
-            guard let candidateHost = candidate.host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-                  !candidateHost.isEmpty,
-                  let baseHost = configuration.baseURL.host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-                  !baseHost.isEmpty else {
-                return nil
-            }
-            if isAllowedDownloadHost(candidateHost, baseHost: baseHost) {
-                return candidate
-            }
+        let candidate: URL
+        if let parsed = URL(string: trimmed), parsed.scheme != nil {
+            candidate = parsed
+        } else if let resolved = URL(string: trimmed, relativeTo: configuration.baseURL)?.absoluteURL {
+            candidate = resolved
+        } else {
             return nil
         }
 
-        return configuration.baseURL.appending(path: trimmed)
+        guard let scheme = candidate.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        if configuration.baseURL.scheme?.lowercased() == "https", scheme != "https" {
+            return nil
+        }
+        guard let candidateHost = candidate.host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !candidateHost.isEmpty,
+              let baseHost = configuration.baseURL.host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !baseHost.isEmpty else {
+            return nil
+        }
+        if isAllowedDownloadHost(candidateHost, baseHost: baseHost) {
+            return candidate
+        }
+        return nil
     }
 
     /// Maps upload session lifecycle error envelopes on PUT (API-13):
