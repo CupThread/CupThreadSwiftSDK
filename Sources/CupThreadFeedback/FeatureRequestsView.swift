@@ -192,10 +192,10 @@ public struct FeatureRequestsView: View {
             // 30/min per-IP search budget and skips duplicate queries.
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            let admitted = await client.searchThrottle.waitForAdmission(key: filterKey)
-            guard admitted else {
+            let verdict = await client.searchThrottle.admissionVerdict(key: filterKey)
+            guard verdict == .admitted else {
                 guard let outcome = SearchAdmissionOutcome.outcome(
-                    isCancelled: Task.isCancelled,
+                    for: verdict,
                     hasExistingContent: !items.isEmpty
                 ) else { return }
                 switch outcome {
