@@ -145,7 +145,8 @@ extension FeedbackClient {
     ///   when the shared per-client read budget is exhausted (HTTP 429 —
     ///   retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   for other HTTP failures, or ``FeedbackClientError/invalidResponse``.
+    ///   for other HTTP failures, ``FeedbackClientError/invalidResponse``,
+    ///   or `CancellationError` when the enclosing task is cancelled.
     public func fetchChangelog(maxPages: Int = Self.defaultMaxPages) async throws -> [ChangelogEntry] {
         let effectiveMaxPages = max(1, maxPages)
         var collected: [ChangelogEntry] = []
@@ -153,6 +154,7 @@ extension FeedbackClient {
         var cursor: String?
         var pagesFetched = 0
         while pagesFetched < effectiveMaxPages {
+            try Task.checkCancellation()
             pagesFetched += 1
             let page = try await fetchChangelog(limit: Self.changelogMaxPageSize, cursor: cursor)
             let freshEntries = page.entries.filter { seenIDs.insert($0.id).inserted }
