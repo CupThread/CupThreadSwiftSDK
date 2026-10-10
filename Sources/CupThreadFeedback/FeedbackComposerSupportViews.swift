@@ -166,14 +166,24 @@ enum FeedbackComposerDismissalAffordance: Equatable, Sendable {
     case cancel
     /// When actively composing, dismissal is guarded against losing draft content.
     case guardedCancel
+    /// The access verdict has not arrived yet (issue #367): the composer keeps
+    /// a neutral loading state instead of flashing the denial placeholder for
+    /// a signed-in user whose provider has not answered.
+    case undetermined
 
     static func resolve(
         result: FeedbackSubmissionResult?,
-        denial: SdkSubmissionDenial
+        denial: SdkSubmissionDenial,
+        verdictResolved: Bool = true
     ) -> FeedbackComposerDismissalAffordance {
         if result != nil {
             return .done
         }
+        // An unsettled verdict neither denies (that would flash the placeholder
+        // for a signed-in user) nor opens the form (that would skip the
+        // fail-closed preflight for a signed-out user): the composer stays
+        // neutral until `resolveAuthenticatedAccess()` answers (issue #367).
+        guard verdictResolved else { return .undetermined }
         if denial != .none {
             return .cancel
         }
