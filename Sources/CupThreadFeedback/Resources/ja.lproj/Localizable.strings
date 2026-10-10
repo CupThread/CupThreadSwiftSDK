@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "%@ に確認リンクを送信しました。リンクを開くと、更新メールの受信が始まります。";
 "cupthread.subscribe.resend_button" = "確認メールを再送信";
 "cupthread.subscribe.resending_button" = "再送信中…";
+"cupthread.subscribe.resend_sent_message" = "確認メールを送信しました。受信箱をご確認ください。";
 "cupthread.whatsnew.emails_on" = "更新メールオン";
 "cupthread.whatsnew.emails_on_destination" = "通知は %@ に送信されます。";
 "cupthread.whatsnew.get_emails" = "更新メールを受け取る";

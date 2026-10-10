@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "%@ adresine bir onay bağlantısı gönderdik. Güncelleme e-postaları almaya başlamak için bağlantıyı açın.";
 "cupthread.subscribe.resend_button" = "Onay e-postasını yeniden gönder";
 "cupthread.subscribe.resending_button" = "Yeniden gönderiliyor…";
+"cupthread.subscribe.resend_sent_message" = "Onay e-postası gönderildi — gelen kutunuzu kontrol edin.";
 "cupthread.whatsnew.emails_on" = "Güncelleme e-postaları açık";
 "cupthread.whatsnew.emails_on_destination" = "Bildirimler %@ adresine gider.";
 "cupthread.whatsnew.get_emails" = "Güncelleme e-postaları al";

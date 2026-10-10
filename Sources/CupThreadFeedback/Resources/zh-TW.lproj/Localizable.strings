@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "我們已將確認連結傳送至 %@。開啟連結即可開始接收更新電子郵件。";
 "cupthread.subscribe.resend_button" = "重新傳送確認電子郵件";
 "cupthread.subscribe.resending_button" = "正在重新傳送…";
+"cupthread.subscribe.resend_sent_message" = "確認電子郵件已傳送，請檢查收件匣。";
 "cupthread.whatsnew.emails_on" = "更新郵件已開啟";
 "cupthread.whatsnew.emails_on_destination" = "通知將傳送至 %@。";
 "cupthread.whatsnew.get_emails" = "接收更新郵件";

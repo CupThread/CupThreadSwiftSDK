@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "We sent a confirmation link to %@. Open it to start receiving update emails.";
 "cupthread.subscribe.resend_button" = "Resend Confirmation Email";
 "cupthread.subscribe.resending_button" = "Resending…";
+"cupthread.subscribe.resend_sent_message" = "Confirmation email sent — check your inbox.";
 "cupthread.whatsnew.emails_on" = "Update Emails On";
 "cupthread.whatsnew.emails_on_destination" = "Notifications go to %@.";
 "cupthread.whatsnew.get_emails" = "Get Update Emails";

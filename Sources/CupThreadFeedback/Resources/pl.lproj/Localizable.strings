@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "Wysłaliśmy link potwierdzający na adres %@. Otwórz go, aby zacząć otrzymywać aktualizacje e-mail.";
 "cupthread.subscribe.resend_button" = "Wyślij ponownie e-mail z potwierdzeniem";
 "cupthread.subscribe.resending_button" = "Ponowne wysyłanie…";
+"cupthread.subscribe.resend_sent_message" = "E-mail z potwierdzeniem został wysłany — sprawdź skrzynkę odbiorczą.";
 "cupthread.whatsnew.emails_on" = "Aktualizacje e-mail włączone";
 "cupthread.whatsnew.emails_on_destination" = "Powiadomienia trafiają na %@.";
 "cupthread.whatsnew.get_emails" = "Otrzymuj aktualizacje e-mail";

@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "Vi har sendt et bekræftelseslink til %@. Åbn det for at begynde at modtage opdateringsmails.";
 "cupthread.subscribe.resend_button" = "Send bekræftelsesmailen igen";
 "cupthread.subscribe.resending_button" = "Sender igen…";
+"cupthread.subscribe.resend_sent_message" = "Bekræftelsesmailen er sendt — tjek din indbakke.";
 "cupthread.whatsnew.emails_on" = "Opdateringsmails slået til";
 "cupthread.whatsnew.emails_on_destination" = "Notifikationer går til %@.";
 "cupthread.whatsnew.get_emails" = "Modtag opdateringsmails";

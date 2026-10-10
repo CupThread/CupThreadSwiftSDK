@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "Enviamos um link de confirmação para %@. Abra-o para começar a receber as novidades por e-mail.";
 "cupthread.subscribe.resend_button" = "Reenviar e-mail de confirmação";
 "cupthread.subscribe.resending_button" = "Reenviando…";
+"cupthread.subscribe.resend_sent_message" = "E-mail de confirmação enviado — verifique sua caixa de entrada.";
 "cupthread.whatsnew.emails_on" = "E-mails de novidades ativados";
 "cupthread.whatsnew.emails_on_destination" = "As notificações vão para %@.";
 "cupthread.whatsnew.get_emails" = "Receber e-mails de novidades";
