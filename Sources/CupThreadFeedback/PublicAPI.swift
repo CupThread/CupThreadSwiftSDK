@@ -406,8 +406,12 @@ public extension PublicAppConfig {
 
     /// Whether an anonymous SDK user may read the changelog
     /// (console switch `allowAnonymousChangelog`).
+    ///
+    /// Combines ``allowPublic`` (the public pages are hidden entirely) with
+    /// ``allowAnonymousChangelog``. Client gating is UX preflight — the server
+    /// stays authoritative.
     var allowsAnonymousChangelog: Bool {
-        allowAnonymousChangelog
+        allowPublic && allowAnonymousChangelog
     }
 
     /// Whether submissions reported from `platform` pass the console's
