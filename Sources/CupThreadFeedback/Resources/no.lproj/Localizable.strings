@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "Vi har sendt en bekreftelseslenke til %@. Åpne den for å begynne å motta oppdaterings-e-poster.";
 "cupthread.subscribe.resend_button" = "Send bekreftelses-e-posten på nytt";
 "cupthread.subscribe.resending_button" = "Sender på nytt…";
+"cupthread.subscribe.resend_sent_message" = "Bekreftelses-e-posten er sendt — sjekk innboksen din.";
 "cupthread.whatsnew.emails_on" = "Oppdaterings-e-post på";
 "cupthread.whatsnew.emails_on_destination" = "Varsler går til %@.";
 "cupthread.whatsnew.get_emails" = "Motta oppdaterings-e-post";

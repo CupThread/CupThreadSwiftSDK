@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "%@ 으로 확인 링크를 보냈습니다. 링크를 열면 업데이트 이메일 수신이 시작됩니다.";
 "cupthread.subscribe.resend_button" = "확인 이메일 다시 보내기";
 "cupthread.subscribe.resending_button" = "다시 보내는 중…";
+"cupthread.subscribe.resend_sent_message" = "확인 이메일을 보냈습니다. 받은편지함을 확인하세요.";
 "cupthread.whatsnew.emails_on" = "업데이트 이메일 켜짐";
 "cupthread.whatsnew.emails_on_destination" = "알림이 %@ 으로 전송됩니다.";
 "cupthread.whatsnew.get_emails" = "업데이트 이메일 받기";

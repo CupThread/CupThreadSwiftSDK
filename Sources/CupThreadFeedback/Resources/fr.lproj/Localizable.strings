@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "Nous avons envoyé un lien de confirmation à %@. Ouvrez-le pour commencer à recevoir les e-mails de mise à jour.";
 "cupthread.subscribe.resend_button" = "Renvoyer l'e-mail de confirmation";
 "cupthread.subscribe.resending_button" = "Renvoi en cours…";
+"cupthread.subscribe.resend_sent_message" = "E-mail de confirmation envoyé — consultez votre boîte de réception.";
 "cupthread.whatsnew.emails_on" = "Mises à jour par e-mail activées";
 "cupthread.whatsnew.emails_on_destination" = "Les notifications arrivent sur %@.";
 "cupthread.whatsnew.get_emails" = "Recevoir les mises à jour par e-mail";

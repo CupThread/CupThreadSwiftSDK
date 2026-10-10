@@ -39,6 +39,11 @@ struct ChangelogSubscribeModel: Equatable, Sendable {
     /// True while the resend-confirmation request is in flight; blocks only
     /// the resend button, never the close affordance.
     var isResending = false
+    /// True once this presentation's latest resend-confirmation request has
+    /// succeeded: the sheet affirms the dispatch so the user is not left
+    /// guessing whether the tap landed and retrying blind (issue #373).
+    /// Withdrawn when a new attempt starts or the user switches address.
+    private(set) var hasResentConfirmation = false
 
     /// Opens in a manage phase when a subscription is remembered for this
     /// app key — `.managePending` while the emailed confirmation is
@@ -125,11 +130,28 @@ struct ChangelogSubscribeModel: Equatable, Sendable {
         isWorking = false
     }
 
+    /// Transition applied when the sheet starts a resend-confirmation
+    /// attempt: the previous attempt's outcome is withdrawn so the
+    /// pending-phase feedback always describes the latest request.
+    mutating func willResendConfirmation() {
+        hasResentConfirmation = false
+        isResending = true
+    }
+
+    /// Transition applied after the resend-confirmation request succeeds:
+    /// the pending phase is kept (the double opt-in is still outstanding)
+    /// and the sheet affirms the dispatch (issue #373).
+    mutating func didResendConfirmation() {
+        hasResentConfirmation = true
+        isResending = false
+    }
+
     /// Transition for "Use a Different Email" from either manage phase.
     mutating func startNewEmailEntry() {
         email = ""
         isWorking = false
         isResending = false
+        hasResentConfirmation = false
         phase = .form
     }
 }

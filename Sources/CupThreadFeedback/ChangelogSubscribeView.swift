@@ -172,6 +172,10 @@ struct ChangelogSubscribeView: View {
             if let errorMessage {
                 ErrorBanner(message: errorMessage)
                     .padding(.horizontal, 8)
+            } else if model.hasResentConfirmation {
+                // Affirms the latest resend so the user is not left guessing
+                // whether the tap landed and retrying blind (issue #373).
+                resendSentBanner
             }
 
             Button {
@@ -198,6 +202,27 @@ struct ChangelogSubscribeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(24)
         .accessibilityElement(children: .contain)
+    }
+
+    /// Success counterpart to `ErrorBanner` for the pending phase's resend
+    /// action: same footprint, affirmative green styling (issue #373).
+    private var resendSentBanner: some View {
+        Label {
+            Text(CupThreadStrings.tr("cupthread.subscribe.resend_sent_message"))
+                .font(.footnote)
+                .multilineTextAlignment(.leading)
+        } icon: {
+            Image(systemName: "checkmark.circle.fill")
+        }
+        .foregroundStyle(.green)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.green.opacity(0.2), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func resultView(icon: String, tint: Color, title: String, message: String) -> some View {
@@ -260,7 +285,7 @@ struct ChangelogSubscribeView: View {
 
     @MainActor
     private func resendConfirmation() async {
-        model.isResending = true
+        model.willResendConfirmation()
         errorMessage = nil
         defer { model.isResending = false }
         do {
@@ -271,6 +296,9 @@ struct ChangelogSubscribeView: View {
                     state: .pending(since: .now)
                 )
             )
+            withAnimation(.snappy(duration: 0.3)) {
+                model.didResendConfirmation()
+            }
         } catch {
             guard !error.isSdkCancellation else { return }
             errorMessage = FriendlyError.message(for: error)

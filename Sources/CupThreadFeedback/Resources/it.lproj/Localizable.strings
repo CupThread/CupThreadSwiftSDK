@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "Abbiamo inviato un link di conferma a %@. Aprilo per iniziare a ricevere gli aggiornamenti via email.";
 "cupthread.subscribe.resend_button" = "Reinvia l'email di conferma";
 "cupthread.subscribe.resending_button" = "Reinvio in corso…";
+"cupthread.subscribe.resend_sent_message" = "Email di conferma inviata — controlla la tua casella di posta.";
 "cupthread.whatsnew.emails_on" = "Email di aggiornamento attive";
 "cupthread.whatsnew.emails_on_destination" = "Le notifiche arrivano su %@.";
 "cupthread.whatsnew.get_emails" = "Ricevi email di aggiornamento";

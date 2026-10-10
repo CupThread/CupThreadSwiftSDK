@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 205, "Expected 205 keys in en.lproj, found \(enKeys.count)")
+        #expect(enKeys.count == 206, "Expected 206 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
@@ -223,7 +223,7 @@ struct LocalizationTests {
 
     /// The pending double-opt-in copy (issue #273) ships localized in every
     /// target language: entry-point titles, footer captions, sheet copy, and
-    /// the resend action.
+    /// the resend action. The resend-success affirmation is issue #373.
     @Test func pendingSubscriptionStringsAreLocalizedAcrossTargetLanguages() throws {
         let keys = [
             "cupthread.whatsnew.pending_title",
@@ -232,7 +232,8 @@ struct LocalizationTests {
             "cupthread.subscribe.pending_title",
             "cupthread.subscribe.pending_message",
             "cupthread.subscribe.resend_button",
-            "cupthread.subscribe.resending_button"
+            "cupthread.subscribe.resending_button",
+            "cupthread.subscribe.resend_sent_message"
         ]
         for lang in Self.targetLanguages {
             let strings = try loadStrings(for: lang)

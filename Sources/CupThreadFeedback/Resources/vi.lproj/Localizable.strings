@@ -141,6 +141,7 @@
 "cupthread.subscribe.pending_message" = "Chúng tôi đã gửi liên kết xác nhận đến %@. Hãy mở liên kết để bắt đầu nhận email cập nhật.";
 "cupthread.subscribe.resend_button" = "Gửi lại email xác nhận";
 "cupthread.subscribe.resending_button" = "Đang gửi lại…";
+"cupthread.subscribe.resend_sent_message" = "Đã gửi email xác nhận — hãy kiểm tra hộp thư đến của bạn.";
 "cupthread.whatsnew.emails_on" = "Email cập nhật đang bật";
 "cupthread.whatsnew.emails_on_destination" = "Thông báo gửi đến %@.";
 "cupthread.whatsnew.get_emails" = "Nhận email cập nhật";
