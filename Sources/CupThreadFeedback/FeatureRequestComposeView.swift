@@ -6,12 +6,22 @@ enum FeatureRequestComposeDismissalAffordance: Equatable, Sendable {
     case close
     /// The compose sheet shows the form guarded against accidental discard.
     case guardedCancel
+    /// The access verdict has not arrived yet (issue #369): the sheet keeps a
+    /// neutral loading state instead of flashing the denial placeholder for a
+    /// signed-in user whose provider has not answered.
+    case undetermined
 
     static func resolve(
         config: PublicAppConfig?,
-        supportsAuthentication: Bool = false
+        supportsAuthentication: Bool = false,
+        verdictResolved: Bool = true
     ) -> FeatureRequestComposeDismissalAffordance {
-        SdkSubmissionDenial.forFeatureRequest(config: config, supportsAuthentication: supportsAuthentication) != .none
+        // An unsettled verdict neither denies (that would flash the placeholder
+        // for a signed-in user) nor opens the form (that would skip the
+        // fail-closed preflight for a signed-out user): the sheet stays
+        // neutral until `resolveAuthenticatedAccess()` answers (issue #369).
+        guard verdictResolved else { return .undetermined }
+        return SdkSubmissionDenial.forFeatureRequest(config: config, supportsAuthentication: supportsAuthentication) != .none
             ? .close
             : .guardedCancel
     }
@@ -31,6 +41,12 @@ struct FeatureRequestComposeView: View {
     /// until then, so a locked-down console never opens the form for a
     /// signed-out user.
     @State private var isAuthenticated: Bool
+    /// Whether `isAuthenticated` has been resolved at least once. Before that,
+    /// a locked-down config must not produce a denial verdict: the sheet keeps
+    /// its neutral loading state instead of flashing the placeholder for a
+    /// signed-in user whose provider has not answered (issue #369, mirroring
+    /// ``RoadmapBoardView``'s gate).
+    @State private var hasResolvedAuthentication: Bool
     @Environment(\.sdkAppConfig) private var sdkAppConfig
     @Environment(\.dismiss) private var dismiss
 
@@ -39,20 +55,23 @@ struct FeatureRequestComposeView: View {
     /// - Parameters:
     ///   - config: Optional console configuration override (previews/tests).
     ///   - preResolvedAuthentication: Injects the resolved access verdict for
-    ///     view-level tests; production presentations leave it `false` and
-    ///     the sheet resolves in `.task`.
+    ///     view-level tests — `nil` leaves the verdict unsettled so the sheet
+    ///     starts in its neutral loading state and resolves in `.task` (the
+    ///     production presentations), while `true`/`false` inject a settled
+    ///     verdict without awaiting `.task`.
     init(
         client: FeedbackClient,
         userToken: String,
         config: PublicAppConfig? = nil,
-        preResolvedAuthentication: Bool = false,
+        preResolvedAuthentication: Bool? = nil,
         onSubmitted: @escaping () -> Void
     ) {
         self.client = client
         self.userToken = userToken
         self.configOverride = config
         self.onSubmitted = onSubmitted
-        _isAuthenticated = State(initialValue: preResolvedAuthentication)
+        _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
+        _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
     }
 
     private var activeConfig: PublicAppConfig? {
@@ -62,16 +81,33 @@ struct FeatureRequestComposeView: View {
     var dismissalAffordance: FeatureRequestComposeDismissalAffordance {
         FeatureRequestComposeDismissalAffordance.resolve(
             config: activeConfig,
-            supportsAuthentication: isAuthenticated
+            supportsAuthentication: isAuthenticated,
+            verdictResolved: isAuthenticationVerdictResolved
         )
+    }
+
+    /// Whether the denial verdict can be decided: either anonymous proposals
+    /// are allowed (the verdict cannot depend on authentication) or the
+    /// resolved access state is in (issue #369).
+    private var isAuthenticationVerdictResolved: Bool {
+        hasResolvedAuthentication || (activeConfig?.allowsAnonymousFeedback ?? true)
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if dismissalAffordance == .close {
+                switch dismissalAffordance {
+                case .undetermined:
+                    // Neutral loading state while the access verdict is in
+                    // flight (issue #369): neither the denial placeholder nor
+                    // the interactive form. The sheet's swipe-down dismissal
+                    // stays available as the escape hatch.
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityIdentifier("cupthread.features.compose_verdict_loading")
+                case .close:
                     SdkSubmissionDenial.anonymousFeedbackDisabled.featureRequestPlaceholder
-                } else {
+                case .guardedCancel:
                     formContent
                         .composerDismissGuard(
                             hasContent: draft.hasContent,
@@ -89,6 +125,7 @@ struct FeatureRequestComposeView: View {
             #endif
             .task {
                 isAuthenticated = await client.resolveAuthenticatedAccess()
+                hasResolvedAuthentication = true
             }
             .toolbar {
                 if dismissalAffordance == .close {
