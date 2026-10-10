@@ -24,42 +24,67 @@ final class DemoAppModel: ObservableObject {
     private static let appKey = ProcessInfo.processInfo.environment["CUPTHREAD_APP_KEY"]
         ?? "app_demo_placeholder"
 
-    /// Whether requests should run against `DemoMockURLProtocol`: unless the
-    /// demo is pointed at a real backend, everything is served by the mock.
-    private static var usesMockServer: Bool {
-        ProcessInfo.processInfo.arguments.contains("-uiTesting") ||
-            ProcessInfo.processInfo.arguments.contains("-mockData") ||
-            ProcessInfo.processInfo.environment["CUPTHREAD_USE_MOCKS"] == "1" ||
-            ProcessInfo.processInfo.environment["CUPTHREAD_BASE_URL"] == nil
-    }
-
     let client: FeedbackClient
     /// Identity scoped to this demo's app key — hosts embedding several
     /// CupThread apps create one store per app key.
     let tokenStore: UserTokenStore
     let config: SdkConfigLoader
 
-    init() {
-        let clientConfiguration = FeedbackClientConfiguration(
-            baseURL: URL(string: Self.baseURL)!,
-            appKey: Self.appKey
-        )
-        if Self.usesMockServer {
-            // The mock protocol must be listed in the session's
-            // `protocolClasses` explicitly: `URLProtocol.registerClass` only
-            // reaches `URLSession.shared` on current OS runtimes, while the
-            // SDK's default session is a custom one built from
-            // `URLSessionConfiguration.default`, which never consults the
-            // global registry.
-            let mockSessionConfiguration = URLSessionConfiguration.default
-            mockSessionConfiguration.protocolClasses = [DemoMockURLProtocol.self]
-            client = FeedbackClient(
-                configuration: clientConfiguration,
-                session: URLSession(configuration: mockSessionConfiguration)
-            )
-        } else {
-            client = FeedbackClient(configuration: clientConfiguration)
+    /// Whether the demo talks to the mock fixtures instead of a real
+    /// backend. Mocks are on unless a developer explicitly points the demo
+    /// at a server with `CUPTHREAD_BASE_URL` (and only `CUPTHREAD_USE_MOCKS=1`
+    /// forces them back on over an explicit backend).
+    private static let usesMockTransport: Bool = {
+        let processInfo = ProcessInfo.processInfo
+        return processInfo.arguments.contains("-uiTesting")
+            || processInfo.arguments.contains("-mockData")
+            || processInfo.environment["CUPTHREAD_USE_MOCKS"] == "1"
+            || processInfo.environment["CUPTHREAD_BASE_URL"] == nil
+    }()
+
+    /// Session with the mock `URLProtocol` installed directly in
+    /// `protocolClasses`. The global `URLProtocol.registerClass` registry is
+    /// not consulted for `URLSessionConfiguration.default` sessions on
+    /// current OSes, so a registerClass-based mock silently misses requests
+    /// and the app talks to production instead of the fixtures; an explicit
+    /// session makes interception deterministic on every OS.
+    private static let mockSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DemoMockURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }()
+
+    /// Debug-grade Turnstile provider token from the `-mockTurnstileToken`
+    /// launch argument (issue #53 harness): `-mockTurnstileToken <value>`
+    /// presents `<value>`, the bare flag presents a deterministic synthetic
+    /// token. When present, the client is created with a
+    /// `turnstileTokenProvider`, so intake submissions carry a token from the
+    /// first attempt and the 403 → provider → single-retry path can be
+    /// exercised against the emulated gate (`-emulateTurnstileGate`) or a
+    /// real gated backend without rendering the actual widget.
+    private static let mockTurnstileToken: String? = {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-mockTurnstileToken") else { return nil }
+        guard index + 1 < args.count, !args[index + 1].hasPrefix("-") else {
+            return "mock_cf_token_auto"
         }
+        return args[index + 1]
+    }()
+
+    init() {
+        // When mocks are on, the injected session bypasses the SDK's default
+        // session (whose same-origin redirect limiter protects real-backend
+        // use); mock fixtures never redirect, so nothing is lost in mock mode.
+        client = FeedbackClient(
+            configuration: FeedbackClientConfiguration(
+                baseURL: URL(string: Self.baseURL)!,
+                appKey: Self.appKey
+            ),
+            session: Self.usesMockTransport ? Self.mockSession : FeedbackClient.defaultSession,
+            turnstileTokenProvider: Self.mockTurnstileToken.map { token in
+                { @Sendable (_: TurnstileChallenge) -> String? in token }
+            }
+        )
         tokenStore = UserTokenStore(appKey: Self.appKey)
         config = SdkConfigLoader(client: client)
     }
