@@ -52,6 +52,13 @@ struct PermissionPredicateTests {
         #expect(config.allowAnonymousChangelog == enabled)
     }
 
+    @Test func allowsAnonymousChangelogRequiresPublicAndAnonymous() {
+        #expect(makePermissionConfig(allowPublic: true, allowAnonymousChangelog: true).allowsAnonymousChangelog)
+        #expect(!makePermissionConfig(allowPublic: true, allowAnonymousChangelog: false).allowsAnonymousChangelog)
+        #expect(!makePermissionConfig(allowPublic: false, allowAnonymousChangelog: true).allowsAnonymousChangelog)
+        #expect(!makePermissionConfig(allowPublic: false, allowAnonymousChangelog: false).allowsAnonymousChangelog)
+    }
+
     @Test func allowsAnonymousRoadmapRequiresPublicAndAnonymous() {
         #expect(makePermissionConfig(allowPublic: true, allowAnonymousRoadmap: true).allowsAnonymousRoadmap)
         #expect(!makePermissionConfig(allowPublic: true, allowAnonymousRoadmap: false).allowsAnonymousRoadmap)
@@ -193,6 +200,7 @@ struct PermissionViewGatingTests {
         #expect(changelogLoadPlan(config: nil) == .load)
         #expect(changelogLoadPlan(config: makePermissionConfig(allowAnonymousChangelog: true)) == .load)
         #expect(changelogLoadPlan(config: makePermissionConfig(allowAnonymousChangelog: false)) == .skip)
+        #expect(changelogLoadPlan(config: makePermissionConfig(allowPublic: false)) == .skip)
     }
 }
 
