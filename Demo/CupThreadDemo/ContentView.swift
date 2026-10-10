@@ -24,6 +24,15 @@ final class DemoAppModel: ObservableObject {
     private static let appKey = ProcessInfo.processInfo.environment["CUPTHREAD_APP_KEY"]
         ?? "app_demo_placeholder"
 
+    /// Whether requests should run against `DemoMockURLProtocol`: unless the
+    /// demo is pointed at a real backend, everything is served by the mock.
+    private static var usesMockServer: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uiTesting") ||
+            ProcessInfo.processInfo.arguments.contains("-mockData") ||
+            ProcessInfo.processInfo.environment["CUPTHREAD_USE_MOCKS"] == "1" ||
+            ProcessInfo.processInfo.environment["CUPTHREAD_BASE_URL"] == nil
+    }
+
     let client: FeedbackClient
     /// Identity scoped to this demo's app key — hosts embedding several
     /// CupThread apps create one store per app key.
@@ -31,12 +40,26 @@ final class DemoAppModel: ObservableObject {
     let config: SdkConfigLoader
 
     init() {
-        client = FeedbackClient(
-            configuration: FeedbackClientConfiguration(
-                baseURL: URL(string: Self.baseURL)!,
-                appKey: Self.appKey
-            )
+        let clientConfiguration = FeedbackClientConfiguration(
+            baseURL: URL(string: Self.baseURL)!,
+            appKey: Self.appKey
         )
+        if Self.usesMockServer {
+            // The mock protocol must be listed in the session's
+            // `protocolClasses` explicitly: `URLProtocol.registerClass` only
+            // reaches `URLSession.shared` on current OS runtimes, while the
+            // SDK's default session is a custom one built from
+            // `URLSessionConfiguration.default`, which never consults the
+            // global registry.
+            let mockSessionConfiguration = URLSessionConfiguration.default
+            mockSessionConfiguration.protocolClasses = [DemoMockURLProtocol.self]
+            client = FeedbackClient(
+                configuration: clientConfiguration,
+                session: URLSession(configuration: mockSessionConfiguration)
+            )
+        } else {
+            client = FeedbackClient(configuration: clientConfiguration)
+        }
         tokenStore = UserTokenStore(appKey: Self.appKey)
         config = SdkConfigLoader(client: client)
     }
