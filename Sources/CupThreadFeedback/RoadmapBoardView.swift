@@ -172,10 +172,10 @@ public struct RoadmapBoardView: View {
             // fetches below the 30/min per-IP budget and skips duplicates.
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            let admitted = await client.searchThrottle.waitForAdmission(key: "roadmap|\(trimmedSearchText)")
-            guard admitted else {
+            let verdict = await client.searchThrottle.admissionVerdict(key: "roadmap|\(trimmedSearchText)")
+            guard verdict == .admitted else {
                 guard let outcome = SearchAdmissionOutcome.outcome(
-                    isCancelled: Task.isCancelled,
+                    for: verdict,
                     hasExistingContent: !groups.isEmpty
                 ) else { return }
                 switch outcome {
