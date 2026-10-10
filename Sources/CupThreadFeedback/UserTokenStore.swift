@@ -173,6 +173,11 @@ public final class UserTokenStore: @unchecked Sendable {
     /// stored item (`errSecDuplicateItem` → `SecItemUpdate`) and would
     /// permanently replace the end user's identity with a fresh UUID. The
     /// stored identity wins again as soon as the store becomes readable.
+    ///
+    /// Likewise, an inaccessible read from the legacy global store (SEC-18)
+    /// keeps adoption suspended: no write is attempted, the adoption flag
+    /// remains uncommitted, and an ephemeral UUID is served so the stored
+    /// legacy identity is not permanently forfeited.
     public var token: String {
         if let existing = readableStoredToken() {
             removeLegacyPlaintextIfOwned()
@@ -195,8 +200,16 @@ public final class UserTokenStore: @unchecked Sendable {
             return UUID().uuidString
         }
 
-        if let inherited = adoptLegacyIdentityOnce() {
+        switch adoptLegacyIdentityOnce() {
+        case .adopted(let inherited):
             return inherited
+        case .inaccessible:
+            // The legacy global item is present but unreadable (SEC-18).
+            // Never mint or persist a fresh identity behind its back;
+            // serve an ephemeral token and let the next read retry.
+            return UUID().uuidString
+        case .notFound:
+            break
         }
 
         let new = UUID().uuidString
@@ -221,6 +234,12 @@ public final class UserTokenStore: @unchecked Sendable {
         return nil
     }
 
+    private enum LegacyAdoptionResult: Sendable, Equatable {
+        case adopted(String)
+        case inaccessible
+        case notFound
+    }
+
     /// Copies the legacy global identity into this store exactly once.
     ///
     /// Scoped stores check the Keychain-held global identity first (the
@@ -230,23 +249,33 @@ public final class UserTokenStore: @unchecked Sendable {
     /// store", not "an adoption attempt was made": the flag is committed only
     /// after ``TokenStorage/saveConfirmed(_:)`` confirms the write, so a
     /// transiently inaccessible Keychain keeps adoption retryable instead of
-    /// permanently rotating the identity. The inherited value is still served
-    /// for the current read when the write fails, which preserves the one-shot
-    /// guarantee against *successful* adoption.
-    private func adoptLegacyIdentityOnce() -> String? {
+    /// permanently rotating the identity.
+    ///
+    /// The same holds when reading the legacy global store (SEC-18): an
+    /// inaccessible read does not prove the store is empty, so adoption is
+    /// suspended without committing the flag or minting a new identity. The
+    /// inherited value is still served for the current read when the write
+    /// fails, which preserves the one-shot guarantee against *successful*
+    /// adoption.
+    private func adoptLegacyIdentityOnce() -> LegacyAdoptionResult {
         if let adoptionDefaults, let adoptionFlagKey,
            adoptionDefaults.bool(forKey: adoptionFlagKey) {
-            return nil
+            return .notFound
         }
 
-        if let legacyGlobalStore,
-           let inherited = legacyGlobalStore.load(),
-           !inherited.isEmpty {
-            guard storage.saveConfirmed(inherited) else {
-                return inherited
+        if let legacyGlobalStore {
+            switch legacyGlobalStore.loadResult() {
+            case .found(let inherited) where !inherited.isEmpty:
+                guard storage.saveConfirmed(inherited) else {
+                    return .adopted(inherited)
+                }
+                markAdoptionComplete()
+                return .adopted(inherited)
+            case .inaccessible:
+                return .inaccessible
+            case .found, .notFound:
+                break
             }
-            markAdoptionComplete()
-            return inherited
         }
 
         if let legacyUserDefaults,
@@ -254,16 +283,16 @@ public final class UserTokenStore: @unchecked Sendable {
            let inherited = legacyUserDefaults.string(forKey: legacyKey),
            !inherited.isEmpty {
             guard storage.saveConfirmed(inherited) else {
-                return inherited
+                return .adopted(inherited)
             }
             if ownsLegacyPlaintext {
                 legacyUserDefaults.removeObject(forKey: legacyKey)
             }
             markAdoptionComplete()
-            return inherited
+            return .adopted(inherited)
         }
 
-        return nil
+        return .notFound
     }
 
     /// Commits the one-shot adoption flag. Only called once the store
