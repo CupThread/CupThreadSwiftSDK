@@ -69,6 +69,22 @@ struct RoadmapBoardViewTests {
         )
     }
 
+    private func makeBoardConfig(allowAnonymousRoadmap: Bool) -> PublicAppConfig {
+        PublicAppConfig(
+            appId: "app-1",
+            appKey: "app_testkey123456",
+            slug: "demo",
+            name: "Demo",
+            allowPublic: true,
+            allowedPlatforms: nil,
+            allowedPlatformValues: [],
+            allowAnonymousRoadmap: allowAnonymousRoadmap,
+            allowAnonymousVote: true,
+            allowAnonymousFeedback: true,
+            allowAnonymousChangelog: true
+        )
+    }
+
     // MARK: - ColumnCard Tests
 
     @Test @MainActor func columnCardRendersEmptyGroupWithPlaceholder() {
@@ -218,5 +234,72 @@ struct RoadmapBoardViewTests {
         _ = board.body
         #expect(board.isLoading)
         #expect(!board.hasLoadedOnce)
+    }
+
+    // MARK: - Load task key stability (issue #365)
+
+    @Test @MainActor func loadTaskKeyIsStableAcrossAuthenticationResolutionUnderLockedDownConfig() {
+        // Issue #365: the task's first act resolves authentication. Keyed on
+        // the resolved verdict, that flip changed the key mid-flight, so
+        // SwiftUI cancelled the in-flight task and restarted the load from
+        // scratch. The key must be identical before the verdict settles, for
+        // a resolved signed-in user, and for a resolved signed-out user —
+        // locked-down switch, same query.
+        let lockedDown = makeBoardConfig(allowAnonymousRoadmap: false)
+        let unresolved = RoadmapBoardView(
+            client: makeTestClient(),
+            userToken: "user_test_token_123",
+            initialGroups: nil,
+            configOverride: lockedDown
+        )
+        let signedIn = RoadmapBoardView(
+            client: makeTestClient(),
+            userToken: "user_test_token_123",
+            initialGroups: nil,
+            configOverride: lockedDown,
+            preResolvedAuthentication: true
+        )
+        let signedOut = RoadmapBoardView(
+            client: makeTestClient(),
+            userToken: "user_test_token_123",
+            initialGroups: nil,
+            configOverride: lockedDown,
+            preResolvedAuthentication: false
+        )
+
+        #expect(unresolved.loadTaskKey == signedIn.loadTaskKey)
+        #expect(unresolved.loadTaskKey == signedOut.loadTaskKey)
+        #expect(signedIn.loadTaskKey == signedOut.loadTaskKey)
+    }
+
+    @Test @MainActor func loadTaskKeyStillTracksTheAnonymousRoadmapSwitch() {
+        // The #274 contract survives on the config switch: a flip of the
+        // anonymous-roadmap switch must restart the task (same query), while
+        // a switch-stable config refresh must keep the key — and the
+        // in-flight load — unchanged.
+        let deniedBoard = RoadmapBoardView(
+            client: makeTestClient(),
+            userToken: "user_test_token_123",
+            initialGroups: nil,
+            configOverride: makeBoardConfig(allowAnonymousRoadmap: false),
+            preResolvedAuthentication: false
+        )
+        let allowedBoard = RoadmapBoardView(
+            client: makeTestClient(),
+            userToken: "user_test_token_123",
+            initialGroups: nil,
+            configOverride: makeBoardConfig(allowAnonymousRoadmap: true),
+            preResolvedAuthentication: false
+        )
+        let refreshedAllowedBoard = RoadmapBoardView(
+            client: makeTestClient(),
+            userToken: "user_test_token_123",
+            initialGroups: nil,
+            configOverride: makeBoardConfig(allowAnonymousRoadmap: true),
+            preResolvedAuthentication: false
+        )
+
+        #expect(deniedBoard.loadTaskKey != allowedBoard.loadTaskKey)
+        #expect(allowedBoard.loadTaskKey == refreshedAllowedBoard.loadTaskKey)
     }
 }

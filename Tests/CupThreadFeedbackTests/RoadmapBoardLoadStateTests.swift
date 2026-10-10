@@ -2,38 +2,38 @@ import Foundation
 import Testing
 @testable import CupThreadFeedback
 
-// MARK: - Load task key (issue #274)
+// MARK: - Load task key (issues #274, #365)
 
 @Suite("RoadmapBoardLoadTaskKey")
 struct RoadmapBoardLoadTaskKeyTests {
-    @Test func permissionFlipChangesTheKeyWithStableSearchText() {
+    @Test func anonymousRoadmapSwitchFlipChangesTheKeyWithStableSearchText() {
         // The denied→permitted config transition from #274: the task must
         // restart even though the query is unchanged. Keyed on the search
         // text alone (the main behavior), the id never changed here.
         #expect(
-            makeRoadmapLoadTaskKey(isRoadmapPermitted: false, trimmedSearchText: "dark mode")
-                != makeRoadmapLoadTaskKey(isRoadmapPermitted: true, trimmedSearchText: "dark mode")
+            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, trimmedSearchText: "dark mode")
+                != makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "dark mode")
         )
     }
 
-    @Test func keystrokeChangesTheKeyWithStableVerdict() {
+    @Test func keystrokeChangesTheKeyWithStableSwitch() {
         // The pre-existing debounce behavior: every query change restarts the
-        // task while the verdict stays permitted.
+        // task while the config switch stays put.
         #expect(
-            makeRoadmapLoadTaskKey(isRoadmapPermitted: true, trimmedSearchText: "dark")
-                != makeRoadmapLoadTaskKey(isRoadmapPermitted: true, trimmedSearchText: "dark mode")
+            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "dark")
+                != makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "dark mode")
         )
     }
 
-    @Test func unchangedVerdictAndQueryProduceTheSameKey() {
-        // A verdict-stable config refresh must not restart the in-flight load.
+    @Test func unchangedSwitchAndQueryProduceTheSameKey() {
+        // A switch-stable config refresh must not restart the in-flight load.
         #expect(
-            makeRoadmapLoadTaskKey(isRoadmapPermitted: true, trimmedSearchText: "")
-                == makeRoadmapLoadTaskKey(isRoadmapPermitted: true, trimmedSearchText: "")
+            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "")
+                == makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "")
         )
         #expect(
-            makeRoadmapLoadTaskKey(isRoadmapPermitted: false, trimmedSearchText: "")
-                == makeRoadmapLoadTaskKey(isRoadmapPermitted: false, trimmedSearchText: "")
+            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, trimmedSearchText: "")
+                == makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, trimmedSearchText: "")
         )
     }
 }

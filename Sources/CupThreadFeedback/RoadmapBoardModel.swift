@@ -117,8 +117,8 @@ struct RoadmapBoardLoadState: Equatable, Sendable {
     /// in-flight permitted load so its success/failure writes cannot land
     /// behind the permission placeholder. With `groups` empty,
     /// `makeBoardDisplayState` renders `.emptyBoard` after this — but the
-    /// permission placeholder replaces the board while denied, and a
-    /// permitted flip restarts the load via the task key.
+    /// permission placeholder replaces the board while denied, and a switch
+    /// flip that unlocks roadmap access restarts the load via the task key.
     mutating func settlePermissionDenied() {
         loadGeneration += 1
         isLoading = false
@@ -127,15 +127,19 @@ struct RoadmapBoardLoadState: Equatable, Sendable {
     }
 }
 
-/// The `.task` identity for the roadmap board's load lifecycle (issue #274):
-/// the permission verdict plus the trimmed search text. Keying on the search
-/// text alone never re-ran the task when the config (or resolved
-/// authentication) flipped the verdict, stranding the board on its
-/// first-load skeleton; keying on the verdict alone would miss keystrokes.
-/// A verdict-stable config refresh produces the same key and therefore no
+/// The `.task` identity for the roadmap board's load lifecycle (issues #274,
+/// #365): the config's `allowsAnonymousRoadmap` switch plus the trimmed
+/// search text. Keying on the search text alone never re-ran the task when
+/// the config flipped the switch, stranding the board on its first-load
+/// skeleton; keying on the *resolved permission verdict* made the task cancel
+/// and restart itself, because the task's first act — resolving
+/// authentication — flipped the verdict and with it the key mid-flight. The
+/// switch is external to the task (the task cannot mutate it), so a
+/// locked-down board resolves authentication inside one stable-key run; a
+/// switch-stable config refresh produces the same key and therefore no
 /// restart.
-func makeRoadmapLoadTaskKey(isRoadmapPermitted: Bool, trimmedSearchText: String) -> String {
-    "\(isRoadmapPermitted)|\(trimmedSearchText)"
+func makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: Bool, trimmedSearchText: String) -> String {
+    "\(allowsAnonymousRoadmap)|\(trimmedSearchText)"
 }
 
 // MARK: - Board display state
