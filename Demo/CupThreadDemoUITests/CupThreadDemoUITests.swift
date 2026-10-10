@@ -211,6 +211,94 @@ final class CupThreadDemoUITests: XCTestCase {
         )
     }
 
+    // MARK: - Turnstile Gate Emulation (issue #53)
+
+    /// Case A: against the emulated production gate
+    /// (`-emulateTurnstileGate`), an intake submission from a client without
+    /// a `turnstileTokenProvider` is rejected with the production-shaped
+    /// `403 turnstile_required`, and the composer surfaces the SDK's friendly
+    /// human-verification copy (with the gate's request id) instead of
+    /// succeeding — the exact production failure a token-less client sees.
+    @MainActor
+    func testTurnstileGateRejectsTokenlessSubmission() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting", "-emulateTurnstileGate", "-initialTab", "requests", "-openCompose"
+        ]
+        app.launch()
+
+        let composeSheetTitle = try fillAndSubmitFeatureRequestDraft(in: app)
+
+        let gateBanner = app.staticTexts.containing(
+            NSPredicate(format: "label CONTAINS %@", "blocked by human verification")
+        ).firstMatch
+        XCTAssertTrue(
+            gateBanner.waitForExistence(timeout: 10),
+            "Token-less intake against the emulated gate must surface the friendly turnstile error"
+        )
+        XCTAssertTrue(
+            gateBanner.label.contains("req_turnstile_mock_gated"),
+            "The surfaced error must carry the gate rejection's request id, got: \(gateBanner.label)"
+        )
+        XCTAssertTrue(composeSheetTitle.exists, "The compose sheet stays up after the rejection")
+    }
+
+    /// Case B: the same emulated gate, but the demo was launched with
+    /// `-mockTurnstileToken`, wiring the Phase 1 `turnstileTokenProvider`.
+    /// The submission now presents a token, the gate admits it, and the
+    /// compose sheet dismisses with success — proving the provider hook
+    /// end-to-end against a gate that rejects token-less traffic.
+    @MainActor
+    func testTurnstileGateAdmitsSubmissionWithMockProviderToken() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting", "-emulateTurnstileGate", "-mockTurnstileToken",
+            "-initialTab", "requests", "-openCompose"
+        ]
+        app.launch()
+
+        let composeSheetTitle = try fillAndSubmitFeatureRequestDraft(in: app)
+
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: composeSheetTitle)
+        waitForExpectations(timeout: 10, handler: nil)
+    }
+
+    /// Opens the auto-presented compose sheet and types a valid draft into
+    /// the title and description fields, leaving the submission to the caller.
+    /// Returns the sheet's navigation bar element for later assertions. The
+    /// compose form's text fields expose their placeholder (not a label), so
+    /// the fields are located by `placeholderValue`.
+    @MainActor
+    private func fillAndSubmitFeatureRequestDraft(in app: XCUIApplication) -> XCUIElement {
+        let composeSheetTitle = app.navigationBars["Request a Feature"]
+        XCTAssertTrue(composeSheetTitle.waitForExistence(timeout: 10), "Request a Feature sheet should appear")
+
+        let titleField = composeTextEntry(withPlaceholder: "Short summary", in: app)
+        XCTAssertTrue(titleField.waitForExistence(timeout: 5), "Title field should exist in the compose form")
+        titleField.tap()
+        titleField.typeText("Widget gaps on iPad")
+
+        let descriptionField = composeTextEntry(withPlaceholder: "Description", in: app)
+        XCTAssertTrue(descriptionField.waitForExistence(timeout: 5), "Description field should exist in the compose form")
+        descriptionField.tap()
+        descriptionField.typeText("Please add resizable home screen widgets.")
+
+        let submitButton = app.buttons["Submit"]
+        XCTAssertTrue(submitButton.waitForExistence(timeout: 5), "Submit button should exist in the compose form")
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: submitButton)
+        waitForExpectations(timeout: 5, handler: nil)
+        submitButton.tap()
+
+        return composeSheetTitle
+    }
+
+    @MainActor
+    private func composeTextEntry(withPlaceholder placeholder: String, in app: XCUIApplication) -> XCUIElement {
+        app.textFields.containing(
+            NSPredicate(format: "placeholderValue == %@", placeholder)
+        ).firstMatch
+    }
+
     // MARK: - Screenshot Persistence Helper
 
     /// Staging PNGs are only written when the caller provided a capture
@@ -243,4 +331,5 @@ final class CupThreadDemoUITests: XCTestCase {
             XCTFail("Failed to stage screenshot '\(name)' into \(stagingDir): \(error)")
         }
     }
+
 }
