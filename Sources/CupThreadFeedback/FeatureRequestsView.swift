@@ -54,15 +54,53 @@ public struct FeatureRequestsView: View {
     /// user can sign in or out while the list is presented. Fail-closed until
     /// then: list content only renders after the first load anyway.
     @State private var isAuthenticated = false
+    @State private var hasResolvedAuthentication = false
+    /// The server answered `401 authentication_required` on a fetch whose
+    /// preflight passed (e.g. the token expired between the check and the
+    /// send): the permission placeholder replaces the list (issue #363).
+    @State private var rejectedByServer = false
 
     @Environment(\.sdkAppConfig) private var sdkAppConfig
+    private let configOverride: PublicAppConfig?
+
+    private var activeConfig: PublicAppConfig? {
+        configOverride ?? sdkAppConfig
+    }
+
+    /// Whether the roadmap / feature requests are permitted to load: anonymous
+    /// roadmap access is allowed, or the client can produce a bearer token for
+    /// the current user (`nil` config fails open; the server stays authoritative).
+    var isRoadmapPermitted: Bool {
+        roadmapLoadPlan(
+            config: activeConfig,
+            supportsAuthentication: isAuthenticated
+        ) == .load
+    }
+
+    /// Whether the permission verdict can be decided: either anonymous roadmap
+    /// access is allowed (the verdict cannot depend on authentication) or the
+    /// resolved access state is in.
+    var isRoadmapVerdictResolved: Bool {
+        hasResolvedAuthentication || (activeConfig?.allowsAnonymousRoadmap ?? true)
+    }
+
+    /// Whether the view must render the permission placeholder: the
+    /// preflight denied a locked-down roadmap, or the server's 401 overrode a
+    /// permitted one (issue #363).
+    var isRoadmapPermissionBlocked: Bool {
+        isSurfacePermissionBlocked(
+            verdictResolved: isRoadmapVerdictResolved,
+            permitted: isRoadmapPermitted,
+            rejectedByServer: rejectedByServer
+        )
+    }
 
     /// Whether the compose sheet and toolbar should offer the composer rather
     /// than the denial placeholder: anonymous submission is allowed by the
     /// console, or the client can produce a bearer token for the current user
     /// (`nil` config fails open; the server stays authoritative).
     private var canCompose: Bool {
-        (sdkAppConfig?.allowsAnonymousFeedback ?? true) || isAuthenticated
+        (activeConfig?.allowsAnonymousFeedback ?? true) || isAuthenticated
     }
 
     var items: [FeatureRequestItem] {
@@ -103,6 +141,7 @@ public struct FeatureRequestsView: View {
     ) {
         self.client = client
         self.userToken = userToken
+        self.configOverride = nil
         _isComposePresented = State(initialValue: autoPresentCompose)
         _searchText = State(initialValue: initialSearchText)
     }
@@ -112,16 +151,23 @@ public struct FeatureRequestsView: View {
     /// is the trimmed query plus the version filter — the identity the shared
     /// search throttle uses for duplicate suppression.
     private var filterKey: String {
-        "features|\(trimmedSearchText)|\(selectedVersionID ?? "")"
+        "features|\(activeConfig?.allowsAnonymousRoadmap ?? true)|\(trimmedSearchText)|\(selectedVersionID ?? "")"
     }
 
     public var body: some View {
         Group {
-            #if os(tvOS)
-            tvList
-            #else
-            cardScroll
-            #endif
+            if isRoadmapPermissionBlocked {
+                SdkPermissionDeniedView(
+                    titleKey: "cupthread.permission.roadmap_title",
+                    descriptionKey: "cupthread.permission.roadmap_description"
+                )
+            } else {
+                #if os(tvOS)
+                tvList
+                #else
+                cardScroll
+                #endif
+            }
         }
         .navigationTitle(CupThreadStrings.tr("cupthread.features.title"))
         #if os(iOS) || os(visionOS)
@@ -137,8 +183,10 @@ public struct FeatureRequestsView: View {
             featureRequestsSubmittedBanner(isVisible: showSubmittedBanner)
         }
         .toolbar {
-            versionFilterToolbarItem
-            composeToolbarItem
+            if !isRoadmapPermissionBlocked {
+                versionFilterToolbarItem
+                composeToolbarItem
+            }
         }
         .sheet(isPresented: $isComposePresented) {
             if canCompose {
@@ -170,11 +218,14 @@ public struct FeatureRequestsView: View {
                 }
             }
         }
-        .refreshable { await refreshFeatureRequests() }
+        .refreshable {
+            guard isRoadmapPermitted else { return }
+            await refreshFeatureRequests()
+        }
         // Re-keyed on the anonymous-roadmap verdict (issue #285): versions
         // answers 401/403 while anonymous reads are disabled; re-attempt on
         // config transitions instead of staying stuck on the first failure.
-        .task(id: sdkAppConfig?.allowsAnonymousRoadmap) {
+        .task(id: activeConfig?.allowsAnonymousRoadmap) {
             await loadVersions()
         }
         .task(id: filterKey) {
@@ -255,7 +306,7 @@ public struct FeatureRequestsView: View {
                             successPulse: voteSuccessPulses[item.id, default: 0],
                             onSelectCard: { activeSheet = .comments(item) },
                             onSelectUser: { activeSheet = .profile($0) },
-                            appConfig: sdkAppConfig,
+                            appConfig: activeConfig,
                             supportsAuthentication: isAuthenticated
                         ) {
                             Task { await toggleVoteOptimistic(for: item) }
@@ -302,7 +353,7 @@ public struct FeatureRequestsView: View {
                         successPulse: voteSuccessPulses[item.id, default: 0],
                         onSelectCard: { activeSheet = .comments(item) },
                         onSelectUser: { activeSheet = .profile($0) },
-                        appConfig: sdkAppConfig,
+                        appConfig: activeConfig,
                         supportsAuthentication: isAuthenticated
                     ) {
                         Task { await toggleVoteOptimistic(for: item) }
@@ -358,23 +409,34 @@ public struct FeatureRequestsView: View {
 private extension FeatureRequestsView {
     @MainActor
     func loadVersions() async {
+        guard isRoadmapPermitted else { return }
         versionFilterState.loadStarted()
         do {
             versionFilterState.loadFinished(try await client.fetchVersions())
         } catch {
+            if isSdkPermissionRejection(error) {
+                rejectedByServer = true
+                return
+            }
             versionFilterState.loadFailed(error)
         }
     }
 
     @MainActor
     private func refreshFeatureRequests() async {
+        guard isRoadmapPermitted else { return }
         await client.searchThrottle.resetLastAdmittedKey()
         await loadFeatureRequests()
     }
 
     @MainActor
     private func loadFeatureRequests(recordsThrottle: Bool = true) async {
-        isAuthenticated = await client.resolveAuthenticatedAccess()
+        await resolveAuthenticationAccess()
+        guard !Task.isCancelled else { return }
+        guard isRoadmapPermitted else {
+            settlePermissionDeniedState()
+            return
+        }
         let generationAtStart = loadState.startLoading()
         loadError = nil
         reloadNotice = nil
@@ -403,26 +465,38 @@ private extension FeatureRequestsView {
             hasEmittedAdmissionNotice = false
             listState.applyPage(result, replacesExisting: true, executedQuery: trimmedSearchText)
         } catch {
-            guard loadGeneration == generationAtStart,
-                  !Task.isCancelled,
-                  let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty)
-            else { return }
-            if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
-                await client.searchThrottle.enterCooldown()
-                hasEmittedAdmissionNotice = true
-            }
-            switch outcome {
-            case .inlineNotice(let message):
-                reloadNotice = message
-            case .fullScreenError(let message):
-                loadError = message
-            }
+            await handleLoadFailure(error, generation: generationAtStart)
+        }
+    }
+
+    @MainActor
+    private func handleLoadFailure(_ error: Error, generation: Int) async {
+        guard loadGeneration == generation, !Task.isCancelled else { return }
+        if isSdkPermissionRejection(error) {
+            // The preflight passed but the server still answered 401 — the
+            // token expired (or was revoked) between the check and the
+            // send. The signed-out permission placeholder replaces the
+            // list instead of the generic error state (issue #297, #363).
+            rejectedByServer = true
+            return
+        }
+        guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty)
+        else { return }
+        if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
+            await client.searchThrottle.enterCooldown()
+            hasEmittedAdmissionNotice = true
+        }
+        switch outcome {
+        case .inlineNotice(let message):
+            reloadNotice = message
+        case .fullScreenError(let message):
+            loadError = message
         }
     }
 
     @MainActor
     private func loadNextPage() async {
-        guard !isLoadingNextPage, let cursor = listState.nextCursor else { return }
+        guard isRoadmapPermitted, !isLoadingNextPage, let cursor = listState.nextCursor else { return }
         let generationAtStart = loadGeneration
         isLoadingNextPage = true
         defer { isLoadingNextPage = false }
@@ -443,6 +517,10 @@ private extension FeatureRequestsView {
             listState.applyPage(result, replacesExisting: false)
         } catch {
             guard loadGeneration == generationAtStart, !error.isSdkCancellation else { return }
+            if isSdkPermissionRejection(error) {
+                rejectedByServer = true
+                return
+            }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
                 await client.searchThrottle.enterCooldown()
             }
@@ -456,7 +534,7 @@ private extension FeatureRequestsView {
     /// failed attempt is waiting for the explicit retry tap.
     @MainActor
     private func loadNextPageIfEligible() async {
-        guard listState.hasMorePages, !isLoadingNextPage, pageError == nil else { return }
+        guard isRoadmapPermitted, listState.hasMorePages, !isLoadingNextPage, pageError == nil else { return }
         await loadNextPage()
     }
 
@@ -464,7 +542,7 @@ private extension FeatureRequestsView {
     private func toggleVoteOptimistic(for item: FeatureRequestItem) async {
         guard !FeatureVoteGate.isActionDisabled(
             isOwnRequest: item.isOwnRequest,
-            config: sdkAppConfig,
+            config: activeConfig,
             supportsAuthentication: isAuthenticated
         ) else {
             return
@@ -511,6 +589,24 @@ private extension FeatureRequestsView {
         UIAccessibility.post(notification: .announcement, argument: message)
         #endif
     }
+
+    /// Settles the lifecycle on the permission denied path (issue #363): ensures
+    /// the list does not get stranded on the first-load skeleton, and invalidates
+    /// any in-flight permitted load so its writes are discarded.
+    private func settlePermissionDeniedState() {
+        loadState.settlePermissionDenied()
+        loadError = nil
+        reloadNotice = nil
+    }
+
+    /// Resolves whether the client can act as the signed-in user right now and
+    /// records it for the permission verdict. Runs on every load: the user can
+    /// sign in or out while the list is presented.
+    @MainActor
+    private func resolveAuthenticationAccess() async {
+        isAuthenticated = await client.resolveAuthenticatedAccess()
+        hasResolvedAuthentication = true
+    }
 }
 
 // MARK: - Test support
@@ -520,14 +616,21 @@ extension FeatureRequestsView {
     init(
         client: FeedbackClient,
         userToken: String,
-        listState: FeatureRequestsListState,
-        loadState: FeatureRequestsLoadState,
-        showsSubmittedBanner: Bool = false
+        listState: FeatureRequestsListState = FeatureRequestsListState(),
+        loadState: FeatureRequestsLoadState = FeatureRequestsLoadState(),
+        showsSubmittedBanner: Bool = false,
+        configOverride: PublicAppConfig? = nil,
+        preResolvedAuthentication: Bool? = nil,
+        rejectedByServer: Bool = false
     ) {
         self.client = client
         self.userToken = userToken
         _listState = State(initialValue: listState)
         _loadState = State(initialValue: loadState)
         _showSubmittedBanner = State(initialValue: showsSubmittedBanner)
+        self.configOverride = configOverride
+        _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
+        _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
+        _rejectedByServer = State(initialValue: rejectedByServer)
     }
 }

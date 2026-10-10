@@ -100,6 +100,19 @@ struct FeatureRequestsLoadStateTests {
         #expect(state.loadGeneration == 3)
     }
 
+    @Test func settlePermissionDeniedClearsLoadingAndMarksLoadedOnce() {
+        var state = FeatureRequestsLoadState()
+        #expect(state.isLoading)
+        #expect(!state.hasLoadedOnce)
+        #expect(state.loadGeneration == 0)
+
+        state.settlePermissionDenied()
+
+        #expect(!state.isLoading)
+        #expect(state.hasLoadedOnce)
+        #expect(state.loadGeneration == 1)
+    }
+
     // MARK: - View Presentation
 
     @Test @MainActor func featureRequestsViewFirstRenderKeepsSkeletonCondition() {
