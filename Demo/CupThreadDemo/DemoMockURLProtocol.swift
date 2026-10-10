@@ -1,5 +1,19 @@
 import Foundation
 
+/// One canned mock response: status code, body, and any headers beyond the
+/// JSON content type every mock reply carries.
+private struct MockResponse {
+    let statusCode: Int
+    let body: Data
+    let extraHeaders: [String: String]
+
+    init(_ statusCode: Int, _ body: Data, headers: [String: String] = [:]) {
+        self.statusCode = statusCode
+        self.body = body
+        self.extraHeaders = headers
+    }
+}
+
 /// URLProtocol subclass that mocks all CupThread API requests for Demo and UI tests.
 final class DemoMockURLProtocol: URLProtocol, @unchecked Sendable {
 
@@ -25,21 +39,27 @@ final class DemoMockURLProtocol: URLProtocol, @unchecked Sendable {
 
         let path = url.path
         let query = url.query ?? ""
+        let body = Self.requestBody(from: request)
 
-        let (statusCode, data) = Self.response(for: path, query: query, method: request.httpMethod ?? "GET")
+        let mockResponse = Self.response(
+            for: path,
+            query: query,
+            method: request.httpMethod ?? "GET",
+            body: body
+        )
 
         let response = HTTPURLResponse(
             url: url,
-            statusCode: statusCode,
+            statusCode: mockResponse.statusCode,
             httpVersion: "HTTP/1.1",
             headerFields: [
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*"
-            ]
+            ].merging(mockResponse.extraHeaders) { _, extra in extra }
         )!
 
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocol(self, didLoad: mockResponse.body)
         client?.urlProtocolDidFinishLoading(self)
     }
 
@@ -67,398 +87,135 @@ final class DemoMockURLProtocol: URLProtocol, @unchecked Sendable {
         counterLock.unlock()
     }
 
-    private static func response(for path: String, query: String, method: String) -> (Int, Data) {
+    private static func response(
+        for path: String,
+        query: String,
+        method: String,
+        body: Data?
+    ) -> MockResponse {
         if path.contains("/api/v1/public/config/") {
             recordConfigRequest()
-            return (200, DemoMockData.appConfigJSON)
+            return MockResponse(200, DemoMockData.appConfigJSON)
         }
         if path.contains("/api/v1/public/columns/") {
-            return (200, DemoMockData.columnsJSON)
+            return MockResponse(200, DemoMockData.columnsJSON)
         }
         if path.contains("/api/v1/public/versions/") {
-            return (200, DemoMockData.versionsJSON)
+            return MockResponse(200, DemoMockData.versionsJSON)
         }
         if path.contains("/api/v1/feature-requests") {
-            return handleFeatureRequests(path: path, query: query, method: method)
+            return handleFeatureRequests(path: path, query: query, method: method, body: body)
         }
         if path.contains("/api/v1/public/apps/") {
             return handleAppsPublic(path: path)
         }
         if path.contains("/api/v1/uploads/sessions") {
-            return (201, DemoMockData.uploadSessionJSON)
+            if let rejection = turnstileRejectionIfUngated(body: body, code: "turnstile_verification_failed") {
+                return rejection
+            }
+            return MockResponse(201, DemoMockData.uploadSessionJSON)
         }
         if path.contains("/api/v1/uploads/") {
-            return (200, DemoMockData.uploadedFileJSON)
+            return MockResponse(200, DemoMockData.uploadedFileJSON)
         }
         if path.contains("/api/v1/feedback") {
-            return (200, DemoMockData.submitFeedbackJSON)
+            if let rejection = turnstileRejectionIfUngated(body: body, code: "turnstile_required") {
+                return rejection
+            }
+            return MockResponse(200, DemoMockData.submitFeedbackJSON)
         }
-        return (200, Data("{}".utf8))
+        return MockResponse(200, Data("{}".utf8))
     }
 
-    private static func handleFeatureRequests(path: String, query: String, method: String) -> (Int, Data) {
+    private static func handleFeatureRequests(
+        path: String,
+        query: String,
+        method: String,
+        body: Data?
+    ) -> MockResponse {
         if path.contains("/vote") {
-            return (200, DemoMockData.voteJSON)
+            return MockResponse(200, DemoMockData.voteJSON)
         }
         if method == "POST" {
-            return (201, DemoMockData.submitFeatureRequestJSON)
+            if let rejection = turnstileRejectionIfUngated(body: body, code: "turnstile_required") {
+                return rejection
+            }
+            return MockResponse(201, DemoMockData.submitFeatureRequestJSON)
         }
-        return (200, DemoMockData.allFeatureRequestsJSON)
+        return MockResponse(200, DemoMockData.allFeatureRequestsJSON)
     }
 
-    private static func handleAppsPublic(path: String) -> (Int, Data) {
+    private static func handleAppsPublic(path: String) -> MockResponse {
         if path.contains("/changelog/subscribe") {
-            return (200, DemoMockData.subscribeJSON)
+            return MockResponse(200, DemoMockData.subscribeJSON)
         }
         if path.contains("/changelog/unsubscribe") {
-            return (200, DemoMockData.unsubscribeJSON)
+            return MockResponse(200, DemoMockData.unsubscribeJSON)
         }
         if path.contains("/changelog") {
-            return (200, DemoMockData.changelogJSON)
+            return MockResponse(200, DemoMockData.changelogJSON)
         }
         if path.contains("/user") {
-            return (200, DemoMockData.userAttributesJSON)
+            return MockResponse(200, DemoMockData.userAttributesJSON)
         }
-        return (200, Data("{}".utf8))
-    }
-}
-
-// MARK: - Mock Data Container
-
-enum DemoMockData {
-    private static func encodeJSON(_ obj: Any) -> Data {
-        (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)
+        return MockResponse(200, Data("{}".utf8))
     }
 
-    static var appConfigJSON: Data {
-        encodeJSON([
-            "appId": "app_demo_1",
-            "appKey": "app_demo_placeholder",
-            "slug": "cupthread-demo",
-            "name": "CupThread Demo",
-            "storeUrl": "https://apps.apple.com",
-            "storeKind": "app_store",
-            "allowPublic": true,
-            "allowedPlatforms": ["ios", "macos", "universal"],
-            "maxAttachmentBytes": 20_000_000,
-            "allowAnonymousRoadmap": true,
-            "allowAnonymousVote": true,
-            "allowAnonymousFeedback": true,
-            "allowAnonymousChangelog": true,
-            "sdk": [
-                "theme": "system",
-                "features": [
-                    "roadmap": true,
-                    "featureRequests": true,
-                    "changelog": true,
-                    "feedback": true
-                ],
-                "changelogOverlay": [
-                    "title": "What's New in v2.4",
-                    "subtitle": "Discover the latest improvements and features in CupThread.",
-                    "primaryButton": "Got It",
-                    "closeButton": "Close",
-                    "entryCount": 3
-                ]
-            ]
-        ])
+    // MARK: - Turnstile gate emulation (issue #53)
+
+    /// Emulates the production human-verification gate on the three intake
+    /// routes (`POST /api/v1/feedback`, `POST /api/v1/feature-requests`,
+    /// `POST /api/v1/uploads/sessions`) so the demo and the UI tests exercise
+    /// the same contract production enforces: token-less intake is rejected
+    /// with a Turnstile-shaped 403, and submissions presenting a token
+    /// succeed. Off by default — every existing mock-mode flow keeps its
+    /// unconditionally successful fixtures.
+    static var emulatesTurnstileGate: Bool {
+        let processInfo = ProcessInfo.processInfo
+        return processInfo.arguments.contains("-emulateTurnstileGate")
+            || processInfo.environment["DEMO_EMULATE_TURNSTILE_GATE"] == "1"
     }
 
-    static var columnsJSON: Data {
-        encodeJSON([
-            "columns": [
-                [
-                    "id": "col_planned",
-                    "appId": "app_demo_1",
-                    "name": "Planned",
-                    "slug": "planned",
-                    "position": 1,
-                    "isVisible": true,
-                    "isSystem": false,
-                    "kind": "normal",
-                    "createdAt": "2026-01-01T00:00:00Z",
-                    "updatedAt": "2026-01-01T00:00:00Z"
-                ],
-                [
-                    "id": "col_in_progress",
-                    "appId": "app_demo_1",
-                    "name": "In Progress",
-                    "slug": "in-progress",
-                    "position": 2,
-                    "isVisible": true,
-                    "isSystem": false,
-                    "kind": "normal",
-                    "createdAt": "2026-01-01T00:00:00Z",
-                    "updatedAt": "2026-01-01T00:00:00Z"
-                ],
-                [
-                    "id": "col_completed",
-                    "appId": "app_demo_1",
-                    "name": "Completed",
-                    "slug": "completed",
-                    "position": 3,
-                    "isVisible": true,
-                    "isSystem": true,
-                    "kind": "done",
-                    "createdAt": "2026-01-01T00:00:00Z",
-                    "updatedAt": "2026-01-01T00:00:00Z"
-                ]
-            ]
-        ])
+    /// The production-shaped 403 when the gate is emulated and the intake
+    /// body carries no presentable Turnstile token; `nil` lets the request
+    /// through to the success fixtures.
+    private static func turnstileRejectionIfUngated(body: Data?, code: String) -> MockResponse? {
+        guard emulatesTurnstileGate, turnstileToken(in: body) == nil else { return nil }
+        return MockResponse(
+            403,
+            DemoMockData.turnstileGateRejectionJSON(code: code),
+            headers: ["X-Request-Id": "req_turnstile_mock_gated"]
+        )
     }
 
-    static var versionsJSON: Data {
-        encodeJSON([
-            "versions": [
-                [
-                    "id": "ver_2_4_0",
-                    "appId": "app_demo_1",
-                    "label": "v2.4.0",
-                    "position": 1,
-                    "released": true,
-                    "releasedAt": "2026-08-20T10:00:00Z",
-                    "description": "Liquid Glass design and performance improvements",
-                    "createdAt": "2026-08-01T00:00:00Z",
-                    "updatedAt": "2026-08-20T10:00:00Z"
-                ],
-                [
-                    "id": "ver_2_5_0",
-                    "appId": "app_demo_1",
-                    "label": "v2.5.0",
-                    "position": 2,
-                    "released": false,
-                    "description": "Interactive widgets and offline synchronization",
-                    "createdAt": "2026-08-15T00:00:00Z",
-                    "updatedAt": "2026-08-15T00:00:00Z"
-                ]
-            ]
-        ])
+    /// Extracts the `turnstileToken` body field the SDK's intake payloads
+    /// send, treating missing, non-string, and whitespace-only values as
+    /// token-less.
+    private static func turnstileToken(in body: Data?) -> String? {
+        guard let body,
+              let payload = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let token = payload["turnstileToken"] as? String else { return nil }
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
-    static var allFeatureRequestsJSON: Data {
-        encodeJSON([
-            "requests": [
-                [
-                    "id": "req_1",
-                    "appId": "app_demo_1",
-                    "title": "Interactive Lock & Home Screen Widgets",
-                    "description": "Add Lock Screen widgets to track roadmap status and upvote features.",
-                    "status": "in-progress",
-                    "columnId": "col_in_progress",
-                    "columnSlug": "in-progress",
-                    "columnName": "In Progress",
-                    "versionId": "ver_2_5_0",
-                    "versionLabel": "v2.5.0",
-                    "requesterName": "Sarah Connor",
-                    "requesterAvatarUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=128&h=128&fit=crop",
-                    "recentCommenters": [
-                        [
-                            "authorName": "David Miller",
-                            "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&fit=crop"
-                        ],
-                        [
-                            "authorName": "Elena Rostova",
-                            "avatarUrl": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=128&h=128&fit=crop"
-                        ]
-                    ],
-                    "hasMoreCommenters": true,
-                    "approved": true,
-                    "voteCount": 142,
-                    "hasVoted": true,
-                    "isOwnRequest": false,
-                    "createdAt": "2026-08-15T08:30:00Z",
-                    "updatedAt": "2026-08-25T14:20:00Z"
-                ],
-                [
-                    "id": "req_2",
-                    "appId": "app_demo_1",
-                    "title": "Offline Draft Caching & Automatic Sync",
-                    "description": "Allow composing feedback offline with background synchronization once network is restored.",
-                    "status": "in-progress",
-                    "columnId": "col_in_progress",
-                    "columnSlug": "in-progress",
-                    "columnName": "In Progress",
-                    "versionId": "ver_2_5_0",
-                    "versionLabel": "v2.5.0",
-                    "requesterName": "David Miller",
-                    "requesterAvatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&fit=crop",
-                    "recentCommenters": [
-                        [
-                            "authorName": "Michael Scott",
-                            "avatarUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=128&h=128&fit=crop"
-                        ]
-                    ],
-                    "hasMoreCommenters": false,
-                    "approved": true,
-                    "voteCount": 98,
-                    "hasVoted": false,
-                    "isOwnRequest": false,
-                    "createdAt": "2026-08-10T14:15:00Z",
-                    "updatedAt": "2026-08-22T09:10:00Z"
-                ],
-                [
-                    "id": "req_3",
-                    "appId": "app_demo_1",
-                    "title": "Export Feedback Threads to CSV & PDF",
-                    "description": "Allow exporting feedback threads with metadata to CSV and PDF for stakeholder reviews.",
-                    "status": "completed",
-                    "columnId": "col_completed",
-                    "columnSlug": "completed",
-                    "columnName": "Completed",
-                    "versionId": "ver_2_4_0",
-                    "versionLabel": "v2.4.0",
-                    "releasedVersion": "2.4.0",
-                    "requesterName": "Elena Rostova",
-                    "approved": true,
-                    "voteCount": 85,
-                    "hasVoted": false,
-                    "isOwnRequest": false,
-                    "createdAt": "2026-07-28T09:00:00Z",
-                    "updatedAt": "2026-08-20T10:00:00Z"
-                ],
-                [
-                    "id": "req_4",
-                    "appId": "app_demo_1",
-                    "title": "Apple Pencil & Scribble Annotation",
-                    "description": "Support drawing annotations on screenshots and handwriting inside composer.",
-                    "status": "planned",
-                    "columnId": "col_planned",
-                    "columnSlug": "planned",
-                    "columnName": "Planned",
-                    "requesterName": "Michael Scott",
-                    "approved": true,
-                    "voteCount": 64,
-                    "hasVoted": false,
-                    "isOwnRequest": false,
-                    "createdAt": "2026-08-01T11:20:00Z",
-                    "updatedAt": "2026-08-18T16:40:00Z"
-                ],
-                [
-                    "id": "req_5",
-                    "appId": "app_demo_1",
-                    "title": "Biometric Authentication for Admin Feedback",
-                    "description": "Require Face ID authentication before viewing or replying to confidential feedback categories.",
-                    "status": "planned",
-                    "columnId": "col_planned",
-                    "columnSlug": "planned",
-                    "columnName": "Planned",
-                    "requesterName": "Clara Oswald",
-                    "approved": true,
-                    "voteCount": 39,
-                    "hasVoted": false,
-                    "isOwnRequest": false,
-                    "createdAt": "2026-08-05T16:45:00Z",
-                    "updatedAt": "2026-08-19T11:05:00Z"
-                ]
-            ],
-            "total": 5
-        ])
-    }
-
-    static var voteJSON: Data {
-        encodeJSON([
-            "featureRequestId": "req_1",
-            "voteCount": 143,
-            "hasVoted": true
-        ])
-    }
-
-    static var changelogJSON: Data {
-        encodeJSON([
-            "entries": [
-                [
-                    "id": "chg_2_4_0",
-                    "title": "Version 2.4.0 — Liquid Glass & Enhanced Export",
-                    "body": "Welcome to **CupThread 2.4.0**! Refreshed visuals, faster search, and export tools.\n\n"
-                        + "- **Export to CSV & PDF**: Export feedback threads directly from the app.\n"
-                        + "- **Liquid Glass**: Refined native appearance on iOS, macOS, and visionOS.\n"
-                        + "- **Instant Search**: Real-time search across all roadmap stages.",
-                    "versionLabel": "2.4.0",
-                    "publishedAt": "2026-08-20T10:00:00Z",
-                    "linkedRequests": [
-                        [
-                            "id": "req_3",
-                            "title": "Export Feedback Threads to CSV & PDF"
-                        ]
-                    ]
-                ],
-                [
-                    "id": "chg_2_3_0",
-                    "title": "Version 2.3.0 — Attachments & visionOS Support",
-                    "body": "We are excited to introduce rich attachment uploads and native visionOS support.\n\n"
-                        + "- **Media Uploads**: Attach screenshots and crash logs to feedback drafts.\n"
-                        + "- **Spatial Computing**: Fully native visionOS spatial window depth.",
-                    "versionLabel": "2.3.0",
-                    "publishedAt": "2026-07-15T09:30:00Z",
-                    "linkedRequests": []
-                ]
-            ]
-        ])
-    }
-
-    static var submitFeedbackJSON: Data {
-        encodeJSON([
-            "id": "sub_demo_123456",
-            "title": "Demo feedback",
-            "status": "queued",
-            "createdAt": "2026-09-13T12:00:00Z"
-        ])
-    }
-
-    static var uploadSessionJSON: Data {
-        encodeJSON([
-            "session": [
-                "sessionId": "sess_demo_1",
-                "sessionToken": "demo-session-token",
-                "expiresAt": "2026-09-13T18:00:00Z",
-                "maxFileSizeBytes": 20_000_000,
-                "maxFiles": 8
-            ],
-            "files": [[
-                "clientFileId": "file-1",
-                "uploadId": "upl_demo_1",
-                "uploadUrl": "https://api.cupthread.com/api/v1/uploads/upl_demo_1",
-                "maxSizeBytes": 20_000_000
-            ]]
-        ])
-    }
-
-    static var uploadedFileJSON: Data {
-        encodeJSON([
-            "uploadId": "upl_demo_1",
-            "clientFileId": "file-1",
-            "filename": "screenshot.png",
-            "contentType": "image/png",
-            "sizeBytes": 42,
-            "sha256": "demo",
-            "stored": true,
-            "downloadUrl": NSNull()
-        ])
-    }
-
-    static var submitFeatureRequestJSON: Data {
-        encodeJSON([
-            "featureRequestId": "req_demo_new_1",
-            "pending": false
-        ])
-    }
-
-    static var subscribeJSON: Data {
-        encodeJSON([
-            "success": true
-        ])
-    }
-
-    static var unsubscribeJSON: Data {
-        encodeJSON([
-            "unsubscribed": true
-        ])
-    }
-
-    static var userAttributesJSON: Data {
-        encodeJSON([
-            "ok": true,
-            "updatedAt": "2026-08-31T12:00:00Z"
-        ])
+    /// Reads a request body through `httpBodyStream` — URLSession hands
+    /// `httpBody` data to URLProtocol subclasses as a stream, so the direct
+    /// property is usually `nil` here.
+    private static func requestBody(from request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        let bufferSize = 16 * 1024
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        var data = Data()
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            guard read > 0 else { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }

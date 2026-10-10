@@ -7,6 +7,7 @@
     A10000000000000000000001 = {isa = PBXBuildFile; fileRef = A10000000000000000000002; };
     A10000000000000000000003 = {isa = PBXBuildFile; fileRef = A10000000000000000000004; };
     A10000000000000000000013 = {isa = PBXBuildFile; fileRef = A10000000000000000000012; };
+    A10000000000000000000021 = {isa = PBXBuildFile; fileRef = A10000000000000000000020; };
     A20000000000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = ../; };
     A20000000000000000000002 = {isa = XCSwiftPackageProductDependency; productName = CupThreadFeedback; package = A20000000000000000000001; };
     A20000000000000000000004 = {isa = PBXBuildFile; productRef = A20000000000000000000002; };
@@ -19,6 +20,7 @@
     A10000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CupThreadDemoApp.swift; sourceTree = "<group>"; };
     A10000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
     A10000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoMockURLProtocol.swift; sourceTree = "<group>"; };
+    A10000000000000000000020 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoMockData.swift; sourceTree = "<group>"; };
     A10000000000000000000005 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CupThreadDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
     
     B10000000000000000000001 = {
@@ -73,7 +75,7 @@
     };
     A10000000000000000000007 = {
       isa = PBXGroup;
-      children = (A10000000000000000000002, A10000000000000000000004, A10000000000000000000012);
+      children = (A10000000000000000000002, A10000000000000000000004, A10000000000000000000012, A10000000000000000000020);
       path = CupThreadDemo;
       sourceTree = "<group>";
     };
@@ -98,7 +100,7 @@
     A1000000000000000000000B = {
       isa = PBXSourcesBuildPhase;
       buildActionMask = 2147483647;
-      files = (A10000000000000000000001, A10000000000000000000003, A10000000000000000000013);
+      files = (A10000000000000000000001, A10000000000000000000003, A10000000000000000000013, A10000000000000000000021);
       runOnlyForDeploymentPostprocessing = 0;
     };
     A1000000000000000000000C = {
