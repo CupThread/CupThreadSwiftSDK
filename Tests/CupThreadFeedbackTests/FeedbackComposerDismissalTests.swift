@@ -58,6 +58,33 @@ struct FeedbackComposerDismissalTests {
         #expect(FeedbackComposerDismissalAffordance.resolve(result: nil, denial: denial) == .guardedCancel)
     }
 
+    // MARK: - Undecided access verdict (issue #367)
+
+    @Test func affordanceStaysUndeterminedWhileVerdictIsInFlight() {
+        let deniedConfig = makeConfig(allowAnonymousFeedback: false)
+        // While the resolved-access verdict has not arrived, the composer must
+        // neither deny (placeholder flash for a signed-in user) nor open the
+        // form (fail-closed preflight for a signed-out user).
+        #expect(FeedbackComposerDismissalAffordance.resolve(
+            result: nil,
+            denial: SdkSubmissionDenial.forFeedback(
+                config: deniedConfig,
+                platform: .ios,
+                supportsAuthentication: true
+            ),
+            verdictResolved: false
+        ) == .undetermined)
+        #expect(FeedbackComposerDismissalAffordance.resolve(
+            result: nil,
+            denial: SdkSubmissionDenial.forFeedback(
+                config: deniedConfig,
+                platform: .ios,
+                supportsAuthentication: false
+            ),
+            verdictResolved: false
+        ) == .undetermined)
+    }
+
     // MARK: - Localized string checks
 
     @Test func commonDoneStringResolvesThroughModuleBundle() {
@@ -137,17 +164,55 @@ struct FeedbackComposerDismissalTests {
         _ = composer.body
     }
 
-    @Test @MainActor func composerEvaluatesBodyInAnonymousDisabledState() {
-        let client = makeClient()
+    @Test @MainActor func composerStaysUndeterminedWhileResolvingUnderDeniedConfig() {
+        // Issue #367: with anonymous feedback denied and the access verdict
+        // not yet resolved (the production presentation state on appearance),
+        // the composer starts in its neutral loading state — never the denial
+        // placeholder a signed-in user would see flash before `.task`
+        // resolves.
+        let client = makeClient(authenticationProvider: { "signed-in-jwt" })
+        let deniedConfig = makeConfig(allowAnonymousFeedback: false)
+        let composer = FeedbackComposerView(
+            client: client,
+            config: deniedConfig
+        )
+        #expect(composer.dismissalAffordance == .undetermined)
+        #expect(composer.dismissalAffordance != .cancel)
+        _ = composer.body
+    }
+
+    @Test @MainActor func composerShowsFormForAuthenticatedClientUnderDeniedConfig() {
+        // A resolved bearer token satisfies the anonymous-feedback preflight;
+        // the server stays authoritative (issue #233). View-level tests inject
+        // the settled verdict instead of awaiting `.task` (issue #297).
+        let client = makeClient(authenticationProvider: { "signed-in-jwt" })
+        let deniedConfig = makeConfig(allowAnonymousFeedback: false)
+        let composer = FeedbackComposerView(
+            client: client,
+            config: deniedConfig,
+            preResolvedAuthentication: true
+        )
+        #expect(composer.dismissalAffordance == .guardedCancel)
+        _ = composer.body
+    }
+
+    @Test @MainActor func composerStaysDeniedForSignedOutClientUnderDeniedConfig() {
+        // An installed provider that answers `nil` (signed out) does not
+        // satisfy the preflight: once the verdict settles on *no* access, the
+        // denial placeholder with Cancel stays up instead of a form that can
+        // only fail at submit (issue #297).
+        let client = makeClient(authenticationProvider: { nil })
         var didDismiss = false
         let deniedConfig = makeConfig(allowAnonymousFeedback: false)
         let composer = FeedbackComposerView(
             client: client,
             config: deniedConfig,
+            preResolvedAuthentication: false,
             onDismiss: { didDismiss = true }
         )
         #expect(composer.dismissalAffordance == .cancel)
         _ = composer.body
+        #expect(!didDismiss)
     }
 
     @Test @MainActor func composerEvaluatesBodyInPlatformNotAllowedState() {

@@ -51,13 +51,32 @@ public struct FeedbackComposerView: View {
     @State private var result: FeedbackSubmissionResult?
     /// Bearer-token availability right now; fail-closed until `.task` resolves it (issue #297).
     @State private var isAuthenticated = false
+    /// Whether `isAuthenticated` has been resolved at least once. Before that,
+    /// a locked-down config must not produce a denial verdict: the composer
+    /// keeps its neutral loading state instead of flashing the placeholder for
+    /// a signed-in user whose provider has not answered (issue #367, mirroring
+    /// ``RoadmapBoardView``'s gate).
+    @State private var hasResolvedAuthentication = false
     @Environment(\.sdkAppConfig) private var sdkAppConfig
     @Environment(\.dismiss) private var dismiss
 
     private var activeConfig: PublicAppConfig? { config ?? sdkAppConfig }
 
+    /// Whether the denial verdict can be decided: either anonymous feedback is
+    /// allowed (the verdict cannot depend on authentication) or the resolved
+    /// access state is in (issue #367).
+    private var isAuthenticationVerdictResolved: Bool {
+        hasResolvedAuthentication || (activeConfig?.allowsAnonymousFeedback ?? true)
+    }
+
     private var submissionDenial: SdkSubmissionDenial {
-        SdkSubmissionDenial.forFeedback(
+        // An unsettled verdict neither denies (that would flash the placeholder
+        // for a signed-in user) nor opens the form (that would skip the
+        // fail-closed preflight for a signed-out user): the body renders the
+        // neutral loading state until `resolveAuthenticatedAccess()` answers
+        // (issue #367).
+        guard isAuthenticationVerdictResolved else { return .none }
+        return SdkSubmissionDenial.forFeedback(
             config: activeConfig,
             platform: draft.platform,
             supportsAuthentication: isAuthenticated
@@ -66,8 +85,7 @@ public struct FeedbackComposerView: View {
 
     var dismissalAffordance: FeedbackComposerDismissalAffordance {
         FeedbackComposerDismissalAffordance.resolve(
-            result: result,
-            denial: submissionDenial
+            result: result, denial: submissionDenial, verdictResolved: isAuthenticationVerdictResolved
         )
     }
 
@@ -123,6 +141,11 @@ public struct FeedbackComposerView: View {
     ///     sheet's `onDismiss` closure. Uploads are never cancelled by view
     ///     lifecycle events; see ``FeedbackComposerView``.
     ///   - config: Optional ``PublicAppConfig`` override for previewing or testing permissions.
+    ///   - preResolvedAuthentication: Injects the resolved access verdict for
+    ///     view-level tests — `nil` leaves the verdict unsettled so the composer
+    ///     starts in its neutral loading state and resolves in `.task` (the
+    ///     production presentations), while `true`/`false` inject a settled
+    ///     verdict without awaiting `.task`.
     ///   - initialResult: Optional initial submission result for testing the sent confirmation state.
     ///   - onDismiss: Optional dismissal action callback.
     ///   - onSubmit: Called with the server's receipt after a successful
@@ -138,6 +161,7 @@ public struct FeedbackComposerView: View {
         stripSensitiveMetadata: Bool = true,
         uploadHandle: FeedbackUploadHandle? = nil,
         config: PublicAppConfig? = nil,
+        preResolvedAuthentication: Bool? = nil,
         initialResult: FeedbackSubmissionResult? = nil,
         onDismiss: (() -> Void)? = nil,
         onSubmit: @escaping (FeedbackSubmissionResult) -> Void = { _ in }
@@ -152,6 +176,8 @@ public struct FeedbackComposerView: View {
         _attachmentState = State(initialValue: FeedbackAttachmentStateMachine(maxAttachmentBytes: maxAttachmentBytes))
         _draft = State(initialValue: initialDraft ?? FeedbackDraft.autofilled(platform: client.configuration.defaultPlatform))
         _result = State(initialValue: initialResult)
+        _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
+        _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
     }
 
     public var body: some View {
@@ -171,11 +197,17 @@ public struct FeedbackComposerView: View {
                 submissionDenial.placeholder
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button(CupThreadStrings.tr("cupthread.common.cancel")) {
-                                performDismiss()
-                            }
+                            Button(CupThreadStrings.tr("cupthread.common.cancel")) { performDismiss() }
                         }
                     }
+            } else if !isAuthenticationVerdictResolved {
+                // Neutral loading state while the access verdict is in flight
+                // (issue #367): neither the denial placeholder nor the
+                // interactive form. The sheet's swipe-down dismissal stays
+                // available as the escape hatch.
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("cupthread.feedback.composer_verdict_loading")
             } else {
                 composer
             }
@@ -196,10 +228,9 @@ public struct FeedbackComposerView: View {
             let resolvedConfig: PublicAppConfig? = if let activeConfig { activeConfig } else { try? await client.cachedAppConfig() }
             if let limit = FeedbackComposerAttachmentLimit.resolve(
                 config: resolvedConfig, lastKnownLimit: client.configStore.lastKnownMaxAttachmentBytes()
-            ) {
-                attachmentState.applyConfigLimit(limit)
-            }
+            ) { attachmentState.applyConfigLimit(limit) }
             isAuthenticated = await client.resolveAuthenticatedAccess()
+            hasResolvedAuthentication = true
         }
         .sdkSurface(client: client, feature: .feedback)
     }
@@ -440,10 +471,7 @@ public struct FeedbackComposerView: View {
     #endif
 
     private var submitBar: some View {
-        FeedbackSubmitBarView(
-            isSubmitting: isSubmitting,
-            canSubmit: attachmentState.canSubmit(draft: draft)
-        ) {
+        FeedbackSubmitBarView(isSubmitting: isSubmitting, canSubmit: attachmentState.canSubmit(draft: draft)) {
             Task { await submitDraft() }
         }
     }
