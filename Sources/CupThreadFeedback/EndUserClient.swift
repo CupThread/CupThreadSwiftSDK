@@ -54,9 +54,12 @@ extension FeedbackClient {
     /// - Returns: Whether a profile was erased. A `404` from the server is
     ///   normalized to `erased: false` rather than an error, so replaying an
     ///   erase is idempotent from the caller's perspective.
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` when no
-    ///   identity header is present, ``FeedbackClientError/rateLimited`` on
-    ///   HTTP 429, or ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when the
+    ///   identity is missing or rejected (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
+    ///   disables self-service erasure (HTTP 403),
+    ///   ``FeedbackClientError/rateLimited`` on HTTP 429, or
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   / ``FeedbackClientError/invalidResponse``.
     public func eraseMyData(userToken: String) async throws -> DataErasureResult {
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/me/erase"))
@@ -74,7 +77,10 @@ extension FeedbackClient {
             // No profile matched the identity — nothing to erase.
             return DataErasureResult(erased: false, endUserId: nil)
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        // The route's 401/403 mean the identity is missing or the app
+        // disabled self-service erasure; map them to the typed permission
+        // errors like the sibling identity-bound endpoints (#359).
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(DataErasureResult.self, from: data)
     }
 
@@ -136,10 +142,14 @@ extension FeedbackClient {
     ///   target: a redirect off the configured API origin is refused and the
     ///   3xx response surfaces as
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   with status 401 when the session is missing, 404 when no profile
-    ///   matches, and 409 when the profile is already confirmed to a
-    ///   different identity, or ``FeedbackClientError/invalidResponse``.
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when the
+    ///   session is missing or invalid (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
+    ///   server policy forbids the link (HTTP 403),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   with status 404 when no profile matches and 409 when the profile
+    ///   is already confirmed to a different identity, or
+    ///   ``FeedbackClientError/invalidResponse``.
     public func linkEndUser(
         sessionToken: String,
         userToken: String
@@ -155,7 +165,10 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        // The route's 401/403 mean the session is missing or the server
+        // policy forbids the link; map them to the typed permission errors
+        // like the sibling identity-bound endpoints (#359).
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(EndUserLinkResult.self, from: data)
     }
 }

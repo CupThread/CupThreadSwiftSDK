@@ -71,6 +71,40 @@ struct EndUserClientTests {
         }
     }
 
+    @Test func eraseMaps401ToAuthenticationRequired() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 401), try encodeJSON(["error": "Authentication required"]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        do {
+            _ = try await client.eraseMyData(userToken: "tok-1")
+            Issue.record("Expected error to be thrown")
+        } catch FeedbackClientError.authenticationRequired {
+            // expected
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test func eraseMaps403ToForbidden() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 403), try encodeJSON(["error": "Data erasure disabled by tenant policy"]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        do {
+            _ = try await client.eraseMyData(userToken: "tok-1")
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .forbidden(let message, _) = error {
+                #expect(message == "Data erasure disabled by tenant policy")
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
+
     @Test func eraseWithStoreResetsIdentityAfterSuccessfulErasure() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             let token = request.value(forHTTPHeaderField: "X-User-Token")
@@ -273,6 +307,40 @@ struct EndUserClientTests {
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(let code, _, _) = error {
                 #expect(code == 409)
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
+
+    @Test func linkMaps401ToAuthenticationRequired() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 401), try encodeJSON(["error": "Session token expired"]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        do {
+            _ = try await client.linkEndUser(sessionToken: "expired-sess", userToken: "tok-1")
+            Issue.record("Expected error to be thrown")
+        } catch FeedbackClientError.authenticationRequired {
+            // expected
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test func linkMaps403ToForbidden() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 403), try encodeJSON(["error": "Account linking disabled by tenant policy"]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        do {
+            _ = try await client.linkEndUser(sessionToken: "sess", userToken: "tok")
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .forbidden(let message, _) = error {
+                #expect(message == "Account linking disabled by tenant policy")
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
