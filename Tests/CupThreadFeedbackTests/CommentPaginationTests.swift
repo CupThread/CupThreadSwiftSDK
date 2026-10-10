@@ -364,6 +364,56 @@ struct CommentPaginationTests {
         #expect(requestCount == 3)
         #expect(comments.map(\.id) == ["c-1", "c-2", "c-3"])
     }
+
+    // MARK: - Cooperative cancellation
+
+    /// Lock-protected request counter, mutated from the mock handler's queue.
+    private final class CancellationProbe: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+
+        func record() -> Int {
+            lock.lock()
+            defer { lock.unlock() }
+            count += 1
+            return count
+        }
+
+        var requestCount: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return count
+        }
+    }
+
+    @Test func fetchCommentsRespectsTaskCancellationBetweenPages() async throws {
+        // The server keeps advertising more pages, so the only thing that can
+        // end the walk early is the cooperative cancellation check.
+        let probe = CancellationProbe()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            let count = probe.record()
+            return commentPage(
+                comments: [makeCommentJSON(id: "c-\(count)")],
+                total: 500,
+                hasMore: true,
+                nextCursor: "cur-\(count)"
+            )
+        }
+
+        let task = Task {
+            try await Self.makePagedClient().fetchComments(featureRequestId: "fr-1", maxPages: 10)
+        }
+
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+
+        // At most the first page was already past the loop head when the
+        // cancel landed; the walk must not continue paging to the cap.
+        #expect(probe.requestCount <= 1)
+    }
 }
 
 // MARK: - JSON fixtures
