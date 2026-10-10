@@ -1,3 +1,7 @@
+// swiftlint:disable file_length
+// One surface per file: the view's @State must stay file-private, so the
+// body is organized by MARK sections rather than split across files to fit
+// the size budget (same policy as the oversized test suites, .swiftlint.yml).
 import SwiftUI
 
 // MARK: - RoadmapBoardView
@@ -13,6 +17,9 @@ import SwiftUI
 public struct RoadmapBoardView: View {
     public let client: FeedbackClient
     public let userToken: String
+    /// Optional console configuration override (previews/tests); `nil` falls
+    /// back to the `sdkAppConfig` environment value.
+    let configOverride: PublicAppConfig?
 
     @State private var groups: [RoadmapGroup] = []
     /// First-load lifecycle and stale-write generation tracking (issue #274).
@@ -44,9 +51,13 @@ public struct RoadmapBoardView: View {
     @State private var rejectedByServer = false
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
+    private var activeConfig: PublicAppConfig? {
+        configOverride ?? sdkAppConfig
+    }
+
     private var isRoadmapPermitted: Bool {
         roadmapLoadPlan(
-            config: sdkAppConfig,
+            config: activeConfig,
             supportsAuthentication: isAuthenticated
         ) == .load
     }
@@ -55,7 +66,7 @@ public struct RoadmapBoardView: View {
     /// access is allowed (the verdict cannot depend on authentication) or the
     /// resolved access state is in.
     private var isRoadmapVerdictResolved: Bool {
-        hasResolvedAuthentication || (sdkAppConfig?.allowsAnonymousRoadmap ?? true)
+        hasResolvedAuthentication || (activeConfig?.allowsAnonymousRoadmap ?? true)
     }
 
     /// Whether the board must render the permission placeholder: the
@@ -75,14 +86,20 @@ public struct RoadmapBoardView: View {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Restarts the load lifecycle whenever the permission verdict or the
-    /// search query changes (issue #274). Keyed on the search text alone, the
-    /// task never re-ran when `sdkAppConfig` (or resolved authentication)
-    /// flipped the verdict, so a denied→permitted config transition left the
-    /// board on its first-load skeleton forever. A verdict-stable config
+    /// Restarts the load lifecycle whenever the config's anonymous-roadmap
+    /// switch or the search query changes (issue #274). Keyed on the resolved
+    /// permission verdict, the task cancelled and restarted itself: its first
+    /// act — `resolveAuthenticationAccess()` — flips `isAuthenticated`, which
+    /// flipped the verdict and therefore the key mid-flight (issue #365). The
+    /// switch is external to the task (the task cannot mutate it), so a
+    /// locked-down board resolves authentication inside one stable-key run
+    /// and loads — or settles denied — exactly once. A switch-stable config
     /// refresh keeps the key — and the in-flight load — unchanged.
-    private var loadTaskKey: String {
-        makeRoadmapLoadTaskKey(isRoadmapPermitted: isRoadmapPermitted, trimmedSearchText: trimmedSearchText)
+    var loadTaskKey: String {
+        makeRoadmapLoadTaskKey(
+            allowsAnonymousRoadmap: activeConfig?.allowsAnonymousRoadmap ?? true,
+            trimmedSearchText: trimmedSearchText
+        )
     }
 
     #if canImport(UIKit)
@@ -98,25 +115,39 @@ public struct RoadmapBoardView: View {
     public init(client: FeedbackClient, userToken: String, initialSearchText: String = "") {
         self.client = client
         self.userToken = userToken
+        self.configOverride = nil
         _searchText = State(initialValue: initialSearchText)
         _lastExecutedQuery = State(initialValue: "")
     }
 
     /// Internal initializer for tests and previews with preloaded groups.
+    ///
+    /// - Parameters:
+    ///   - configOverride: Console configuration override; `nil` falls back to
+    ///     the `sdkAppConfig` environment value.
+    ///   - preResolvedAuthentication: Injects the resolved access verdict for
+    ///     view-level tests — `nil` leaves the verdict unsettled so the board
+    ///     resolves in `.task` (the production presentation), while
+    ///     `true`/`false` inject a settled verdict without awaiting `.task`.
     init(
         client: FeedbackClient,
         userToken: String,
         initialSearchText: String = "",
-        initialGroups: [RoadmapGroup]?
+        initialGroups: [RoadmapGroup]?,
+        configOverride: PublicAppConfig? = nil,
+        preResolvedAuthentication: Bool? = nil
     ) {
         self.client = client
         self.userToken = userToken
+        self.configOverride = configOverride
         _searchText = State(initialValue: initialSearchText)
         _lastExecutedQuery = State(initialValue: initialSearchText)
         if let initialGroups {
             _groups = State(initialValue: initialGroups)
             _loadState = State(initialValue: RoadmapBoardLoadState(isLoading: false, hasLoadedOnce: true))
         }
+        _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
+        _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
     }
 
     public var body: some View {
@@ -428,7 +459,7 @@ extension RoadmapBoardView {
                 client: client,
                 userToken: userToken,
                 query: query,
-                config: sdkAppConfig,
+                config: activeConfig,
                 skipInitialAdmissionRecord: alreadyAdmitted
             ) {
                 // A newer load, cancellation, or a permission denial owns the board now.
