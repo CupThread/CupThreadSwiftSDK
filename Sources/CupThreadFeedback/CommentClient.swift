@@ -56,8 +56,9 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   (including `400` for a malformed cursor) or
-    ///   ``FeedbackClientError/invalidResponse``.
+    ///   (including `400` for a malformed cursor),
+    ///   ``FeedbackClientError/invalidResponse``, or `CancellationError`
+    ///   when the enclosing task is cancelled.
     public func fetchComments(
         featureRequestId: String,
         maxPages: Int = Self.defaultMaxPages
@@ -68,6 +69,7 @@ extension FeedbackClient {
         var cursor: String?
         var pagesFetched = 0
         while pagesFetched < effectiveMaxPages {
+            try Task.checkCancellation()
             pagesFetched += 1
             let page = try await fetchComments(
                 featureRequestId: featureRequestId,
