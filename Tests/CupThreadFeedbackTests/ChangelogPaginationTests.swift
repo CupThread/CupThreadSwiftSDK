@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import CupThreadFeedback
 
@@ -224,6 +225,48 @@ struct ChangelogPaginationTests {
 
         #expect(requestCount == 3)
         #expect(entries.count == 3)
+    }
+
+    // MARK: - Cooperative cancellation
+
+    private final class CancellationProbe: @unchecked Sendable {
+        private let state = OSAllocatedUnfairLock(initialState: 0)
+
+        func record() -> Int {
+            state.withLock { count in
+                count += 1
+                return count
+            }
+        }
+
+        var requestCount: Int {
+            state.withLock { $0 }
+        }
+    }
+
+    @Test func fetchChangelogRespectsTaskCancellationBetweenPages() async throws {
+        let probe = CancellationProbe()
+
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            let count = probe.record()
+            return page(
+                entries: [makePagedEntryJSON(id: "cl-\(count)", publishedAt: "2026-01-01T00:00:00.000Z")],
+                hasMore: true,
+                nextCursor: "cur-\(count)"
+            )
+        }
+
+        let task = Task {
+            try await Self.makePagedClient().fetchChangelog(maxPages: 10)
+        }
+
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+
+        #expect(probe.requestCount < 10)
     }
 }
 
