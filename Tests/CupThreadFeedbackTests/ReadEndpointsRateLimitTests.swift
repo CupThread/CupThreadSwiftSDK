@@ -121,6 +121,22 @@ struct ReadEndpointsRateLimitTests {
         }
     }
 
+    @Test func featureRequestMaps429ToRateLimited() async throws {
+        try Self.setRateLimitedHandler()
+
+        do {
+            _ = try await Self.makeAPIClient().fetchFeatureRequest(id: "fr-1")
+            Issue.record("Expected rateLimited")
+        } catch let error as FeedbackClientError {
+            guard case .rateLimited(let message, let requestId) = error else {
+                Issue.record("Expected .rateLimited, got \(error)")
+                return
+            }
+            #expect(message == Self.rateLimitBody["error"] as? String)
+            #expect(requestId == "req-429-read1")
+        }
+    }
+
     // MARK: - User-facing copy
 
     @Test func rateLimitedOnReadsRendersCuratedCopyWithoutServerText() throws {

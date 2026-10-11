@@ -77,6 +77,9 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// e.g. comments are disabled for this item or the thread has not been initialized.
     /// `message` carries the raw server text for diagnostics; it is never shown to end users.
     case commentsUnavailable(message: String?, requestId: String?)
+    /// The requested feature request could not be found, is unapproved, or belongs to an app
+    /// with public access disabled (HTTP 404). `message` carries the raw server text for diagnostics.
+    case featureRequestNotFound(message: String?, requestId: String?)
     /// The reply target no longer qualifies as a parent (HTTP 400
     /// `invalid_parent`) — the comment being replied to was hidden,
     /// soft-deleted, or belongs to a different feature request by the time
@@ -144,6 +147,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .unexpectedStatus(_, let message, _):
             return message
         case .userProfileNotFound(let message):
+            return message
+        case .featureRequestNotFound(let message, _):
             return message
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
              .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
@@ -241,6 +246,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .alreadyFinalized(_, let requestId):
             return requestId
+        case .featureRequestNotFound(_, let requestId):
+            return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
         case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound, .textTooLong:
@@ -289,6 +296,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return CupThreadStrings.tr("cupthread.error.daily_storage_quota_exceeded") + Self.requestIdSuffix(requestId)
         case .userProfileNotFound:
             return CupThreadStrings.tr("cupthread.error.profile_not_found")
+        case .featureRequestNotFound(_, let requestId):
+            return CupThreadStrings.tr("cupthread.error.http_not_found") + Self.requestIdSuffix(requestId)
         case .commentsUnavailable(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.comments_unavailable") + Self.requestIdSuffix(requestId)
         case .invalidParent(_, let requestId):

@@ -11,6 +11,7 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
     case createUploadSession
     case uploadSessionSlotPut
     case fetchFeatureRequests
+    case fetchFeatureRequest
     case submitFeatureRequest
     case toggleVote
     case castVote
@@ -51,6 +52,20 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
             ])
         case .fetchFeatureRequests:
             return try encodeJSON(["requests": [String](), "total": 0])
+        case .fetchFeatureRequest:
+            return try encodeJSON(["request": [
+                "id": "fr-1",
+                "appId": "app-1",
+                "title": "t",
+                "description": "d",
+                "status": "s",
+                "approved": true,
+                "voteCount": 1,
+                "hasVoted": false,
+                "isOwnRequest": false,
+                "createdAt": "2026-09-18T00:00:00Z",
+                "updatedAt": "2026-09-18T00:00:00Z"
+            ]])
         case .submitFeatureRequest:
             return try encodeJSON(["featureRequestId": "fr-1", "pending": true])
         case .postComment:
@@ -76,7 +91,7 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
         switch self {
         case .feedbackSubmit, .createUploadSession, .uploadSessionSlotPut:
             try await performAttachmentFlow(on: client)
-        case .fetchFeatureRequests, .submitFeatureRequest, .toggleVote, .castVote, .removeVote, .postComment:
+        case .fetchFeatureRequests, .fetchFeatureRequest, .submitFeatureRequest, .toggleVote, .castVote, .removeVote, .postComment:
             try await performFeatureRequestFlow(on: client)
         case .subscribeToChangelog, .updateUserAttributes, .eraseMyData, .linkEndUser:
             try await performAccountFlow(on: client)
@@ -114,6 +129,8 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
         switch self {
         case .fetchFeatureRequests:
             _ = try await client.fetchFeatureRequests(userToken: token)
+        case .fetchFeatureRequest:
+            _ = try await client.fetchFeatureRequest(id: "fr-1", userToken: token)
         case .submitFeatureRequest:
             _ = try await client.submitFeatureRequest(FeatureRequestDraft(title: "t", description: "d"), userToken: token)
         case .toggleVote:

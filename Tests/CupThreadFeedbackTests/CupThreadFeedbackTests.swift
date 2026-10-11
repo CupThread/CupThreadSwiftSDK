@@ -485,6 +485,7 @@ struct FeedbackClientErrorTests {
         #expect(FeedbackClientError.forbidden(message: "nope", requestId: reqId).requestId == reqId)
         #expect(FeedbackClientError.forbidden(message: "nope").requestId == nil)
         #expect(FeedbackClientError.userProfileNotFound(message: "missing").requestId == nil)
+        #expect(FeedbackClientError.featureRequestNotFound(message: "missing", requestId: reqId).requestId == reqId)
     }
 
     @Test func typedErrorsDescriptionIncludesRequestIdWhenPresent() throws {

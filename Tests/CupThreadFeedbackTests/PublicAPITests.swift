@@ -251,6 +251,7 @@ struct PublicAPITests {
             "hasMoreCommenters": true,
             "approved": true,
             "voteCount": 7,
+            "commentCount": 5,
             "hasVoted": true,
             "isOwnRequest": false,
             "createdAt": "2026-01-01T00:00:00.000Z",
@@ -266,6 +267,7 @@ struct PublicAPITests {
         #expect(item.stageName == "In Progress")
         #expect(item.versionLabel == "2.1")
         #expect(item.voteCount == 7)
+        #expect(item.commentCount == 5)
         #expect(item.hasVoted == true)
         #expect(item.requesterAvatarUrl == "https://example.com/avatar.png")
         #expect(item.requesterClerkId == "user_123")
@@ -305,6 +307,7 @@ struct PublicAPITests {
         #expect(item.recentCommenters.isEmpty)
         #expect(item.hasMoreCommenters == false)
         #expect(item.importedVotes == nil)
+        #expect(item.commentCount == nil)
     }
 
     @Test func featureRequestItemDecodesCustomStatusWithoutColumn() throws {
