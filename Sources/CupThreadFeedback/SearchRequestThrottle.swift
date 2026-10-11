@@ -69,33 +69,49 @@ actor SearchRequestThrottle {
         }
     }
 
-    /// Suspends until a query-bearing fetch for `key` may hit the network.
+    /// Suspends until a query-bearing fetch for `key` may hit the network,
+    /// returning the admission verdict.
     ///
-    /// Returns `false` when the fetch should be skipped: a 429 cooldown is
-    /// active, the key duplicates the last admitted fetch, or the task was
-    /// cancelled while waiting. A cancelled or skipped wait records no
-    /// reservation — only a `true` return commits a budget slot, so callers
-    /// must perform the network call exactly when this returns `true`.
-    func waitForAdmission(key: String) async -> Bool {
+    /// Returns:
+    /// - `.admitted` when admission is granted and a budget slot is committed.
+    /// - `.duplicateSkipped` when `key` matches the last admitted fetch.
+    /// - `.rateLimited` when an HTTP 429 cooldown is currently active.
+    /// - `nil` when the task was cancelled while waiting.
+    func admissionVerdict(key: String) async -> SearchAdmissionVerdict? {
         while true {
-            guard !Task.isCancelled else { return false }
-            if let cooldownEnd, now() < cooldownEnd { return false }
-            if key == lastAdmittedKey { return false }
+            guard !Task.isCancelled else { return nil }
+            if let cooldownEnd, now() < cooldownEnd { return .rateLimited }
+            if key == lastAdmittedKey { return .duplicateSkipped }
             if let last = lastAdmittedAt, now() - last < minimumInterval {
-                guard await sleepUntilAllowingCancel(last + minimumInterval) else { return false }
+                guard await sleepUntilAllowingCancel(last + minimumInterval) else { return nil }
                 continue
             }
             admittedTimes.removeAll { now() - $0 >= windowPeriod }
             if admittedTimes.count >= windowCapacity, let oldest = admittedTimes.first {
-                guard await sleepUntilAllowingCancel(oldest + windowPeriod) else { return false }
+                guard await sleepUntilAllowingCancel(oldest + windowPeriod) else { return nil }
                 continue
             }
             let admittedAt = now()
             lastAdmittedAt = admittedAt
             lastAdmittedKey = key
             admittedTimes.append(admittedAt)
-            return true
+            return .admitted
         }
+    }
+
+    /// Suspends until a query-bearing fetch for `key` may hit the network.
+    ///
+    /// Returns `true` when admitted, or `false` when skipped (duplicate query,
+    /// active cooldown, or task cancellation). A cancelled or skipped wait
+    /// records no reservation — only a `true` return commits a budget slot, so
+    /// callers must perform the network call exactly when this returns `true`.
+    func waitForAdmission(key: String) async -> Bool {
+        await admissionVerdict(key: key) == .admitted
+    }
+
+    /// Whether `key` duplicates the last admitted search key.
+    func isDuplicateKey(_ key: String) -> Bool {
+        key == lastAdmittedKey
     }
 
     /// Records a query-bearing fetch that already happened (or is about to)
@@ -197,36 +213,83 @@ enum SearchReloadOutcome: Equatable {
     }
 }
 
+// MARK: - Search admission verdict
+
+/// The verdict of evaluating a query-bearing search against the throttle budget.
+enum SearchAdmissionVerdict: Equatable, Sendable {
+    /// The fetch is granted admission and its budget slot has been recorded.
+    case admitted
+    /// The query matches the last admitted fetch and is skipped as a duplicate.
+    case duplicateSkipped
+    /// An active HTTP 429 cooldown is suppressing query-bearing searches.
+    case rateLimited
+}
+
 // MARK: - Search admission outcome presentation
 
 /// How a denied search-throttle admission should be presented.
 ///
-/// When the throttle denies a query-bearing fetch (active 429 cooldown,
-/// duplicate search, or window exhaustion), the surface must explain to the
-/// user why the search did not run instead of silently leaving stale results
-/// on screen.
+/// When the throttle denies a query-bearing fetch due to an active 429 cooldown,
+/// the surface explains to the user why the search did not run.
+///
+/// Benign duplicate query skips and task cancellations remain completely silent
+/// (no notice or full-screen error).
 ///
 /// When previous results are visible, the denial becomes a transient inline
 /// notice; on a fresh surface with nothing to show, it presents the full-screen
 /// error view so the user does not see a bare skeleton or empty state.
-///
-/// Cancellation is not a denial: superseded keystrokes and dismissed views
-/// must remain completely silent (``outcome(isCancelled:hasExistingContent:)``
-/// returns `nil`).
 enum SearchAdmissionOutcome: Equatable {
     /// Previous results stay visible; show this message as a transient notice.
     case inlineNotice(String)
     /// Nothing to show — present the full-screen error view with this message.
     case fullScreenError(String)
 
+    /// Derives the presentation for an admission verdict.
+    ///
+    /// - Parameters:
+    ///   - verdict: The admission verdict from the search throttle.
+    ///   - hasExistingContent: Whether the surface already shows results.
+    /// - Returns: `nil` if admitted or duplicate-skipped; otherwise the outcome for rate limiting.
+    static func outcome(
+        for verdict: SearchAdmissionVerdict,
+        hasExistingContent: Bool
+    ) -> SearchAdmissionOutcome? {
+        switch verdict {
+        case .admitted, .duplicateSkipped:
+            return nil
+        case .rateLimited:
+            let message = CupThreadStrings.tr("cupthread.search.rate_limited")
+            return hasExistingContent ? .inlineNotice(message) : .fullScreenError(message)
+        }
+    }
+
+    /// Derives the presentation for an optional admission verdict (where `nil` represents task cancellation).
+    ///
+    /// - Parameters:
+    ///   - verdict: The optional admission verdict from the search throttle.
+    ///   - hasExistingContent: Whether the surface already shows results.
+    /// - Returns: `nil` if `verdict` is `nil`, `.admitted`, or `.duplicateSkipped`; otherwise the outcome for rate limiting.
+    static func outcome(
+        for verdict: SearchAdmissionVerdict?,
+        hasExistingContent: Bool
+    ) -> SearchAdmissionOutcome? {
+        guard let verdict else { return nil }
+        return outcome(for: verdict, hasExistingContent: hasExistingContent)
+    }
+
     /// Derives the presentation for an admission denial.
     ///
     /// - Parameters:
     ///   - isCancelled: Whether the calling task was cancelled (superseded keystroke).
     ///   - hasExistingContent: Whether the surface already shows results.
-    /// - Returns: `nil` when `isCancelled` is `true`; otherwise the outcome for the denial.
-    static func outcome(isCancelled: Bool, hasExistingContent: Bool) -> SearchAdmissionOutcome? {
-        guard !isCancelled else { return nil }
+    ///   - isDuplicate: Whether the fetch was skipped as a duplicate query.
+    /// - Returns: `nil` when `isCancelled` or `isDuplicate` is `true`; otherwise the outcome for the denial.
+    static func outcome(
+        isCancelled: Bool,
+        hasExistingContent: Bool,
+        isDuplicate: Bool = false
+    ) -> SearchAdmissionOutcome? {
+        guard !isCancelled, !isDuplicate else { return nil }
         let message = CupThreadStrings.tr("cupthread.search.rate_limited")
         return hasExistingContent ? .inlineNotice(message) : .fullScreenError(message)
     }
@@ -237,13 +300,21 @@ enum SearchAdmissionOutcome: Equatable {
     ///   - wasAdmitted: Whether the throttle admitted the fetch.
     ///   - isCancelled: Whether the calling task was cancelled (superseded keystroke).
     ///   - hasExistingContent: Whether the surface already shows results.
-    /// - Returns: `nil` if admitted or cancelled; otherwise the outcome for the denial.
+    ///   - isDuplicate: Whether the fetch was skipped as a duplicate query.
+    /// - Returns: `nil` if admitted, cancelled, or duplicate-skipped; otherwise the outcome for the denial.
     static func outcome(
         wasAdmitted: Bool,
         isCancelled: Bool,
-        hasExistingContent: Bool
+        hasExistingContent: Bool,
+        isDuplicate: Bool = false
     ) -> SearchAdmissionOutcome? {
-        guard !wasAdmitted else { return nil }
-        return outcome(isCancelled: isCancelled, hasExistingContent: hasExistingContent)
+        guard !wasAdmitted, !isDuplicate else { return nil }
+        return outcome(isCancelled: isCancelled, hasExistingContent: hasExistingContent, isDuplicate: isDuplicate)
+    }
+
+    /// Explicitly returns `nil` for duplicate query skips so duplicate fetches never
+    /// trigger a rate-limiting notice.
+    static func outcomeForDuplicateSkip() -> SearchAdmissionOutcome? {
+        nil
     }
 }
