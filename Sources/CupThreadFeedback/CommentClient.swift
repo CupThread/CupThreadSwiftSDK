@@ -50,7 +50,9 @@ extension FeedbackClient {
     ///     defaults to ``FeedbackClient/defaultMaxPages`` (100).
     /// - Returns: The visible comments, oldest first.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   access is disabled for the app (HTTP 401 `authentication_required`),
+    ///   access is disabled for the app (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
+    ///   server's permission policy rejects the read (HTTP 403),
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
     ///   comments are not available or disabled (HTTP 404),
     ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
@@ -110,7 +112,9 @@ extension FeedbackClient {
     ///     ``ListCommentsResult/nextCursor``; omit for the first page.
     /// - Returns: The page's comments plus `total` / `hasMore` / `nextCursor`.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   access is disabled for the app (HTTP 401 `authentication_required`),
+    ///   access is disabled for the app (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
+    ///   server's permission policy rejects the read (HTTP 403),
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
     ///   comments are not available or disabled (HTTP 404),
     ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
@@ -154,7 +158,10 @@ extension FeedbackClient {
             let message = (trimmed?.isEmpty ?? true) ? nil : trimmed
             throw FeedbackClientError.commentsUnavailable(message: message, requestId: httpResponse.cupthreadRequestID)
         }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        // The route's 401/403 mean anonymous access is disabled or the
+        // server's permission policy rejected the read; map them to the typed
+        // permission errors like the sibling endpoints (#358).
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(ListCommentsResult.self, from: data)
     }
 
@@ -178,7 +185,9 @@ extension FeedbackClient {
     ///   - userToken: A stable UUID string identifying the commenting user.
     /// - Returns: The created comment, as echoed by the server.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when the
-    ///   caller is not signed in,
+    ///   caller is not signed in (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
+    ///   server's permission policy rejects the comment (HTTP 403),
     ///   ``FeedbackClientError/invalidParent(message:requestId:)`` when the
     ///   reply target is missing, hidden, or not on this feature request
     ///   (HTTP 400 `invalid_parent`),
@@ -209,7 +218,10 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: [200, 201])
+        // The route's 401/403 mean the caller is not signed in or the
+        // server's permission policy rejected the comment; map them to the
+        // typed permission errors like the sibling endpoints (#358).
+        try validateResponse(httpResponse, data: data, accepted: [200, 201], mapsPermissionErrors: true)
         return try decoder.decode(CreatedCommentResponse.self, from: data).comment
     }
 }

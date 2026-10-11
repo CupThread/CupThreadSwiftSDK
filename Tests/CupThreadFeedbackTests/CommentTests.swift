@@ -464,23 +464,4 @@ struct CommentClientTests {
             #expect(error == .authenticationRequired)
         }
     }
-
-    @Test func other401sStayUnexpectedStatus() async throws {
-        // Only the documented `authentication_required` envelope maps to the
-        // typed error; any other 401 keeps the diagnostic unexpectedStatus.
-        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (makeHTTPResponse(status: 401), try encodeJSON(["error": "Invalid token"]))
-        }
-
-        do {
-            _ = try await Self.makeAPIClient().fetchComments(featureRequestId: "fr-123")
-            Issue.record("Expected unexpectedStatus")
-        } catch let error as FeedbackClientError {
-            guard case .unexpectedStatus(let code, _, _) = error else {
-                Issue.record("Expected unexpectedStatus, got \(error)")
-                return
-            }
-            #expect(code == 401)
-        }
-    }
 }

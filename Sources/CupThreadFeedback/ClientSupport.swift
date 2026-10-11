@@ -345,12 +345,17 @@ enum FeedbackMetadataSanitizer {
 
 extension FeedbackClient {
     /// Shared JSON request/response plumbing for JSON endpoints.
+    /// - Parameter mapsPermissionErrors: Forwarded to
+    ///   ``validateResponse(_:data:accepted:mapsPermissionErrors:)``;
+    ///   endpoints whose `401`/`403` express a permission state (e.g.
+    ///   `subscribeToChangelog`) pass `true`.
     func sendJSON<Response: Decodable>(
         _ method: String,
         path: String,
         body: some Encodable,
         userToken: String?,
-        acceptedStatuses: Set<Int>
+        acceptedStatuses: Set<Int>,
+        mapsPermissionErrors: Bool = false
     ) async throws -> Response {
         var request = URLRequest(url: configuration.baseURL.appending(path: path))
         request.httpMethod = method
@@ -363,7 +368,12 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        try validateResponse(httpResponse, data: data, accepted: acceptedStatuses)
+        try validateResponse(
+            httpResponse,
+            data: data,
+            accepted: acceptedStatuses,
+            mapsPermissionErrors: mapsPermissionErrors
+        )
         return try decoder.decode(Response.self, from: data)
     }
 }

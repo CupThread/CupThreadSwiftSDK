@@ -141,7 +141,10 @@ extension FeedbackClient {
     ///   defaults to ``FeedbackClient/defaultMaxPages`` (100).
     /// - Returns: All published entries, newest first.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   changelog access is disabled, ``FeedbackClientError/rateLimited``
+    ///   changelog access is disabled (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
+    ///   server's permission policy rejects the read (HTTP 403),
+    ///   ``FeedbackClientError/rateLimited``
     ///   when the shared per-client read budget is exhausted (HTTP 429 —
     ///   retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
@@ -194,7 +197,10 @@ extension FeedbackClient {
     /// - Returns: The page's entries plus `hasMore`/`nextCursor` paging
     ///   metadata.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   changelog access is disabled, ``FeedbackClientError/rateLimited``
+    ///   changelog access is disabled (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
+    ///   server's permission policy rejects the read (HTTP 403),
+    ///   ``FeedbackClientError/rateLimited``
     ///   when the shared per-client read budget is exhausted (HTTP 429 —
     ///   retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
@@ -228,11 +234,10 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode == 401 {
-            // Anonymous changelog disabled for this app.
-            throw FeedbackClientError.authenticationRequired
-        }
-        try validateResponse(httpResponse, data: data, accepted: [200])
+        // The route's 401/403 mean anonymous changelog access is disabled or
+        // the server's permission policy rejected the read; map them to the
+        // typed permission errors like the sibling endpoints (#358).
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(ListChangelogResult.self, from: data)
     }
 
@@ -255,9 +260,11 @@ extension FeedbackClient {
     ///     subscription to the end-user identity.
     /// - Returns: Whether the subscription was recorded (pending confirmation).
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
-    ///   changelog access is disabled (HTTP 401 `authentication_required`),
+    ///   changelog access is disabled (HTTP 401),
     ///   ``FeedbackClientError/emailNotVerified(message:requestId:)`` when the
     ///   email must be verified from a signed-in account (HTTP 403 `email_not_verified`),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` for any other
+    ///   HTTP 403 policy rejection,
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
@@ -265,12 +272,13 @@ extension FeedbackClient {
         email: String,
         userToken: String
     ) async throws -> ChangelogSubscriptionResult {
-        try await send(
+        try await sendJSON(
             "POST",
             path: "/api/v1/public/apps/\(configuration.appKey)/changelog/subscribe",
             body: ChangelogEmailPayload(email: email.trimmingCharacters(in: .whitespacesAndNewlines)),
             userToken: userToken,
-            acceptedStatuses: [200, 201]
+            acceptedStatuses: [200, 201],
+            mapsPermissionErrors: true
         )
     }
 
@@ -335,23 +343,6 @@ extension FeedbackClient {
         // map it to the typed permission error like the sibling endpoints.
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
         return try decoder.decode(ChangelogUnsubscribeResult.self, from: data)
-    }
-
-    /// Shared JSON request/response plumbing for the changelog endpoints.
-    private func send<Response: Decodable>(
-        _ method: String,
-        path: String,
-        body: some Encodable,
-        userToken: String?,
-        acceptedStatuses: Set<Int>
-    ) async throws -> Response {
-        try await sendJSON(
-            method,
-            path: path,
-            body: body,
-            userToken: userToken,
-            acceptedStatuses: acceptedStatuses
-        )
     }
 }
 
