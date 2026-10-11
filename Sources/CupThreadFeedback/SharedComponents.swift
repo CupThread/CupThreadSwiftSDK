@@ -82,9 +82,13 @@ struct CapsuleBadge: View {
 struct AvatarView: View {
     let url: String?
     var size: CGFloat = 20
+    var thumbnailWidth: PublicImageThumbnailWidth?
 
     var resolvedURL: URL? {
-        remoteImageURL(from: url)
+        if let thumbnailWidth {
+            return publicImageThumbnailURL(from: url, width: thumbnailWidth)
+        }
+        return remoteImageURL(from: url)
     }
 
     var body: some View {

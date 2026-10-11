@@ -37,6 +37,12 @@ typealias PlatformImage = NSImage
 /// budget charged with each decoded bitmap's size in addition to its entry
 /// count.
 ///
+/// Public image delivery URLs (such as `https://api.cupthread.com/api/v1/files/{key}`)
+/// are handled as opaque URLs, preserving the path and query string (such as `?width=...`).
+/// Distinct thumbnail width hints are partitioned as separate cache entries in `NSCache`.
+/// Format decoding evaluates container data via ImageIO (e.g. WebP thumbnails or original bytes)
+/// rather than inferring formats from URL file extensions.
+///
 /// MainActor-isolated so cached images are only touched from one isolation
 /// domain; the download itself (including bitmap decoding) runs detached to
 /// keep that work off the main thread.
