@@ -15,12 +15,28 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     public let appKey: String
     /// URL-safe slug used in CupThread web links.
     public let slug: String
+    /// URL-safe slug of the workspace owning the app.
+    ///
+    /// Forms the first path segment of the portal's share URLs
+    /// (`/{workspaceSlug}/{appSlug}/requests/{requestId}`); the user-profile
+    /// payloads carry the same value. Required and non-null on the wire.
+    public let workspaceSlug: String
     /// The app's display name.
     public let name: String
     /// App Store or download page URL, when configured.
     public let storeUrl: URL?
     /// Kind of store behind `storeUrl` (e.g. `"app_store"`), when configured.
     public let storeKind: String?
+    /// Direct App Store listing URL, when configured.
+    ///
+    /// Per-store refinement of `storeUrl`/`storeKind`; mirrored so the config
+    /// round-trips losslessly. Native SDK surfaces do not open store links.
+    public let appStoreUrl: URL?
+    /// Direct Google Play listing URL, when configured.
+    ///
+    /// Per-store refinement of `storeUrl`/`storeKind`; mirrored so the config
+    /// round-trips losslessly. Native SDK surfaces do not open store links.
+    public let googlePlayUrl: URL?
     /// The app's icon, when uploaded to the console.
     public let iconUrl: URL?
     /// The app's public website URL, when configured (Web / Universal apps).
@@ -72,9 +88,12 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         case appId
         case appKey
         case slug
+        case workspaceSlug
         case name
         case storeUrl
         case storeKind
+        case appStoreUrl
+        case googlePlayUrl
         case iconUrl
         case websiteUrl
         case hideSiteBranding
@@ -93,9 +112,12 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         appId: String,
         appKey: String,
         slug: String,
+        workspaceSlug: String = "",
         name: String,
         storeUrl: URL? = nil,
         storeKind: String? = nil,
+        appStoreUrl: URL? = nil,
+        googlePlayUrl: URL? = nil,
         iconUrl: URL? = nil,
         websiteUrl: URL? = nil,
         hideSiteBranding: Bool = false,
@@ -113,9 +135,12 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         self.appId = appId
         self.appKey = appKey
         self.slug = slug
+        self.workspaceSlug = workspaceSlug
         self.name = name
         self.storeUrl = storeUrl
         self.storeKind = storeKind
+        self.appStoreUrl = appStoreUrl
+        self.googlePlayUrl = googlePlayUrl
         self.iconUrl = iconUrl
         self.websiteUrl = websiteUrl
         self.hideSiteBranding = hideSiteBranding
@@ -141,9 +166,14 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         appId = try container.decode(String.self, forKey: .appId)
         appKey = try container.decode(String.self, forKey: .appKey)
         slug = try container.decode(String.self, forKey: .slug)
+        // Required and non-null on the wire (like appId/appKey/slug), so a
+        // missing key surfaces contract drift instead of decoding to a sentinel.
+        workspaceSlug = try container.decode(String.self, forKey: .workspaceSlug)
         name = try container.decode(String.self, forKey: .name)
         storeUrl = try container.decodeIfPresent(URL.self, forKey: .storeUrl)
         storeKind = try container.decodeIfPresent(String.self, forKey: .storeKind)
+        appStoreUrl = try container.decodeIfPresent(URL.self, forKey: .appStoreUrl)
+        googlePlayUrl = try container.decodeIfPresent(URL.self, forKey: .googlePlayUrl)
         iconUrl = try container.decodeIfPresent(URL.self, forKey: .iconUrl)
         websiteUrl = try container.decodeIfPresent(URL.self, forKey: .websiteUrl)
         hideSiteBranding = try container.decodeIfPresent(Bool.self, forKey: .hideSiteBranding) ?? false
@@ -165,9 +195,12 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         try container.encode(appId, forKey: .appId)
         try container.encode(appKey, forKey: .appKey)
         try container.encode(slug, forKey: .slug)
+        try container.encode(workspaceSlug, forKey: .workspaceSlug)
         try container.encode(name, forKey: .name)
         try container.encodeIfPresent(storeUrl, forKey: .storeUrl)
         try container.encodeIfPresent(storeKind, forKey: .storeKind)
+        try container.encodeIfPresent(appStoreUrl, forKey: .appStoreUrl)
+        try container.encodeIfPresent(googlePlayUrl, forKey: .googlePlayUrl)
         try container.encodeIfPresent(iconUrl, forKey: .iconUrl)
         try container.encodeIfPresent(websiteUrl, forKey: .websiteUrl)
         try container.encode(hideSiteBranding, forKey: .hideSiteBranding)

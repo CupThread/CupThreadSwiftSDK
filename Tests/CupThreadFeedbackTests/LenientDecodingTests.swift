@@ -95,6 +95,7 @@ struct LenientDecodingTests {
             "appId": "app-1",
             "appKey": "app_testkey123456",
             "slug": "demo-app",
+            "workspaceSlug": "demo-workspace",
             "name": "Demo App",
             "allowedPlatforms": ["ios", "visionos"]
         ])
@@ -143,6 +144,7 @@ struct LenientDecodingTests {
             "appId": "app-1",
             "appKey": "app_testkey123456",
             "slug": "demo-app",
+            "workspaceSlug": "demo-workspace",
             "name": "Demo App",
             "allowedEmbedOrigins": ["https://docs.example.com"]
         ])
@@ -161,6 +163,7 @@ struct LenientDecodingTests {
             "appId": "app-1",
             "appKey": "app_testkey123456",
             "slug": "demo-app",
+            "workspaceSlug": "demo-workspace",
             "name": "Demo App"
         ])
         let decoded = try JSONDecoder().decode(PublicAppConfig.self, from: json)

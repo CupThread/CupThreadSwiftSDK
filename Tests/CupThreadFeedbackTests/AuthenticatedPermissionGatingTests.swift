@@ -187,6 +187,7 @@ struct AuthenticatedPermissionFetchingTests {
             "appId": "app-1",
             "appKey": "app_testkey123456",
             "slug": "demo",
+            "workspaceSlug": "demo-workspace",
             "name": "Demo",
             "allowPublic": true,
             "allowedPlatforms": ["ios", "macos"],
