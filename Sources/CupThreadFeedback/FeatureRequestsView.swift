@@ -50,7 +50,7 @@ public struct FeatureRequestsView: View {
     /// (failed) vote never fires success cues.
     @State private var voteSuccessPulses: [String: Int] = [:]
     /// Whether a request sent right now could carry the signed-in identity's
-    /// bearer token. Resolved at the start of every load (issue #297) — the
+    /// bearer token. Resolved at the start of every load (issue #297, #361) — the
     /// user can sign in or out while the list is presented. Fail-closed until
     /// then: list content only renders after the first load anyway.
     @State private var isAuthenticated = false
@@ -63,7 +63,7 @@ public struct FeatureRequestsView: View {
     @Environment(\.sdkAppConfig) private var sdkAppConfig
     private let configOverride: PublicAppConfig?
 
-    private var activeConfig: PublicAppConfig? {
+    var activeConfig: PublicAppConfig? {
         configOverride ?? sdkAppConfig
     }
 
@@ -99,8 +99,22 @@ public struct FeatureRequestsView: View {
     /// than the denial placeholder: anonymous submission is allowed by the
     /// console, or the client can produce a bearer token for the current user
     /// (`nil` config fails open; the server stays authoritative).
-    private var canCompose: Bool {
+    var canCompose: Bool {
         (activeConfig?.allowsAnonymousFeedback ?? true) || isAuthenticated
+    }
+
+    /// Whether the decision to allow or deny composition has settled (issue #361):
+    /// either anonymous feedback is permitted (verdict does not depend on auth)
+    /// or authentication resolution has completed.
+    var isComposeAccessResolved: Bool {
+        hasResolvedAuthentication || (activeConfig?.allowsAnonymousFeedback ?? true)
+    }
+
+    /// Identity key for the version filter loading task (issue #285, #361).
+    /// Re-evaluates when anonymous-roadmap configuration changes or when
+    /// authentication resolves to permit authorized version reads.
+    var versionFilterTaskKey: String {
+        "\(isAuthenticated)|\(activeConfig?.allowsAnonymousRoadmap ?? true)"
     }
 
     var items: [FeatureRequestItem] {
@@ -189,19 +203,7 @@ public struct FeatureRequestsView: View {
             }
         }
         .sheet(isPresented: $isComposePresented) {
-            if canCompose {
-                FeatureRequestComposeView(client: client, userToken: userToken) {
-                    isComposePresented = false
-                    withAnimation(.snappy(duration: 0.3)) {
-                        showSubmittedBanner = true
-                    }
-                    Task { await loadFeatureRequests() }
-                }
-            } else {
-                FeatureRequestDenialSheet {
-                    isComposePresented = false
-                }
-            }
+            composeSheetContent()
         }
         .sheet(item: $activeSheet) { sheet in
             NavigationStack {
@@ -222,10 +224,12 @@ public struct FeatureRequestsView: View {
             guard isRoadmapPermitted else { return }
             await refreshFeatureRequests()
         }
-        // Re-keyed on the anonymous-roadmap verdict (issue #285): versions
-        // answers 401/403 while anonymous reads are disabled; re-attempt on
-        // config transitions instead of staying stuck on the first failure.
-        .task(id: activeConfig?.allowsAnonymousRoadmap) {
+        // Re-keyed on the anonymous-roadmap verdict (issue #285) and
+        // authentication resolution (issue #361): versions answers 401/403
+        // while anonymous reads are disabled; re-attempt on config transitions
+        // or when authentication resolves instead of staying stuck on the
+        // first failure.
+        .task(id: versionFilterTaskKey) {
             await loadVersions()
         }
         .task(id: filterKey) {
@@ -609,10 +613,53 @@ private extension FeatureRequestsView {
     }
 }
 
+// MARK: - Compose Sheet Presentation
+
+extension FeatureRequestsView {
+    @ViewBuilder
+    func composeSheetContent() -> some View {
+        if canCompose {
+            FeatureRequestComposeView(
+                client: client,
+                userToken: userToken,
+                config: activeConfig,
+                preResolvedAuthentication: isAuthenticated
+            ) {
+                isComposePresented = false
+                withAnimation(.snappy(duration: 0.3)) {
+                    showSubmittedBanner = true
+                }
+                Task { await loadFeatureRequests() }
+            }
+        } else if !isComposeAccessResolved {
+            NavigationStack {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("cupthread.features.compose_verdict_loading")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(CupThreadStrings.tr("cupthread.common.cancel")) {
+                                isComposePresented = false
+                            }
+                        }
+                    }
+            }
+            .task {
+                isAuthenticated = await client.resolveAuthenticatedAccess()
+                hasResolvedAuthentication = true
+            }
+        } else {
+            FeatureRequestDenialSheet {
+                isComposePresented = false
+            }
+        }
+    }
+}
+
 // MARK: - Test support
 
 extension FeatureRequestsView {
-    /// Internal initializer for tests with custom list and load state.
+    /// Internal initializer for tests with custom state injection.
     init(
         client: FeedbackClient,
         userToken: String,
@@ -621,16 +668,20 @@ extension FeatureRequestsView {
         showsSubmittedBanner: Bool = false,
         configOverride: PublicAppConfig? = nil,
         preResolvedAuthentication: Bool? = nil,
-        rejectedByServer: Bool = false
+        rejectedByServer: Bool = false,
+        autoPresentCompose: Bool = false,
+        initialSearchText: String = ""
     ) {
         self.client = client
         self.userToken = userToken
+        self.configOverride = configOverride
         _listState = State(initialValue: listState)
         _loadState = State(initialValue: loadState)
         _showSubmittedBanner = State(initialValue: showsSubmittedBanner)
-        self.configOverride = configOverride
         _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
         _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
         _rejectedByServer = State(initialValue: rejectedByServer)
+        _isComposePresented = State(initialValue: autoPresentCompose)
+        _searchText = State(initialValue: initialSearchText)
     }
 }
