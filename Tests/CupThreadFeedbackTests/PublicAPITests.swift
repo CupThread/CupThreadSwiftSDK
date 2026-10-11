@@ -36,6 +36,7 @@ struct PublicAPITests {
 
         #expect(config.appId == "app-1")
         #expect(config.name == "Demo App")
+        #expect(config.workspaceSlug == "demo-workspace")
         #expect(config.allowPublic == true)
         #expect(config.allowedPlatforms == [.ios, .macos])
         #expect(config.maxAttachmentBytes == 20_000_000)
@@ -47,6 +48,8 @@ struct PublicAPITests {
         #expect(config.sdk.features.changelog == true)
         #expect(config.sdk.changelogOverlay.entryCount == 3)
         #expect(config.iconUrl == URL(string: "https://example.com/icon.png"))
+        #expect(config.appStoreUrl == nil)
+        #expect(config.googlePlayUrl == nil)
     }
 
     @Test func fetchAppConfigDecodesWebsiteFields() async throws {
