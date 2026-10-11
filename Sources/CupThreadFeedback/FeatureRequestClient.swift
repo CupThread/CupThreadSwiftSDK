@@ -94,6 +94,79 @@ extension FeedbackClient {
         return try decoder.decode(ListFeatureRequestsResult.self, from: data)
     }
 
+    /// Fetches a single feature request by its id (`GET /api/v1/feature-requests/{id}`).
+    ///
+    /// Deep links, notification routing, and share links can fetch an individual
+    /// request directly rather than paging the entire board listing.
+    ///
+    /// When `userToken` is provided, the returned request includes personalized
+    /// vote state (``FeatureRequestItem/hasVoted``) and ownership
+    /// (``FeatureRequestItem/isOwnRequest``). When omitted or `nil`, both fields
+    /// are `false`. When the client is configured with an authentication provider,
+    /// the signed-in user's bearer token is attached so requests succeed when
+    /// `allowAnonymousRoadmap = false`.
+    ///
+    /// - Parameters:
+    ///   - id: The stable request id (as returned by ``fetchFeatureRequests(userToken:limit:offset:versionId:query:cursor:)``
+    ///     or in push/deep-link payloads).
+    ///   - userToken: Optional stable UUID string identifying this user.
+    /// - Returns: The matching feature request.
+    /// - Throws: ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
+    ///   when the request does not exist, is unapproved, or belongs to an app
+    ///   with public access disabled (HTTP 404),
+    ///   ``FeedbackClientError/authenticationRequired`` or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous access
+    ///   is disabled for the app (HTTP 401/403),
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the per-client-IP
+    ///   rate limit is exceeded (HTTP 429),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
+    ///   ``FeedbackClientError/invalidResponse``.
+    public func fetchFeatureRequest(
+        id: String,
+        userToken: String? = nil
+    ) async throws -> FeatureRequestItem {
+        let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else {
+            throw FeedbackClientError.invalidResponse
+        }
+        let url = configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        await applyBearerToken(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw FeedbackClientError.invalidResponse
+        }
+        if httpResponse.statusCode == 404 {
+            let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
+            let rawMessage = envelope?.error ?? String(data: data, encoding: .utf8)
+            let trimmed = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = (trimmed?.isEmpty ?? true) ? nil : trimmed
+            throw FeedbackClientError.featureRequestNotFound(
+                message: message,
+                requestId: httpResponse.cupthreadRequestID
+            )
+        }
+        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
+        let result = try decoder.decode(FeatureRequestResponse.self, from: data)
+        return result.request
+    }
+
+    /// Fetches a single feature request by its id (alias for ``fetchFeatureRequest(id:userToken:)``).
+    ///
+    /// - Parameters:
+    ///   - id: The stable request id.
+    ///   - userToken: Optional stable UUID string identifying this user.
+    /// - Returns: The matching feature request.
+    public func getFeatureRequest(
+        id: String,
+        userToken: String? = nil
+    ) async throws -> FeatureRequestItem {
+        try await fetchFeatureRequest(id: id, userToken: userToken)
+    }
+
     /// Submits a new feature request. It will be pending until approved by an admin.
     ///
     /// Titles and descriptions are trimmed; an empty `requesterName` is sent

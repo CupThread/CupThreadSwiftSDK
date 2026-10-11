@@ -103,6 +103,13 @@ final class DemoMockURLProtocol: URLProtocol, @unchecked Sendable {
         if method == "POST" {
             return (201, DemoMockData.submitFeatureRequestJSON)
         }
+        let prefix = "/api/v1/feature-requests/"
+        if let range = path.range(of: prefix), !path.contains("/comments") {
+            let id = String(path[range.upperBound...])
+            if !id.isEmpty && !id.contains("/") {
+                return (200, DemoMockData.singleFeatureRequestJSON(id: id))
+            }
+        }
         return (200, DemoMockData.allFeatureRequestsJSON)
     }
 
@@ -353,6 +360,15 @@ enum DemoMockData {
             ],
             "total": 5
         ])
+    }
+
+    static func singleFeatureRequestJSON(id: String) -> Data {
+        encodeJSON(["request": [
+            "id": id, "appId": "app_demo_1", "title": "Interactive Lock Screen",
+            "description": "Widgets", "status": "in-progress", "approved": true,
+            "voteCount": 142, "commentCount": 3, "hasVoted": false, "isOwnRequest": false,
+            "createdAt": "2026-08-12T10:00:00Z", "updatedAt": "2026-08-25T14:20:00Z"
+        ]])
     }
 
     static var voteJSON: Data {

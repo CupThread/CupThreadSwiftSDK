@@ -145,6 +145,7 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `hasSeenChangelog(version:)` | Checks `UserDefaults` for previously seen changelog version/ID |
 | `markChangelogSeen(version:)` | Marks changelog version/ID as seen |
 | `fetchFeatureRequests(userToken:limit:offset:versionId:query:)` | `GET /api/v1/feature-requests` |
+| `fetchFeatureRequest(id:userToken:)` / `getFeatureRequest(id:userToken:)` | `GET /api/v1/feature-requests/{id}` |
 | `submitFeatureRequest(_:userToken:)` | `POST /api/v1/feature-requests` |
 | `toggleVote(featureRequestId:userToken:)` | `POST /api/v1/feature-requests/{id}/vote` |
 | `fetchComments(featureRequestId:)` | `GET /api/v1/feature-requests/{id}/comments` (walks keyset pages; `total` is the visible thread size) |

@@ -27,6 +27,17 @@ struct FriendlyErrorTests {
         #expect(!desc.lowercased().contains("html"))
     }
 
+    @Test func featureRequestNotFoundHidesServerMessage() throws {
+        let error = FeedbackClientError.featureRequestNotFound(message: htmlBody, requestId: "req-fr-404")
+        let desc = try #require(error.errorDescription)
+        let expected = CupThreadStrings.tr("cupthread.error.http_not_found") + " (request id: req-fr-404)"
+        #expect(desc == expected)
+        #expect(!desc.contains("<"))
+        #expect(!desc.lowercased().contains("html"))
+        #expect(error.responseBody == htmlBody)
+        #expect(error.requestId == "req-fr-404")
+    }
+
     @Test func scanRejectedHTMLBodyNeverReachesErrorDescriptionOrFriendlyError() throws {
         let error = FeedbackClientError.scanRejected(message: htmlBody, requestId: nil)
         let desc = try #require(error.errorDescription)

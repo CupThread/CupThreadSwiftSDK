@@ -21,6 +21,7 @@
   - `POST /api/v1/public/digest/unsubscribe` — RFC 8058 one-click weekly-digest unsubscribe (token via query string, form field, or JSON body; idempotent replay).
   - `PUT /api/v1/public/apps/:appKey/user` — Report user attributes (paying status, MRR).
   - `GET /api/v1/feature-requests` — Feature requests list and search with `q` query parameter.
+  - `GET /api/v1/feature-requests/:id` — Single feature request details (optional `X-User-Token`).
   - `POST /api/v1/feature-requests/:id/vote` — Cast vote on a feature request (insert-only; idempotent).
   - `DELETE /api/v1/feature-requests/:id/vote` — Remove vote on a feature request (idempotent).
   - `POST /api/v1/uploads/sessions` → `PUT /api/v1/uploads/{uploadId}` — Create an upload session, then stream attachment bytes into its pre-allocated slots (the legacy `POST /api/v1/uploads/images` / `POST /api/v1/uploads/r2` endpoints were removed in the September 2026 API sync). Upload slot URLs are restricted to same-origin relative paths or same-host absolute `http`/`https` URLs matching `configuration.baseURL.host`; off-origin values are rejected (`FeedbackClientError.invalidResponse`) before any network write occurs. Download URLs in upload responses are similarly verified against the allowed host/domain before propagating to `FeedbackAttachment.url`.

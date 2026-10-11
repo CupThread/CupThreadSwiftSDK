@@ -69,6 +69,8 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     /// (GitHub issues/discussions, Linear, Notion, Slack), when any. Already
     /// included in ``voteCount`` (not additive on top of it).
     public let importedVotes: Int?
+    /// Total number of visible comments on this request, when reported.
+    public let commentCount: Int?
     /// Whether the user token of the last fetch has voted on this request.
     public let hasVoted: Bool
     /// Whether the request was submitted with the user token of the last fetch.
@@ -129,7 +131,8 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         hasVoted: Bool,
         isOwnRequest: Bool,
         createdAt: String,
-        updatedAt: String
+        updatedAt: String,
+        commentCount: Int? = nil
     ) {
         self.id = id
         self.appId = appId
@@ -154,6 +157,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.isOwnRequest = isOwnRequest
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.commentCount = commentCount
     }
 
     func withVoteState(voted: Bool, count: Int) -> FeatureRequestItem {
@@ -180,7 +184,8 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
             hasVoted: voted,
             isOwnRequest: isOwnRequest,
             createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            commentCount: commentCount
         )
     }
     public init(from decoder: Decoder) throws {
@@ -204,6 +209,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.approved = try container.decodeIfPresent(Bool.self, forKey: .approved) ?? false
         self.voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0
         self.importedVotes = try container.decodeIfPresent(Int.self, forKey: .importedVotes)
+        self.commentCount = try container.decodeIfPresent(Int.self, forKey: .commentCount)
         self.hasVoted = try container.decodeIfPresent(Bool.self, forKey: .hasVoted) ?? false
         self.isOwnRequest = try container.decodeIfPresent(Bool.self, forKey: .isOwnRequest) ?? false
         self.createdAt = try container.decode(String.self, forKey: .createdAt)
@@ -216,6 +222,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         case releasedVersion, requesterName, requesterAvatarUrl, requesterClerkId
         case recentCommenters, hasMoreCommenters, approved, voteCount, importedVotes
         case hasVoted, isOwnRequest, createdAt, updatedAt
+        case commentCount
     }
 }
 
@@ -396,3 +403,20 @@ public struct ListFeatureRequestsResult: Decodable, Sendable {
         case requests, total, hasMore, nextCursor
     }
 }
+
+// MARK: - Single request response
+
+/// Response to ``FeedbackClient/fetchFeatureRequest(id:userToken:)`` (`GET /api/v1/feature-requests/{id}`).
+public struct FeatureRequestResponse: Decodable, Equatable, Sendable {
+    /// The requested feature request.
+    public let request: FeatureRequestItem
+
+    /// Creates a single feature request response envelope.
+    /// - Parameter request: The requested feature request.
+    public init(request: FeatureRequestItem) {
+        self.request = request
+    }
+}
+
+/// Convenience alias matching the SDK result naming convention.
+public typealias SingleFeatureRequestResult = FeatureRequestResponse
