@@ -45,6 +45,7 @@ struct ErrorDescriptionLocalizationTests {
         "cupthread.error.profile_not_found",
         "cupthread.error.comments_unavailable",
         "cupthread.error.email_not_verified",
+        "cupthread.error.reserved_plan_value",
         "cupthread.attachment.oversized",
         "cupthread.attachment.unprocessable",
         "cupthread.attachment.unsupported_type"
@@ -125,6 +126,10 @@ struct ErrorDescriptionLocalizationTests {
         #expect(
             FeedbackClientError.emailNotVerified(message: nil, requestId: nil).errorDescription
                 == CupThreadStrings.tr("cupthread.error.email_not_verified")
+        )
+        #expect(
+            FeedbackClientError.reservedPlanValue(message: nil, requestId: nil).errorDescription
+                == CupThreadStrings.tr("cupthread.error.reserved_plan_value")
         )
     }
 

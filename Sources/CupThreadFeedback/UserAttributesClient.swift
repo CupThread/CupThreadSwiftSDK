@@ -148,6 +148,14 @@ extension FeedbackClient {
     /// To explicitly clear an attribute server-side (such as a churned subscription
     /// plan or reset MRR), pass `.null` using the ``UserAttributesSigner/Field`` overload.
     ///
+    /// Two plan names are reserved: the byte-exact literals `"unset"` and
+    /// `"null"` are the signature canonical string's "leave unchanged" /
+    /// "clear" sentinels (issue #403), so the server rejects a report whose
+    /// plan equals either literal with HTTP 400 `plan_reserved_sentinel`,
+    /// surfaced as ``FeedbackClientError/reservedPlanValue(message:requestId:)``.
+    /// Near-miss strings (`"UNSET"`, `"Unset"`, `"unsettled"`, `"nullify"`, …)
+    /// remain valid plan names.
+    ///
     /// Signature timestamps come from the device clock corrected by the
     /// server-time offset the client learns from response `Date` headers
     /// (API-19), so a device whose clock is off never signs with a timestamp
@@ -162,7 +170,8 @@ extension FeedbackClient {
     /// first-syncs behind one shared IP recover without caller changes.
     /// - Parameters:
     ///   - isPaying: Whether the user is on a paid plan.
-    ///   - plan: Host-app plan name (e.g. `"pro"`).
+    ///   - plan: Host-app plan name (e.g. `"pro"`); never the reserved literals
+    ///     `"unset"` or `"null"`.
     ///   - mrr: Monthly recurring revenue attributable to this user.
     ///   - currency: Three-letter ISO 4217 code for `mrr` (an omitted currency preserves the stored value).
     ///   - userToken: Anonymous user token sent as `X-User-Token`.
@@ -175,8 +184,10 @@ extension FeedbackClient {
     ///   reports — the signature failures
     ///   ``FeedbackClientError/paymentAttributesRequireSignature(message:requestId:)``,
     ///   ``FeedbackClientError/sdkSigningSecretNotConfigured(message:requestId:)``,
-    ///   ``FeedbackClientError/invalidSignature(message:requestId:)``, and
-    ///   ``FeedbackClientError/staleSignature(message:requestId:)``.
+    ///   ``FeedbackClientError/invalidSignature(message:requestId:)``,
+    ///   ``FeedbackClientError/staleSignature(message:requestId:)``, and the
+    ///   reserved-plan validation error
+    ///   ``FeedbackClientError/reservedPlanValue(message:requestId:)``.
     public func updateUserAttributes(
         isPaying: Bool? = nil,
         plan: String? = nil,
@@ -202,9 +213,17 @@ extension FeedbackClient {
     /// Use this overload to pass `.null` when clearing churned subscription plans or
     /// resetting MRR on the server.
     ///
+    /// A `plan` of `.value("unset")` or `.value("null")` is rejected by the
+    /// server with HTTP 400 `plan_reserved_sentinel` (issue #403) — those
+    /// byte-exact literals are the canonical string's sentinels for `.unset`
+    /// and `.null` — and surfaces as
+    /// ``FeedbackClientError/reservedPlanValue(message:requestId:)``. Pass
+    /// `.unset` / `.null` directly for the sentinel semantics.
+    ///
     /// - Parameters:
     ///   - isPaying: Whether the user is on a paid plan (`.value`, `.null`, or `.unset`).
-    ///   - plan: Host-app plan name (`.value`, `.null`, or `.unset`).
+    ///   - plan: Host-app plan name (`.value`, `.null`, or `.unset`); a `.value`
+    ///     is never the reserved literals `"unset"` or `"null"`.
     ///   - mrr: Monthly recurring revenue (`.value`, `.null`, or `.unset`).
     ///   - currency: Currency code (`.value`, `.null`, or `.unset`).
     ///   - userToken: Anonymous user token sent as `X-User-Token`.
@@ -217,8 +236,10 @@ extension FeedbackClient {
     ///   reports — the signature failures
     ///   ``FeedbackClientError/paymentAttributesRequireSignature(message:requestId:)``,
     ///   ``FeedbackClientError/sdkSigningSecretNotConfigured(message:requestId:)``,
-    ///   ``FeedbackClientError/invalidSignature(message:requestId:)``, and
-    ///   ``FeedbackClientError/staleSignature(message:requestId:)``.
+    ///   ``FeedbackClientError/invalidSignature(message:requestId:)``,
+    ///   ``FeedbackClientError/staleSignature(message:requestId:)``, and the
+    ///   reserved-plan validation error
+    ///   ``FeedbackClientError/reservedPlanValue(message:requestId:)``.
     public func updateUserAttributes(
         isPaying: UserAttributesSigner.Field<Bool> = .unset,
         plan: UserAttributesSigner.Field<String> = .unset,

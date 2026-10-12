@@ -201,6 +201,8 @@
 "cupthread.error.signing_secret_not_configured" = "Nie można zgłosić danych płatności: ta aplikacja nie ma skonfigurowanego tajnego klucza podpisu SDK.";
 "cupthread.error.invalid_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia nie przeszedł weryfikacji. Sprawdź tajny klucz podpisu SDK aplikacji.";
 "cupthread.error.stale_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia wygasł. Sprawdź zegar urządzenia i spróbuj ponownie.";
+/* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
+"cupthread.error.reserved_plan_value" = "Dane płatności nie zostały zaktualizowane: nazwy planów „unset“ i „null“ są zastrzeżone. Wybierz inną nazwę planu.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Ta opinia lub załącznik zostały już przesłane.";

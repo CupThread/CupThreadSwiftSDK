@@ -4,9 +4,20 @@ import Foundation
 
 /// The error envelope shared by every public endpoint:
 /// `{"error": "...", "code": "..."}` (`code` is optional and machine-readable).
+/// Endpoints that validate individual fields may additionally carry a
+/// `details` block with a flattened field-error map, e.g.
+/// `{"error": "Validation failed", "details": {"fieldErrors": {"plan": ["plan_reserved_sentinel"]}}}`.
 struct APIErrorEnvelope: Decodable, Sendable {
     let error: String?
     let code: String?
+    let details: FieldErrorDetails?
+}
+
+/// The optional `details` block of a failure envelope: a flattened
+/// field-error map keyed by field name, each value a list of issue messages
+/// (issue #403). Absent on most failure envelopes.
+struct FieldErrorDetails: Decodable, Sendable {
+    let fieldErrors: [String: [String]]?
 }
 
 extension HTTPURLResponse {
@@ -97,6 +108,7 @@ extension FeedbackClient {
             statusCode: statusCode,
             code: envelope?.code,
             envelopeMessage: envelope?.error,
+            fieldErrors: envelope?.details?.fieldErrors,
             requestId: requestId
         ) {
             throw typed

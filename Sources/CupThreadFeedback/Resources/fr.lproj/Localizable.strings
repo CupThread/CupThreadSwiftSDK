@@ -201,6 +201,8 @@
 "cupthread.error.signing_secret_not_configured" = "Impossible d’envoyer les informations de paiement : cette app n’a pas configuré de secret de signature SDK.";
 "cupthread.error.invalid_signature" = "Les informations de paiement n’ont pas été mises à jour : la signature du rapport n’a pas pu être vérifiée. Vérifiez le secret de signature SDK de l’app.";
 "cupthread.error.stale_signature" = "Les informations de paiement n’ont pas été mises à jour : la signature du rapport a expiré. Vérifiez l’horloge de l’appareil et réessayez.";
+/* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
+"cupthread.error.reserved_plan_value" = "Les informations de paiement n’ont pas été mises à jour : les noms de formule « unset » et « null » sont réservés. Choisissez un autre nom de formule.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Ce retour ou cette pièce jointe a déjà été envoyé.";

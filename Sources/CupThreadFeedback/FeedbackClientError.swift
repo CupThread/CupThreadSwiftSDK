@@ -128,6 +128,18 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// or treat the submission as already completed. `message` carries the raw server
     /// text for diagnostics; it is never shown to end users.
     case alreadyFinalized(message: String?, requestId: String?)
+    /// A payment-attribute report carried a `plan` equal to one of the
+    /// signature-sentinel literals `"unset"` or `"null"` and the server
+    /// rejected it before signature verification (HTTP 400, field error
+    /// `plan_reserved_sentinel` — issue #403). The canonical signature string
+    /// renders an absent `plan` as `unset` and an explicit JSON null as
+    /// `null`, so those two byte-exact literals are reserved and can never be
+    /// sent as real plan names; near-miss strings (`"UNSET"`, `"unsettled"`,
+    /// `"nullify"`, …) remain valid. Pick a different plan name and resubmit —
+    /// this is a normal validation error and is never retried. `message`
+    /// carries the raw server text for diagnostics; it is never shown to end
+    /// users.
+    case reservedPlanValue(message: String?, requestId: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -157,7 +169,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .commentsUnavailable, .emailNotVerified, .invalidParent,
              .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
-             .alreadyFinalized, .textTooLong:
+             .alreadyFinalized, .reservedPlanValue, .textTooLong:
             return nil
         }
     }
@@ -246,6 +258,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .alreadyFinalized(_, let requestId):
             return requestId
+        case .reservedPlanValue(_, let requestId):
+            return requestId
         case .featureRequestNotFound(_, let requestId):
             return requestId
         case .unexpectedStatus(_, _, let requestId):
@@ -322,6 +336,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             // Raw server body stays off the user-facing copy (#257); callers
             // can read the associated `message` programmatically.
             return CupThreadStrings.tr("cupthread.error.already_finalized") + Self.requestIdSuffix(requestId)
+        case .reservedPlanValue(_, let requestId):
+            // Raw server body stays off the user-facing copy (#30); callers
+            // can read the associated `message` programmatically.
+            return CupThreadStrings.tr("cupthread.error.reserved_plan_value") + Self.requestIdSuffix(requestId)
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
@@ -434,5 +452,10 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``alreadyFinalized(message:requestId:)`` with no request id.
     static func alreadyFinalized(message: String? = nil) -> FeedbackClientError {
         .alreadyFinalized(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``reservedPlanValue(message:requestId:)`` with no request id.
+    static func reservedPlanValue(message: String? = nil) -> FeedbackClientError {
+        .reservedPlanValue(message: message, requestId: nil)
     }
 }

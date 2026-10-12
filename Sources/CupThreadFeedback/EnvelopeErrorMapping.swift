@@ -12,6 +12,7 @@ extension FeedbackClient {
         statusCode: Int,
         code: String?,
         envelopeMessage: String?,
+        fieldErrors: [String: [String]]? = nil,
         requestId: String?
     ) -> FeedbackClientError? {
         switch (statusCode, code) {
@@ -30,7 +31,12 @@ extension FeedbackClient {
             // code ships, so the message matches as a fallback.
             return .turnstileRequired(message: envelopeMessage, requestId: requestId)
         case (400, _):
-            return badRequestTypedError(code: code, envelopeMessage: envelopeMessage, requestId: requestId)
+            return badRequestTypedError(
+                code: code,
+                envelopeMessage: envelopeMessage,
+                fieldErrors: fieldErrors,
+                requestId: requestId
+            )
         case (403, "email_not_verified"):
             return .emailNotVerified(message: envelopeMessage, requestId: requestId)
         case (409, "already_finalized"):
@@ -63,12 +69,24 @@ extension FeedbackClient {
     }
 
     /// Maps status 400 failure envelopes to typed errors (uploader identity/mismatch,
-    /// invalid parent comment, disallowed MIME / executable extension).
+    /// invalid parent comment, disallowed MIME / executable extension, and the
+    /// reserved-plan-sentinel field error of `PUT /api/v1/public/apps/{appKey}/user`).
     private static func badRequestTypedError(
         code: String?,
         envelopeMessage: String?,
+        fieldErrors: [String: [String]]?,
         requestId: String?
     ) -> FeedbackClientError? {
+        // The DATA-03 sentinel reservation (#403, SaaS PR #794): the canonical
+        // string renders an absent `plan` as `unset` and an explicit JSON null
+        // as `null`, so a developer-supplied plan equal to either literal would
+        // be byte-indistinguishable from "leave unchanged" / "clear" inside the
+        // signed payload — the server now reserves both and rejects the report
+        // before signature verification. Byte-exact: `"UNSET"`, `"Unset"`,
+        // `"unsettled"`, `"nullify"`, … stay valid plan names.
+        if fieldErrors?["plan"]?.contains("plan_reserved_sentinel") == true {
+            return .reservedPlanValue(message: envelopeMessage, requestId: requestId)
+        }
         switch code {
         case "uploader_identity_required":
             return .uploaderIdentityRequired(message: envelopeMessage, requestId: requestId)

@@ -201,6 +201,8 @@
 "cupthread.error.signing_secret_not_configured" = "Zahlungsinformationen können nicht gemeldet werden: Für diese App ist kein SDK-Signatur-Geheimnis konfiguriert.";
 "cupthread.error.invalid_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts konnte nicht verifiziert werden. Prüfen Sie das SDK-Signatur-Geheimnis der App.";
 "cupthread.error.stale_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts ist abgelaufen. Prüfen Sie die Geräteuhr und versuchen Sie es erneut.";
+/* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
+"cupthread.error.reserved_plan_value" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Plan-Namen „unset“ und „null“ sind reserviert. Wählen Sie einen anderen Plan-Namen.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Dieses Feedback oder dieser Anhang wurde bereits übermittelt.";

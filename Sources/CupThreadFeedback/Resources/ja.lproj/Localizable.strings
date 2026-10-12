@@ -201,6 +201,8 @@
 "cupthread.error.signing_secret_not_configured" = "支払い情報を報告できません：このアプリでは SDK 署名シークレットが設定されていません。";
 "cupthread.error.invalid_signature" = "支払い情報は更新されませんでした：レポートの署名を検証できませんでした。アプリの SDK 署名シークレットを確認してください。";
 "cupthread.error.stale_signature" = "支払い情報は更新されませんでした：レポートの署名の有効期限が切れています。端末の時刻を確認して、もう一度お試しください。";
+/* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
+"cupthread.error.reserved_plan_value" = "支払い情報は更新されませんでした：プラン名「unset」と「null」は予約されているため使用できません。別のプラン名を選択してください。";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "このフィードバックまたは添付ファイルは既に送信されています。";
