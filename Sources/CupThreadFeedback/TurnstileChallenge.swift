@@ -17,9 +17,13 @@ import Foundation
 /// | `POST /api/v1/uploads/sessions` | ``TurnstileAction/feedback`` | app key |
 /// | `POST /api/v1/feature-requests` | ``TurnstileAction/featureRequest`` | app key |
 ///
-/// Upload sessions intentionally reuse the feedback action: the public web
-/// form spends one single-use token on both the attachment session and the
-/// feedback submission.
+/// Upload sessions intentionally reuse the feedback action: the server pins
+/// the upload-session gate to the same `(action, cdata)` binding as feedback
+/// intake, so one binding covers a submission's attachments and its intake
+/// alike. Tokens are single-use — every gated call (session creation and
+/// intake alike) presents its own freshly minted token, matching the public
+/// web form's dedicated-token flow since the SaaS shared-token fix
+/// (SaaS #569/#571).
 public struct TurnstileChallenge: Equatable, Sendable {
     /// The Cloudflare widget `action` the server binds verification to.
     public let action: String
