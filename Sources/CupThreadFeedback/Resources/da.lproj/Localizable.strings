@@ -233,3 +233,6 @@
 
 /* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
 "cupthread.error.daily_storage_quota_exceeded" = "Denne app har nået sin daglige grænse for uploads. Prøv igen senere.";
+
+/* issue #401: unexpected server-side storage failure on an upload intake (HTTP 500 image_upload_failed) */
+"cupthread.error.image_upload_failed" = "Uploaden af den vedhæftede fil mislykkedes. Prøv igen en gang til.";

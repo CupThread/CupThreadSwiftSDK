@@ -103,7 +103,10 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
     ///   ``FeedbackClientError/uploadSessionExpired`` (HTTP 401 `session_expired` /
     ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid``
-    ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors), or
+    ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors),
+    ///   ``FeedbackClientError/imageUploadFailed(message:requestId:)``
+    ///   (HTTP 500 `image_upload_failed` — an unexpected server-side storage
+    ///   failure; retryable), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` /
     ///   ``FeedbackClientError/invalidResponse`` for other failures.
     public func uploadAttachment(
@@ -169,7 +172,10 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
     ///   ``FeedbackClientError/uploadSessionExpired`` (HTTP 401 `session_expired` /
     ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid``
-    ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors), or
+    ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors),
+    ///   ``FeedbackClientError/imageUploadFailed(message:requestId:)``
+    ///   (HTTP 500 `image_upload_failed` — an unexpected server-side storage
+    ///   failure; retryable), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` /
     ///   ``FeedbackClientError/invalidResponse`` for other failures.
     public func uploadAttachment(
@@ -226,7 +232,10 @@ extension FeedbackClient {
     ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
     ///   lifecycle failures,
     ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
-    ///   has exceeded its daily upload limit, or
+    ///   has exceeded its daily upload limit,
+    ///   ``FeedbackClientError/imageUploadFailed(message:requestId:)`` when the
+    ///   server hits an unexpected storage failure (HTTP 500
+    ///   `image_upload_failed`; retryable), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
     ///   other server failures.
     public func uploadAttachment(
@@ -278,7 +287,10 @@ extension FeedbackClient {
     ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
     ///   lifecycle failures,
     ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
-    ///   has exceeded its daily upload limit, or
+    ///   has exceeded its daily upload limit,
+    ///   ``FeedbackClientError/imageUploadFailed(message:requestId:)`` when the
+    ///   server hits an unexpected storage failure (HTTP 500
+    ///   `image_upload_failed`; retryable), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` for
     ///   other server failures.
     public func uploadAttachment(

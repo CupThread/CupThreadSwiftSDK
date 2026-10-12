@@ -37,6 +37,12 @@ extension FeedbackClient {
             // A concurrent or retried submission already finalized the referenced
             // uploadId (#257, SaaS #579). No duplicate submission was created.
             return .alreadyFinalized(message: envelopeMessage, requestId: requestId)
+        case (500, "image_upload_failed"):
+            // Unexpected storage failure behind an upload intake (issue #401):
+            // the body is stable and provider-agnostic — R2/Cloudflare Images/D1
+            // detail is logged server-side only — so hosts can match the typed
+            // case for retry UX instead of falling through to `.unexpectedStatus`.
+            return .imageUploadFailed(message: envelopeMessage, requestId: requestId)
         default:
             return uploadSessionLifecycleTypedError(
                 statusCode: statusCode,

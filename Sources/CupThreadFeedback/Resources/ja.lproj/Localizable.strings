@@ -233,3 +233,6 @@
 
 /* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
 "cupthread.error.daily_storage_quota_exceeded" = "このアプリは本日のアップロード上限に達しました。しばらくしてからもう一度お試しください。";
+
+/* issue #401: unexpected server-side storage failure on an upload intake (HTTP 500 image_upload_failed) */
+"cupthread.error.image_upload_failed" = "添付ファイルのアップロードがサーバーで失敗しました。もう一度お試しください。";
