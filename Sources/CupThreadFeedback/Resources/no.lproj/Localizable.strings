@@ -201,6 +201,8 @@
 "cupthread.error.signing_secret_not_configured" = "Kan ikke rapportere betalingsinformasjon: denne appen har ikke konfigurert en SDK-signeringshemmelighet.";
 "cupthread.error.invalid_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten kunne ikke verifiseres. Sjekk appens SDK-signeringshemmelighet.";
 "cupthread.error.stale_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten er utløpt. Sjekk enhetens klokke og prøv på nytt.";
+/* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
+"cupthread.error.reserved_plan_value" = "Betalingsinformasjonen ble ikke oppdatert: plannavnene «unset» og «null» er reservert. Velg et annet plannavn.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Denne tilbakemeldingen eller vedlegget er allerede sendt.";

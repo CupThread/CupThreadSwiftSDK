@@ -201,6 +201,8 @@
 "cupthread.error.signing_secret_not_configured" = "Impossibile segnalare i dati di pagamento: questa app non ha configurato un segreto di firma SDK.";
 "cupthread.error.invalid_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report non è stata verificata. Controlla il segreto di firma SDK dell'app.";
 "cupthread.error.stale_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report è scaduta. Controlla l'orologio del dispositivo e riprova.";
+/* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
+"cupthread.error.reserved_plan_value" = "I dati di pagamento non sono stati aggiornati: i nomi di piano «unset» e «null» sono riservati. Scegli un nome di piano diverso.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Questo feedback o allegato è già stato inviato.";
