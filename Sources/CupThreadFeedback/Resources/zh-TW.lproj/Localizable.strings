@@ -235,3 +235,6 @@
 
 /* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
 "cupthread.error.daily_storage_quota_exceeded" = "此應用程式已達今日上傳上限，請稍後再試。";
+
+/* issue #401: unexpected server-side storage failure on an upload intake (HTTP 500 image_upload_failed) */
+"cupthread.error.image_upload_failed" = "附件上傳在伺服器端失敗，請再試一次。";

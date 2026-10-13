@@ -235,3 +235,6 @@
 
 /* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
 "cupthread.error.daily_storage_quota_exceeded" = "이 앱은 오늘의 업로드 한도에 도달했습니다. 나중에 다시 시도해 주세요.";
+
+/* issue #401: unexpected server-side storage failure on an upload intake (HTTP 500 image_upload_failed) */
+"cupthread.error.image_upload_failed" = "서버에서 첨부 파일 업로드가 실패했습니다. 다시 시도해 주세요.";

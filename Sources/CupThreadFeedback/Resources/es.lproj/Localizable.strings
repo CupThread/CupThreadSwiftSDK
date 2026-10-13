@@ -235,3 +235,6 @@
 
 /* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
 "cupthread.error.daily_storage_quota_exceeded" = "Esta app ha alcanzado su límite de subidas de hoy. Inténtalo de nuevo más tarde.";
+
+/* issue #401: unexpected server-side storage failure on an upload intake (HTTP 500 image_upload_failed) */
+"cupthread.error.image_upload_failed" = "La subida del adjunto ha fallado en el servidor. Inténtalo de nuevo.";

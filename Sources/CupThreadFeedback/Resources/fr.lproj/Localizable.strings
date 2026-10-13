@@ -235,3 +235,6 @@
 
 /* API-12: workspace daily upload storage quota exceeded (HTTP 429) */
 "cupthread.error.daily_storage_quota_exceeded" = "Cette app a atteint sa limite de téléversement du jour. Réessayez plus tard.";
+
+/* issue #401: unexpected server-side storage failure on an upload intake (HTTP 500 image_upload_failed) */
+"cupthread.error.image_upload_failed" = "Le téléversement de la pièce jointe a échoué côté serveur. Veuillez réessayer.";
