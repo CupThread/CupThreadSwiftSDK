@@ -63,6 +63,14 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// not created. Sessions succeed again once the quota resets or the
     /// workspace's storage limit is upgraded in the developer console.
     case dailyStorageQuotaExceeded(message: String?, requestId: String?)
+    /// An attachment upload failed with an unexpected server-side storage
+    /// error (HTTP 500 `image_upload_failed` — an R2, Cloudflare Images, or
+    /// D1 failure behind the upload intake). Transient from the caller's
+    /// perspective: wait briefly and retry the upload (issue #401). The
+    /// server's body is stable and provider-agnostic — infrastructure detail
+    /// is logged server-side only — so `message` carries no actionable
+    /// diagnostics and is never shown to end users.
+    case imageUploadFailed(message: String?, requestId: String?)
     /// The server's Cloudflare Turnstile human-verification gate rejected the
     /// submission (HTTP 403) and no fresh token could be presented. Create
     /// the client with a `turnstileTokenProvider` — or arrange a server-side
@@ -157,7 +165,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .commentsUnavailable, .emailNotVerified, .invalidParent,
              .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
-             .alreadyFinalized, .textTooLong:
+             .alreadyFinalized, .imageUploadFailed, .textTooLong:
             return nil
         }
     }
@@ -221,6 +229,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .subscriptionInactive(_, let requestId):
             return requestId
         case .dailyStorageQuotaExceeded(_, let requestId):
+            return requestId
+        case .imageUploadFailed(_, let requestId):
             return requestId
         case .turnstileRequired(_, let requestId):
             return requestId
@@ -294,6 +304,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return CupThreadStrings.tr("cupthread.error.subscription_inactive") + Self.requestIdSuffix(requestId)
         case .dailyStorageQuotaExceeded(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.daily_storage_quota_exceeded") + Self.requestIdSuffix(requestId)
+        case .imageUploadFailed(_, let requestId):
+            return CupThreadStrings.tr("cupthread.error.image_upload_failed") + Self.requestIdSuffix(requestId)
         case .userProfileNotFound:
             return CupThreadStrings.tr("cupthread.error.profile_not_found")
         case .featureRequestNotFound(_, let requestId):
@@ -374,6 +386,11 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``dailyStorageQuotaExceeded(message:requestId:)`` with no request id.
     static func dailyStorageQuotaExceeded(message: String? = nil) -> FeedbackClientError {
         .dailyStorageQuotaExceeded(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``imageUploadFailed(message:requestId:)`` with no request id.
+    static func imageUploadFailed(message: String? = nil) -> FeedbackClientError {
+        .imageUploadFailed(message: message, requestId: nil)
     }
 
     /// Convenience constructor for ``forbidden(message:requestId:)`` with no request id.
