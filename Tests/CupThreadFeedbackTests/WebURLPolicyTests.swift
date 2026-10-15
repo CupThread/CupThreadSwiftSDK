@@ -300,3 +300,43 @@ struct DownloadHostValidationTests {
         #expect(isAllowedDownloadHost("localhost", baseHost: "localhost"))
     }
 }
+
+// MARK: - Allowed Download Host Security Tests (SEC-27)
+
+@Suite("AllowedDownloadHostSecurityTests")
+struct AllowedDownloadHostSecurityTests {
+    @Test("Candidate IPv4 literal fails closed against domain with matching numeric suffix")
+    func testCandidateIPv4FailsClosedAgainstMatchingSuffix() {
+        // "10.0.0.1" ends in ".0.1". "api.0.1" has registrable domain "0.1".
+        // candidate must fail closed rather than matching "0.1".
+        #expect(isAllowedDownloadHost("10.0.0.1", baseHost: "api.0.1") == false)
+        #expect(isAllowedDownloadHost("192.168.1.1", baseHost: "cdn.1.1") == false)
+        #expect(isAllowedDownloadHost("172.16.2.1", baseHost: "api.cupthread.com") == false)
+    }
+
+    @Test("Candidate IPv6 literal fails closed against domain")
+    func testCandidateIPv6FailsClosedAgainstDomain() {
+        #expect(isAllowedDownloadHost("::1", baseHost: "api.cupthread.com") == false)
+        #expect(isAllowedDownloadHost("[::1]", baseHost: "api.cupthread.com") == false)
+        #expect(isAllowedDownloadHost("2001:db8::1", baseHost: "api.cupthread.com") == false)
+        #expect(isAllowedDownloadHost("[2001:db8::1]", baseHost: "api.cupthread.com") == false)
+    }
+
+    @Test("Exact IP literal match is allowed")
+    func testExactIPLiteralMatchAllowed() {
+        #expect(isAllowedDownloadHost("127.0.0.1", baseHost: "127.0.0.1"))
+        #expect(isAllowedDownloadHost("::1", baseHost: "::1"))
+        #expect(isAllowedDownloadHost("[::1]", baseHost: "[::1]"))
+        #expect(isAllowedDownloadHost("[::1]", baseHost: "::1"))
+        #expect(isAllowedDownloadHost("2001:db8::1", baseHost: "2001:db8::1"))
+    }
+
+    @Test("IP base host fails closed against candidate domain and mismatched IP")
+    func testIPBaseHostFailsClosedAgainstMismatchedHosts() {
+        #expect(isAllowedDownloadHost("api.cupthread.com", baseHost: "10.0.0.1") == false)
+        #expect(isAllowedDownloadHost("api.cupthread.com", baseHost: "::1") == false)
+        #expect(isAllowedDownloadHost("api.cupthread.com", baseHost: "[::1]") == false)
+        #expect(isAllowedDownloadHost("10.0.0.2", baseHost: "10.0.0.1") == false)
+        #expect(isAllowedDownloadHost("2001:db8::2", baseHost: "2001:db8::1") == false)
+    }
+}

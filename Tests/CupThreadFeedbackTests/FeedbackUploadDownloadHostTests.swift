@@ -94,4 +94,36 @@ struct FeedbackUploadDownloadHostTests {
         #expect(attachment.url != URL(string: "https://attacker.co.uk/uploaded.png"))
         #expect(attachment.url.host == coUKHost)
     }
+
+    @Test func candidateIPv4DownloadURLDoesNotPropagateToAttachmentURLAgainstNumericSuffixBase() async throws {
+        // A candidate download host of "10.0.0.1" against a base host of "api.0.1"
+        // must fail closed and fall back to the default upload URL rather than
+        // matching the "0.1" suffix (SEC-27).
+        let numericBaseHost = "api.0.1"
+        var ipSessionJSON = sessionJSON
+        ipSessionJSON["files"] = [[
+            "clientFileId": "file-1",
+            "uploadId": "upl-1",
+            "uploadUrl": "https://\(numericBaseHost)/api/v1/uploads/upl-1",
+            "maxSizeBytes": 20_000_000
+        ]]
+        var ipUploadedJSON = uploadedJSON
+        ipUploadedJSON["downloadUrl"] = "https://10.0.0.1/uploaded.png"
+
+        MockURLProtocol.setHandler(forHost: numericBaseHost) { [ipSessionJSON, ipUploadedJSON] request in
+            if request.url?.path == "/api/v1/uploads/sessions" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(ipSessionJSON))
+            }
+            return (makeHTTPResponse(status: 200), try encodeJSON(ipUploadedJSON))
+        }
+        defer { MockURLProtocol.setHandler(forHost: numericBaseHost, nil) }
+
+        let client = makeClient(baseURL: URL(string: "https://\(numericBaseHost)")!)
+        let attachment = try await client.uploadAttachment(
+            data: Data("hello".utf8), filename: "f.png", mimeType: "image/png", userToken: nil
+        )
+
+        #expect(attachment.url != URL(string: "https://10.0.0.1/uploaded.png"))
+        #expect(attachment.url.host == numericBaseHost)
+    }
 }

@@ -106,10 +106,23 @@ private let registrySecondLevelLabels: Set<String> = [
     "ac", "co", "com", "edu", "go", "gov", "idv", "ne", "net", "or", "org"
 ]
 
+/// Checks whether a normalized host string represents an IP literal (IPv4 or IPv6).
+/// IP literals cannot establish a registrable-domain relationship with any other host.
+private func isIPLiteral(_ host: String) -> Bool {
+    if host.contains(":") || host.contains("[") || host.contains("]") {
+        return true
+    }
+    let labels = host.split(separator: ".")
+    return !labels.isEmpty && labels.allSatisfy { Int($0) != nil }
+}
+
 /// Returns the registrable domain (public suffix plus one label) of `host`, or
 /// `nil` when `host` is itself a bare public suffix and cannot establish
 /// same-site trust.
 private func registrableDomain(of host: String) -> String? {
+    guard !isIPLiteral(host) else {
+        return nil
+    }
     let labels = host.split(separator: ".")
     guard labels.count >= 2 else {
         return nil // A single label is a bare TLD (or an intranet host), never registrable.
@@ -143,9 +156,8 @@ func isAllowedDownloadHost(_ candidateHost: String, baseHost: String) -> Bool {
     if candidate == base {
         return true
     }
-    let baseLabels = base.split(separator: ".")
-    if !baseLabels.isEmpty, baseLabels.allSatisfy({ Int($0) != nil }) {
-        return false // IP-literal base hosts have no registrable-domain relation.
+    if isIPLiteral(candidate) || isIPLiteral(base) {
+        return false // IP-literal hosts have no registrable-domain relation.
     }
     guard let candidateDomain = registrableDomain(of: candidate),
           let baseDomain = registrableDomain(of: base) else {
@@ -158,6 +170,9 @@ private func normalizedDownloadHost(_ host: String) -> String? {
     var trimmed = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     while trimmed.hasSuffix(".") {
         trimmed.removeLast()
+    }
+    if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") && trimmed.count >= 2 {
+        trimmed = String(trimmed.dropFirst().dropLast())
     }
     return trimmed.isEmpty ? nil : trimmed
 }
