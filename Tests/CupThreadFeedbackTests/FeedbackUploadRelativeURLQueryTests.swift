@@ -135,4 +135,17 @@ struct FeedbackUploadRelativeURLQueryTests {
             #expect(client.resolvedDownloadURL(from: disallowed) == nil)
         }
     }
+
+    @Test func resolvedDownloadURLRejectsEmbeddedUserinfo() {
+        let client = makeClient(baseURL: URL(string: "https://api.cupthread.com")!)
+        let userinfoURLs = [
+            "https://user:pass@api.cupthread.com/api/v1/uploads/upl_123/download",
+            "https://secret@cdn.cupthread.com/uploads/screenshot.png",
+            "https://:token@api.cupthread.com/download"
+        ]
+
+        for item in userinfoURLs {
+            #expect(client.resolvedDownloadURL(from: item) == nil, "Expected \(item) to be rejected by resolvedDownloadURL")
+        }
+    }
 }

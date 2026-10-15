@@ -387,7 +387,8 @@ extension FeedbackClient {
     /// - Same-host absolute `http`/`https` URL matching `configuration.baseURL.host` (case-insensitive).
     ///
     /// Throws ``FeedbackClientError/invalidResponse`` on off-origin absolute URLs,
-    /// protocol-relative URLs (`//`), or disallowed schemes.
+    /// protocol-relative URLs (`//`), URLs containing embedded credentials (userinfo),
+    /// or disallowed schemes.
     func uploadURL(from uploadUrl: String?) throws -> URL {
         if let uploadUrl, !uploadUrl.isEmpty {
             let trimmed = uploadUrl.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -405,7 +406,8 @@ extension FeedbackClient {
             } else {
                 throw FeedbackClientError.invalidResponse
             }
-            guard let scheme = candidate.scheme?.lowercased(),
+            guard candidate.user == nil, candidate.password == nil,
+                  let scheme = candidate.scheme?.lowercased(),
                   scheme == "http" || scheme == "https" else {
                 throw FeedbackClientError.invalidResponse
             }
@@ -419,8 +421,7 @@ extension FeedbackClient {
                   candidateHost.caseInsensitiveCompare(baseHost) == .orderedSame else {
                 throw FeedbackClientError.invalidResponse
             }
-            let basePort = configuration.baseURL.port ??
-                (configuration.baseURL.scheme?.lowercased() == "http" ? 80 : 443)
+            let basePort = configuration.baseURL.port ?? (configuration.baseURL.scheme?.lowercased() == "http" ? 80 : 443)
             let candidatePort = candidate.port ?? (scheme == "http" ? 80 : 443)
             guard basePort == candidatePort else {
                 throw FeedbackClientError.invalidResponse
@@ -435,7 +436,8 @@ extension FeedbackClient {
     /// - Accepts absolute `http`/`https` URLs whose host matches `configuration.baseURL.host`
     ///   or shares its registrable domain (e.g. CDN subdomains or the apex of the
     ///   same domain; public-suffix and multi-tenant siblings never match).
-    /// - Returns `nil` for off-origin, protocol-relative, or disallowed-scheme URLs.
+    /// - Returns `nil` for off-origin, protocol-relative, userinfo-containing,
+    ///   or disallowed-scheme URLs.
     func resolvedDownloadURL(from downloadUrl: String?) -> URL? {
         guard let downloadUrl else { return nil }
         let trimmed = downloadUrl.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -450,7 +452,8 @@ extension FeedbackClient {
             return nil
         }
 
-        guard let scheme = candidate.scheme?.lowercased(),
+        guard candidate.user == nil, candidate.password == nil,
+              let scheme = candidate.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else {
             return nil
         }
