@@ -359,7 +359,12 @@ extension FeedbackClient {
             "/api/v1/public/columns/\(configuration.appKey)",
             mapsPermissionErrors: true
         )
-        return response.columns.sorted { $0.position < $1.position }
+        return response.columns.sorted {
+            if $0.position != $1.position {
+                return $0.position < $1.position
+            }
+            return $0.id < $1.id
+        }
     }
 
     /// Fetches the app's versions, ordered by position.
@@ -379,7 +384,12 @@ extension FeedbackClient {
             "/api/v1/public/versions/\(configuration.appKey)",
             mapsPermissionErrors: true
         )
-        return response.versions.sorted { $0.position < $1.position }
+        return response.versions.sorted {
+            if $0.position != $1.position {
+                return $0.position < $1.position
+            }
+            return $0.id < $1.id
+        }
     }
 
     private func get<T: Decodable>(

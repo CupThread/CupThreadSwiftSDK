@@ -175,9 +175,14 @@ extension FeedbackClient {
         return Self.sortChangelogEntries(collected)
     }
 
-    private static func sortChangelogEntries(_ entries: [ChangelogEntry]) -> [ChangelogEntry] {
+    static func sortChangelogEntries(_ entries: [ChangelogEntry]) -> [ChangelogEntry] {
         entries.sorted { lhs, rhs in
-            (lhs.publishedAtDate ?? .distantPast) > (rhs.publishedAtDate ?? .distantPast)
+            let lhsDate = lhs.publishedAtDate ?? .distantPast
+            let rhsDate = rhs.publishedAtDate ?? .distantPast
+            if lhsDate != rhsDate {
+                return lhsDate > rhsDate
+            }
+            return lhs.id > rhs.id
         }
     }
 
