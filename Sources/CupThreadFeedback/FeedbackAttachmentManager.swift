@@ -122,6 +122,22 @@ public enum PhotoAttachmentHelper {
         return nil
     }
 
+    /// Sanitizes an attachment file extension by trimming whitespace and leading dots,
+    /// enforcing an alphanumeric character set, and falling back to `"jpg"` if empty or invalid.
+    ///
+    /// - Parameter raw: The raw file extension string.
+    /// - Returns: A sanitized lowercase alphanumeric extension without leading dots or path separators.
+    public static func sanitizeFileExtension(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .drop(while: { $0 == "." })
+        let cleaned = String(trimmed)
+        guard !cleaned.isEmpty,
+              cleaned.allSatisfy({ $0.isLetter || $0.isNumber }) else {
+            return "jpg"
+        }
+        return cleaned.lowercased()
+    }
+
     /// Generates a collision-resistant filename incorporating a unique UUID.
     ///
     /// - Parameters:
@@ -129,7 +145,8 @@ public enum PhotoAttachmentHelper {
     ///   - id: The unique identifier for the attachment.
     /// - Returns: A filename string formatted as `"screenshot_<uuid>.<ext>"`.
     public static func makeFilename(fileExtension: String, id: UUID = UUID()) -> String {
-        "screenshot_\(id.uuidString.lowercased()).\(fileExtension)"
+        let sanitizedExtension = sanitizeFileExtension(fileExtension)
+        return "screenshot_\(id.uuidString.lowercased()).\(sanitizedExtension)"
     }
 
     /// Validates that raw data size does not exceed the allowed byte budget.
