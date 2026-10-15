@@ -18,6 +18,10 @@ private struct VotePayload: Encodable, Sendable {
     /// skips absent optionals), so the default vote payload keeps its exact
     /// historical shape.
     let shipNotifyEmail: String?
+    /// Optional Cloudflare Turnstile token for human verification on anonymous
+    /// votes and ship notification opt-ins (Issue #450, SaaS public API sync).
+    /// Omitted from the encoded JSON when `nil` to preserve historical payload shape.
+    let turnstileToken: String?
 }
 
 // MARK: - FeedbackClient extension
@@ -236,32 +240,63 @@ extension FeedbackClient {
         method: String,
         featureRequestId: String,
         userToken: String,
-        shipNotifyEmail: String? = nil
+        shipNotifyEmail: String? = nil,
+        turnstileToken: String? = nil
     ) async throws -> VoteResult {
         let normalizedShipNotifyEmail = shipNotifyEmail?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
-        let payload = VotePayload(
-            appKey: configuration.appKey,
-            userToken: userToken,
-            shipNotifyEmail: normalizedShipNotifyEmail
-        )
+        let normalizedTurnstileToken = turnstileToken?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
 
-        var request = URLRequest(
-            url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(featureRequestId)/vote")
-        )
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
-        await applyBearerToken(to: &request)
-        request.httpBody = try encoder.encode(payload)
+        if method == "POST" {
+            let data = try await sendWithTurnstileRetry(
+                accepted: [200],
+                challenge: .vote(appKey: configuration.appKey),
+                initialToken: normalizedTurnstileToken
+            ) { token, requestID in
+                let payload = VotePayload(
+                    appKey: self.configuration.appKey,
+                    userToken: userToken,
+                    shipNotifyEmail: normalizedShipNotifyEmail,
+                    turnstileToken: token
+                )
+                var request = URLRequest(
+                    url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests/\(featureRequestId)/vote")
+                )
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
+                await self.applyBearerToken(to: &request)
+                request.httpBody = try self.encoder.encode(payload)
+                return request
+            }
+            return try decoder.decode(VoteResult.self, from: data)
+        } else {
+            let payload = VotePayload(
+                appKey: configuration.appKey,
+                userToken: userToken,
+                shipNotifyEmail: nil,
+                turnstileToken: nil
+            )
 
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw FeedbackClientError.invalidResponse
+            var request = URLRequest(
+                url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(featureRequestId)/vote")
+            )
+            request.httpMethod = method
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+            await applyBearerToken(to: &request)
+            request.httpBody = try encoder.encode(payload)
+
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw FeedbackClientError.invalidResponse
+            }
+            try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
+            return try decoder.decode(VoteResult.self, from: data)
         }
-        try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        return try decoder.decode(VoteResult.self, from: data)
     }
 
     /// Casts a vote on a feature request.
@@ -289,6 +324,13 @@ extension FeedbackClient {
     /// without toggling anything. The value is trimmed, and a whitespace-only
     /// value is treated as `nil` (the field is omitted from the JSON body).
     ///
+    /// When human verification is enabled on the server, anonymous voters
+    /// on apps with ``PublicAppConfig/requireAnonymousVoteTurnstile`` or voters
+    /// providing `shipNotifyEmail` should supply a Turnstile token via
+    /// `turnstileToken`. When omitted and the client is configured with a
+    /// `turnstileTokenProvider`, a token bound to ``TurnstileAction/vote`` is
+    /// requested automatically.
+    ///
     /// On boards that require signed-in voting, the server accepts a
     /// `shipNotifyEmail` only when it is one of the signed-in session's
     /// verified addresses; a mismatched address still records the vote but
@@ -304,9 +346,15 @@ extension FeedbackClient {
     ///   - shipNotifyEmail: Optional email address (max 254 characters) to
     ///     enroll in ship notifications for this request; `nil` keeps the
     ///     payload unchanged and sends no opt-in.
+    ///   - turnstileToken: Optional Cloudflare Turnstile token for human
+    ///     verification when voting anonymously or opting in to ship
+    ///     notifications. When omitted and a `turnstileTokenProvider` is
+    ///     configured, a token is resolved automatically.
     /// - Returns: The new vote state, the request's authoritative vote count,
     ///   and any non-fatal warning the server attached.
     /// - Throws: ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when human
+    ///   verification is required or rejected (HTTP 403 `turnstile_verification_failed`),
     ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
     ///   voting is disabled for the app (HTTP 401/403),
@@ -315,13 +363,15 @@ extension FeedbackClient {
     public func castVote(
         featureRequestId: String,
         userToken: String,
-        shipNotifyEmail: String? = nil
+        shipNotifyEmail: String? = nil,
+        turnstileToken: String? = nil
     ) async throws -> VoteResult {
         try await sendVoteRequest(
             method: "POST",
             featureRequestId: featureRequestId,
             userToken: userToken,
-            shipNotifyEmail: shipNotifyEmail
+            shipNotifyEmail: shipNotifyEmail,
+            turnstileToken: turnstileToken
         )
     }
 
@@ -352,25 +402,28 @@ extension FeedbackClient {
             method: "DELETE",
             featureRequestId: featureRequestId,
             userToken: userToken,
-            shipNotifyEmail: nil
+            shipNotifyEmail: nil,
+            turnstileToken: nil
         )
     }
 
     /// Casts a vote on a feature request (legacy shim).
     ///
     /// The backend vote endpoint is now insert-only and no longer toggles.
-    /// Use ``castVote(featureRequestId:userToken:shipNotifyEmail:)`` to cast
+    /// Use ``castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)`` to cast
     /// and ``removeVote(featureRequestId:userToken:)`` to remove.
     @available(*, deprecated, message: "Use castVote or removeVote instead. The vote endpoint is insert-only (CupThread/SaaS#406).")
     public func toggleVote(
         featureRequestId: String,
         userToken: String,
-        shipNotifyEmail: String? = nil
+        shipNotifyEmail: String? = nil,
+        turnstileToken: String? = nil
     ) async throws -> VoteResult {
         try await castVote(
             featureRequestId: featureRequestId,
             userToken: userToken,
-            shipNotifyEmail: shipNotifyEmail
+            shipNotifyEmail: shipNotifyEmail,
+            turnstileToken: turnstileToken
         )
     }
 }

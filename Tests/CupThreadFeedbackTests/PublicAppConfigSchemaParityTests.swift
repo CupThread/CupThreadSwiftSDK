@@ -102,12 +102,29 @@ struct PublicAppConfigSchemaParityTests {
         #expect(config.googlePlayUrl == nil)
     }
 
+    @Test func decodesRequireAnonymousVoteTurnstileWhenPresent() throws {
+        let jsonTrue = try encodeJSON(makeConfigJSON().merging(["requireAnonymousVoteTurnstile": true]) { _, new in new })
+        let configTrue = try JSONDecoder().decode(PublicAppConfig.self, from: jsonTrue)
+        #expect(configTrue.requireAnonymousVoteTurnstile == true)
+
+        let jsonFalse = try encodeJSON(makeConfigJSON().merging(["requireAnonymousVoteTurnstile": false]) { _, new in new })
+        let configFalse = try JSONDecoder().decode(PublicAppConfig.self, from: jsonFalse)
+        #expect(configFalse.requireAnonymousVoteTurnstile == false)
+    }
+
+    @Test func defaultsRequireAnonymousVoteTurnstileToFalseWhenAbsent() throws {
+        let json = try encodeJSON(makeConfigJSON())
+        let config = try JSONDecoder().decode(PublicAppConfig.self, from: json)
+        #expect(config.requireAnonymousVoteTurnstile == false)
+    }
+
     // MARK: - Encoding
 
     @Test func encodeRoundTripsNewFields() throws {
         let json = try encodeJSON(makeConfigJSON().merging([
             "workspaceSlug": "acme-workspace",
-            "appStoreUrl": "https://apps.apple.com/app/demo"
+            "appStoreUrl": "https://apps.apple.com/app/demo",
+            "requireAnonymousVoteTurnstile": true
         ]) { _, new in new })
 
         let config = try JSONDecoder().decode(PublicAppConfig.self, from: json)
@@ -116,6 +133,7 @@ struct PublicAppConfigSchemaParityTests {
         #expect(dict["workspaceSlug"] as? String == "acme-workspace")
         #expect(dict["appStoreUrl"] as? String == "https://apps.apple.com/app/demo")
         #expect(dict["googlePlayUrl"] == nil) // nil encodes as key absence, matching the `storeUrl` precedent
+        #expect(dict["requireAnonymousVoteTurnstile"] as? Bool == true)
     }
 
     // MARK: - Source compatibility
@@ -133,5 +151,6 @@ struct PublicAppConfigSchemaParityTests {
         #expect(config.workspaceSlug.isEmpty)
         #expect(config.appStoreUrl == nil)
         #expect(config.googlePlayUrl == nil)
+        #expect(config.requireAnonymousVoteTurnstile == false)
     }
 }
