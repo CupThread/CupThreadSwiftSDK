@@ -146,17 +146,22 @@ public final class UserTokenStore: @unchecked Sendable {
         "\(defaultKey).\(appKey).legacyAdopted"
     }
 
-    /// Deletes the stored identity. The next ``token`` access mints and
-    /// persists a fresh UUID.
+    /// Deletes the stored identity and reports whether the deletion was confirmed.
+    /// The next ``token`` access mints and persists a fresh UUID.
     ///
     /// Use this to support in-app "delete my data" actions, or to drop a
     /// rotated identity — ``FeedbackClient/eraseMyData(store:)`` calls it
     /// automatically after a successful erasure, because the server stops
     /// accepting the old token immediately.
-    public func reset() {
+    ///
+    /// - Returns: `true` if the backing store successfully deleted the token
+    ///   or confirmed no token was present; `false` if the deletion failed
+    ///   (e.g. locked Keychain).
+    @discardableResult
+    public func reset() -> Bool {
         Self.processLock.lock()
         defer { Self.processLock.unlock() }
-        storage.delete()
+        return storage.deleteConfirmed()
     }
 
     /// Returns the existing token, or generates and persists a new UUID on first access.
