@@ -264,10 +264,11 @@ public struct CommentsView: View {
     @MainActor
     private func loadComments() async {
         let generation = loadState.startLoading()
-        // The defer (not a trailing assignment) resets `isLoading`: a
-        // cancelled load (dismissal, restart for another request) returns
-        // early and must still leave the spinner (CONC-4).
-        defer { loadState.finishLoading(generation: generation) }
+        var wasCancelled = false
+        // Cancellation has no empty/error verdict to render (#442).
+        defer {
+            loadState.finishLoading(generation: generation, wasCancelled: wasCancelled || Task.isCancelled)
+        }
         // The compose-area and reply gates track the resolved access verdict,
         // re-read on every load so a sign-in or sign-out while the thread is
         // presented is picked up (BUG-24). Session verdict, not load data: a
@@ -279,13 +280,14 @@ public struct CommentsView: View {
             // A superseded load (pull-to-refresh racing the initial task,
             // retry taps stacking up) must not clobber the newer run's
             // comments.
-            guard loadState.isCurrent(generation: generation) else { return }
+            guard !Task.isCancelled, loadState.isCurrent(generation: generation) else { return }
             comments = fetched
         } catch {
             // A cancelled load never reached a verdict — keep the currently
             // rendered comments. A superseded run must not write either;
             // both leave the surface to the surviving load.
-            guard loadState.isCurrent(generation: generation), !error.isSdkCancellation else { return }
+            wasCancelled = error.isSdkCancellation || Task.isCancelled
+            guard loadState.isCurrent(generation: generation), !wasCancelled else { return }
             if let clientError = error as? FeedbackClientError, case .commentsUnavailable = clientError {
                 isCommentsUnavailable = true
             }

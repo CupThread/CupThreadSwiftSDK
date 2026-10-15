@@ -7,17 +7,14 @@ import Foundation
 /// latest full-screen error, and a monotonic generation counter that
 /// discards stale out-of-order writes.
 ///
-/// A load can be superseded by a newer one (pull-to-refresh racing the
-/// `.task` initial load, retry taps stacking up) or cancelled outright
-/// (dismissal mid-fetch). Either way the superseded or cancelled run must
-/// not write behind newer data or strand the surface on its spinner:
-/// ``isCurrent(generation:)`` gates every state write, and
-/// ``finishLoading(generation:)`` only clears `isLoading` for the
-/// generation that still owns the surface — reached through the callers'
-/// `defer`, so an early `return` on cancellation can no longer leave
-/// `isLoading == true` forever.
+/// A superseded load must not write behind newer data. A cancelled load
+/// has no result to display, so it retains the loading presentation until
+/// a replacement load settles or the surface disappears.
+/// ``isCurrent(generation:)`` gates state writes, and
+/// ``finishLoading(generation:wasCancelled:)`` settles only the current,
+/// non-cancelled generation.
 struct SurfaceLoadState: Equatable, Sendable {
-    /// Whether a fetch is currently in flight.
+    /// Whether the surface is waiting for a resolved load outcome.
     var isLoading: Bool
     /// User-friendly message when the latest failure had nothing to show.
     var loadError: String?
@@ -44,7 +41,7 @@ struct SurfaceLoadState: Equatable, Sendable {
 
     /// Starts a load cycle: bumps the generation, marks the surface loading,
     /// and clears any previous full-screen error. Returns the generation to
-    /// pass to ``finishLoading(generation:)`` and check with
+    /// pass to ``finishLoading(generation:wasCancelled:)`` and check with
     /// ``isCurrent(generation:)`` around every write.
     @discardableResult
     mutating func startLoading() -> Int {
@@ -54,11 +51,10 @@ struct SurfaceLoadState: Equatable, Sendable {
         return loadGeneration
     }
 
-    /// Ends the load cycle for `generation`. Runs from the caller's `defer`,
-    /// so a cancelled run's early `return` still resets `isLoading`. A
-    /// superseded load leaves the flag alone — the newer load owns it.
-    mutating func finishLoading(generation: Int) {
-        guard loadGeneration == generation else { return }
+    /// Settles a completed load. Cancellation leaves the loading presentation
+    /// intact; a superseded generation cannot change the newer load's state.
+    mutating func finishLoading(generation: Int, wasCancelled: Bool = false) {
+        guard loadGeneration == generation, !wasCancelled else { return }
         isLoading = false
     }
 
