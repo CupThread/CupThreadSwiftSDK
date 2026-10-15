@@ -145,6 +145,15 @@ final class CupThreadDemoUITests: XCTestCase {
     /// vote through the `cupthread.features.vote_pill` toggle. Every step
     /// asserts unconditionally so a broken flow fails the test instead of
     /// silently skipping it.
+    ///
+    /// Each interaction goes through ``tapAndAwait``: the tap is confirmed by
+    /// its observable effect and re-issued once when the effect doesn't land.
+    /// A dropped tap against a still-animating surface is the chronic
+    /// shared-runner flake here (this test failed on green code twice on main),
+    /// and every retried action is safe to repeat — tab re-selection and sheet
+    /// open/cancel are idempotent, and the mock's vote endpoint reconciles
+    /// absolutely (`143 / hasVoted`), so a re-delivered tap can never
+    /// half-apply a state change.
     @MainActor
     func testInteractiveNavigationAndVotingFlow() throws {
         let app = XCUIApplication()
@@ -158,35 +167,46 @@ final class CupThreadDemoUITests: XCTestCase {
         // 2. Switch to What's New.
         let whatsNewTab = app.tabBars.buttons["What's New"]
         XCTAssertTrue(whatsNewTab.waitForExistence(timeout: 5), "What's New tab should exist in the tab bar")
-        whatsNewTab.tap()
         XCTAssertTrue(
-            app.navigationBars["What's New"].waitForExistence(timeout: 5),
+            tapAndAwait("switching to What's New", tap: { whatsNewTab.tap() }) {
+                app.navigationBars["What's New"].exists
+            },
             "What's New navigation bar should appear after switching tabs"
         )
 
         // 3. Switch to Requests.
         let requestsTab = app.tabBars.buttons["Requests"]
         XCTAssertTrue(requestsTab.waitForExistence(timeout: 5), "Requests tab should exist in the tab bar")
-        requestsTab.tap()
         XCTAssertTrue(
-            app.navigationBars["Feature Requests"].waitForExistence(timeout: 10),
+            tapAndAwait("switching to Requests", tap: { requestsTab.tap() }) {
+                app.navigationBars["Feature Requests"].exists
+            },
             "Feature Requests navigation bar should appear after switching tabs"
         )
 
         // 4. Open the compose sheet through the SDK's stable identifier.
         let composeButton = app.buttons["cupthread.features.compose"]
         XCTAssertTrue(composeButton.waitForExistence(timeout: 5), "Compose button should expose the cupthread.features.compose identifier")
-        composeButton.tap()
         let composeSheetTitle = app.navigationBars["Request a Feature"]
-        XCTAssertTrue(composeSheetTitle.waitForExistence(timeout: 5), "Request a Feature sheet should appear after tapping compose")
+        XCTAssertTrue(
+            tapAndAwait("opening the compose sheet", tap: { composeButton.tap() }) {
+                composeSheetTitle.exists
+            },
+            "Request a Feature sheet should appear after tapping compose"
+        )
 
         // 5. Dismiss it again (the compose sheet's cancellation action comes
         // from the shared dismiss guard, whose localized label is "Cancel").
+        // The existence guard keeps a slow dismissal from re-tapping a Cancel
+        // button that has already gone away with the sheet.
         let cancelButton = app.navigationBars["Request a Feature"].buttons["Cancel"]
         XCTAssertTrue(cancelButton.waitForExistence(timeout: 5), "Compose sheet should expose a Cancel button")
-        cancelButton.tap()
-        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: composeSheetTitle)
-        waitForExpectations(timeout: 5, handler: nil)
+        XCTAssertTrue(
+            tapAndAwait("dismissing the compose sheet", tap: { if cancelButton.exists { cancelButton.tap() } }) {
+                !composeSheetTitle.exists
+            },
+            "Compose sheet should dismiss after tapping Cancel"
+        )
 
         // 6. Cast one vote against the mock server. The mock reconciles every
         // vote to "143 / hasVoted", so the pill's label must change from its
@@ -194,21 +214,53 @@ final class CupThreadDemoUITests: XCTestCase {
         let votePill = app.buttons["cupthread.features.vote_pill"].firstMatch
         XCTAssertTrue(votePill.waitForExistence(timeout: 10), "Vote pill should expose the cupthread.features.vote_pill identifier")
         let labelBeforeVote = votePill.label
-        votePill.tap()
-        expectation(
-            for: NSPredicate(format: "label != %@", labelBeforeVote),
-            evaluatedWith: votePill
+        XCTAssertTrue(
+            tapAndAwait(
+                "casting the vote",
+                tap: { votePill.tap() },
+                until: { votePill.label != labelBeforeVote },
+                timeoutPerAttempt: 8
+            ),
+            "Vote pill label should change from '\(labelBeforeVote)' after casting a vote"
         )
-        waitForExpectations(timeout: 10, handler: nil)
 
         // 7. Switch to Feedback.
         let feedbackTab = app.tabBars.buttons["Feedback"]
         XCTAssertTrue(feedbackTab.waitForExistence(timeout: 5), "Feedback tab should exist in the tab bar")
-        feedbackTab.tap()
         XCTAssertTrue(
-            app.navigationBars["Send Feedback"].waitForExistence(timeout: 10),
+            tapAndAwait("switching to Feedback", tap: { feedbackTab.tap() }) {
+                app.navigationBars["Send Feedback"].exists
+            },
             "Send Feedback navigation bar should appear after switching tabs"
         )
+    }
+
+    /// Performs a UI interaction whose effect is observable in the element
+    /// tree: taps, polls `condition` at 10 Hz, and re-taps once when the
+    /// budget expires. `timeoutPerAttempt` keeps the second attempt's budget
+    /// explicit (the vote needs longer than the navigation taps); every caller
+    /// documents why a repeat tap is safe. The runner log records each retry
+    /// so a red run still shows which step flaked.
+    @MainActor
+    private func tapAndAwait(
+        _ description: String,
+        tap: () -> Void,
+        until condition: () -> Bool,
+        timeoutPerAttempt: TimeInterval = 5,
+        attempts: Int = 2
+    ) -> Bool {
+        for attempt in 1...attempts {
+            tap()
+            let deadline = Date().addingTimeInterval(timeoutPerAttempt)
+            while Date() < deadline {
+                if condition() { return true }
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            if attempt < attempts {
+                print("UITest: '\(description)' unconfirmed after \(Int(timeoutPerAttempt))s — retrying tap (\(attempt + 1) of \(attempts))")
+            }
+        }
+        return false
     }
 
     // MARK: - Turnstile Gate Emulation (issue #53)
