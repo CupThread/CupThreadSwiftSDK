@@ -305,17 +305,21 @@ public struct WhatsNewView: View {
     @MainActor
     func loadEntries() async {
         await resolveAuthenticationAccess()
+        guard !Task.isCancelled else { return }
         guard isChangelogPermitted else {
             state.handlePermissionDenied(generation: state.loadGeneration)
             return
         }
         rejectedByServer = false
         let generationAtStart = state.startLoading()
+        var wasCancelled = false
         defer {
-            state.finishLoading(generation: generationAtStart)
+            state.finishLoading(generation: generationAtStart, wasCancelled: wasCancelled || Task.isCancelled)
         }
         do {
-            guard let fetched = try await loadChangelogEntries(client: client, config: activeConfig) else {
+            let fetched = try await loadChangelogEntries(client: client, config: activeConfig)
+            try Task.checkCancellation()
+            guard let fetched else {
                 state.handlePermissionDenied(generation: generationAtStart)
                 return
             }
@@ -323,7 +327,8 @@ public struct WhatsNewView: View {
         } catch {
             // A cancelled load (dismissal, superseded restart) never reached
             // a verdict — keep the currently rendered entries.
-            guard !error.isSdkCancellation else { return }
+            wasCancelled = error.isSdkCancellation || Task.isCancelled
+            guard !wasCancelled else { return }
             if isSdkPermissionRejection(error) {
                 // The preflight passed but the server still answered 401 —
                 // the token expired between the check and the send. The

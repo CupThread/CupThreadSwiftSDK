@@ -8,7 +8,7 @@ struct WhatsNewViewState: Equatable, Sendable {
     /// The currently displayed changelog entries.
     var entries: [ChangelogEntry]
 
-    /// Whether a changelog fetch is currently in flight.
+    /// Whether to show loading, including a cancelled load awaiting a replacement.
     var isLoading: Bool
 
     /// True once a load has finished successfully or was permission-denied.
@@ -53,9 +53,9 @@ struct WhatsNewViewState: Equatable, Sendable {
     }
 
     /// Ends the load cycle for a specific generation.
-    /// If a newer generation has started, `isLoading` remains unchanged.
-    mutating func finishLoading(generation: Int) {
-        if loadGeneration == generation {
+    /// Cancelled loads have no verdict; they and stale generations preserve the presentation.
+    mutating func finishLoading(generation: Int, wasCancelled: Bool = false) {
+        if loadGeneration == generation, !wasCancelled {
             isLoading = false
         }
     }
