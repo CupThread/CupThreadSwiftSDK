@@ -309,6 +309,9 @@ public struct CommentsView: View {
             draft.clearReplyTarget()
         } catch {
             guard !error.isSdkCancellation else { return }
+            if let clientError = error as? FeedbackClientError, case .commentsUnavailable = clientError {
+                isCommentsUnavailable = true
+            }
             if Self.invalidatesReplyTarget(for: error) {
                 // The server rejected the stale reply target (#237): clear
                 // it so the next submit succeeds as a top-level comment.
