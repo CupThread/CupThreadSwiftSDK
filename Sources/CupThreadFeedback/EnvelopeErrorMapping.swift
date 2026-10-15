@@ -153,27 +153,31 @@ extension FeedbackClient {
 
     /// Resolves an anonymous identity for requests that require one.
     /// Falls back to this client's app-key-scoped token store when the caller
-    /// did not pass one, so identities never bleed across app keys.
+    /// did not pass one, or when the supplied token contains newline characters,
+    /// so identities never bleed across app keys and header injection is prevented.
     func resolvedIdentity(_ userToken: String?) -> String? {
-        userToken?.nilIfEmpty ?? tokenStore.token
+        if let token = userToken?.nilIfEmpty, !token.contains(where: \.isNewline) {
+            return token
+        }
+        return tokenStore.token
     }
 
     /// Resolves the identity to send on feedback submissions.
     ///
-    /// When `userToken` is `nil` and the submission contains attachments with upload IDs,
-    /// falls back to this client's app-key-scoped store so the submitter matches the
-    /// uploader identity.
-    /// When there are no attachments and `userToken` is `nil`, the header is omitted.
+    /// When `userToken` is `nil` (or contains newline characters) and the submission
+    /// contains attachments with upload IDs, falls back to this client's app-key-scoped
+    /// store so the submitter matches the uploader identity.
+    /// When there are no attachments and `userToken` is `nil` or invalid, the header is omitted.
     func resolvedSubmitUserToken(_ userToken: String?, hasAttachments: Bool) -> String? {
-        if let token = userToken?.nilIfEmpty {
+        if let token = userToken?.nilIfEmpty, !token.contains(where: \.isNewline) {
             return token
         }
         return hasAttachments ? resolvedIdentity(userToken) : nil
     }
 
-    /// Sets the `X-User-Token` header when a token is present.
+    /// Sets the `X-User-Token` header when a valid single-line token is present.
     func applyUserToken(_ userToken: String?, to request: inout URLRequest) {
-        if let userToken = userToken?.nilIfEmpty {
+        if let userToken = userToken?.nilIfEmpty, !userToken.contains(where: \.isNewline) {
             request.setValue(userToken, forHTTPHeaderField: "X-User-Token")
         }
     }
