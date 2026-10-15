@@ -72,6 +72,18 @@ struct FeatureRequestsListStateTests {
         #expect(state.items[0].voteCount == 4)
     }
 
+    @Test func optimisticVoteClampsVoteCountToZeroWhenUnvotingZeroCountItem() {
+        let initialItem = makeItem(id: "fr-1", voteCount: 0, hasVoted: true)
+        var state = FeatureRequestsListState(items: [initialItem])
+
+        let preVote = state.applyOptimisticVote(for: "fr-1")
+        #expect(preVote?.originalVoted == true)
+        #expect(preVote?.originalCount == 0)
+
+        #expect(state.items[0].hasVoted == false)
+        #expect(state.items[0].voteCount == 0)
+    }
+
     @Test func voteSuccessReconcilesServerCountsAndClearsVotingId() {
         let initialItem = makeItem(id: "fr-1", voteCount: 5, hasVoted: false)
         var state = FeatureRequestsListState(items: [initialItem])
