@@ -4,10 +4,8 @@ import Testing
 
 // MARK: - SurfaceLoadState (CONC-4, issue #181)
 
-/// Pins the load lifecycle shared by `CommentsView` and `UserProfileView`:
-/// a cancelled load must still reset `isLoading` (through the caller's
-/// `defer`), and a superseded load's writes — content, error, and the
-/// `isLoading` reset — must be discarded in favor of the newer run.
+/// Cancellation preserves the unresolved presentation; only the current,
+/// completed generation may settle the surface.
 @Suite("SurfaceLoadState")
 struct SurfaceLoadStateTests {
     @Test func initialStateIsFirstLoading() {
@@ -34,20 +32,47 @@ struct SurfaceLoadStateTests {
         #expect(!state.isLoading)
     }
 
-    @Test func cancelledLoadStillResetsIsLoadingThroughTheDefer() {
-        // The CONC-4 stuck-spinner bug: a cancelled load returns early from
-        // the catch block, so the reset must live in the caller's `defer`
-        // and still clear `isLoading` for the current generation.
+    @Test func cancelledLoadPreservesSpinnerUntilReplacementSettles() {
         var state = SurfaceLoadState()
         let generation = state.startLoading()
-        // The view's catch block: `guard isCurrent, !isSdkCancellation else
-        // { return }` — then the defer runs.
-        let cancellation = URLError(.cancelled)
-        #expect(cancellation.isSdkCancellation)
-        #expect(state.isCurrent(generation: generation))
-        state.finishLoading(generation: generation)
+        state.finishLoading(generation: generation, wasCancelled: true)
+        #expect(state.isLoading)
+        #expect(state.loadError == nil)
+
+        let replacement = state.startLoading()
+        state.finishLoading(generation: replacement)
         #expect(!state.isLoading)
         #expect(state.loadError == nil)
+    }
+
+    @Test func staleCancellationDoesNotChangeReplacementState() {
+        var state = SurfaceLoadState()
+        let cancelled = state.startLoading()
+        let replacement = state.startLoading()
+        state.finishLoading(generation: cancelled, wasCancelled: true)
+        #expect(state.isLoading)
+        state.loadError = "replacement failed"
+        state.finishLoading(generation: replacement)
+        let settled = state
+        state.finishLoading(generation: cancelled, wasCancelled: true)
+        #expect(state == settled)
+        #expect(!state.isLoading)
+    }
+
+    @Test func cancelledRefreshWaitsForAResolvedRetry() {
+        var state = SurfaceLoadState()
+        let initial = state.startLoading()
+        state.finishLoading(generation: initial)
+        let refresh = state.startLoading()
+        state.finishLoading(generation: refresh, wasCancelled: true)
+        #expect(state.isLoading)
+        #expect(state.loadError == nil)
+
+        let retry = state.startLoading()
+        state.loadError = "retry failed"
+        state.finishLoading(generation: retry)
+        #expect(!state.isLoading)
+        #expect(state.loadError == "retry failed")
     }
 
     @Test func supersededGenerationIsNotCurrent() {
