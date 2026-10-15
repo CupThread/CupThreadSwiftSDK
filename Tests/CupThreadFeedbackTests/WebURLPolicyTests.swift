@@ -56,6 +56,23 @@ struct WebURLPolicyValidationTests {
             }
         }
     }
+
+    @Test func isAllowedWebURLRejectsEmbeddedUserinfo() throws {
+        let credentialURLs = [
+            "https://user:pass@example.com",
+            "https://admin@example.com",
+            "http://user:secret@example.com/path",
+            "https://trusted.com@evil.com",
+            "https://:pass@example.com",
+            "https://@example.com",
+            "https://user%3Apass@example.com"
+        ]
+
+        for urlString in credentialURLs {
+            let url = try #require(URL(string: urlString))
+            #expect(isAllowedWebURL(url) == false, "Expected \(urlString) to be rejected due to userinfo")
+        }
+    }
 }
 
 // MARK: - Website URL Normalization
@@ -92,11 +109,37 @@ struct WebsiteURLNormalizationTests {
         }
     }
 
+    @Test func normalizeWebsiteURLNormalizesProtocolRelativeURLs() {
+        #expect(normalizeWebsiteURL("//example.com") == URL(string: "https://example.com"))
+        #expect(normalizeWebsiteURL("//example.com/profile") == URL(string: "https://example.com/profile"))
+        #expect(normalizeWebsiteURL("///example.com/profile") == URL(string: "https://example.com/profile"))
+        #expect(normalizeWebsiteURL("//github.com/cupthread") == URL(string: "https://github.com/cupthread"))
+        #expect(normalizeWebsiteURL("   //example.com   ") == URL(string: "https://example.com"))
+    }
+
+    @Test func normalizeWebsiteURLRejectsEmbeddedUserinfo() {
+        let userinfoURLs = [
+            "https://user:pass@example.com",
+            "https://apple.com@attacker.com",
+            "http://user:secret@example.com/path",
+            "//user:pass@example.com",
+            "//trusted.com@evil.com",
+            "user:pass@example.com",
+            "@example.com"
+        ]
+
+        for item in userinfoURLs {
+            #expect(normalizeWebsiteURL(item) == nil, "Expected \(item) to normalize to nil due to userinfo")
+        }
+    }
+
     @Test func normalizeWebsiteURLRejectsInvalidOrEmptyStrings() {
         #expect(normalizeWebsiteURL("") == nil)
         #expect(normalizeWebsiteURL("   ") == nil)
         #expect(normalizeWebsiteURL("https://") == nil)
         #expect(normalizeWebsiteURL("http://") == nil)
+        #expect(normalizeWebsiteURL("//") == nil)
+        #expect(normalizeWebsiteURL("///") == nil)
     }
 }
 
@@ -115,6 +158,21 @@ struct MarkdownTextSanitizationTests {
         ]
 
         for sample in disallowedMarkdownSamples {
+            let attributed = MarkdownText.attributed(sample)
+            for run in attributed.runs {
+                #expect(run.link == nil, "Expected no link attribute for: \(sample), but found \(String(describing: run.link))")
+            }
+        }
+    }
+
+    @Test func markdownContainingEmbeddedUserinfoProducesNoOpenableLink() {
+        let credentialMarkdownSamples = [
+            "[Phishing](https://trusted.com@evil.com)",
+            "[Credentials](https://admin:secret@example.com)",
+            "[Http User](http://user:pass@example.com/account)"
+        ]
+
+        for sample in credentialMarkdownSamples {
             let attributed = MarkdownText.attributed(sample)
             for run in attributed.runs {
                 #expect(run.link == nil, "Expected no link attribute for: \(sample), but found \(String(describing: run.link))")
@@ -338,5 +396,37 @@ struct AllowedDownloadHostSecurityTests {
         #expect(isAllowedDownloadHost("api.cupthread.com", baseHost: "[::1]") == false)
         #expect(isAllowedDownloadHost("10.0.0.2", baseHost: "10.0.0.1") == false)
         #expect(isAllowedDownloadHost("2001:db8::2", baseHost: "2001:db8::1") == false)
+    }
+}
+
+// MARK: - Security & Normalization Tests (SEC-23)
+
+@Suite("WebURLSecurityAndNormalizationTests")
+struct WebURLSecurityAndNormalizationTests {
+    @Test("isAllowedWebURL rejects URLs with embedded userinfo credentials")
+    func rejectsEmbeddedCredentials() {
+        let credentialURLs = [
+            "https://user:pass@example.com",
+            "https://admin@example.com",
+            "http://user:secret@example.com/path",
+            "https://trusted.com@evil.com"
+        ]
+        for urlString in credentialURLs {
+            if let url = URL(string: urlString) {
+                #expect(isAllowedWebURL(url) == false, "Expected \(urlString) to be rejected due to userinfo")
+            }
+        }
+    }
+
+    @Test("normalizeWebsiteURL sanitizes protocol-relative URLs")
+    func normalizesProtocolRelativeURLs() {
+        #expect(normalizeWebsiteURL("//example.com") == URL(string: "https://example.com"))
+        #expect(normalizeWebsiteURL("///example.com/profile") == URL(string: "https://example.com/profile"))
+    }
+
+    @Test("normalizeWebsiteURL rejects URLs with userinfo")
+    func rejectsUserinfoInWebsiteURL() {
+        #expect(normalizeWebsiteURL("https://user:pass@example.com") == nil)
+        #expect(normalizeWebsiteURL("https://apple.com@attacker.com") == nil)
     }
 }
