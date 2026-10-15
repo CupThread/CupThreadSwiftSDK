@@ -187,18 +187,30 @@ public enum PhotoAttachmentHelper {
     /// transform to the decoded pixel buffer. The fresh encode also drops any
     /// embedded metadata, so this doubles as a sanitizer for transcoded paths.
     ///
-    /// - Parameter data: The raw image bytes.
+    /// When `maxDimension` is non-nil and positive, ImageIO decodes the image
+    /// with its longest pixel edge capped at `maxDimension`, bounding peak
+    /// memory usage on large sources (such as 48MP iPhone photos).
+    ///
+    /// - Parameters:
+    ///   - data: The raw image bytes.
+    ///   - maxDimension: Maximum allowed pixel size for the longest edge of the decoded bitmap, or `nil` for unconstrained decoding. Defaults to `4096`.
     /// - Returns: JPEG bytes, or `nil` when the data cannot be decoded as an image.
-    public static func jpegRepresentationResampled(from data: Data) -> Data? {
+    public static func jpegRepresentationResampled(
+        from data: Data,
+        maxDimension: CGFloat? = 4096
+    ) -> Data? {
         guard !data.isEmpty,
               let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else {
             return nil
         }
-        let thumbnailOptions: [CFString: Any] = [
+        var thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCache: false
         ]
+        if let maxDimension, maxDimension > 0 {
+            thumbnailOptions[kCGImageSourceThumbnailMaxPixelSize] = maxDimension
+        }
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
             ?? CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: false] as CFDictionary) else {
             return nil

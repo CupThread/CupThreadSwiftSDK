@@ -84,6 +84,7 @@ extension PhotoAttachmentHelper {
     ///   - data: The raw image bytes from the photo picker.
     ///   - limit: Maximum allowed upload size in bytes.
     ///   - stripSensitiveMetadata: Whether to re-encode and strip EXIF/GPS metadata.
+    ///   - maxDimension: Cap for the longest pixel edge of decoded bitmaps during downscaling or transcoding. Defaults to `4096`.
     /// - Returns: The prepared photo ready for upload.
     /// - Throws: ``AttachmentValidationError/unsupportedType`` for SVG or,
     ///   when `stripSensitiveMetadata` is `false`, for undecodable bytes;
@@ -94,7 +95,8 @@ extension PhotoAttachmentHelper {
     nonisolated static func prepareForUpload(
         _ data: Data,
         limit: Int,
-        stripSensitiveMetadata: Bool
+        stripSensitiveMetadata: Bool,
+        maxDimension: CGFloat? = 4096
     ) async throws -> PreparedPhoto {
         var data = data
 
@@ -107,7 +109,7 @@ extension PhotoAttachmentHelper {
         // never recompressed here.
         var reencoded = false
         if data.count > limit {
-            guard let downscaled = downscaledImageData(data, limit: limit) else {
+            guard let downscaled = downscaledImageData(data, limit: limit, maxDimension: maxDimension ?? 4096) else {
                 throw AttachmentValidationError.oversized(size: data.count, limit: limit)
             }
             data = downscaled
@@ -130,7 +132,7 @@ extension PhotoAttachmentHelper {
         }
 
         if needsTranscode {
-            guard let jpeg = jpegRepresentationResampled(from: data) else {
+            guard let jpeg = jpegRepresentationResampled(from: data, maxDimension: maxDimension) else {
                 // Undecodable bytes: keep the pre-#79 error mapping, where
                 // the strip pass surfaced `unprocessableImage` when stripping
                 // was enabled and the transcode `unsupportedType` when not.
@@ -149,7 +151,7 @@ extension PhotoAttachmentHelper {
         // fresh encode drops metadata by construction, so no strip pass is
         // needed after it.
         if data.count > limit {
-            guard let downscaled = downscaledImageData(data, limit: limit) else {
+            guard let downscaled = downscaledImageData(data, limit: limit, maxDimension: maxDimension ?? 4096) else {
                 throw AttachmentValidationError.oversized(size: data.count, limit: limit)
             }
             data = downscaled
