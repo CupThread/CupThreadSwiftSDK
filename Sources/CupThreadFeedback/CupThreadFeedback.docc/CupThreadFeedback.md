@@ -72,7 +72,7 @@ Comment creation is signed-in-only on the CupThread API — create the client wi
 - ``FeedbackClient/presentLatestChangelog(onlyIfUnseen:)``: Programmatic overlay presentation.
 - ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``: Fetch overlay data without presenting.
 - ``FeedbackClient/hasSeenChangelog(version:)``, ``FeedbackClient/markChangelogSeen(version:)``, ``FeedbackClient/markChangelogSeen(id:versionLabel:)``
-- ``FeedbackClient/fetchChangelog()``, ``FeedbackClient/fetchChangelog(limit:cursor:)``, ``FeedbackClient/subscribeToChangelog(email:userToken:)``, ``FeedbackClient/unsubscribeFromChangelog(token:)``
+- ``FeedbackClient/fetchChangelog()``, ``FeedbackClient/fetchChangelog(limit:cursor:)``, ``FeedbackClient/subscribeToChangelog(email:userToken:turnstileToken:)``, ``FeedbackClient/unsubscribeFromChangelog(token:)``
 - ``FeedbackClient/unsubscribeFromWeeklyDigest(token:)``: Complete the RFC 8058 one-click unsubscribe from a weekly digest email.
 
 ## Appearance & feature flags

@@ -110,6 +110,10 @@ public struct ChangelogUnsubscribeResult: Codable, Equatable, Sendable {
 
 private struct ChangelogEmailPayload: Encodable, Sendable {
     let email: String
+    /// Optional Cloudflare Turnstile token for human-verification-gated
+    /// subscription intake (Issue #448, SaaS public API sync). Omitted from
+    /// the encoded JSON when `nil` to preserve historical payload shape.
+    let turnstileToken: String?
 }
 
 // MARK: - FeedbackClient extension
@@ -263,9 +267,13 @@ extension FeedbackClient {
     ///   - email: The address to notify. Trimmed before sending.
     ///   - userToken: Anonymous user token sent as `X-User-Token`, linking the
     ///     subscription to the end-user identity.
+    ///   - turnstileToken: Optional Cloudflare Turnstile token (10-2048 chars)
+    ///     for bot challenge verification on anonymous subscriptions.
     /// - Returns: Whether the subscription was recorded (pending confirmation).
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
     ///   changelog access is disabled (HTTP 401),
+    ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when
+    ///   human verification is required or rejected (HTTP 403 `turnstile_verification_failed`),
     ///   ``FeedbackClientError/emailNotVerified(message:requestId:)`` when the
     ///   email must be verified from a signed-in account (HTTP 403 `email_not_verified`),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` for any other
@@ -275,12 +283,19 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidResponse``.
     public func subscribeToChangelog(
         email: String,
-        userToken: String
+        userToken: String,
+        turnstileToken: String? = nil
     ) async throws -> ChangelogSubscriptionResult {
-        try await sendJSON(
+        let normalizedToken = turnstileToken?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+        return try await sendJSON(
             "POST",
             path: "/api/v1/public/apps/\(configuration.appKey)/changelog/subscribe",
-            body: ChangelogEmailPayload(email: email.trimmingCharacters(in: .whitespacesAndNewlines)),
+            body: ChangelogEmailPayload(
+                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                turnstileToken: normalizedToken
+            ),
             userToken: userToken,
             acceptedStatuses: [200, 201],
             mapsPermissionErrors: true
