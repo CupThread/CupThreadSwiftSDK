@@ -16,6 +16,7 @@ import Foundation
 /// | `POST /api/v1/feedback` | ``TurnstileAction/feedback`` | app key |
 /// | `POST /api/v1/uploads/sessions` | ``TurnstileAction/feedback`` | app key |
 /// | `POST /api/v1/feature-requests` | ``TurnstileAction/featureRequest`` | app key |
+/// | `POST /api/v1/feature-requests/{id}/vote` | ``TurnstileAction/vote`` | app key |
 ///
 /// Upload sessions intentionally reuse the feedback action: the server pins
 /// the upload-session gate to the same `(action, cdata)` binding as feedback
@@ -53,6 +54,12 @@ public struct TurnstileChallenge: Equatable, Sendable {
     public static func featureRequest(appKey: String) -> TurnstileChallenge {
         TurnstileChallenge(action: TurnstileAction.featureRequest, cdata: appKey)
     }
+
+    /// The binding for voting on a feature request
+    /// (`POST /api/v1/feature-requests/{id}/vote`).
+    public static func vote(appKey: String) -> TurnstileChallenge {
+        TurnstileChallenge(action: TurnstileAction.vote, cdata: appKey)
+    }
 }
 
 /// Server-aligned `action` values for Turnstile-gated intake endpoints.
@@ -71,4 +78,7 @@ public enum TurnstileAction {
 
     /// Binding for `POST /api/v1/feature-requests`.
     public static let featureRequest = "feature-request"
+
+    /// Binding for `POST /api/v1/feature-requests/{id}/vote`.
+    public static let vote = "vote"
 }

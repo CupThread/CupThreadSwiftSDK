@@ -316,9 +316,9 @@ public struct VoteWarning: Decodable, Equatable, Sendable {
     }
 }
 
-/// Response to ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:)``,
+/// Response to ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``,
 /// ``FeedbackClient/removeVote(featureRequestId:userToken:)``, or
-/// ``FeedbackClient/toggleVote(featureRequestId:userToken:shipNotifyEmail:)``.
+/// ``FeedbackClient/toggleVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``.
 public struct VoteResult: Decodable, Equatable, Sendable {
     /// The user's vote state after the operation.
     public let voted: Bool
@@ -334,7 +334,7 @@ public struct VoteResult: Decodable, Equatable, Sendable {
     /// verified addresses. Built-in ``FeatureRequestsView`` flows never send
     /// that field, so they never receive one; the field is decoded for
     /// callers that opt in via
-    /// ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:)``
+    /// ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``
     /// or that post votes through their own transport. Branch on
     /// ``VoteWarning/code`` (see ``VoteWarning/isEmailNotVerified``).
     public let warning: VoteWarning?

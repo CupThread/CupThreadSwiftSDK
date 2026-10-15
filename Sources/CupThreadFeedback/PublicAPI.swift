@@ -75,6 +75,8 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     public let allowAnonymousRoadmap: Bool
     /// Whether signed-out users may vote on feature requests.
     public let allowAnonymousVote: Bool
+    /// Whether developers require human verification (Cloudflare Turnstile token) for anonymous votes.
+    public let requireAnonymousVoteTurnstile: Bool
     /// Whether signed-out users may submit feedback.
     public let allowAnonymousFeedback: Bool
     /// Whether signed-out users may read the changelog. `false` makes
@@ -103,6 +105,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         case maxAttachmentBytes
         case allowAnonymousRoadmap
         case allowAnonymousVote
+        case requireAnonymousVoteTurnstile
         case allowAnonymousFeedback
         case allowAnonymousChangelog
         case sdk
@@ -128,6 +131,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         maxAttachmentBytes: Int = 20_000_000,
         allowAnonymousRoadmap: Bool = true,
         allowAnonymousVote: Bool = true,
+        requireAnonymousVoteTurnstile: Bool = false,
         allowAnonymousFeedback: Bool = true,
         allowAnonymousChangelog: Bool = true,
         sdk: SdkAppearance = .defaults
@@ -156,6 +160,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         self.maxAttachmentBytes = maxAttachmentBytes
         self.allowAnonymousRoadmap = allowAnonymousRoadmap
         self.allowAnonymousVote = allowAnonymousVote
+        self.requireAnonymousVoteTurnstile = requireAnonymousVoteTurnstile
         self.allowAnonymousFeedback = allowAnonymousFeedback
         self.allowAnonymousChangelog = allowAnonymousChangelog
         self.sdk = sdk
@@ -185,6 +190,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         maxAttachmentBytes = try container.decodeIfPresent(Int.self, forKey: .maxAttachmentBytes) ?? 20_000_000
         allowAnonymousRoadmap = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousRoadmap) ?? true
         allowAnonymousVote = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousVote) ?? true
+        requireAnonymousVoteTurnstile = try container.decodeIfPresent(Bool.self, forKey: .requireAnonymousVoteTurnstile) ?? false
         allowAnonymousFeedback = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousFeedback) ?? true
         allowAnonymousChangelog = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousChangelog) ?? true
         sdk = try container.decodeIfPresent(SdkAppearance.self, forKey: .sdk) ?? .defaults
@@ -210,6 +216,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         try container.encode(maxAttachmentBytes, forKey: .maxAttachmentBytes)
         try container.encode(allowAnonymousRoadmap, forKey: .allowAnonymousRoadmap)
         try container.encode(allowAnonymousVote, forKey: .allowAnonymousVote)
+        try container.encode(requireAnonymousVoteTurnstile, forKey: .requireAnonymousVoteTurnstile)
         try container.encode(allowAnonymousFeedback, forKey: .allowAnonymousFeedback)
         try container.encode(allowAnonymousChangelog, forKey: .allowAnonymousChangelog)
         try container.encode(sdk, forKey: .sdk)
