@@ -34,11 +34,11 @@ struct WhatsNewViewTests {
         // Simulate task cancellation before fetchChangelog returns
         let cancellationError = URLError(.cancelled)
         state.handleFailure(error: cancellationError, generation: generation)
-        state.finishLoading(generation: generation)
+        state.finishLoading(generation: generation, wasCancelled: true)
 
         // Verify hasLoadedOnce remains false, allowing skeletons to display on reload
         #expect(!state.hasLoadedOnce)
-        #expect(!state.isLoading)
+        #expect(state.isLoading)
         #expect(state.loadError == nil)
         #expect(state.entries.isEmpty)
 
@@ -55,10 +55,63 @@ struct WhatsNewViewTests {
 
         let cancellationError = CancellationError()
         state.handleFailure(error: cancellationError, generation: generation)
-        state.finishLoading(generation: generation)
+        state.finishLoading(generation: generation, wasCancelled: true)
 
         #expect(!state.hasLoadedOnce)
+        #expect(state.isLoading)
+        #expect(state.loadError == nil)
+    }
+
+    @Test func cancelledRefreshPreservesEntriesAndRetryCanFail() {
+        let entries = [makeEntry()]
+        var state = WhatsNewViewState(entries: entries, isLoading: false, hasLoadedOnce: true)
+        let cancelled = state.startLoading()
+        state.handleFailure(error: CancellationError(), generation: cancelled)
+        state.finishLoading(generation: cancelled, wasCancelled: true)
+        #expect(state.entries == entries)
+        #expect(state.hasLoadedOnce)
+        #expect(state.isLoading)
+        #expect(state.loadError == nil)
+
+        let retry = state.startLoading()
+        state.handleFailure(error: URLError(.timedOut), generation: retry)
+        state.finishLoading(generation: retry)
         #expect(!state.isLoading)
+        #expect(state.loadError != nil)
+        #expect(state.entries == entries)
+    }
+
+    @Test func staleCancellationCannotChangeReplacementLoad() {
+        var state = WhatsNewViewState()
+        let cancelled = state.startLoading()
+        let replacement = state.startLoading()
+        state.finishLoading(generation: cancelled, wasCancelled: true)
+        #expect(state.isLoading)
+        #expect(!state.hasLoadedOnce)
+
+        let entries = [makeEntry()]
+        state.handleSuccess(entries: entries, generation: replacement)
+        state.finishLoading(generation: replacement)
+        let completed = state
+        state.handleFailure(error: CancellationError(), generation: cancelled)
+        state.finishLoading(generation: cancelled, wasCancelled: true)
+        #expect(state == completed)
+        #expect(!state.isLoading)
+        #expect(state.entries == entries)
+        #expect(state.hasLoadedOnce)
+    }
+
+    @Test func successfulEmptyRetrySettlesCancelledInitialLoad() {
+        var state = WhatsNewViewState()
+        let cancelled = state.startLoading()
+        state.finishLoading(generation: cancelled, wasCancelled: true)
+        #expect(state.isLoading)
+        let retry = state.startLoading()
+        state.handleSuccess(entries: [], generation: retry)
+        state.finishLoading(generation: retry)
+        #expect(!state.isLoading)
+        #expect(state.hasLoadedOnce)
+        #expect(state.entries.isEmpty)
         #expect(state.loadError == nil)
     }
 
