@@ -59,6 +59,14 @@ protocol TokenStorage: Sendable {
 
     /// Deletes any stored token.
     func delete()
+
+    /// Deletes the stored token and reports whether the deletion was confirmed.
+    ///
+    /// The default delegates to ``delete()`` and reports success, which is
+    /// accurate for storages that cannot fail. Backing stores that can
+    /// observe delete failures (the Keychain) override this.
+    @discardableResult
+    func deleteConfirmed() -> Bool
 }
 
 extension TokenStorage {
@@ -71,6 +79,12 @@ extension TokenStorage {
 
     func saveConfirmed(_ token: String) -> Bool {
         save(token)
+        return true
+    }
+
+    @discardableResult
+    func deleteConfirmed() -> Bool {
+        delete()
         return true
     }
 }
@@ -117,6 +131,8 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
     typealias SecItemUpdateOperation = @Sendable (CFDictionary, CFDictionary) -> OSStatus
     /// Test seam standing in for `SecItemCopyMatching`.
     typealias SecItemCopyOperation = @Sendable (CFDictionary, UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus
+    /// Test seam standing in for `SecItemDelete`.
+    typealias SecItemDeleteOperation = @Sendable (CFDictionary) -> OSStatus
 
     let service: String
     let account: String
@@ -124,6 +140,7 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
     private let addItem: SecItemAddOperation
     private let updateItem: SecItemUpdateOperation
     private let copyItem: SecItemCopyOperation
+    private let deleteItem: SecItemDeleteOperation
 
     init(
         service: String = KeychainTokenStorage.defaultService,
@@ -136,10 +153,11 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
         self.addItem = { SecItemAdd($0, nil) }
         self.updateItem = { SecItemUpdate($0, $1) }
         self.copyItem = { SecItemCopyMatching($0, $1) }
+        self.deleteItem = { SecItemDelete($0) }
     }
 
-    /// Scripts `SecItemAdd`/`SecItemUpdate`/`SecItemCopyMatching` outcomes so
-    /// the read- and write-status handling is unit-testable without touching
+    /// Scripts `SecItemAdd`/`SecItemUpdate`/`SecItemCopyMatching`/`SecItemDelete` outcomes so
+    /// the read-, write-, and delete-status handling is unit-testable without touching
     /// the real Keychain.
     init(
         service: String,
@@ -147,7 +165,8 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
         accessibility: CFString,
         addItem: @escaping SecItemAddOperation,
         updateItem: @escaping SecItemUpdateOperation,
-        copyItem: @escaping SecItemCopyOperation = { SecItemCopyMatching($0, $1) }
+        copyItem: @escaping SecItemCopyOperation = { SecItemCopyMatching($0, $1) },
+        deleteItem: @escaping SecItemDeleteOperation = { SecItemDelete($0) }
     ) {
         self.service = service
         self.account = account
@@ -155,6 +174,7 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
         self.addItem = addItem
         self.updateItem = updateItem
         self.copyItem = copyItem
+        self.deleteItem = deleteItem
     }
 
     func load() -> String? {
@@ -230,11 +250,24 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
     }
 
     func delete() {
+        _ = deleteConfirmed()
+    }
+
+    /// Deletes the stored token and reports whether the Keychain confirmed it.
+    ///
+    /// Returns `true` when the item was successfully deleted (`errSecSuccess`)
+    /// or when no item was found (`errSecItemNotFound`), indicating that the
+    /// item is verifiably absent.
+    /// Returns `false` for every other status (such as `errSecInteractionNotAllowed`
+    /// when the Keychain is inaccessible), preventing silent deletion failures.
+    @discardableResult
+    func deleteConfirmed() -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
-        SecItemDelete(query as CFDictionary)
+        let status = deleteItem(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 }
