@@ -188,6 +188,8 @@ extension FeedbackClient {
     ///   caller is not signed in (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
     ///   server's permission policy rejects the comment (HTTP 403),
+    ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
+    ///   comments are not available or disabled (HTTP 404),
     ///   ``FeedbackClientError/invalidParent(message:requestId:)`` when the
     ///   reply target is missing, hidden, or not on this feature request
     ///   (HTTP 400 `invalid_parent`),
@@ -217,6 +219,13 @@ extension FeedbackClient {
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
+        }
+        if httpResponse.statusCode == 404 {
+            let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
+            let rawMessage = envelope?.error ?? String(data: data, encoding: .utf8)
+            let trimmed = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = (trimmed?.isEmpty ?? true) ? nil : trimmed
+            throw FeedbackClientError.commentsUnavailable(message: message, requestId: httpResponse.cupthreadRequestID)
         }
         // The route's 401/403 mean the caller is not signed in or the
         // server's permission policy rejected the comment; map them to the
