@@ -372,9 +372,10 @@ public struct FeedbackClient: Sendable {
 
     /// Resolves whether a request sent **right now** can carry the signed-in
     /// identity's bearer token: an `authenticationProvider` must be installed
-    /// *and* return a non-empty token. `false` covers every signed-out shape —
-    /// no provider at all, or a provider answering `nil`/blank because the
-    /// user is signed out or the token cannot be refreshed.
+    /// *and* return a non-empty, single-line token without newlines. `false`
+    /// covers every signed-out shape — no provider at all, or a provider
+    /// answering `nil`/blank/newline-bearing string because the user is signed
+    /// out, the token cannot be refreshed, or the value contains newlines.
     ///
     /// Permission preflights gate on this resolved value and re-evaluate it on
     /// every load, so a sign-in (or sign-out) between two loads is picked up
@@ -384,17 +385,19 @@ public struct FeedbackClient: Sendable {
     /// `Authorization: Bearer …`.
     func resolveAuthenticatedAccess() async -> Bool {
         guard let authenticationProvider else { return false }
-        return await authenticationProvider()?.nilIfEmpty != nil
+        guard let token = await authenticationProvider()?.nilIfEmpty else { return false }
+        return !token.contains(where: \.isNewline)
     }
 
     /// Resolves the signed-in identity's bearer token through the
     /// authentication provider and presents it as `Authorization: Bearer …`.
-    /// A `nil` or blank provider result (or no provider at all) leaves the
-    /// header unset, so the server's `401 authentication_required` response
-    /// decides the outcome.
+    /// A `nil` or blank provider result, or a token containing newlines (or no provider at all)
+    /// leaves the header unset, preventing HTTP header injection and letting the
+    /// server's `401 authentication_required` response decide the outcome.
     func applyBearerToken(to request: inout URLRequest) async {
         guard let authenticationProvider else { return }
-        if let bearer = await authenticationProvider()?.nilIfEmpty {
+        if let bearer = await authenticationProvider()?.nilIfEmpty,
+           !bearer.contains(where: \.isNewline) {
             request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         }
     }
