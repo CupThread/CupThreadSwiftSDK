@@ -250,4 +250,64 @@ struct ChangelogSeenStoreTests {
         #expect(customStore.storedVersions() == ["entry-1", "1.0.0"])
         #expect(customStore.writeCount == 1)
     }
+
+    @Test func sharedStoreRespectsDistinctUserDefaultsSuitesForSameAppKey() throws {
+        let appKey = "app_registry_test_\(UUID().uuidString)"
+        let suiteNameA = "group.test.suiteA.\(UUID().uuidString)"
+        let suiteNameB = "group.test.suiteB.\(UUID().uuidString)"
+        guard let suiteA = UserDefaults(suiteName: suiteNameA),
+              let suiteB = UserDefaults(suiteName: suiteNameB) else {
+            Issue.record("Failed to instantiate isolated test UserDefaults suites")
+            return
+        }
+        defer {
+            suiteA.removePersistentDomain(forName: suiteNameA)
+            suiteB.removePersistentDomain(forName: suiteNameB)
+            ChangelogSeenStore.resetRegistry()
+        }
+
+        let storeA = ChangelogSeenStore.shared(for: appKey, userDefaults: suiteA)
+        let storeB = ChangelogSeenStore.shared(for: appKey, userDefaults: suiteB)
+
+        #expect(storeA.userDefaults === suiteA)
+        #expect(storeB.userDefaults === suiteB)
+        #expect(storeA !== storeB)
+
+        storeA.markSeen("version-1.0.0")
+        #expect(storeA.hasSeen("version-1.0.0") == true)
+        #expect(storeB.hasSeen("version-1.0.0") == false)
+
+        let storeA2 = ChangelogSeenStore.shared(for: appKey, userDefaults: suiteA)
+        #expect(storeA2 === storeA)
+    }
+
+    @Test func sharedStoreRespectsDistinctMaxCapacityForSameAppKey() throws {
+        let appKey = "app_cap_test_\(UUID().uuidString)"
+        defer { ChangelogSeenStore.resetRegistry() }
+
+        let storeA = ChangelogSeenStore.shared(for: appKey, maxCapacity: 10)
+        let storeB = ChangelogSeenStore.shared(for: appKey, maxCapacity: 20)
+
+        #expect(storeA.maxCapacity == 10)
+        #expect(storeB.maxCapacity == 20)
+        #expect(storeA !== storeB)
+
+        let storeA2 = ChangelogSeenStore.shared(for: appKey, maxCapacity: 10)
+        #expect(storeA2 === storeA)
+    }
+
+    @Test func resetRegistryEvictsCachedStoresAndOverrides() throws {
+        let appKey = "app_reset_test_\(UUID().uuidString)"
+        let context = makeIsolatedDefaults()
+        defer { context.cleanup() }
+
+        let customStore = ChangelogSeenStore(appKey: appKey, userDefaults: context.defaults)
+        ChangelogSeenStore.register(customStore, for: appKey)
+        #expect(ChangelogSeenStore.shared(for: appKey) === customStore)
+
+        ChangelogSeenStore.resetRegistry()
+        let freshStore = ChangelogSeenStore.shared(for: appKey)
+        #expect(freshStore !== customStore)
+        #expect(freshStore.userDefaults === UserDefaults.standard)
+    }
 }

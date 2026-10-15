@@ -16,8 +16,15 @@ final class ChangelogSeenStore: @unchecked Sendable {
     static let keyPrefix = "com.cupthread.changelog.seenVersions."
 
     private final class StoreRegistry: @unchecked Sendable {
+        private struct RegistryKey: Hashable {
+            let appKey: String
+            let userDefaultsID: ObjectIdentifier
+            let maxCapacity: Int
+        }
+
         private let lock = NSLock()
-        private var stores: [String: ChangelogSeenStore] = [:]
+        private var registeredOverrides: [String: ChangelogSeenStore] = [:]
+        private var stores: [RegistryKey: ChangelogSeenStore] = [:]
 
         func store(
             for appKey: String,
@@ -26,23 +33,33 @@ final class ChangelogSeenStore: @unchecked Sendable {
         ) -> ChangelogSeenStore {
             lock.lock()
             defer { lock.unlock() }
-            if let existing = stores[appKey] {
+            if let override = registeredOverrides[appKey] {
+                return override
+            }
+            let effectiveCapacity = max(1, maxCapacity)
+            let key = RegistryKey(
+                appKey: appKey,
+                userDefaultsID: ObjectIdentifier(userDefaults),
+                maxCapacity: effectiveCapacity
+            )
+            if let existing = stores[key] {
                 return existing
             }
-            let store = ChangelogSeenStore(appKey: appKey, userDefaults: userDefaults, maxCapacity: maxCapacity)
-            stores[appKey] = store
+            let store = ChangelogSeenStore(appKey: appKey, userDefaults: userDefaults, maxCapacity: effectiveCapacity)
+            stores[key] = store
             return store
         }
 
         func register(_ store: ChangelogSeenStore, for appKey: String) {
             lock.lock()
             defer { lock.unlock() }
-            stores[appKey] = store
+            registeredOverrides[appKey] = store
         }
 
         func reset() {
             lock.lock()
             defer { lock.unlock() }
+            registeredOverrides.removeAll()
             stores.removeAll()
         }
     }
