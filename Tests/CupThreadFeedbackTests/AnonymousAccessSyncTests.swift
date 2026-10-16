@@ -258,6 +258,80 @@ struct AnonymousAccessSyncTests {
         }
     }
 
+    // MARK: - Propose endpoint (issue #467 API sync)
+
+    // The propose route now enforces the same 401 gate as the other roadmap
+    // endpoints, keyed by the app's `allowAnonymousRoadmap` setting. The
+    // plumbing already maps both envelope shapes; these cases pin the
+    // contract so a plumbing refactor cannot silently degrade it.
+
+    @Test func submitFeatureRequestMapsAuthenticationRequiredEnvelopeToTypedError() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401),
+                try encodeJSON([
+                    "error": "Sign in required to propose on this roadmap",
+                    "code": "authentication_required"
+                ])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().submitFeatureRequest(
+                FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
+                userToken: "user-fr-propose-1"
+            )
+            Issue.record("Expected authenticationRequired")
+        } catch let error as FeedbackClientError {
+            #expect(error == .authenticationRequired)
+        }
+    }
+
+    @Test func submitFeatureRequestMapsCodeLess401ToAuthenticationRequired() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 401),
+                try encodeJSON(["error": "Sign in required to propose on this roadmap"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().submitFeatureRequest(
+                FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
+                userToken: "user-fr-propose-1"
+            )
+            Issue.record("Expected authenticationRequired")
+        } catch let error as FeedbackClientError {
+            #expect(error == .authenticationRequired)
+        }
+    }
+
+    @Test func submitFeatureRequestMaps403ToForbidden() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 403, headers: ["X-Request-Id": "req-propose-403"]),
+                try encodeJSON(["error": "Feature request submissions are disabled for this app"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().submitFeatureRequest(
+                FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
+                userToken: "user-fr-propose-1"
+            )
+            Issue.record("Expected forbidden")
+        } catch let error as FeedbackClientError {
+            guard case .forbidden(let message, let requestId) = error else {
+                Issue.record("Expected forbidden, got \(error)")
+                return
+            }
+            #expect(message == "Feature request submissions are disabled for this app")
+            #expect(requestId == "req-propose-403")
+            #expect(error.requestId == "req-propose-403")
+            #expect(error.responseBody == nil)
+        }
+    }
+
     @Test func convenienceConstructorsInitializeWithoutRequestId() {
         let commentsError = FeedbackClientError.commentsUnavailable(message: "unavailable")
         #expect(commentsError == .commentsUnavailable(message: "unavailable", requestId: nil))

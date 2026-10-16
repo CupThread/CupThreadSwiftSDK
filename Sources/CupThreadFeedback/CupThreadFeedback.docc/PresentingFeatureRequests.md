@@ -90,6 +90,8 @@ let client = FeedbackClient(
 
 In addition to comment creation, the authentication provider attaches the bearer token to read and subscribe endpoints (loading comments, feature requests, roadmap columns, versions, and changelog) so signed-in users continue to have access even when the console disables anonymous access for the app (`allowAnonymousRoadmap` or `allowAnonymousChangelog`).
 
+Proposing a new feature request is gated by the same roadmap setting: when the console requires sign-in for the roadmap (`allowAnonymousRoadmap = false`) and no end-user session is present, ``FeedbackClient/submitFeatureRequest(_:userToken:)`` receives `401 authentication_required`, mapped to ``FeedbackClientError/authenticationRequired`` — the same failure as browsing a private board, so hosts can reuse their existing sign-in prompt.
+
 When the provider resolves `nil` (signed out) or the client has none, ``CommentsView`` shows a deliberate signed-out notice instead of a composer that could never succeed, and direct ``FeedbackClient/postComment(featureRequestId:draft:userToken:)`` calls throw the typed error. The author's display name and avatar always resolve server-side from the signed-in profile. Avatar and app-icon URLs from the API are treated as untrusted and filtered by `WebURLPolicy` to require HTTPS and prevent outbound requests to insecure or disallowed schemes.
 
 ## Human verification (Turnstile)
