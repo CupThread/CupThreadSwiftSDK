@@ -50,19 +50,22 @@ public struct CommentsView: View {
     /// Test seam mirroring `FeatureRequestComposeView`: `preResolvedAuthentication`
     /// injects the resolved access verdict for view-level tests; production
     /// presentations use the public initializer and the view resolves the
-    /// verdict on every load.
+    /// verdict on every load. `initialDraft` seeds the composer for tests
+    /// that drive `submitComment()` end to end.
     init(
         client: FeedbackClient,
         userToken: String,
         featureRequestId: String,
         featureRequestTitle: String,
-        preResolvedAuthentication: Bool
+        preResolvedAuthentication: Bool,
+        initialDraft: CommentDraft? = nil
     ) {
         self.client = client
         self.userToken = userToken
         self.featureRequestId = featureRequestId
         self.featureRequestTitle = featureRequestTitle
         _isAuthenticated = State(initialValue: preResolvedAuthentication)
+        _draft = State(initialValue: initialDraft ?? CommentDraft())
     }
 
     public var body: some View {
@@ -262,7 +265,7 @@ public struct CommentsView: View {
     }
 
     @MainActor
-    private func loadComments() async {
+    func loadComments() async {
         let generation = loadState.startLoading()
         var wasCancelled = false
         // Cancellation has no empty/error verdict to render (#442).
@@ -295,8 +298,13 @@ public struct CommentsView: View {
         }
     }
 
+    /// Internal for view-level tests (`@testable`), mirroring
+    /// `FeatureRequestComposeView.submit()`: `@State` writes are not
+    /// observable on a unit-constructed view, so the tests drive the real
+    /// method against a mocked client and pin the `@State` mutations with
+    /// the source-scan pattern.
     @MainActor
-    private func submitComment() async {
+    func submitComment() async {
         isSubmitting = true
         defer { isSubmitting = false }
         submitError = nil
@@ -307,6 +315,11 @@ public struct CommentsView: View {
                 userToken: userToken
             )
             comments.append(newComment)
+            // BUG-30: the stale full-screen load error outranks the comment
+            // list in the body, so a comment appended while it stands would
+            // stay masked behind LoadErrorView — retire the verdict on
+            // success.
+            loadState.loadError = nil
             draft.body = ""
             draft.clearReplyTarget()
         } catch {
