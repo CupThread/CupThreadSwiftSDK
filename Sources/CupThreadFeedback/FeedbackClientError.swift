@@ -86,9 +86,11 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// the submission unchanged will not.
     case turnstileRequired(message: String?, requestId: String?)
     /// The requested user profile could not be found (HTTP 404). `message`
-    /// carries the raw response body for diagnostics — see ``responseBody``;
-    /// it is never shown to end users.
-    case userProfileNotFound(message: String?)
+    /// carries the raw server text for diagnostics — see ``responseBody``;
+    /// it is never shown to end users. `requestId` is the response's
+    /// `X-Request-Id` correlation id for support requests (`nil` when the
+    /// id was rejected locally, before any request was sent — API-26).
+    case userProfileNotFound(message: String?, requestId: String?)
     /// Comments are not available for the requested feature request (HTTP 404) —
     /// e.g. comments are disabled for this item or the thread has not been initialized.
     /// `message` carries the raw server text for diagnostics; it is never shown to end users.
@@ -174,7 +176,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         switch self {
         case .unexpectedStatus(_, let message, _):
             return message
-        case .userProfileNotFound(let message):
+        case .userProfileNotFound(let message, _):
             return message
         case .featureRequestNotFound(let message, _):
             return message
@@ -280,10 +282,12 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .featureRequestNotFound(_, let requestId):
             return requestId
+        case .userProfileNotFound(_, let requestId):
+            return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
         case .invalidResponse, .unreadableUploadResponse, .invalidConfiguration,
-             .authenticationRequired, .userProfileNotFound, .textTooLong:
+             .authenticationRequired, .textTooLong:
             return nil
         }
     }
@@ -332,8 +336,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return CupThreadStrings.tr("cupthread.error.daily_storage_quota_exceeded") + Self.requestIdSuffix(requestId)
         case .imageUploadFailed(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.image_upload_failed") + Self.requestIdSuffix(requestId)
-        case .userProfileNotFound:
-            return CupThreadStrings.tr("cupthread.error.profile_not_found")
+        case .userProfileNotFound(_, let requestId):
+            return CupThreadStrings.tr("cupthread.error.profile_not_found") + Self.requestIdSuffix(requestId)
         case .featureRequestNotFound(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.http_not_found") + Self.requestIdSuffix(requestId)
         case .commentsUnavailable(_, let requestId):
@@ -436,6 +440,11 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``commentsUnavailable(message:requestId:)`` with no request id.
     static func commentsUnavailable(message: String? = nil) -> FeedbackClientError {
         .commentsUnavailable(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``userProfileNotFound(message:requestId:)`` with no request id.
+    static func userProfileNotFound(message: String? = nil) -> FeedbackClientError {
+        .userProfileNotFound(message: message, requestId: nil)
     }
 
     /// Convenience constructor for ``invalidParent(message:requestId:)`` with no request id.
