@@ -216,7 +216,11 @@ public struct RoadmapBoardView: View {
                         hasEmittedAdmissionNotice = true
                     }
                 case .fullScreenError(let message):
-                    loadState.loadError = message
+                    // Admission never started a load, so settle the inherited
+                    // first-load flags here — otherwise `isLoading &&
+                    // !hasLoadedOnce` keeps the skeleton up and masks the
+                    // error (issue #418).
+                    loadState.settleAdmissionDenied(message: message)
                 }
                 return
             }

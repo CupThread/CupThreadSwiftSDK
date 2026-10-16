@@ -113,6 +113,48 @@ struct FeatureRequestsLoadStateTests {
         #expect(state.loadGeneration == 1)
     }
 
+    // MARK: - Admission Denial Settle (Issue #418)
+
+    @Test func settleAdmissionDeniedEndsTheFirstLoadSkeletonCondition() {
+        // Admission denies a fresh surface without ever starting a load, so
+        // the inherited first-load flags would keep `isLoading &&
+        // !hasLoadedOnce` true forever and mask the admission error rendered
+        // next to these flags.
+        var state = FeatureRequestsLoadState()
+
+        state.settleAdmissionDenied()
+
+        #expect(!state.isLoading)
+        #expect(state.hasLoadedOnce)
+        #expect(state.loadGeneration == 1)
+    }
+
+    @Test func settleAdmissionDeniedInvalidatesAnInFlightLoad() {
+        // A load still in flight from a superseded task must not resolve the
+        // lifecycle or apply its page behind the denial.
+        var state = FeatureRequestsLoadState()
+        let inFlight = state.startLoading()
+
+        state.settleAdmissionDenied()
+
+        #expect(state.loadGeneration != inFlight)
+        state.finishLoading(generation: inFlight, wasCancelled: false)
+        #expect(!state.isLoading && state.hasLoadedOnce, "The denial settle's flags stand; the stale finish is a no-op")
+    }
+
+    @Test func restartAfterAdmissionDeniedLoadsTheListAgain() {
+        // Denial settle, then the retry (LoadErrorView → refreshFeatureRequests)
+        // starts a fresh load whose verdict resolves the lifecycle normally.
+        var state = FeatureRequestsLoadState()
+        state.settleAdmissionDenied()
+
+        let generation = state.startLoading()
+        state.finishLoading(generation: generation, wasCancelled: false)
+
+        #expect(!state.isLoading)
+        #expect(state.hasLoadedOnce)
+    }
+
     // MARK: - View Presentation
 
     @Test @MainActor func featureRequestsViewFirstRenderKeepsSkeletonCondition() {

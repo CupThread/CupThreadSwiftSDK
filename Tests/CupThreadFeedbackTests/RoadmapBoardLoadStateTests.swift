@@ -157,6 +157,71 @@ struct RoadmapBoardLoadStateTests {
         #expect(state.loadError == "current")
     }
 
+    @Test func settledAdmissionDeniedRecordsErrorAndEndsTheFirstLoad() {
+        // Issue #418: admission denies a fresh surface without ever running
+        // load(), so the settle must both end the first-load skeleton and
+        // record the denial message — the state the full-screen error renders.
+        var state = RoadmapBoardLoadState()
+
+        state.settleAdmissionDenied(message: "Rate limited. Please wait a moment.")
+
+        #expect(!state.isLoading)
+        #expect(state.hasLoadedOnce)
+        #expect(state.loadError == "Rate limited. Please wait a moment.")
+        #expect(state.loadGeneration == 1)
+
+        let displayState = makeBoardDisplayState(
+            isLoading: state.isLoading,
+            hasLoadedOnce: state.hasLoadedOnce,
+            loadError: state.loadError,
+            searchText: "dark mode",
+            groups: []
+        )
+        #expect(displayState == .error("Rate limited. Please wait a moment."))
+        #expect(displayState != .loading)
+    }
+
+    @Test func settledAdmissionDeniedInvalidatesAnInFlightLoad() {
+        // A load still in flight from a superseded task must not write its
+        // verdict behind the denial: the settle bumps the generation so the
+        // stale finish and failure are both no-ops.
+        var state = RoadmapBoardLoadState()
+        let inFlight = state.startLoading()
+
+        state.settleAdmissionDenied(message: "denied")
+
+        #expect(!state.isCurrent(generation: inFlight))
+        state.finishLoading(generation: inFlight)
+        #expect(!state.isLoading && state.hasLoadedOnce, "The denial settle's flags stand; the stale finish is a no-op")
+        #expect(state.loadError == "denied")
+
+        state.handleFailure(message: "stale failure", generation: inFlight)
+        #expect(state.loadError == "denied")
+    }
+
+    @Test func restartAfterAdmissionDeniedLoadsTheBoardAgain() {
+        // The #418 sequence end to end at the state level: a denied admission
+        // settles with the error, then clearing the query starts a plain load
+        // whose verdict leaves the board renderable — never stuck in `.loading`.
+        var state = RoadmapBoardLoadState()
+        state.settleAdmissionDenied(message: "Rate limited. Please wait a moment.")
+
+        let generation = state.startLoading()
+        #expect(state.isCurrent(generation: generation))
+        #expect(state.loadError == nil, "startLoading clears the denial on the retry")
+
+        state.finishLoading(generation: generation)
+        let displayState = makeBoardDisplayState(
+            isLoading: state.isLoading,
+            hasLoadedOnce: state.hasLoadedOnce,
+            loadError: state.loadError,
+            searchText: "",
+            groups: []
+        )
+        #expect(displayState == .emptyBoard)
+        #expect(displayState != .loading)
+    }
+
     @Test func deniedThenPermittedRestartLoadsTheBoardAgain() {
         // The #274 sequence end to end at the state level: denied settle,
         // then a permitted flip restarts a load whose success leaves the

@@ -65,4 +65,16 @@ struct FeatureRequestsLoadState: Equatable, Sendable {
         isLoading = false
         hasLoadedOnce = true
     }
+
+    /// Settles the lifecycle when search admission denies a query with nothing
+    /// to show (issue #418). Admission never starts a load, so the first-load
+    /// flags it inherited would otherwise keep the skeleton up and mask the
+    /// admission error (`loadError` lives outside this struct); settling also
+    /// bumps the generation, invalidating any load still in flight from a
+    /// superseded task so its late verdict cannot overwrite the denial.
+    mutating func settleAdmissionDenied() {
+        loadGeneration += 1
+        isLoading = false
+        hasLoadedOnce = true
+    }
 }

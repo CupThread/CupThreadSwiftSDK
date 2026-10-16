@@ -62,18 +62,26 @@ struct RoadmapBoardDisplayStateTests {
         )
     }
 
-    @Test func firstLoadInProgressYieldsLoadingEvenWithStaleInputs() {
-        let columns = [makeColumn(id: "col-1", name: "Planned")]
-        let groups = makeGroups(columns: columns, requests: [makeItem(id: "req-1", columnId: "col-1")])
-
-        let state = makeState(
-            isLoading: true,
-            hasLoadedOnce: false,
-            loadError: "stale error",
-            groups: groups
+    @Test func loadErrorPrioritizedOverInitialLoadingSkeleton() {
+        // Issue #418: a denied initial search admission writes the error
+        // without running load(), so the skeleton branch used to own the
+        // surface forever and masked the error. The derivation must render
+        // the error first — the skeleton only represents "no verdict yet",
+        // and an error on record is a verdict.
+        #expect(
+            makeState(
+                isLoading: true,
+                hasLoadedOnce: false,
+                loadError: "Rate limited. Please wait a moment.",
+                groups: []
+            ) == .error("Rate limited. Please wait a moment.")
         )
+    }
 
-        #expect(state == .loading)
+    @Test func firstLoadInProgressWithoutErrorYieldsLoading() {
+        // The skeleton branch keeps ownership of the genuinely undecided
+        // first load; #418 only dethroned it when a loadError is on record.
+        #expect(makeState(isLoading: true, hasLoadedOnce: false, groups: []) == .loading)
     }
 
     @Test func loadErrorYieldsErrorRegardlessOfGroups() {
