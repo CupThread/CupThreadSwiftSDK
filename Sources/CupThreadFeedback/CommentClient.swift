@@ -107,9 +107,11 @@ extension FeedbackClient {
     /// `Authorization: Bearer …` so comments load when `allowAnonymousRoadmap = false`.
     /// - Parameters:
     ///   - featureRequestId: Id of the feature request.
-    ///   - limit: Comments per page. The server accepts 1...200 (default 200).
+    ///   - limit: Comments per page. The server accepts 1...200 (default 200);
+    ///     values outside that range are clamped to it.
     ///   - cursor: Opaque keyset cursor from a previous page's
     ///     ``ListCommentsResult/nextCursor``; omit for the first page.
+    ///     Blank or whitespace-only values are dropped.
     /// - Returns: The page's comments plus `total` / `hasMore` / `nextCursor`.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
     ///   access is disabled for the app (HTTP 401),
@@ -137,8 +139,11 @@ extension FeedbackClient {
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
             throw FeedbackClientError.invalidResponse
         }
-        var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
-        if let cursor, !cursor.isEmpty {
+        // The gateway rejects page sizes outside 1...200 with 400, so clamp
+        // here instead of letting invalid values reach it (#425).
+        let effectiveLimit = min(max(1, limit), Self.commentsMaxPageSize)
+        var queryItems = [URLQueryItem(name: "limit", value: String(effectiveLimit))]
+        if let cursor = cursor?.nilIfEmpty {
             queryItems.append(URLQueryItem(name: "cursor", value: cursor))
         }
         components.queryItems = queryItems
