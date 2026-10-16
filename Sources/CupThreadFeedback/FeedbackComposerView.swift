@@ -383,6 +383,25 @@ public struct FeedbackComposerView: View {
             guard let prepared = try await preparePhotoForUpload(item, uploadId: uploadId) else { return }
             defer { PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL) }
 
+            // Re-validate across the resume boundary (#423): the checks in
+            // `preparePhotoForUpload` only held at its return, and a
+            // superseding selection or handle cancel can land during the hop
+            // back to the main actor. Skip the doomed network round-trip
+            // instead of creating a backend upload session and streaming
+            // obsolete bytes over it.
+            switch PhotoUploadAdmission.resolve(
+                isCancelled: Task.isCancelled,
+                isActiveUpload: attachmentState.activeUploadId == uploadId
+            ) {
+            case .proceed:
+                break
+            case .cancelledWhileActive:
+                attachmentState.cancelUpload()
+                return
+            case .superseded:
+                return
+            }
+
             let uploaded = try await client.uploadAttachment(
                 fileURL: prepared.fileURL,
                 filename: prepared.filename,
@@ -444,8 +463,11 @@ public struct FeedbackComposerView: View {
     /// bytes are released when this returns.
     ///
     /// Returns `nil` when the upload was superseded or cancelled before
-    /// preparation finished. Delete the returned file with
-    /// ``PhotoAttachmentHelper/removeTempUploadFile(at:)`` when done.
+    /// preparation finished — including while the spooled file was being
+    /// written, in which case the file is removed before returning so no
+    /// orphan is left behind in the temporary directory (#423). Delete the
+    /// returned file with ``PhotoAttachmentHelper/removeTempUploadFile(at:)``
+    /// when done.
     private func preparePhotoForUpload(
         _ item: PhotosPickerItem,
         uploadId: UUID
@@ -459,6 +481,27 @@ public struct FeedbackComposerView: View {
             fileExtension: prepared.fileExtension,
             id: uploadId
         )
+
+        // The spool ran across awaits, so the write may have been racing a
+        // cancellation or a superseding selection the whole time. Re-validate
+        // before handing the file out, removing it when the upload is already
+        // doomed (#423).
+        switch PhotoUploadAdmission.resolve(
+            isCancelled: Task.isCancelled,
+            isActiveUpload: attachmentState.activeUploadId == uploadId
+        ) {
+        case .proceed:
+            break
+        case .cancelledWhileActive:
+            PhotoAttachmentHelper.removeTempUploadFile(at: fileURL)
+            // Same unwind as the pre-spool `checkCancellation`: the catch in
+            // `uploadPhotoItem` resets the still-active machine.
+            throw CancellationError()
+        case .superseded:
+            PhotoAttachmentHelper.removeTempUploadFile(at: fileURL)
+            return nil
+        }
+
         return PreparedPhotoUpload(
             fileURL: fileURL,
             filename: PhotoAttachmentHelper.makeFilename(
