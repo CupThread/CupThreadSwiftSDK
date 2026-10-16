@@ -54,6 +54,8 @@ struct FeatureRequestComposeView: View {
 
     /// - Parameters:
     ///   - config: Optional console configuration override (previews/tests).
+    ///   - initialDraft: Optional draft to seed the form with (previews/tests,
+    ///     mirroring ``FeedbackComposerView``).
     ///   - preResolvedAuthentication: Injects the resolved access verdict for
     ///     view-level tests — `nil` leaves the verdict unsettled so the sheet
     ///     starts in its neutral loading state and resolves in `.task` (the
@@ -63,6 +65,7 @@ struct FeatureRequestComposeView: View {
         client: FeedbackClient,
         userToken: String,
         config: PublicAppConfig? = nil,
+        initialDraft: FeatureRequestDraft? = nil,
         preResolvedAuthentication: Bool? = nil,
         onSubmitted: @escaping () -> Void
     ) {
@@ -70,6 +73,7 @@ struct FeatureRequestComposeView: View {
         self.userToken = userToken
         self.configOverride = config
         self.onSubmitted = onSubmitted
+        _draft = State(initialValue: initialDraft ?? FeatureRequestDraft())
         _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
         _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
     }
@@ -195,8 +199,10 @@ struct FeatureRequestComposeView: View {
         IntakeTextLimits.overLimitField(in: draft) == nil
     }
 
+    /// Sends the current draft. Internal so view-level tests can drive the
+    /// submission flow directly.
     @MainActor
-    private func submit() async {
+    func submit() async {
         guard SdkSubmissionDenial.forFeatureRequest(
             config: activeConfig,
             supportsAuthentication: isAuthenticated
@@ -206,6 +212,12 @@ struct FeatureRequestComposeView: View {
         defer { isSubmitting = false }
         do {
             _ = try await client.submitFeatureRequest(draft, userToken: userToken)
+            // The proposal is saved server-side: drop the draft immediately so
+            // `canSubmit` turns off and the accidental-dismiss guard releases
+            // even while the host tears the sheet down — a stale draft would
+            // invite duplicate proposals and a spurious "discard changes?"
+            // prompt (issue #424).
+            draft = FeatureRequestDraft()
             onSubmitted()
         } catch {
             guard !error.isSdkCancellation else { return }

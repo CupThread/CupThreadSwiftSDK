@@ -149,4 +149,122 @@ struct FeatureRequestComposeDismissalTests {
         sheet.onDismiss()
         #expect(didDismiss)
     }
+
+    // MARK: - Post-submission draft reset (issue #424)
+
+    @Test @MainActor func successfulSubmissionFiresCallbackAndSendsSeededDraft() async throws {
+        // Each submission test gets its own mock host: Swift Testing runs
+        // tests in parallel, and MockURLProtocol handlers are keyed by host.
+        let host = "compose-success.test.example.com"
+        let capture = CaptureBox<URLRequest>()
+        let json: [String: Any] = ["featureRequestId": "fr_reset_1", "pending": true]
+        MockURLProtocol.setHandler(forHost: host) { request in
+            capture.value = request
+            return (makeHTTPResponse(status: 201), try encodeJSON(json))
+        }
+        defer { MockURLProtocol.setHandler(forHost: host, nil) }
+
+        var didSubmit = false
+        let view = FeatureRequestComposeView(
+            client: makeClient(baseURL: URL(string: "https://\(host)")!),
+            userToken: "test_token",
+            config: makeConfig(allowAnonymousFeedback: true),
+            initialDraft: FeatureRequestDraft(
+                title: "Dark mode support",
+                description: "Please add dark mode.",
+                requesterName: "Alice"
+            )
+        ) { didSubmit = true }
+
+        await view.submit()
+
+        #expect(didSubmit)
+        let request = try #require(capture.value)
+        let body = try #require(bodyData(from: request))
+        let payload = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(payload["title"] as? String == "Dark mode support")
+    }
+
+    @Test @MainActor func failedSubmissionKeepsDraftForRetryAndSkipsCallback() async {
+        let host = "compose-failure.test.example.com"
+        MockURLProtocol.setHandler(forHost: host) { _ in
+            (makeHTTPResponse(status: 500), try encodeJSON(["error": "boom"]))
+        }
+        defer { MockURLProtocol.setHandler(forHost: host, nil) }
+
+        var didSubmit = false
+        let view = FeatureRequestComposeView(
+            client: makeClient(baseURL: URL(string: "https://\(host)")!),
+            userToken: "test_token",
+            config: makeConfig(allowAnonymousFeedback: true),
+            initialDraft: FeatureRequestDraft(
+                title: "Dark mode support",
+                description: "Please add dark mode."
+            )
+        ) { didSubmit = true }
+
+        await view.submit()
+
+        #expect(!didSubmit, "a failed submission must not fire onSubmitted")
+    }
+
+    @Test func successfulSubmitPathResetsDraftBeforeCallback() throws {
+        // SwiftUI @State is only writable inside a live view hierarchy, so the
+        // draft reset itself cannot be observed on a unit-constructed view.
+        // Follow the CancellationSuppressionTests source-scan pattern: the
+        // success path must drop the draft between saving the proposal and
+        // notifying the host, so `canSubmit` turns off and the accidental-
+        // dismiss guard releases (issue #424).
+        var directory = URL(fileURLWithPath: #filePath)
+        var sourceURL: URL?
+        for _ in 0..<6 {
+            directory.deleteLastPathComponent()
+            let candidate = directory
+                .appendingPathComponent("Sources", isDirectory: true)
+                .appendingPathComponent("CupThreadFeedback", isDirectory: true)
+                .appendingPathComponent("FeatureRequestComposeView.swift")
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                sourceURL = candidate
+                break
+            }
+        }
+        let content = try String(contentsOf: try #require(sourceURL), encoding: .utf8)
+
+        let submitCall = try #require(
+            content.range(of: "_ = try await client.submitFeatureRequest"),
+            "submit success path not found"
+        )
+        let callback = try #require(
+            content.range(of: "onSubmitted()", range: submitCall.upperBound..<content.endIndex),
+            "onSubmitted() after the submit call not found"
+        )
+        let between = content[submitCall.upperBound..<callback.lowerBound]
+        #expect(
+            between.contains("draft = FeatureRequestDraft()"),
+            "a successful submission must reset the draft before onSubmitted() so the dismiss guard releases (issue #424)"
+        )
+    }
+
+    @Test func resetDraftReleasesSubmitGuardAndDismissConfirmation() {
+        // What the reset buys the user: once the draft empties, the submit
+        // guard drops (no duplicate proposals) and a leave attempt no longer
+        // asks for discard confirmation — the content is already saved
+        // server-side.
+        var draft = FeatureRequestDraft(
+            title: "Dark mode support",
+            description: "Please add dark mode."
+        )
+        #expect(draft.hasContent)
+        #expect(
+            ComposerDismissalDecision.resolve(hasContent: draft.hasContent, isSubmitting: false)
+                == .confirmDiscard
+        )
+
+        draft = FeatureRequestDraft()
+        #expect(!draft.hasContent)
+        #expect(
+            ComposerDismissalDecision.resolve(hasContent: draft.hasContent, isSubmitting: false)
+                == .dismiss
+        )
+    }
 }
