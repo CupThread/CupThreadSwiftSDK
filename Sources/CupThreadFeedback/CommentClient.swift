@@ -127,8 +127,12 @@ extension FeedbackClient {
         limit: Int,
         cursor: String? = nil
     ) async throws -> ListCommentsResult {
+        let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else {
+            throw FeedbackClientError.invalidResponse
+        }
         let base = configuration.baseURL.appending(
-            path: "/api/v1/feature-requests/\(featureRequestId)/comments"
+            path: "/api/v1/feature-requests/\(trimmedID)/comments"
         )
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
             throw FeedbackClientError.invalidResponse
@@ -203,13 +207,17 @@ extension FeedbackClient {
         draft: CommentDraft,
         userToken: String
     ) async throws -> FeatureRequestComment {
+        let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else {
+            throw FeedbackClientError.invalidResponse
+        }
         let payload = CommentSubmitPayload(
             body: draft.body.trimmingCharacters(in: .whitespacesAndNewlines),
             parentId: draft.parentId?.nilIfEmpty,
             replyToAuthorName: draft.replyToAuthorName?.nilIfEmpty
         )
 
-        var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(featureRequestId)/comments"))
+        var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)/comments"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)

@@ -243,6 +243,10 @@ extension FeedbackClient {
         shipNotifyEmail: String? = nil,
         turnstileToken: String? = nil
     ) async throws -> VoteResult {
+        let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else {
+            throw FeedbackClientError.invalidResponse
+        }
         let normalizedShipNotifyEmail = shipNotifyEmail?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
@@ -263,7 +267,7 @@ extension FeedbackClient {
                     turnstileToken: token
                 )
                 var request = URLRequest(
-                    url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests/\(featureRequestId)/vote")
+                    url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)/vote")
                 )
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -282,7 +286,7 @@ extension FeedbackClient {
             )
 
             var request = URLRequest(
-                url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(featureRequestId)/vote")
+                url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)/vote")
             )
             request.httpMethod = method
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
