@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 // MARK: - User Attributes API
@@ -139,11 +140,22 @@ extension FeedbackClient {
     /// `PUT /api/v1/public/apps/{appKey}/user`.
     ///
     /// When reporting paying-user attributes (`isPaying`, `plan`, `mrr`, or `currency`),
-    /// the request must be HMAC-SHA256 signed using the app's SDK signing secret
-    /// (configured on ``FeedbackClientConfiguration/signingSecret`` or provided
-    /// via the `signingSecret` parameter). Requests without payment attributes
-    /// (identity-only updates) do not require a signature and are
-    /// sent unsigned.
+    /// the request must be HMAC-SHA256 signed. The signature is produced
+    /// wherever the SDK signing secret lives: a backend-delegated
+    /// `userAttributesSigner` provider (your server holds the secret — the
+    /// recommended integration, SEC-19), the app-embedded secret (configured
+    /// on ``FeedbackClientConfiguration/signingSecret`` or provided via the
+    /// `signingSecret` parameter, consulted only when no provider is
+    /// installed or the provider declines), and, when neither is available,
+    /// the report is sent unsigned and rejected by the server. Requests
+    /// without payment attributes (identity-only updates) do not require a
+    /// signature and are sent unsigned.
+    ///
+    /// > Warning: An embedded signing secret is not tamper-resistant — anyone
+    /// > who installs the app can extract it from the binary and forge
+    /// > verified payment attributes for arbitrary end users. Prefer the
+    /// > backend-delegated `userAttributesSigner` provider on
+    /// > ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``.
     ///
     /// To explicitly clear an attribute server-side (such as a churned subscription
     /// plan or reset MRR), pass `.null` using the ``UserAttributesSigner/Field`` overload.
@@ -180,7 +192,10 @@ extension FeedbackClient {
     ///     and surrounding whitespace would desynchronize the HMAC from the
     ///     trimmed header (#417).
     ///   - signingSecret: Optional override for the SDK signing secret configured
-    ///     on ``FeedbackClientConfiguration/signingSecret``.
+    ///     on ``FeedbackClientConfiguration/signingSecret``. Consulted only
+    ///     when no `userAttributesSigner` provider is installed or the
+    ///     provider declines — and not tamper-resistant (see the warning
+    ///     above): prefer backend-delegated signing.
     /// - Returns: Whether the update was applied and when.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when
     ///   `userToken` is blank, whitespace-only, or contains a newline (all
@@ -227,6 +242,16 @@ extension FeedbackClient {
     /// ``FeedbackClientError/reservedPlanValue(message:requestId:)``. Pass
     /// `.unset` / `.null` directly for the sentinel semantics.
     ///
+    /// Signatures resolve exactly as in the optional-values overload: the
+    /// backend-delegated `userAttributesSigner` provider first, then the
+    /// embedded secret, then unsigned.
+    ///
+    /// > Warning: An embedded signing secret is not tamper-resistant — anyone
+    /// > who installs the app can extract it from the binary and forge
+    /// > verified payment attributes for arbitrary end users. Prefer the
+    /// > backend-delegated `userAttributesSigner` provider on
+    /// > ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``.
+    ///
     /// - Parameters:
     ///   - isPaying: Whether the user is on a paid plan (`.value`, `.null`, or `.unset`).
     ///   - plan: Host-app plan name (`.value`, `.null`, or `.unset`); a `.value`
@@ -236,7 +261,9 @@ extension FeedbackClient {
     ///   - userToken: Anonymous user token sent as `X-User-Token`. Blank,
     ///     whitespace-only, or multi-line values are rejected locally (#417).
     ///   - signingSecret: Optional override for the SDK signing secret configured
-    ///     on ``FeedbackClientConfiguration/signingSecret``.
+    ///     on ``FeedbackClientConfiguration/signingSecret``. Consulted only
+    ///     when no `userAttributesSigner` provider is installed or the
+    ///     provider declines.
     /// - Returns: Whether the update was applied and when.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when
     ///   `userToken` is blank, whitespace-only, or contains a newline (all
@@ -272,11 +299,22 @@ extension FeedbackClient {
 
     /// Reports end-user attributes (identity only) to `PUT /api/v1/public/apps/{appKey}/user`.
     ///
+    /// Identity-only reports carry no payment attributes and are sent
+    /// unsigned, so no signing secret or signing provider is consulted.
+    ///
+    /// > Warning: The `signingSecret` override accepted here for signature
+    /// > symmetry is never used by this overload — and an embedded signing
+    /// > secret anywhere in a host app is not tamper-resistant: anyone who
+    /// > installs the app can extract it from the binary and forge verified
+    /// > payment attributes. Prefer the backend-delegated `userAttributesSigner`
+    /// > provider on ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``.
+    ///
     /// - Parameters:
     ///   - userToken: Anonymous user token sent as `X-User-Token`. Blank,
     ///     whitespace-only, or multi-line values are rejected locally (#417).
     ///   - signingSecret: Optional override for the SDK signing secret configured
-    ///     on ``FeedbackClientConfiguration/signingSecret``.
+    ///     on ``FeedbackClientConfiguration/signingSecret``. Unused by this
+    ///     identity-only overload — no payment attributes, no signature.
     /// - Returns: Whether the update was applied and when.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when
     ///   `userToken` is blank, whitespace-only, or contains a newline (all
@@ -345,68 +383,107 @@ extension FeedbackClient {
               !identityToken.contains(where: \.isNewline) else {
             throw FeedbackClientError.authenticationRequired
         }
-        let hasPaymentAttributes = isPaying != .unset || plan != .unset || mrr != .unset || currency != .unset
+        let signingSecretInUse = (signingSecret ?? configuration.signingSecret)?.nilIfEmpty
 
-        func signedPayload(epochSeconds: Int64, secret: String) -> UserAttributesPayload {
-            let canonical = UserAttributesSigner.canonicalString(
-                for: .init(
+        // The signing clock is the device clock corrected by the server-time
+        // offset learned from response `Date` headers (API-19) — the pinned
+        // `timestamp` test parameter wins when provided. Before any
+        // observation the offset is 0, so behavior matches the device clock.
+        let initialEpochSeconds = timestamp ?? Int64(serverClock.correctedNow().timeIntervalSince1970)
+        let attempt = try await resolveUserAttributesAttemptPayload(
+            arguments: UserAttributesSigner.Arguments(
+                appKey: configuration.appKey,
+                userToken: identityToken,
+                isPaying: isPaying,
+                plan: plan,
+                mrr: mrr,
+                currency: currency,
+                timestamp: initialEpochSeconds
+            ),
+            signingSecretInUse: signingSecretInUse
+        )
+
+        do {
+            return try await sendUserAttributesAttempt(attempt.payload, userToken: identityToken)
+        } catch let error as FeedbackClientError {
+            guard case .staleSignature = error, attempt.signed else {
+                throw error
+            }
+            // The signature timestamp fell outside the server's freshness
+            // window (API-19): the failing response's `Date` header has
+            // already refreshed the offset in `validateResponse`, so a fresh
+            // timestamp from the corrected clock lands inside the window.
+            // Resolution runs again with the fresh timestamp — the provider
+            // is called once more, falling back to the secret when it
+            // declines — and the PUT is retried exactly once. An
+            // `invalid_signature` failure (a mismatched secret — time cannot
+            // fix it) and every other failure is never retried.
+            let retryEpochSeconds = Int64(serverClock.correctedNow().timeIntervalSince1970)
+            let retry = try await resolveUserAttributesAttemptPayload(
+                arguments: UserAttributesSigner.Arguments(
                     appKey: configuration.appKey,
                     userToken: identityToken,
                     isPaying: isPaying,
                     plan: plan,
                     mrr: mrr,
                     currency: currency,
-                    timestamp: epochSeconds
-                )
+                    timestamp: retryEpochSeconds
+                ),
+                signingSecretInUse: signingSecretInUse
             )
-            return UserAttributesPayload(
-                isPaying: isPaying,
-                plan: plan,
-                mrr: mrr,
-                currency: currency,
-                signature: UserAttributesSigner.signature(for: canonical, secret: secret),
-                timestamp: epochSeconds
+            return try await sendUserAttributesAttempt(retry.payload, userToken: identityToken)
+        }
+    }
+
+    /// Produces the payload for one signed-or-unsigned `PUT /user` attempt.
+    ///
+    /// Signing resolution (SEC-19): the backend-delegated provider wins,
+    /// then the embedded secret, then the report goes unsigned (which the
+    /// server rejects). The SDK builds the canonical string with its own
+    /// server-clock-corrected timestamp (embedded in `arguments`) and sends
+    /// the provider's returned timestamp verbatim; a provider result outside
+    /// the signature grammar is rejected locally before any request is
+    /// built. The `signed` flag tells the stale-signature retry whether this
+    /// attempt carried a signature worth refreshing.
+    private func resolveUserAttributesAttemptPayload(
+        arguments: UserAttributesSigner.Arguments,
+        signingSecretInUse: String?
+    ) async throws -> (payload: UserAttributesPayload, signed: Bool) {
+        func payload(signature: String?, timestamp: Int64?) -> UserAttributesPayload {
+            UserAttributesPayload(
+                isPaying: arguments.isPaying,
+                plan: arguments.plan,
+                mrr: arguments.mrr,
+                currency: arguments.currency,
+                signature: signature,
+                timestamp: timestamp
             )
         }
 
-        // The signing clock is the device clock corrected by the server-time
-        // offset learned from response `Date` headers (API-19) — the pinned
-        // `timestamp` test parameter wins when provided. Before any
-        // observation the offset is 0, so behavior matches the device clock.
-        let signingSecretInUse = (signingSecret ?? configuration.signingSecret)?.nilIfEmpty
-        let payload: UserAttributesPayload
-        if hasPaymentAttributes, let secret = signingSecretInUse {
-            let epochSeconds = timestamp ?? Int64(serverClock.correctedNow().timeIntervalSince1970)
-            payload = signedPayload(epochSeconds: epochSeconds, secret: secret)
-        } else {
-            payload = UserAttributesPayload(
-                isPaying: isPaying,
-                plan: plan,
-                mrr: mrr,
-                currency: currency
-            )
+        guard arguments.isPaying != .unset || arguments.plan != .unset
+                || arguments.mrr != .unset || arguments.currency != .unset else {
+            return (payload(signature: nil, timestamp: nil), false)
         }
-
-        do {
-            return try await sendUserAttributesAttempt(payload, userToken: identityToken)
-        } catch let error as FeedbackClientError {
-            guard case .staleSignature = error,
-                  hasPaymentAttributes, let secret = signingSecretInUse else {
-                throw error
+        let request = UserAttributesSigningRequest(
+            canonicalString: UserAttributesSigner.canonicalString(for: arguments),
+            arguments: arguments
+        )
+        if let provider = userAttributesSigner {
+            if let resolved = try await provider(request) {
+                guard UserAttributesSignatureGrammar.isValid(resolved.signature) else {
+                    throw FeedbackClientError.invalidSignature(
+                        message: "Signing provider returned a malformed signature (expected 64 hexadecimal characters)",
+                        requestId: nil
+                    )
+                }
+                return (payload(signature: resolved.signature, timestamp: resolved.timestamp), true)
             }
-            // The signature timestamp fell outside the server's freshness
-            // window (API-19): the failing response's `Date` header has
-            // already refreshed the offset in `validateResponse`, so
-            // re-signing with the corrected clock produces a timestamp inside
-            // the window. Retried exactly once — `invalid_signature` (a
-            // mismatched secret) and every other failure is never retried,
-            // because time cannot fix it.
-            let retryEpochSeconds = Int64(serverClock.correctedNow().timeIntervalSince1970)
-            return try await sendUserAttributesAttempt(
-                signedPayload(epochSeconds: retryEpochSeconds, secret: secret),
-                userToken: identityToken
-            )
         }
+        if let secret = signingSecretInUse {
+            let signature = UserAttributesSigner.signature(for: request.canonicalString, secret: secret)
+            return (payload(signature: signature, timestamp: arguments.timestamp), true)
+        }
+        return (payload(signature: nil, timestamp: nil), false)
     }
 
     /// Sends one signed-or-unsigned `PUT /user` attempt, applying the

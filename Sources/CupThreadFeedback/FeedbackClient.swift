@@ -60,6 +60,15 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     /// When `nil`, requests reporting payment attributes (`isPaying`, `plan`, `mrr`, `currency`)
     /// are sent unsigned and will be rejected by the server. Requests without
     /// payment attributes (identity-only updates) do not require a secret.
+    ///
+    /// > Warning: An embedded signing secret is **not tamper-resistant**.
+    /// Anyone who installs the app can extract it from the binary and forge
+    /// verified payment attributes (`isPaying`, `plan`, `mrr`, `currency`) for
+    /// arbitrary end users, poisoning revenue-weighted triage. Prefer
+    /// backend-delegated signing — hold the secret on your own server and
+    /// install a `userAttributesSigner` provider on ``FeedbackClient`` (SEC-19).
+    /// Reserve the embedded secret for internal, debug, or otherwise trusted
+    /// builds.
     public let signingSecret: String?
 
     /// Creates a configuration for a CupThread app.
@@ -77,6 +86,10 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///     defaults to a per-request UUID.
     ///   - signingSecret: Optional SDK signing secret for HMAC-SHA256 request
     ///     signing when reporting paying-user attributes (`isPaying`, `plan`, `mrr`, `currency`).
+    ///     > Warning: An embedded signing secret lets anyone who extracts it
+    ///     > from the app binary forge verified payment attributes. Prefer the
+    ///     > backend-delegated `userAttributesSigner` provider on
+    ///     > ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``.
     public init(
         baseURL: URL,
         appKey: String,
@@ -180,6 +193,17 @@ public struct FeedbackClient: Sendable {
     let turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)?
     /// Resolves the signed-in end user's bearer token on demand.
     let authenticationProvider: (@Sendable () async -> String?)?
+    /// Signs payment-attribute reports wherever the SDK signing secret
+    /// actually lives (SEC-19) — normally the host's backend, which holds the
+    /// entitlement truth and the secret, so neither ships inside the app
+    /// binary. Called once per signed attempt (including the automatic single
+    /// retry after `401 stale_signature`) with the ``UserAttributesSigningRequest``
+    /// naming the exact canonical string to HMAC; the returned
+    /// ``UserAttributesSignature`` is sent verbatim. Return `nil` to fall back
+    /// to the configured `signingSecret` (and then an unsigned report);
+    /// thrown errors propagate to the caller. When `nil` (the default),
+    /// signing falls back to the embedded `signingSecret` configuration.
+    let userAttributesSigner: (@Sendable (UserAttributesSigningRequest) async throws -> UserAttributesSignature?)?
 
     /// The process-wide session used by clients that do not inject one: built
     /// from the default configuration with `SameOriginRedirectLimiter`
@@ -232,18 +256,30 @@ public struct FeedbackClient: Sendable {
     ///   - authenticationProvider: Async closure resolving the signed-in
     ///     user's bearer token, `nil` when signed out. Called once per
     ///     authenticated request, so it can refresh an expiring token.
+    ///   - userAttributesSigner: Async closure signing payment-attribute
+    ///     reports wherever the SDK signing secret lives — normally your
+    ///     backend (SEC-19). Called with the ``UserAttributesSigningRequest``
+    ///     carrying the exact canonical string to HMAC-SHA256 with the secret;
+    ///     return the ``UserAttributesSignature`` to send, or `nil` to fall
+    ///     back to the configured `signingSecret` (and then an unsigned
+    ///     report). Called once per signed attempt, including the automatic
+    ///     single retry after a `stale_signature` rejection, so it can mint a
+    ///     fresh signature each time. When `nil` (the default), signing uses
+    ///     the embedded `signingSecret` configuration only.
     public init(
         configuration: FeedbackClientConfiguration,
         session: URLSession = FeedbackClient.defaultSession,
         turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil,
-        authenticationProvider: (@Sendable () async -> String?)? = nil
+        authenticationProvider: (@Sendable () async -> String?)? = nil,
+        userAttributesSigner: (@Sendable (UserAttributesSigningRequest) async throws -> UserAttributesSignature?)? = nil
     ) {
         self.init(
             configuration: configuration,
             session: session,
             overlayPresenter: nil,
             turnstileTokenProvider: turnstileTokenProvider,
-            authenticationProvider: authenticationProvider
+            authenticationProvider: authenticationProvider,
+            userAttributesSigner: userAttributesSigner
         )
     }
 
@@ -256,7 +292,8 @@ public struct FeedbackClient: Sendable {
         configStore: AppConfigStore? = nil,
         serverClock: ServerClock? = nil,
         turnstileTokenProvider: (@Sendable (TurnstileChallenge) async -> String?)? = nil,
-        authenticationProvider: (@Sendable () async -> String?)? = nil
+        authenticationProvider: (@Sendable () async -> String?)? = nil,
+        userAttributesSigner: (@Sendable (UserAttributesSigningRequest) async throws -> UserAttributesSignature?)? = nil
     ) {
         self.configuration = configuration
         self.session = session
@@ -271,6 +308,7 @@ public struct FeedbackClient: Sendable {
         )
         self.serverClock = serverClock ?? ServerClock()
         self.turnstileTokenProvider = turnstileTokenProvider
+        self.userAttributesSigner = userAttributesSigner
     }
 
     /// Submits a feedback draft.

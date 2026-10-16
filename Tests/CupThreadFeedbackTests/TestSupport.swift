@@ -80,7 +80,8 @@ func makeClient(
     tokenStore: UserTokenStore? = nil,
     configStore: AppConfigStore? = nil,
     serverClock: ServerClock? = nil,
-    authenticationProvider: (@Sendable () async -> String?)? = nil
+    authenticationProvider: (@Sendable () async -> String?)? = nil,
+    userAttributesSigner: (@Sendable (UserAttributesSigningRequest) async throws -> UserAttributesSignature?)? = nil
 ) -> FeedbackClient {
     let config = FeedbackClientConfiguration(
         baseURL: baseURL,
@@ -96,7 +97,8 @@ func makeClient(
         tokenStore: tokenStore,
         configStore: configStore,
         serverClock: serverClock,
-        authenticationProvider: authenticationProvider
+        authenticationProvider: authenticationProvider,
+        userAttributesSigner: userAttributesSigner
     )
 }
 

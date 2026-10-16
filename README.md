@@ -169,6 +169,43 @@ Every API request dispatched by `FeedbackClient` carries:
 
 Feedback submissions (`submit(_:userToken:)`) include `metadata.sdk` (`cupthread-apple/<semver>`) and `metadata.sdkVersion` (`<semver>`), allowing backend analytics and telemetry to segment behavior by SDK release independently of the host app's version.
 
+### Reporting Paying Users Securely
+
+`updateUserAttributes(isPaying:plan:mrr:currency:userToken:)` feeds revenue-weighted triage, so the server only accepts *verified* reports: each one is HMAC-SHA256 signed with your app's SDK signing secret. Where that secret lives decides whether the verification means anything:
+
+- **Backend-delegated signing (recommended)** — keep the secret on your own server, where the entitlement truth already lives (StoreKit server notifications, RevenueCat webhooks, …), and create the client with a `userAttributesSigner` provider. The SDK builds the canonical string (with the server-clock-corrected timestamp), your backend HMACs it, and the signature travels back through the SDK — the secret never ships inside the app binary:
+
+  ```swift
+  let client = FeedbackClient(
+      configuration: configuration,
+      userAttributesSigner: { request in
+          // request.canonicalString is the exact UTF-8 bytes to HMAC-SHA256
+          // with the SDK signing secret held on your server.
+          let signed = try await myBackend.signUserAttributes(request.canonicalString)
+          return UserAttributesSignature(signature: signed.signature, timestamp: signed.timestamp)
+      }
+  )
+  ```
+
+  Server side, the canonical string is newline-joined — sign its exact bytes:
+
+  ```
+  cpt-user-attrs-v1
+  <appKey>
+  <userToken>
+  <isPaying: true|false|unset>
+  <plan: value|null|unset>
+  <mrr: fixed(2), trailing zeros stripped|null|unset>
+  <currency: as sent|unset>
+  <timestamp: epochSeconds>
+  ```
+
+  Return the 64-hex-character signature and the timestamp embedded in the signed string; the SDK validates the grammar locally and sends both verbatim. A `stale_signature` rejection re-consults the provider exactly once with a fresh server-clock-corrected timestamp; `invalid_signature` is never retried.
+
+- **Embedded secret (debug / internal builds only)** — `FeedbackClientConfiguration.signingSecret` compiles the key into the binary. **This is not tamper-resistant**: anyone who installs the app can extract it (strings, class-dump, a memory dump) and forge verified payment attributes for arbitrary users, poisoning revenue-weighted triage. Never ship it in a production app.
+
+When a provider is installed it wins: the embedded secret is consulted only if the provider returns `nil`, and with neither available the report is sent unsigned and rejected by the server (HTTP 422).
+
 ---
 
 ## Documentation
