@@ -28,6 +28,16 @@ public enum IntakeField: Equatable, Sendable {
 /// validation where one exists and stay far enough below the byte budget
 /// otherwise.
 public enum IntakeTextLimits: Sendable {
+    /// Feedback and feature-request title floor, in trimmed characters
+    /// (BUG-32): the server rejects shorter titles with `400`, so the
+    /// composers disable submitting below it and the client methods refuse
+    /// such drafts locally, before any network work.
+    public static let minTitleLength = 3
+    /// Feedback and feature-request description floor, in trimmed characters
+    /// (BUG-32): the server rejects shorter descriptions with `400`, so the
+    /// composers disable submitting below it and the client methods refuse
+    /// such drafts locally, before any network work.
+    public static let minDescriptionLength = 5
     /// Feedback and feature-request title cap, in characters.
     public static let maxTitleLength = 200
     /// Feedback and feature-request description cap, in characters.
@@ -77,6 +87,24 @@ public enum IntakeTextLimits: Sendable {
         if measuredLength(draft.body) > maxCommentLength { return .commentBody }
         return nil
     }
+
+    /// The first feedback-draft field below its minimum trimmed length, or
+    /// `nil` when `title` and `description` both meet the server's floors
+    /// (BUG-32). "First" follows wire order: title, description.
+    public static func underLimitField(in draft: FeedbackDraft) -> IntakeField? {
+        if measuredLength(draft.title) < minTitleLength { return .title }
+        if measuredLength(draft.description) < minDescriptionLength { return .description }
+        return nil
+    }
+
+    /// The feature-request draft field below its minimum trimmed length, or
+    /// `nil` when `title` and `description` both meet the server's floors
+    /// (BUG-32).
+    public static func underLimitField(in draft: FeatureRequestDraft) -> IntakeField? {
+        if measuredLength(draft.title) < minTitleLength { return .title }
+        if measuredLength(draft.description) < minDescriptionLength { return .description }
+        return nil
+    }
 }
 
 // MARK: - Whole-payload budget preflight
@@ -100,5 +128,26 @@ extension FeedbackClient {
             throw FeedbackClientError.textTooLong
         }
         return data
+    }
+
+    /// Rejects a feedback draft whose trimmed `title` or `description` is
+    /// below the server's minimum intake length (BUG-32) before a Turnstile
+    /// token is consumed or any request is built. The server can only answer
+    /// such a submission with `400 Validation failed`, and the headless
+    /// programmatic path has no form gate to stop it first — mirroring
+    /// ``FeedbackAttachmentStateMachine``/``canSubmit(draft:)`` without the UI.
+    func validateIntakeMinimums(in draft: FeedbackDraft) throws {
+        guard IntakeTextLimits.underLimitField(in: draft) == nil else {
+            throw FeedbackClientError.invalidResponse
+        }
+    }
+
+    /// Rejects a feature-request draft whose trimmed `title` or
+    /// `description` is below the server's minimum intake length (BUG-32),
+    /// mirroring ``FeatureRequestComposeView``'s form gate without the UI.
+    func validateIntakeMinimums(in draft: FeatureRequestDraft) throws {
+        guard IntakeTextLimits.underLimitField(in: draft) == nil else {
+            throw FeedbackClientError.invalidResponse
+        }
     }
 }

@@ -102,7 +102,7 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
         let token = UserTokenTransportTests.token
         switch self {
         case .feedbackSubmit:
-            _ = try await client.submit(FeedbackDraft(platform: .ios), userToken: token)
+            _ = try await client.submit(FeedbackDraft(title: "Title", description: "Description", platform: .ios), userToken: token)
         case .createUploadSession:
             _ = try await client.createUploadSession(
                 files: [FeedbackUploadFileSpec(
@@ -132,7 +132,7 @@ enum AuthenticatedEndpoint: String, CaseIterable, Sendable {
         case .fetchFeatureRequest:
             _ = try await client.fetchFeatureRequest(id: "fr-1", userToken: token)
         case .submitFeatureRequest:
-            _ = try await client.submitFeatureRequest(FeatureRequestDraft(title: "t", description: "d"), userToken: token)
+            _ = try await client.submitFeatureRequest(FeatureRequestDraft(title: "Title", description: "Description"), userToken: token)
         case .toggleVote:
             _ = try await client.toggleVote(featureRequestId: "fr-1", userToken: token)
         case .castVote:

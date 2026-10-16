@@ -185,7 +185,7 @@ struct PublicAPITests {
 
         let token = UUID().uuidString
         _ = try await Self.makeAPIClient().submit(
-            FeedbackDraft(title: "T", description: "Desc ok", platform: .ios),
+            FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios),
             userToken: token
         )
 
@@ -200,7 +200,7 @@ struct PublicAPITests {
             return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1", "forwardedToGithub": true]))
         }
 
-        _ = try await Self.makeAPIClient().submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        _ = try await Self.makeAPIClient().submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
 
         #expect((capture.value ?? "").isEmpty)
     }

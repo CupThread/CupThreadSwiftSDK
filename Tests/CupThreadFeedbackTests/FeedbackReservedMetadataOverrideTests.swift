@@ -56,8 +56,8 @@ struct FeedbackReservedMetadataOverrideTests {
 
         let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, appKey: "app_metadatatest01")
         let draft = FeedbackDraft(
-            title: "T",
-            description: "D",
+            title: "Title",
+            description: "Description",
             platform: .macos,
             metadata: ["submittedAt": "1970-01-01T00:00:00Z"]
         )

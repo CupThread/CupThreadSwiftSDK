@@ -194,8 +194,7 @@ struct FeatureRequestComposeView: View {
     }
 
     private var canSubmit: Bool {
-        draft.title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
-        draft.description.trimmingCharacters(in: .whitespacesAndNewlines).count >= 5 &&
+        IntakeTextLimits.underLimitField(in: draft) == nil &&
         IntakeTextLimits.overLimitField(in: draft) == nil
     }
 

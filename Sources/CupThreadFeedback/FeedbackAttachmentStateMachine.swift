@@ -153,15 +153,14 @@ public struct FeedbackAttachmentStateMachine: Sendable {
     /// Validates whether the feedback form can currently be submitted.
     ///
     /// Submission is rejected while an attachment is uploading, when
-    /// title/description length requirements are unmet, or when any free-text
-    /// field is over its ``IntakeTextLimits`` cap (BUG-18).
+    /// title/description fall below their ``IntakeTextLimits`` minimums
+    /// (BUG-32), or when any free-text field is over its ``IntakeTextLimits``
+    /// cap (BUG-18).
     /// - Parameter draft: The draft to inspect.
     /// - Returns: `true` if the form is ready to submit.
     public func canSubmit(draft: FeedbackDraft) -> Bool {
         guard !isUploading else { return false }
-        let titleTrimmed = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let descriptionTrimmed = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard titleTrimmed.count >= 3, descriptionTrimmed.count >= 5 else { return false }
+        guard IntakeTextLimits.underLimitField(in: draft) == nil else { return false }
         return IntakeTextLimits.overLimitField(in: draft) == nil
     }
 
