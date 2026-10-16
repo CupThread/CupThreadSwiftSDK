@@ -235,9 +235,13 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when the
     ///   server's Turnstile gate rejects the submission and no fresh token
     ///   could be presented (HTTP 403),
-    ///   ``FeedbackClientError/authenticationRequired`` or
-    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   feedback is disabled for the app (HTTP 401/403),
+    ///   ``FeedbackClientError/authenticationRequired`` when the app's roadmap
+    ///   requires sign-in (`allowAnonymousRoadmap = false`) and no end-user
+    ///   session is presented (HTTP 401 `authentication_required` — the same
+    ///   gate as browsing a private board, so hosts can reuse their sign-in
+    ///   prompt), or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app's
+    ///   permission policy rejects the proposal for this caller (HTTP 403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``, or
     ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds
