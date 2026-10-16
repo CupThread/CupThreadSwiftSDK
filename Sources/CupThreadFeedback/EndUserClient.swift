@@ -51,10 +51,15 @@ extension FeedbackClient {
     /// matched this device) surfaces as `erased: false`.
     ///
     /// - Parameter userToken: Anonymous user token sent as `X-User-Token`.
+    ///   Blank, whitespace-only, or multi-line values are rejected locally —
+    ///   the header plumbing would silently drop them and dispatch the
+    ///   erasure without any identity (#417).
     /// - Returns: Whether a profile was erased. A `404` from the server is
     ///   normalized to `erased: false` rather than an error, so replaying an
     ///   erase is idempotent from the caller's perspective.
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` when the
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when
+    ///   `userToken` is blank, whitespace-only, or contains a newline (all
+    ///   rejected before any network round trip), or when the
     ///   identity is missing or rejected (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
     ///   disables self-service erasure (HTTP 403),
@@ -62,10 +67,17 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   / ``FeedbackClientError/invalidResponse``.
     public func eraseMyData(userToken: String) async throws -> DataErasureResult {
+        // A blank or multi-line token would be silently dropped by
+        // applyUserToken, dispatching the erasure without any identity —
+        // fail fast locally instead of letting the server 401 (#417).
+        guard let identityToken = userToken.nilIfEmpty,
+              !identityToken.contains(where: \.isNewline) else {
+            throw FeedbackClientError.authenticationRequired
+        }
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/me/erase"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: identityToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(MeAppKeyPayload(appKey: configuration.appKey))
 
