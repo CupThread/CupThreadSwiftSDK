@@ -309,9 +309,15 @@ extension FeedbackClient {
             .nilIfEmpty
 
         if method == "POST" {
+            // SEC-90 (SaaS #983/#1023): one token verified once per request.
+            // The ship-notify binding passes both the opt-in-only challenge
+            // and the combined intake; a plain vote keeps the `vote` binding.
+            let challenge = normalizedShipNotifyEmail == nil
+                ? TurnstileChallenge.vote(appKey: configuration.appKey)
+                : TurnstileChallenge.shipNotify(appKey: configuration.appKey)
             let data = try await sendWithTurnstileRetry(
                 accepted: [200],
-                challenge: .vote(appKey: configuration.appKey),
+                challenge: challenge,
                 initialToken: normalizedTurnstileToken
             ) { token, requestID in
                 let payload = VotePayload(
@@ -382,12 +388,16 @@ extension FeedbackClient {
     /// without toggling anything. The value is trimmed, and a whitespace-only
     /// value is treated as `nil` (the field is omitted from the JSON body).
     ///
-    /// When human verification is enabled on the server, anonymous voters
-    /// on apps with ``PublicAppConfig/requireAnonymousVoteTurnstile`` or voters
+    /// When human verification applies, anonymous voters on apps with
+    /// ``PublicAppConfig/requireAnonymousVoteTurnstile`` and voters
     /// providing `shipNotifyEmail` should supply a Turnstile token via
-    /// `turnstileToken`. When omitted and the client is configured with a
-    /// `turnstileTokenProvider`, a token bound to ``TurnstileAction/vote`` is
-    /// requested automatically.
+    /// `turnstileToken`. When omitted and a `turnstileTokenProvider` is
+    /// configured, a `shipNotifyEmail` opt-in consults the provider with
+    /// ``TurnstileChallenge/shipNotify(appKey:)`` and a plain vote with
+    /// ``TurnstileChallenge/vote(appKey:)`` — the endpoint verifies its
+    /// single token exactly once per request (SEC-90), and the ship-notify
+    /// binding is the only one its opt-in challenge accepts on boards
+    /// without anonymous-vote Turnstile.
     ///
     /// On boards that require signed-in voting, the server accepts a
     /// `shipNotifyEmail` only when it is one of the signed-in session's

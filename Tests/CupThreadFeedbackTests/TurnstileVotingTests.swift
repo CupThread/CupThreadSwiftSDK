@@ -29,6 +29,14 @@ struct TurnstileVotingTests {
         #expect(challenge.cdata == "app_key_123")
     }
 
+    @Test func shipNotifyActionAndChallengeConstantsMatchServer() {
+        // SEC-90 (SaaS #983/#1023): the ship-notify opt-in binding.
+        #expect(TurnstileAction.shipNotify == "ship-notify")
+        let challenge = TurnstileChallenge.shipNotify(appKey: "app_key_123")
+        #expect(challenge.action == "ship-notify")
+        #expect(challenge.cdata == "app_key_123")
+    }
+
     // MARK: - Vote Payload Shape & Token Handling
 
     @Test func castVoteOmitsTurnstileTokenByDefault() async throws {
@@ -146,6 +154,91 @@ struct TurnstileVotingTests {
         let data = try #require(capture.value)
         let dict = try #require(parseJSONDict(data))
         #expect(dict["turnstileToken"] as? String == "provider-minted-token")
+    }
+
+    @Test func castVoteConsultsProviderWithShipNotifyBindingWhenOptInPresent() async throws {
+        // SEC-90: with a `shipNotifyEmail` opt-in the SDK must request the
+        // `ship-notify` binding — the only action the ship-notify challenge
+        // accepts on boards without anonymous-vote Turnstile, and one of the
+        // two accepted on the combined intake.
+        let capture = CaptureBox<Data>()
+        let challengeCapture = CaptureBox<TurnstileChallenge>()
+
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            capture.value = bodyData(from: request)
+            return (makeHTTPResponse(status: 200), try encodeJSON(["voted": true, "voteCount": 13]))
+        }
+        defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
+
+        let client = Self.makeAPIClient { challenge in
+            challengeCapture.value = challenge
+            return "ship-notify-minted-token"
+        }
+
+        let result = try await client.castVote(
+            featureRequestId: "fr-vote-ship-notify",
+            userToken: "tok-user-ship-notify",
+            shipNotifyEmail: "voter@example.com"
+        )
+        #expect(result.voted == true)
+
+        let challenge = try #require(challengeCapture.value)
+        #expect(challenge.action == TurnstileAction.shipNotify)
+        #expect(challenge.action == "ship-notify")
+        #expect(challenge.cdata == "app_testkey123456")
+
+        let data = try #require(capture.value)
+        let dict = try #require(parseJSONDict(data))
+        #expect(dict["shipNotifyEmail"] as? String == "voter@example.com")
+        #expect(dict["turnstileToken"] as? String == "ship-notify-minted-token")
+    }
+
+    @Test func castVoteRetryWithOptInConsultsProviderUnderShipNotifyBinding() async throws {
+        // SEC-90: an explicit token rides the first attempt unchanged; when
+        // the gate rejects it, the provider retry must be consulted under the
+        // ship-notify binding (accepted by both the combined intake and the
+        // Turnstile-off opt-in challenge).
+        final class AttemptState: @unchecked Sendable {
+            var attempt = 0
+        }
+        let state = AttemptState()
+        let challengeCapture = CaptureBox<TurnstileChallenge>()
+
+        MockURLProtocol.setHandler(forHost: Self.host) { _ in
+            state.attempt += 1
+            if state.attempt == 1 {
+                return (
+                    makeHTTPResponse(status: 403, headers: ["X-Request-Id": "req-ship-retry-1"]),
+                    try encodeJSON([
+                        "code": "turnstile_verification_failed",
+                        "error": "Human verification failed."
+                    ])
+                )
+            }
+            return (
+                makeHTTPResponse(status: 200, headers: ["X-Request-Id": "req-ship-retry-2"]),
+                try encodeJSON(["voted": true, "voteCount": 21])
+            )
+        }
+        defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
+
+        let client = Self.makeAPIClient { challenge in
+            challengeCapture.value = challenge
+            return "retry-ship-notify-token"
+        }
+
+        let result = try await client.castVote(
+            featureRequestId: "fr-ship-retry",
+            userToken: "tok-ship-retry",
+            shipNotifyEmail: "voter@example.com",
+            turnstileToken: "stale-explicit-token"
+        )
+        #expect(result.voted == true)
+        #expect(state.attempt == 2)
+
+        let challenge = try #require(challengeCapture.value)
+        #expect(challenge.action == TurnstileAction.shipNotify)
+        #expect(challenge.cdata == "app_testkey123456")
     }
 
     @Test func castVoteSurfacesTurnstileRequiredErrorWhenMissingOrFailed() async throws {
