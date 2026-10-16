@@ -17,6 +17,7 @@ import Foundation
 /// | `POST /api/v1/uploads/sessions` | ``TurnstileAction/feedback`` | app key |
 /// | `POST /api/v1/feature-requests` | ``TurnstileAction/featureRequest`` | app key |
 /// | `POST /api/v1/feature-requests/{id}/vote` | ``TurnstileAction/vote`` | app key |
+/// | `POST /api/v1/feature-requests/{id}/vote` + `shipNotifyEmail` | ``TurnstileAction/shipNotify`` | app key |
 ///
 /// Upload sessions intentionally reuse the feedback action: the server pins
 /// the upload-session gate to the same `(action, cdata)` binding as feedback
@@ -25,6 +26,15 @@ import Foundation
 /// intake alike) presents its own freshly minted token, matching the public
 /// web form's dedicated-token flow since the SaaS shared-token fix
 /// (SaaS #569/#571).
+///
+/// The vote endpoint verifies its token exactly once per request (SEC-90,
+/// SaaS #983/#1023). Without a `shipNotifyEmail` the vote guard accepts only
+/// a ``TurnstileAction/vote`` token; with one, the combined intake verifies a
+/// single token minted with either vote-flow action —
+/// ``TurnstileAction/shipNotify`` or ``TurnstileAction/vote`` — so
+/// ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``
+/// requests the ship-notify binding, which passes on boards with and without
+/// anonymous-vote Turnstile alike.
 public struct TurnstileChallenge: Equatable, Sendable {
     /// The Cloudflare widget `action` the server binds verification to.
     public let action: String
@@ -60,6 +70,19 @@ public struct TurnstileChallenge: Equatable, Sendable {
     public static func vote(appKey: String) -> TurnstileChallenge {
         TurnstileChallenge(action: TurnstileAction.vote, cdata: appKey)
     }
+
+    /// The binding for the ship-notification opt-in carried on a vote
+    /// (`POST /api/v1/feature-requests/{id}/vote` with `shipNotifyEmail`).
+    ///
+    /// On boards that also enable anonymous-vote Turnstile the endpoint's
+    /// single verification accepts this binding and
+    /// ``TurnstileAction/vote`` alike (SEC-90); ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``
+    /// consults its provider with this binding whenever `shipNotifyEmail`
+    /// is set, because it is the only action accepted on Turnstile-off
+    /// boards, where the ship-notify challenge applies alone.
+    public static func shipNotify(appKey: String) -> TurnstileChallenge {
+        TurnstileChallenge(action: TurnstileAction.shipNotify, cdata: appKey)
+    }
 }
 
 /// Server-aligned `action` values for Turnstile-gated intake endpoints.
@@ -81,4 +104,13 @@ public enum TurnstileAction {
 
     /// Binding for `POST /api/v1/feature-requests/{id}/vote`.
     public static let vote = "vote"
+
+    /// Binding for the ship-notification opt-in carried on
+    /// `POST /api/v1/feature-requests/{id}/vote` with `shipNotifyEmail`.
+    ///
+    /// The vote endpoint verifies one token per request: alone this action
+    /// only passes the ship-notify challenge (and the combined intake, which
+    /// accepts either vote-flow action); a board's plain vote guard accepts
+    /// only ``TurnstileAction/vote``.
+    public static let shipNotify = "ship-notify"
 }

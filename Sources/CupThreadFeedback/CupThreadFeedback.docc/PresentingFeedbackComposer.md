@@ -108,7 +108,11 @@ token is presented. Every verification is bound to the widget `(action, cdata)`
 pair it was rendered with, so create the client with a `turnstileTokenProvider`
 and mint each token under the exact binding the SDK asks for — `feedback` for
 feedback submissions and attachment upload sessions, `feature-request` for
-feature-request submissions, always with the app key as `cdata`. A token
+feature-request submissions, `vote` for plain anonymous votes, and
+`ship-notify` for votes that carry a `shipNotifyEmail` opt-in (the vote
+endpoint verifies that single token exactly once, and the ship-notify binding
+is the only one its opt-in challenge accepts on boards where anonymous votes
+are not Turnstile-gated), always with the app key as `cdata`. A token
 minted without a binding, or under the other action, is rejected by the
 server. The SDK sends the token as `turnstileToken`, and when the server still
 rejects the submission with the verification gate (HTTP 403), it asks the
