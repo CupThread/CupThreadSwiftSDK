@@ -159,40 +159,106 @@ struct UserProfileClientTests {
         #expect(response.recentComments[0].workspaceSlug == "ws-alpha")
     }
 
-    @Test func fetchUserProfileThrowsUserProfileNotFoundOn404() async throws {
+    @Test func fetchUserProfileThrowsUserProfileNotFoundOnEnvelope404() async throws {
+        // The documented JSON error envelope is the only 404 shape that means
+        // "no public profile" (API-26); its `X-Request-Id` is carried on the
+        // typed error for support correlation.
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (makeHTTPResponse(status: 404), try encodeJSON(["error": "User profile not found"]))
+            (
+                makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-404-profile"]),
+                try encodeJSON(["error": "User profile not found"])
+            )
         }
 
         do {
             _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_unknown")
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .userProfileNotFound(let message) = error {
+            if case .userProfileNotFound(let message, let requestId) = error {
                 // The server text stays on the case for diagnostics (#30);
                 // the displayed copy is the friendly fallback.
                 #expect(message == "User profile not found")
+                #expect(requestId == "req-404-profile")
                 #expect(error.responseBody == "User profile not found")
-                #expect(error.errorDescription == CupThreadStrings.tr("cupthread.error.profile_not_found"))
+                #expect(
+                    error.errorDescription
+                        == CupThreadStrings.tr("cupthread.error.profile_not_found") + " (request id: req-404-profile)"
+                )
             } else {
                 Issue.record("Unexpected error type: \(error)")
             }
         }
     }
 
-    @Test func fetchUserProfileThrowsUserProfileNotFoundWithDefaultMessageOnEmpty404() async throws {
+    @Test func fetchUserProfileFallsBackToUnexpectedStatusOnEmpty404() async throws {
+        // An empty-body 404 cannot be distinguished from a router fallback,
+        // so it surfaces as `.unexpectedStatus` instead of
+        // `.userProfileNotFound` (API-26).
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (makeHTTPResponse(status: 404), Data())
+            (makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-404-empty"]), Data())
         }
 
         do {
             _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_empty_404")
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
-            if case .userProfileNotFound(let message) = error {
-                #expect(message == nil)
-                #expect(error.errorDescription == CupThreadStrings.tr("cupthread.error.profile_not_found"))
+            if case .unexpectedStatus(let code, let message, let requestId) = error {
+                #expect(code == 404)
+                // The raw diagnostic message echoes the (empty) body.
+                #expect(message.isEmpty)
+                #expect(requestId == "req-404-empty")
             } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
+
+    @Test func fetchUserProfileFallsBackToUnexpectedStatusOnRouter404() async throws {
+        // A text/plain or HTML 404 page from a router, proxy, or captive
+        // portal is not a profile miss — it must not be reported as
+        // `.userProfileNotFound` (API-26).
+        for fallbackBody in ["404 Not Found", "<html><body>Not Found</body></html>"] {
+            MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+                (
+                    makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-404-router"]),
+                    Data(fallbackBody.utf8)
+                )
+            }
+
+            do {
+                _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_router_404")
+                Issue.record("Expected error to be thrown")
+            } catch let error as FeedbackClientError {
+                if case .unexpectedStatus(let code, let message, let requestId) = error {
+                    #expect(code == 404)
+                    #expect(message == fallbackBody)
+                    #expect(requestId == "req-404-router")
+                } else {
+                    Issue.record("Unexpected error type: \(error)")
+                }
+            }
+        }
+    }
+
+    @Test func fetchUserProfileMapsMalformed200ToInvalidResponse() async throws {
+        // A 200 whose payload does not decode as the documented profile
+        // schema surfaces as `.invalidResponse`, never as a raw
+        // `Swift.DecodingError` (API-26). Covers both a non-JSON body and a
+        // JSON body with an unexpected schema.
+        for malformedBody in ["not json", #"{"unexpected": true}"#] {
+            MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+                (
+                    makeHTTPResponse(headers: ["X-Request-Id": "req-200-malformed"]),
+                    Data(malformedBody.utf8)
+                )
+            }
+
+            do {
+                _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_malformed_200")
+                Issue.record("Expected error to be thrown")
+            } catch let error as FeedbackClientError {
+                #expect(error == .invalidResponse, "Got \(error)")
+            } catch {
                 Issue.record("Unexpected error type: \(error)")
             }
         }
