@@ -340,3 +340,36 @@ struct AllowedDownloadHostSecurityTests {
         #expect(isAllowedDownloadHost("2001:db8::2", baseHost: "2001:db8::1") == false)
     }
 }
+
+// MARK: - Security Userinfo Validation Tests (SEC-24)
+
+@Suite("SecurityUserinfoValidationTests")
+struct SecurityUserinfoValidationTests {
+    @Test("isAllowedSecureImageURL rejects URLs with embedded userinfo")
+    func secureImageURLRejectsUserinfo() {
+        let maliciousURLs = [
+            "https://user:pass@cdn.cupthread.com/avatar.png",
+            "https://admin@cdn.cupthread.com/avatar.png",
+            "https://:secret@cdn.cupthread.com/avatar.png",
+            "https://cupthread.com@attacker.com/avatar.png"
+        ]
+        for urlString in maliciousURLs {
+            if let url = URL(string: urlString) {
+                #expect(isAllowedSecureImageURL(url) == false, "Expected \(urlString) to be rejected")
+            }
+            #expect(remoteImageURL(from: urlString) == nil)
+        }
+    }
+
+    @Test("SameOriginRedirectLimiter rejects redirects containing userinfo")
+    func sameOriginRedirectRejectsUserinfo() {
+        let base = URL(string: "https://api.cupthread.com/api/v1/feedback")!
+        let redirectWithUserinfo = URL(string: "https://attacker:secret@api.cupthread.com/api/v1/feedback")!
+        let redirectWithUserOnly = URL(string: "https://attacker@api.cupthread.com/api/v1/feedback")!
+        let baseWithUserinfo = URL(string: "https://user:secret@api.cupthread.com/api/v1/feedback")!
+
+        #expect(SameOriginRedirectLimiter.isSameOrigin(base, redirectURL: redirectWithUserinfo) == false)
+        #expect(SameOriginRedirectLimiter.isSameOrigin(base, redirectURL: redirectWithUserOnly) == false)
+        #expect(SameOriginRedirectLimiter.isSameOrigin(baseWithUserinfo, redirectURL: base) == false)
+    }
+}

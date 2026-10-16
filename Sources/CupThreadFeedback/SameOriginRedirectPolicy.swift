@@ -18,8 +18,9 @@ import Foundation
 /// A redirect is followed only when the redirect target's origin — scheme
 /// (case-insensitive), host (case-insensitive), and effective port with the
 /// `http`/`https` defaults 80/443 — equals the origin of the task's original
-/// request. Anything else (a hop to another host, a port change, or a
-/// `https → http` downgrade) is refused by passing `nil` to the completion
+/// request, and neither URL contains embedded userinfo credentials. Anything
+/// else (a hop to another host, a port change, a `https → http` downgrade,
+/// or embedded credentials) is refused by passing `nil` to the completion
 /// handler: URLSession then surfaces the 3xx response itself as the final
 /// response, which response validation maps to
 /// ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` — there
@@ -30,11 +31,13 @@ import Foundation
 /// them into the same guarantee.
 final class SameOriginRedirectLimiter: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     /// The redirect policy for one redirect decision: `true` when
-    /// `redirectURL` stays within `originalURL`'s origin and the task may
-    /// follow it. `nil` URLs (either side, or a URL without scheme or host)
-    /// never match.
+    /// `redirectURL` stays within `originalURL`'s origin, neither URL contains
+    /// embedded userinfo credentials, and the task may follow it. `nil` URLs
+    /// (either side, or a URL without scheme or host) never match.
     static func isSameOrigin(_ originalURL: URL?, redirectURL: URL?) -> Bool {
         guard let originalURL, let redirectURL,
+              originalURL.user == nil, originalURL.password == nil,
+              redirectURL.user == nil, redirectURL.password == nil,
               let originalScheme = originalURL.scheme?.lowercased(),
               let redirectScheme = redirectURL.scheme?.lowercased(),
               originalScheme == redirectScheme,

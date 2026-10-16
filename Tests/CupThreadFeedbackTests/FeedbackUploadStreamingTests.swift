@@ -376,7 +376,11 @@ struct FeedbackUploadStreamingTests {
         let reqEmpty = try #require(captureEmpty.value)
         #expect(reqEmpty.value(forHTTPHeaderField: "Authorization") == nil)
     }
+}
 
+// MARK: - Authorization and Security Verification
+
+extension FeedbackUploadStreamingTests {
     @Test func createUploadSessionWithoutProviderOmitsAuthorizationHeader() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: host) { request in
@@ -421,6 +425,44 @@ struct FeedbackUploadStreamingTests {
 
         #expect(slotPut.httpMethod == "PUT")
         #expect(slotPut.value(forHTTPHeaderField: "Authorization") == "Bearer stok-stream")
+    }
+
+    @Test func uploadAttachmentRejectsUploadSlotWithEmbeddedUserinfo() async throws {
+        let sessionJSON: [String: Any] = [
+            "session": [
+                "sessionId": "sess-stream-userinfo",
+                "sessionToken": "stok-stream",
+                "expiresAt": "2026-09-30T12:00:00Z",
+                "maxFileSizeBytes": 20_000_000,
+                "maxFiles": 8
+            ],
+            "files": [[
+                "clientFileId": "file-1",
+                "uploadId": "upl-stream-1",
+                "uploadUrl": "https://leaked:creds@\(host)/api/v1/uploads/upl-stream-1",
+                "maxSizeBytes": 20_000_000
+            ]]
+        ]
+
+        MockURLProtocol.setHandler(forHost: host) { request in
+            if request.httpMethod == "POST" {
+                return (makeHTTPResponse(status: 201), try encodeJSON(sessionJSON))
+            }
+            return (makeHTTPResponse(status: 200), try encodeJSON(self.uploadedJSON))
+        }
+
+        let client = makeClient(baseURL: baseURL)
+        do {
+            _ = try await client.uploadAttachment(
+                data: Data("test".utf8),
+                filename: "test.txt",
+                mimeType: "text/plain",
+                userToken: nil
+            )
+            Issue.record("Expected uploadAttachment to reject slot URL with userinfo")
+        } catch let error as FeedbackClientError {
+            #expect(error == .invalidResponse)
+        }
     }
 }
 
