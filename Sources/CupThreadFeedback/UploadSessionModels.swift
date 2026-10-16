@@ -31,6 +31,22 @@ public struct FeedbackUploadFileSpec: Encodable, Equatable, Sendable {
     }
 }
 
+/// Client-side bounds for upload-session creation (API-28).
+///
+/// `POST /api/v1/uploads/sessions` accepts 1–8 `files` per session and can
+/// only answer anything else with `400`, so
+/// ``FeedbackClient/createUploadSession(files:userToken:turnstileToken:)``
+/// refuses out-of-bounds arrays locally — before a Turnstile token is
+/// consumed or any request is sent — instead of burning a single-use
+/// challenge on a guaranteed-failing round trip.
+public enum UploadSessionLimits: Sendable {
+    /// The file-count range the session endpoint accepts: one specification
+    /// per pre-allocated slot, at least one file, at most eight — the same
+    /// cap the feedback submission endpoint enforces on referenced
+    /// `uploadId`s.
+    public static let allowedFileCountRange = 1...8
+}
+
 /// An upload session created via `POST /api/v1/uploads/sessions`.
 ///
 /// Files are uploaded by streaming bytes to each slot's

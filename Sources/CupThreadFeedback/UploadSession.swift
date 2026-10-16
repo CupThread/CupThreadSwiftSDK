@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 // MARK: - FeedbackClient upload-session extension
@@ -14,7 +15,9 @@ extension FeedbackClient {
     /// via the configured `authenticationProvider`.
     ///
     /// - Parameters:
-    ///   - files: One specification per file to pre-allocate (1–8).
+    ///   - files: One specification per file to pre-allocate (1–8). An empty
+    ///     array or more than ``UploadSessionLimits/allowedFileCountRange``
+    ///     entries is rejected locally — see the throws list.
     ///   - userToken: Anonymous end-user token sent as `X-User-Token`.
     ///   - turnstileToken: Optional Turnstile token for apps that require one.
     ///     When `nil`, the client's `turnstileTokenProvider` is consulted as a
@@ -40,12 +43,18 @@ extension FeedbackClient {
     ///   when a declared MIME type or executable extension is rejected
     ///   (HTTP 400 `unsupported_mime_type` / `executable_extension_prohibited`), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   / ``FeedbackClientError/invalidResponse`` for other failures.
+    ///   / ``FeedbackClientError/invalidResponse`` for other failures. A
+    ///   `files` array outside ``UploadSessionLimits/allowedFileCountRange``
+    ///   (empty, or more than eight entries) also throws
+    ///   ``FeedbackClientError/invalidResponse`` locally (API-28), before the
+    ///   Turnstile token provider is consulted or any request is sent.
     public func createUploadSession(
         files: [FeedbackUploadFileSpec],
         userToken: String?,
         turnstileToken: String? = nil
     ) async throws -> FeedbackUploadSession {
+        try validateUploadFileCount(files)
+
         struct CreateSessionPayload: Encodable, Sendable {
             let appKey: String
             let purpose: String
@@ -317,6 +326,17 @@ extension FeedbackClient {
     }
 
     // MARK: Helpers
+
+    /// Rejects a `files` array outside ``UploadSessionLimits/allowedFileCountRange``
+    /// (API-28) before a Turnstile token is consumed or any request is built.
+    /// The server can only answer such a session creation with `400`, and the
+    /// headless programmatic path has no attachment-picker gate to stop it
+    /// first — mirroring `FeedbackAttachmentStateMachine` without the UI.
+    func validateUploadFileCount(_ files: [FeedbackUploadFileSpec]) throws {
+        guard UploadSessionLimits.allowedFileCountRange.contains(files.count) else {
+            throw FeedbackClientError.invalidResponse
+        }
+    }
 
     /// Builds the `PUT /api/v1/uploads/{uploadId}` request for a slot.
     private func uploadRequest(
