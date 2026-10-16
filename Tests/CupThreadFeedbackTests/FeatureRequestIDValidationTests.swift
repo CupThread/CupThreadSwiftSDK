@@ -109,36 +109,71 @@ struct FeatureRequestIDValidationTests {
 
     // MARK: - Voting (castVote / removeVote share sendVoteRequest)
 
-    @Test("castVote rejects blank feature request ids locally with no network call")
-    func castVoteRejectsBlankIDs() async throws {
+    // Issue #413 (API-27): vote ids are checked against the same
+    // `FeatureRequestIDGrammar` as `fetchFeatureRequest(id:)` — an id that
+    // cannot be a single opaque path segment can never name an existing
+    // request, so it is reported as `.featureRequestNotFound` locally, with
+    // no request built and no Turnstile token consumed.
+
+    @Test("castVote rejects invalid feature request ids locally with no network call")
+    func castVoteRejectsInvalidIDs() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             return (makeHTTPResponse(), try encodeJSON(["voted": true, "voteCount": 1]))
         }
 
-        for blankID in ["", "   "] {
-            await #expect(throws: FeedbackClientError.invalidResponse) {
-                _ = try await Self.makeAPIClient().castVote(featureRequestId: blankID, userToken: "tok-1")
+        for invalidID in ["", "   ", " \n\t ", "../admin", "fr-1/vote", "fr 1", "%2e%2e", String(repeating: "a", count: 129)] {
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
+                _ = try await Self.makeAPIClient().castVote(featureRequestId: invalidID, userToken: "tok-1")
             }
         }
-        #expect(capture.value == nil, "A blank id must be rejected before any request is sent")
+        #expect(capture.value == nil, "An invalid id must be rejected before any request is sent")
     }
 
-    @Test("removeVote rejects blank feature request ids locally with no network call")
-    func removeVoteRejectsBlankIDs() async throws {
+    @Test("removeVote rejects invalid feature request ids locally with no network call")
+    func removeVoteRejectsInvalidIDs() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             return (makeHTTPResponse(), try encodeJSON(["voted": false, "voteCount": 0]))
         }
 
-        for blankID in ["", "   "] {
-            await #expect(throws: FeedbackClientError.invalidResponse) {
-                _ = try await Self.makeAPIClient().removeVote(featureRequestId: blankID, userToken: "tok-1")
+        for invalidID in ["", "   ", "..", "fr-1/../../feedback", "id?next=1", String(repeating: "a", count: 129)] {
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
+                _ = try await Self.makeAPIClient().removeVote(featureRequestId: invalidID, userToken: "tok-1")
             }
         }
-        #expect(capture.value == nil, "A blank id must be rejected before any request is sent")
+        #expect(capture.value == nil, "An invalid id must be rejected before any request is sent")
+    }
+
+    @Test("castVote rejects invalid ids without consulting the Turnstile provider")
+    func castVoteRejectsInvalidIDsWithoutTurnstileConsultation() async throws {
+        let consulted = CaptureBox<Bool>()
+        let capture = CaptureBox<URLRequest>()
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            capture.value = request
+            return (makeHTTPResponse(), try encodeJSON(["voted": true, "voteCount": 1]))
+        }
+        let client = FeedbackClient(
+            configuration: FeedbackClientConfiguration(
+                baseURL: URL(string: "https://\(Self.apiHost)")!,
+                appKey: "app_testkey123456"
+            ),
+            session: makeMockSession(),
+            turnstileTokenProvider: { _ in
+                consulted.value = true
+                return "tok-turnstile"
+            }
+        )
+
+        // A single-use challenge must not be spent on an id that can never
+        // name a request (API-27).
+        await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
+            _ = try await client.castVote(featureRequestId: "../../admin", userToken: "tok-1")
+        }
+        #expect(consulted.value != true, "The Turnstile provider must not be consulted for an invalid id")
+        #expect(capture.value == nil, "No request may be sent for an invalid id")
     }
 
     @Test("removeVote trims a padded id and requests the trimmed path")

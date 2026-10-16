@@ -33,6 +33,14 @@ struct FeatureVoteFailureTests {
             VoteFailureNotice.notice(for: FeedbackClientError.forbidden(message: "anonymous voting disabled"))
                 == .permissionDenied
         )
+        #expect(
+            VoteFailureNotice.notice(
+                for: FeedbackClientError.featureRequestNotFound(
+                    message: "Feature request not found",
+                    requestId: "req-1"
+                )
+            ) == .notFound
+        )
         #expect(VoteFailureNotice.notice(for: FeedbackClientError.invalidResponse) == .generic)
     }
 
@@ -49,6 +57,10 @@ struct FeatureVoteFailureTests {
         #expect(
             VoteFailureNotice.permissionDenied.message
                 == CupThreadStrings.tr("cupthread.error.forbidden")
+        )
+        #expect(
+            VoteFailureNotice.notFound.message
+                == CupThreadStrings.tr("cupthread.features.vote_request_unavailable")
         )
     }
 
@@ -69,6 +81,14 @@ struct FeatureVoteFailureTests {
             let value = try #require(dict["cupthread.features.vote_failed"], "\(lang) missing vote_failed")
             #expect(!value.isEmpty, "\(lang) vote_failed copy is empty")
             #expect(!value.contains("cupthread."), "\(lang) vote_failed leaked the raw key")
+            // Issue #413 (API-27): the deleted-request copy must ship
+            // wherever the generic vote-failure copy ships.
+            let notFound = try #require(
+                dict["cupthread.features.vote_request_unavailable"],
+                "\(lang) missing vote_request_unavailable"
+            )
+            #expect(!notFound.isEmpty, "\(lang) vote_request_unavailable copy is empty")
+            #expect(!notFound.contains("cupthread."), "\(lang) vote_request_unavailable leaked the raw key")
         }
     }
 }
