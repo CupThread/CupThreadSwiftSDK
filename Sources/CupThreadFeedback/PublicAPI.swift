@@ -418,7 +418,7 @@ extension FeedbackClient {
             accepted: [200],
             mapsPermissionErrors: mapsPermissionErrors
         )
-        return try decoder.decode(T.self, from: data)
+        return try decodeSuccess(T.self, from: data)
     }
 }
 

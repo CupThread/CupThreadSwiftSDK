@@ -408,6 +408,21 @@ enum FeedbackMetadataSanitizer {
 }
 
 extension FeedbackClient {
+    /// Decodes an endpoint's success payload, mapping a malformed or
+    /// schema-violating 2xx body to ``FeedbackClientError/invalidResponse``
+    /// (API-25) so public APIs keep their documented error contract and
+    /// hosts never observe a raw `Swift.DecodingError`.
+    func decodeSuccess<Response: Decodable>(
+        _ type: Response.Type,
+        from data: Data
+    ) throws -> Response {
+        do {
+            return try decoder.decode(type, from: data)
+        } catch is DecodingError {
+            throw FeedbackClientError.invalidResponse
+        }
+    }
+
     /// Shared JSON request/response plumbing for JSON endpoints.
     /// - Parameter mapsPermissionErrors: Forwarded to
     ///   ``validateResponse(_:data:accepted:mapsPermissionErrors:)``;
@@ -438,6 +453,6 @@ extension FeedbackClient {
             accepted: acceptedStatuses,
             mapsPermissionErrors: mapsPermissionErrors
         )
-        return try decoder.decode(Response.self, from: data)
+        return try decodeSuccess(Response.self, from: data)
     }
 }
