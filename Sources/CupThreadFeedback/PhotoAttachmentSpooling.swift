@@ -21,8 +21,9 @@ extension PhotoAttachmentHelper {
         fileExtension: String,
         id: UUID
     ) async throws -> URL {
-        let url = FileManager.default.temporaryDirectory
-            .appending(path: "cupthread-upload-\(id.uuidString.lowercased()).\(fileExtension)")
+        let sanitizedExtension = sanitizeFileExtension(fileExtension)
+        let filename = "cupthread-upload-\(id.uuidString.lowercased()).\(sanitizedExtension)"
+        let url = FileManager.default.temporaryDirectory.appending(path: filename)
         try data.write(to: url, options: .atomic)
         return url
     }
