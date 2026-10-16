@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Der Feedback-Server hat eine ungültige Antwort zurückgegeben.";
 "cupthread.error.unreadable_upload_response" = "Der Feedback-Server hat eine unlesbare Upload-Antwort zurückgegeben.";
+"cupthread.error.invalid_configuration" = "Die App-Konfiguration ist ungültig. Überprüfe den App-Key und versuche es erneut.";
 "cupthread.error.auth_required" = "Diese Aktion ist nur für angemeldete Benutzer verfügbar.";
 "cupthread.error.scan_rejected" = "Der referenzierte Anhang wurde bei der Inhaltsprüfung abgelehnt und konnte nicht hochgeladen werden.";
 "cupthread.error.unsupported_media" = "Dieser Bildtyp wird nicht unterstützt. Bitte hängen Sie ein PNG, JPEG, WebP oder GIF an.";

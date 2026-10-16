@@ -7,6 +7,14 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// The upload endpoint returned a success response (200, 201, or 202)
     /// whose body could not be decoded.
     case unreadableUploadResponse
+    /// The client's configuration is structurally invalid, so no request was
+    /// sent (SEC-22): the app key is blank after trimming, or contains
+    /// characters outside `[A-Za-z0-9_.-]`, exceeds 64 characters, or carries
+    /// a traversal sequence — none of which can form a legal endpoint path,
+    /// query item, Turnstile `cdata`, or HMAC canonical line. `message` is a
+    /// developer-facing diagnostic naming the violated rule; it is never
+    /// shown to end users. Fix the ``FeedbackClientConfiguration`` and retry.
+    case invalidConfiguration(message: String)
     /// The endpoint requires a signed-in user — e.g. the app's changelog
     /// is restricted and anonymous access is disabled (`401 authentication_required`).
     case authenticationRequired
@@ -170,8 +178,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return message
         case .featureRequestNotFound(let message, _):
             return message
-        case .invalidResponse, .unreadableUploadResponse, .authenticationRequired,
-             .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
+        case .invalidResponse, .unreadableUploadResponse, .invalidConfiguration,
+             .authenticationRequired, .forbidden, .scanRejected, .rateLimited, .unsupportedMediaType, .payloadTooLarge,
              .uploaderIdentityRequired, .uploaderMismatch, .submissionQuotaExceeded,
              .subscriptionInactive, .dailyStorageQuotaExceeded, .turnstileRequired,
              .commentsUnavailable, .emailNotVerified, .invalidParent,
@@ -274,7 +282,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .unexpectedStatus(_, _, let requestId):
             return requestId
-        case .invalidResponse, .unreadableUploadResponse, .authenticationRequired, .userProfileNotFound, .textTooLong:
+        case .invalidResponse, .unreadableUploadResponse, .invalidConfiguration,
+             .authenticationRequired, .userProfileNotFound, .textTooLong:
             return nil
         }
     }
@@ -285,6 +294,9 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return CupThreadStrings.tr("cupthread.error.invalid_response")
         case .unreadableUploadResponse:
             return CupThreadStrings.tr("cupthread.error.unreadable_upload_response")
+        case .invalidConfiguration:
+            // Rejected locally before dispatch, so there is no request id to quote.
+            return CupThreadStrings.tr("cupthread.error.invalid_configuration")
         case .authenticationRequired:
             return CupThreadStrings.tr("cupthread.error.auth_required")
         case .forbidden(_, let requestId):

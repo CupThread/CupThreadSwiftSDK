@@ -241,7 +241,7 @@ extension FeedbackClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
@@ -357,7 +357,7 @@ extension FeedbackClient {
         // (or an unspecified preference) can yield the HTML confirmation
         // landing page instead of the JSON result this method decodes.
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {

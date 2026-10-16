@@ -141,8 +141,11 @@ final class ChangelogSubscriptionStore: @unchecked Sendable {
         storage: (any ChangelogSubscriptionStorage)? = nil,
         legacyUserDefaults: UserDefaults? = .standard
     ) {
-        let storageKey = Self.keyPrefix + appKey
-        self.appKey = appKey
+        // Trimmed like UserTokenStore.scopedKey so a whitespace-padded key
+        // cannot mint a storage identity distinct from its trimmed form (SEC-22).
+        let normalizedAppKey = AppKeyGrammar.normalized(appKey)
+        let storageKey = Self.keyPrefix + normalizedAppKey
+        self.appKey = normalizedAppKey
         self.storageKey = storageKey
         self.storage = storage ?? KeychainTokenStorage(
             service: Self.keychainService,

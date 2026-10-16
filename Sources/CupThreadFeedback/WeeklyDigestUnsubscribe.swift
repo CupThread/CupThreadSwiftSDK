@@ -53,7 +53,7 @@ extension FeedbackClient {
         // page for browsers; the JSON result this method decodes is only
         // guaranteed with an explicit JSON preference.
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {

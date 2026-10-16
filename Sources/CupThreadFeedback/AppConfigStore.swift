@@ -52,7 +52,9 @@ final class SdkConfigCache: Sendable {
     private let storage: any SdkConfigCacheStorage
     private let key: String
 
-    /// Creates a cache scoped to one app key.
+    /// Creates a cache scoped to one app key. The key is trimmed like the
+    /// other scoped-storage helpers so a padded value cannot alias an entry
+    /// distinct from its trimmed form (SEC-22).
     /// - Parameters:
     ///   - appKey: The CupThread app key that namespaces the entry.
     ///   - storage: The backing store; defaults to the standard
@@ -62,7 +64,7 @@ final class SdkConfigCache: Sendable {
         storage: any SdkConfigCacheStorage = UserDefaultsConfigStorage(userDefaults: .standard)
     ) {
         self.storage = storage
-        self.key = Self.keyPrefix + appKey
+        self.key = Self.keyPrefix + AppKeyGrammar.normalized(appKey)
     }
 
     /// The persisted appearance for this app key, or `nil` when no fetch has

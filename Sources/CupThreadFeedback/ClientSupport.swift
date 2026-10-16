@@ -69,12 +69,27 @@ extension FeedbackClient {
         return UUID().uuidString.lowercased()
     }
 
-    /// Sets the correlation and version headers shared by every request.
+    /// Sets the correlation and version headers shared by every request,
+    /// after validating the configuration's app key (SEC-22). Every outgoing
+    /// SDK request funnels through here — including the Turnstile-gated
+    /// intake request builders — so a configuration whose app key violates
+    /// ``AppKeyGrammar`` (blank, path separators, traversal sequences,
+    /// control characters, oversize) throws
+    /// ``FeedbackClientError/invalidConfiguration(message:)`` before the
+    /// request can reach the network. URL path interpolation, query items,
+    /// the Turnstile `cdata` binding, and HMAC canonicalization therefore
+    /// never see a hostile or misconfigured key.
     func applyCorrelationHeaders(
         userToken: String?,
         requestID: String,
         to request: inout URLRequest
-    ) {
+    ) throws {
+        guard AppKeyGrammar.isValid(configuration.appKey) else {
+            throw FeedbackClientError.invalidConfiguration(message:
+                "configuration.appKey is blank or violates the app-key grammar " +
+                "^[A-Za-z0-9_.-]{1,\(AppKeyGrammar.maxLength)}$; no request was sent"
+            )
+        }
         applyUserToken(userToken, to: &request)
         request.setValue(requestID, forHTTPHeaderField: "X-Request-Id")
         request.setValue(Self.sdkVersion, forHTTPHeaderField: "X-SDK-Version")
@@ -377,7 +392,7 @@ extension FeedbackClient {
         var request = URLRequest(url: configuration.baseURL.appending(path: path))
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(body)
 

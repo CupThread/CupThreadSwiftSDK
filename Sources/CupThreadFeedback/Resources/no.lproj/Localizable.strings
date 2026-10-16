@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Tilbakemeldingsserveren returnerte et ugyldig svar.";
 "cupthread.error.unreadable_upload_response" = "Tilbakemeldingsserveren returnerte et uleselig opplastingssvar.";
+"cupthread.error.invalid_configuration" = "Appkonfigurasjonen er ugyldig. Kontroller appnøkkelen og prøv igjen.";
 "cupthread.error.auth_required" = "Denne handlingen er bare tilgjengelig for innloggede brukere.";
 "cupthread.error.scan_rejected" = "Vedlegget det vises til ble avvist ved innholdskontroll og kunne ikke lastes opp.";
 "cupthread.error.unsupported_media" = "Denne bildetypen støttes ikke. Legg ved et PNG-, JPEG-, WebP- eller GIF-bilde.";

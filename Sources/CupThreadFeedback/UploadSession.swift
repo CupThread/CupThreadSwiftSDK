@@ -62,7 +62,7 @@ extension FeedbackClient {
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/uploads/sessions"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            self.applyCorrelationHeaders(
+            try self.applyCorrelationHeaders(
                 userToken: effectiveIdentity,
                 requestID: requestID,
                 to: &request

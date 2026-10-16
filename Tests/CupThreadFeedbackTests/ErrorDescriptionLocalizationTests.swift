@@ -34,6 +34,7 @@ struct ErrorDescriptionLocalizationTests {
     private static let errorDescriptionKeys = [
         "cupthread.error.invalid_response",
         "cupthread.error.unreadable_upload_response",
+        "cupthread.error.invalid_configuration",
         "cupthread.error.auth_required",
         "cupthread.error.scan_rejected",
         "cupthread.error.unsupported_media",

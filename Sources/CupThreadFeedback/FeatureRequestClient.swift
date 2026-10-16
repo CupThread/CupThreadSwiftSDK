@@ -113,7 +113,7 @@ extension FeedbackClient {
         }
 
         var request = URLRequest(url: url)
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
@@ -173,7 +173,7 @@ extension FeedbackClient {
         let url = configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
@@ -266,7 +266,7 @@ extension FeedbackClient {
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
+            try self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
             await self.applyBearerToken(to: &request)
             request.httpBody = try self.encodedIntakeBody(FeatureRequestSubmitPayload(
                 appKey: self.configuration.appKey,
@@ -319,7 +319,7 @@ extension FeedbackClient {
                 )
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
+                try self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
                 await self.applyBearerToken(to: &request)
                 request.httpBody = try self.encoder.encode(payload)
                 return request
@@ -338,7 +338,7 @@ extension FeedbackClient {
             )
             request.httpMethod = method
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+            try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
             await applyBearerToken(to: &request)
             request.httpBody = try encoder.encode(payload)
 

@@ -209,6 +209,7 @@
 /* Issue #266: typed error & attachment-validation copy — every errorDescription resolves through the catalog */
 "cupthread.error.invalid_response" = "The feedback server returned an invalid response.";
 "cupthread.error.unreadable_upload_response" = "The feedback server returned an unreadable upload response.";
+"cupthread.error.invalid_configuration" = "The app configuration is invalid. Check the app key and try again.";
 "cupthread.error.auth_required" = "This action is only available to signed-in users.";
 "cupthread.error.scan_rejected" = "The referenced attachment could not be uploaded due to content inspection rejection.";
 "cupthread.error.unsupported_media" = "That image type isn't supported. Please attach a PNG, JPEG, WebP, or GIF.";
