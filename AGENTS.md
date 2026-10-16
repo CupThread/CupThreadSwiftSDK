@@ -19,7 +19,7 @@
   - `POST /api/v1/public/apps/:appKey/changelog/unsubscribe` — Unsubscribe from updates.
   - `GET /api/v1/public/digest/unsubscribe?token={token}` — Weekly-digest unsubscribe confirmation page (non-destructive; JSON-only clients receive `405` with `Allow: POST`).
   - `POST /api/v1/public/digest/unsubscribe` — RFC 8058 one-click weekly-digest unsubscribe (token via query string, form field, or JSON body; idempotent replay).
-  - `PUT /api/v1/public/apps/:appKey/user` — Report user attributes (paying status, MRR).
+  - `PUT /api/v1/public/apps/:appKey/user` — Report user attributes (paying status, MRR). Payment attributes are HMAC-SHA256 signed: the backend-delegated `userAttributesSigner` provider on `FeedbackClient` is the recommended integration (SEC-19) — the host's server holds the SDK signing secret and signs the canonical string the SDK builds; the embedded `FeedbackClientConfiguration.signingSecret` path is debug/internal-only (an extracted secret lets any user forge verified payment attributes).
   - `GET /api/v1/feature-requests` — Feature requests list and search with `q` query parameter.
   - `GET /api/v1/feature-requests/:id` — Single feature request details (optional `X-User-Token`).
   - `POST /api/v1/feature-requests/:id/vote` — Cast vote on a feature request (insert-only; idempotent).
