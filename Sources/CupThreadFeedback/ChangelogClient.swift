@@ -200,9 +200,11 @@ extension FeedbackClient {
     /// bearer token is attached as `Authorization: Bearer …` so changelog
     /// reads succeed when `allowAnonymousChangelog = false`.
     /// - Parameters:
-    ///   - limit: Entries per page. The server accepts 1...100 (default 50).
+    ///   - limit: Entries per page. The server accepts 1...100 (default 50);
+    ///     values outside that range are clamped to it.
     ///   - cursor: Opaque keyset cursor from a previous page's
     ///     ``ListChangelogResult/nextCursor``; omit for the first page.
+    ///     Blank or whitespace-only values are dropped.
     /// - Returns: The page's entries plus `hasMore`/`nextCursor` paging
     ///   metadata.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
@@ -225,8 +227,11 @@ extension FeedbackClient {
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
             throw FeedbackClientError.invalidResponse
         }
-        var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
-        if let cursor, !cursor.isEmpty {
+        // The gateway rejects page sizes outside 1...100 with 400, so clamp
+        // here instead of letting invalid values reach it (#425).
+        let effectiveLimit = min(max(1, limit), Self.changelogMaxPageSize)
+        var queryItems = [URLQueryItem(name: "limit", value: String(effectiveLimit))]
+        if let cursor = cursor?.nilIfEmpty {
             queryItems.append(URLQueryItem(name: "cursor", value: cursor))
         }
         components.queryItems = queryItems
