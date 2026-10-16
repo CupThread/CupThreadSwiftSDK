@@ -242,6 +242,9 @@ enum VoteFailureNotice: Equatable {
     case rateLimited
     /// Console permission rejected the vote (anonymous voting disabled).
     case permissionDenied
+    /// The feature request no longer exists (deleted or unapproved — the
+    /// documented JSON 404 envelope, API-27): retrying can never succeed.
+    case notFound
     /// Any other failure (offline, 5xx): generic copy.
     case generic
 
@@ -254,6 +257,8 @@ enum VoteFailureNotice: Equatable {
                 return .rateLimited
             case .authenticationRequired, .forbidden:
                 return .permissionDenied
+            case .featureRequestNotFound:
+                return .notFound
             default:
                 break
             }
@@ -270,6 +275,8 @@ enum VoteFailureNotice: Equatable {
             return CupThreadStrings.tr("cupthread.features.vote_rate_limited")
         case .permissionDenied:
             return CupThreadStrings.tr("cupthread.error.forbidden")
+        case .notFound:
+            return CupThreadStrings.tr("cupthread.features.vote_request_unavailable")
         case .generic:
             return CupThreadStrings.tr("cupthread.features.vote_failed")
         }

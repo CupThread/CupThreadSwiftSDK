@@ -28,6 +28,10 @@ extension FeedbackClient {
     ///     is not consulted prior to the initial request; if the server
     ///     subsequently rejects the attempt, the provider is consulted for a
     ///     fresh retry token.
+    ///   - mapResourceNotFound: Forwarded to `validateResponse` so endpoints
+    ///     with a meaningful missing-resource state (votes on a deleted
+    ///     feature request, API-27) can map envelope-carrying `404`s to
+    ///     their typed error.
     ///   - makeRequest: Builds the request for a `(turnstileToken, requestID)`
     ///     pair — called once per attempt so the retry re-encodes the payload
     ///     with the fresh token and a new correlation id.
@@ -40,6 +44,7 @@ extension FeedbackClient {
         accepted: Set<Int>,
         challenge: TurnstileChallenge,
         initialToken: String? = nil,
+        mapResourceNotFound: ((String, String?) -> FeedbackClientError)? = nil,
         makeRequest: (String?, String) async throws -> URLRequest
     ) async throws -> Data {
         let firstToken: String?
@@ -52,6 +57,7 @@ extension FeedbackClient {
             return try await sendTurnstileAttempt(
                 accepted: accepted,
                 turnstileToken: firstToken,
+                mapResourceNotFound: mapResourceNotFound,
                 makeRequest: makeRequest
             )
         } catch let error as FeedbackClientError {
@@ -67,6 +73,7 @@ extension FeedbackClient {
             return try await sendTurnstileAttempt(
                 accepted: accepted,
                 turnstileToken: retryToken,
+                mapResourceNotFound: mapResourceNotFound,
                 makeRequest: makeRequest
             )
         }
@@ -75,6 +82,7 @@ extension FeedbackClient {
     private func sendTurnstileAttempt(
         accepted: Set<Int>,
         turnstileToken: String?,
+        mapResourceNotFound: ((String, String?) -> FeedbackClientError)? = nil,
         makeRequest: (String?, String) async throws -> URLRequest
     ) async throws -> Data {
         let request = try await makeRequest(turnstileToken, nextRequestID())
@@ -89,7 +97,8 @@ extension FeedbackClient {
             httpResponse,
             data: data,
             accepted: accepted,
-            mapsPermissionErrors: true
+            mapsPermissionErrors: true,
+            mapResourceNotFound: mapResourceNotFound
         )
         return data
     }

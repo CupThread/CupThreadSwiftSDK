@@ -65,11 +65,6 @@ extension FeedbackClient {
                 code: code,
                 envelopeMessage: envelopeMessage,
                 requestId: requestId
-            ) ?? signatureTypedError(
-                statusCode: statusCode,
-                code: code,
-                envelopeMessage: envelopeMessage,
-                requestId: requestId
             )
         }
     }

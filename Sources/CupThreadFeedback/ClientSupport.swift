@@ -108,11 +108,18 @@ extension FeedbackClient {
     ///     feedback, feature-request submit, roadmap columns/list) whose
     ///     `401`/`403` mean the console disabled the action for anonymous
     ///     users, so surfaces can render a semantic permission state (#34).
+    ///   - mapResourceNotFound: When provided, a `404` carrying the API's
+    ///     documented JSON error envelope with a non-empty message maps to
+    ///     the returned typed error (e.g. votes on a deleted feature
+    ///     request, API-27). Router-fallback `404`s — text/plain, empty
+    ///     body, or JSON without an `error` string — keep falling through
+    ///     to `.unexpectedStatus`.
     func validateResponse(
         _ httpResponse: HTTPURLResponse,
         data: Data,
         accepted: Set<Int>,
-        mapsPermissionErrors: Bool = false
+        mapsPermissionErrors: Bool = false,
+        mapResourceNotFound: ((String, String?) -> FeedbackClientError)? = nil
     ) throws {
         // Every response carries the server's clock (API-19); observe it on
         // successes and failures alike — a stale-signature 401's own `Date`
@@ -123,6 +130,13 @@ extension FeedbackClient {
         let requestId = httpResponse.cupthreadRequestID
         let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
         let message = envelope?.error ?? String(data: data, encoding: .utf8) ?? "Unknown error"
+
+        try throwMappedResourceNotFound(
+            statusCode: statusCode,
+            envelope: envelope,
+            requestId: requestId,
+            mapResourceNotFound: mapResourceNotFound
+        )
 
         if let typed = Self.typedError(
             statusCode: statusCode,
@@ -162,6 +176,24 @@ extension FeedbackClient {
         default:
             throw FeedbackClientError.unexpectedStatus(code: statusCode, message: message, requestId: requestId)
         }
+    }
+
+    /// Throws the caller's mapped missing-resource error when `statusCode` is
+    /// 404 and the decoded body is the API's documented error envelope with a
+    /// non-empty message — the only shape that means "this resource does not
+    /// exist". Returns silently for router-fallback `404`s (text/plain, empty
+    /// body, JSON without an `error` string), leaving them with `validateResponse`,
+    /// and when no mapping was requested.
+    private func throwMappedResourceNotFound(
+        statusCode: Int,
+        envelope: APIErrorEnvelope?,
+        requestId: String?,
+        mapResourceNotFound: ((String, String?) -> FeedbackClientError)?
+    ) throws {
+        guard statusCode == 404,
+              let mapResourceNotFound,
+              let envelopeMessage = envelope?.error?.nilIfEmpty else { return }
+        throw mapResourceNotFound(envelopeMessage, requestId)
     }
 
     /// Records the response's `Date` header as a server-clock observation

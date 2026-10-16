@@ -98,6 +98,7 @@
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "Du stimmst zu schnell ab. Bitte versuche es in einer Minute erneut.";
 "cupthread.features.vote_failed" = "Deine Stimme konnte nicht übermittelt werden. Prüfe deine Verbindung und versuche es erneut.";
+"cupthread.features.vote_request_unavailable" = "Diese Funktionsanfrage ist nicht mehr verfügbar.";
 "cupthread.features.load_more" = "Mehr laden";
 "cupthread.features.load_more_hint" = "Zeigt die nächste Seite der Funktionsanfragen.";
 
