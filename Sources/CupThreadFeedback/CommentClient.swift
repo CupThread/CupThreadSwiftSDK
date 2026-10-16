@@ -118,19 +118,30 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
     ///   server's permission policy rejects the read (HTTP 403),
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
-    ///   comments are not available or disabled (HTTP 404),
+    ///   the server answers HTTP 404 with the documented JSON error envelope
+    ///   (comments are not available or disabled on this request),
     ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   (including `400` for a malformed cursor) or
-    ///   ``FeedbackClientError/invalidResponse``.
+    ///   (including `400` for a malformed cursor, and a 404 that arrives
+    ///   *without* the JSON envelope — a router fallback, deploy skew, or a
+    ///   wrong `baseURL`), or
+    ///   ``FeedbackClientError/invalidResponse`` when `featureRequestId`
+    ///   cannot be a valid feature-request id (empty, whitespace-padded to
+    ///   nothing, or containing path/query/percent characters — deep-link ids
+    ///   are untrusted input; rejected locally with no request sent).
     public func fetchComments(
         featureRequestId: String,
         limit: Int,
         cursor: String? = nil
     ) async throws -> ListCommentsResult {
         let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedID.isEmpty else {
+        // Deep-link, push, and share-link ids are untrusted input (BUG-31):
+        // an id that cannot be a single opaque path segment can never name a
+        // real request, so reject it locally instead of interpolating path
+        // separators, `..`, or query/fragment characters into the URL while
+        // `Authorization: Bearer` and `X-User-Token` headers are attached.
+        guard FeatureRequestIDGrammar.isValid(trimmedID) else {
             throw FeedbackClientError.invalidResponse
         }
         let base = configuration.baseURL.appending(
@@ -160,11 +171,16 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode == 404 {
-            let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
-            let rawMessage = envelope?.error ?? String(data: data, encoding: .utf8)
-            let trimmed = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let message = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        if httpResponse.statusCode == 404,
+           let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data),
+           let message = envelope.error?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+            // Only the API's documented resource-404 envelope means "comments
+            // are unavailable on this request" (BUG-31). A bare router
+            // fallback (text/plain "404 Not Found", empty body — what
+            // production answers on deploy skew or a wrong `baseURL`) falls
+            // through to `validateResponse` and surfaces as
+            // `.unexpectedStatus`, so an infrastructure misconfiguration is
+            // not misreported as a per-request comments-disabled state.
             throw FeedbackClientError.commentsUnavailable(message: message, requestId: httpResponse.cupthreadRequestID)
         }
         // The route's 401/403 mean anonymous access is disabled or the
@@ -206,18 +222,32 @@ extension FeedbackClient {
     ///   the client-side intake byte budget (BUG-18) — rejected locally with
     ///   no network round trip; shorten the comment and post again,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse`` otherwise.
+    ///   or ``FeedbackClientError/invalidResponse`` otherwise — the latter is
+    ///   also thrown locally, before any request is built, when
+    ///   `featureRequestId` cannot be a valid feature-request id (empty,
+    ///   whitespace-padded to nothing, or containing path/query/percent
+    ///   characters) or `draft.body` is empty after trimming.
     public func postComment(
         featureRequestId: String,
         draft: CommentDraft,
         userToken: String
     ) async throws -> FeatureRequestComment {
         let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedID.isEmpty else {
+        // Same untrusted-input grammar as `fetchComments` (BUG-31): never
+        // build a URL path from an id that cannot be a single opaque segment.
+        guard FeatureRequestIDGrammar.isValid(trimmedID) else {
+            throw FeedbackClientError.invalidResponse
+        }
+        // A body that is empty after trimming can only be rejected by the
+        // server (`400 Validation failed`); fail fast locally so headless
+        // callers do not spend a network round trip — or the signed-in
+        // session's bearer token — on a request that cannot succeed.
+        let body = draft.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else {
             throw FeedbackClientError.invalidResponse
         }
         let payload = CommentSubmitPayload(
-            body: draft.body.trimmingCharacters(in: .whitespacesAndNewlines),
+            body: body,
             parentId: draft.parentId?.nilIfEmpty,
             replyToAuthorName: draft.replyToAuthorName?.nilIfEmpty
         )
