@@ -1229,6 +1229,83 @@ struct FeedbackClientSubmitTests {
         #expect(capture.value == "stable-run-identifier-1")
     }
 
+    @Test func nextRequestIDUsesGrammarConformingCustomIDVerbatim() {
+        let validIDs = [
+            "abcd1234",
+            "stable-run-identifier-1",
+            String(repeating: "x", count: 64),
+            "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+            "Az.9_-10"
+        ]
+        for validID in validIDs {
+            let config = FeedbackClientConfiguration(
+                baseURL: baseURL,
+                appKey: appKey,
+                requestID: validID
+            )
+            #expect(FeedbackClient(configuration: config).nextRequestID() == validID)
+        }
+    }
+
+    @Test func nextRequestIDTrimsSurroundingWhitespaceFromCustomID() {
+        let config = FeedbackClientConfiguration(
+            baseURL: baseURL,
+            appKey: appKey,
+            requestID: "   stable-run-1 \n\t"
+        )
+        #expect(FeedbackClient(configuration: config).nextRequestID() == "stable-run-1")
+    }
+
+    @Test func nextRequestIDFallsBackToGrammarValidUUIDForNonConformingCustomIDs() {
+        let invalidIDs = [
+            "",                                     // empty
+            "   ",                                  // whitespace only
+            "short",                                // < 8 characters
+            "abc1234",                              // 7 characters, one short of the boundary
+            String(repeating: "a", count: 65),      // > 64 characters
+            "session id with spaces",               // interior space not allowed
+            "session/slash",                        // slash not allowed
+            "session:colon",                        // colon not allowed
+            "session+plus",                         // plus not allowed
+            "requêst-id-1",                         // non-ASCII
+            "session\r\nX-Injected: attack",        // CRLF header injection
+            "valid-\nid-1"                          // interior newline defeats trimming
+        ]
+        for invalidID in invalidIDs {
+            let config = FeedbackClientConfiguration(
+                baseURL: baseURL,
+                appKey: appKey,
+                requestID: invalidID
+            )
+            let resolved = FeedbackClient(configuration: config).nextRequestID()
+
+            #expect(resolved != invalidID)
+            #expect(RequestIDGrammar.isValid(resolved))
+            #expect(UUID(uuidString: resolved) != nil)
+            #expect(resolved == resolved.lowercased())
+        }
+    }
+
+    @Test func submitSendsGrammarValidRequestIDWhenConfigurationIDIsInvalid() async throws {
+        let capture = CaptureBox<String?>()
+        MockURLProtocol.requestHandler = { request in
+            capture.value = request.value(forHTTPHeaderField: "X-Request-Id")
+            return (makeHTTPResponse(), try encodeJSON(["submissionId": "s-1"]))
+        }
+
+        let config = FeedbackClientConfiguration(
+            baseURL: baseURL,
+            appKey: appKey,
+            requestID: "session_123\r\nX-Injected: attack"
+        )
+        let client = FeedbackClient(configuration: config, session: makeMockSession())
+        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+
+        let header = try #require(capture.value)
+        #expect(header != "session_123\r\nX-Injected: attack")
+        #expect(RequestIDGrammar.isValid(try #require(header)))
+    }
+
     @Test func sendsXSDKVersionHeaderOnRequests() async throws {
         let capture = CaptureBox<String?>()
         MockURLProtocol.requestHandler = { request in
