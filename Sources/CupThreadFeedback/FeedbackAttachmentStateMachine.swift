@@ -29,16 +29,16 @@ public struct FeedbackAttachmentStateMachine: Sendable {
 
     /// Creates a state machine with an optional explicit attachment size limit.
     ///
-    /// When `maxAttachmentBytes` is `nil`, the state machine falls back to
+    /// When `maxAttachmentBytes` is `nil` or non-positive (`<= 0`), the state machine falls back to
     /// ``PhotoAttachmentHelper/defaultMaxAttachmentBytes`` and allows future
     /// console configuration updates via ``applyConfigLimit(_:)``.
-    /// When an explicit non-nil limit is provided, ``applyConfigLimit(_:)``
+    /// When an explicit positive limit is provided, ``applyConfigLimit(_:)``
     /// will not override it.
     ///
     /// - Parameter maxAttachmentBytes: Upper byte limit for uploaded files, or `nil` to use defaults and console config.
     public init(maxAttachmentBytes: Int? = nil) {
         self.state = .idle
-        if let maxAttachmentBytes {
+        if let maxAttachmentBytes, maxAttachmentBytes > 0 {
             self.maxAttachmentBytes = maxAttachmentBytes
             self.hasExplicitLimit = true
         } else {
@@ -49,14 +49,14 @@ public struct FeedbackAttachmentStateMachine: Sendable {
 
     /// Applies the console configuration upload byte limit if no explicit limit was provided by the caller.
     ///
-    /// If the state machine was initialized with an explicit non-nil `maxAttachmentBytes`, this method is a no-op,
-    /// preserving the caller's explicit limit.
+    /// If the state machine was initialized with an explicit positive `maxAttachmentBytes`, or if `limit <= 0`,
+    /// this method is a no-op, preserving the caller's explicit limit or the existing valid limit.
     ///
     /// - Parameter limit: The byte limit from `PublicAppConfig.maxAttachmentBytes`.
-    /// - Returns: `true` if the limit was applied, or `false` if ignored due to an explicit caller limit.
+    /// - Returns: `true` if the limit was applied, or `false` if ignored due to an explicit caller limit or non-positive value.
     @discardableResult
     public mutating func applyConfigLimit(_ limit: Int) -> Bool {
-        guard !hasExplicitLimit else { return false }
+        guard !hasExplicitLimit, limit > 0 else { return false }
         maxAttachmentBytes = limit
         return true
     }

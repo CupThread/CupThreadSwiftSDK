@@ -107,6 +107,31 @@ struct AttachmentLimitFallbackTests {
         #expect(resolved == nil, "Nothing resolved must leave the compiled-in default in force")
     }
 
+    @Test func resolveAttachmentLimitIgnoresNonPositiveConfigAndFallsBackToLastKnown() {
+        let zeroConfig = makeConfig(maxAttachmentBytes: 0)
+        let resolvedWithZero = FeedbackComposerAttachmentLimit.resolve(
+            config: zeroConfig,
+            lastKnownLimit: 5_000_000
+        )
+        #expect(resolvedWithZero == 5_000_000)
+
+        let negativeConfig = makeConfig(maxAttachmentBytes: -1024)
+        let resolvedWithNegative = FeedbackComposerAttachmentLimit.resolve(
+            config: negativeConfig,
+            lastKnownLimit: 5_000_000
+        )
+        #expect(resolvedWithNegative == 5_000_000)
+    }
+
+    @Test func resolveAttachmentLimitIgnoresNonPositiveLastKnownLimit() {
+        #expect(FeedbackComposerAttachmentLimit.resolve(config: nil, lastKnownLimit: 0) == nil)
+        #expect(FeedbackComposerAttachmentLimit.resolve(config: nil, lastKnownLimit: -1) == nil)
+
+        let negativeConfig = makeConfig(maxAttachmentBytes: -5_000_000)
+        #expect(FeedbackComposerAttachmentLimit.resolve(config: negativeConfig, lastKnownLimit: 0) == nil)
+        #expect(FeedbackComposerAttachmentLimit.resolve(config: negativeConfig, lastKnownLimit: -100) == nil)
+    }
+
     // MARK: - Downscale contract through the fallback (#287 requirement 3)
 
     @Test func lastKnownLimitDrivesDownscaleOfOversizedPhoto() async throws {
