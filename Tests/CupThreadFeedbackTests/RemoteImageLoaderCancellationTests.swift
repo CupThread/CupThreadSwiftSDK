@@ -209,4 +209,76 @@ struct RemoteImageLoaderCancellationTests {
         }
         #expect(counter.requestCount == 1, "Negative cache must replay error without contacting the network")
     }
+
+    // MARK: CachedRemoteImage phase mapping (issue #421)
+
+    /// Issue #421: a cancelled image load is not a failure. `CachedRemoteImage`
+    /// must keep its current phase when SwiftUI tears `.task(id:)` down
+    /// (scroll-away, cell recycling, view dismissal) instead of flashing the
+    /// failure placeholder — the detached download keeps running and may still
+    /// land in the cache for the next appearance.
+    @Test func cancellationThrownByTaskJoinDoesNotMapToFailurePhase() {
+        // `awaitJoinedTask` resumes its cancelled caller with a bare
+        // CancellationError; URLSession surfaces the same interruption as
+        // URLError(.cancelled). Neither may map to the failure phase.
+        #expect(!RemoteImagePhase.mapsToFailurePhase(CancellationError()))
+        #expect(!RemoteImagePhase.mapsToFailurePhase(URLError(.cancelled)))
+    }
+
+    @Test func cancelledImageLoadErrorDoesNotMapToFailurePhase() async throws {
+        let counter = CancellationRequestCounter()
+        let png = makePNGData()
+        let imageURL = makeImageURL("/phase-cancelled.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            counter.record()
+            Thread.sleep(forTimeInterval: 0.15)
+            return (self.makeImageResponse(request.url ?? imageURL), png)
+        }
+        let loader = RemoteImageLoader(session: makeMockSession())
+
+        let caller = Task { @MainActor in
+            try await loader.image(for: imageURL)
+        }
+        try await Task.sleep(for: .milliseconds(30))
+        caller.cancel()
+
+        guard case .failure(let error) = await caller.result else {
+            Issue.record("Expected the cancelled caller to throw")
+            return
+        }
+        #expect(error.isSdkCancellation)
+        #expect(
+            !RemoteImagePhase.mapsToFailurePhase(error),
+            "The error thrown by a cancelled image(for:) call must not transition CachedRemoteImage to .failure"
+        )
+    }
+
+    @Test func genuineNetworkFailureStillMapsToFailurePhase() async throws {
+        let imageURL = makeImageURL("/phase-genuine-failure.png")
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            (self.makeImageResponse(request.url ?? imageURL, status: 500), Data())
+        }
+        let loader = RemoteImageLoader(session: makeMockSession())
+
+        do {
+            _ = try await loader.image(for: imageURL)
+            Issue.record("Expected the failed download to throw")
+        } catch {
+            #expect(RemoteImagePhase.mapsToFailurePhase(error), "A genuine download failure must map to .failure")
+        }
+    }
+
+    @Test func genuineErrorInCancelledCallerTaskDoesNotMapToFailurePhase() async {
+        // SwiftUI may cancel the .task before its body observes the teardown;
+        // once the caller task is cancelled the phase must stay put even if a
+        // genuine-looking error surfaces in the same window.
+        let caller = Task { @MainActor in
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            return RemoteImagePhase.mapsToFailurePhase(URLError(.timedOut))
+        }
+        caller.cancel()
+        #expect(await caller.value == false, "A cancelled caller task must not transition to .failure even on a genuine error")
+    }
 }

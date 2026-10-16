@@ -385,6 +385,15 @@ enum RemoteImagePhase {
     /// short negative-cache window (replaying it without a network request)
     /// and retries the download on the next appearance after it lapses.
     case failure
+
+    /// Whether a failed load attempt maps to `failure`. Task cancellation
+    /// does not: a scrolled-away or recycled cell keeps its current phase —
+    /// the detached download keeps running and may still land in the cache,
+    /// resolving the next appearance — instead of flashing the failure
+    /// placeholder for an error the user can never see (issue #421).
+    static func mapsToFailurePhase(_ error: any Error) -> Bool {
+        !(error.isSdkCancellation || Task.isCancelled)
+    }
 }
 
 // MARK: - View
@@ -423,6 +432,7 @@ struct CachedRemoteImage<Content: View>: View {
                         Image(platformImage: try await RemoteImageLoader.shared.image(for: url))
                     )
                 } catch {
+                    guard RemoteImagePhase.mapsToFailurePhase(error) else { return }
                     phase = .failure
                 }
             }
