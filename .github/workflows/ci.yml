@@ -121,12 +121,29 @@ jobs:
           echo "SIMULATOR_UDID=$SIM_UDID" >> "$GITHUB_ENV"
       - name: Run Demo UI tests
         run: |
+          rm -rf /tmp/cupthread-ui-test.xcresult
           xcodebuild test \
             -project Demo/CupThreadDemo.xcodeproj \
             -scheme CupThreadDemo \
             -destination "id=${SIMULATOR_UDID}" \
             -only-testing:CupThreadDemoUITests/CupThreadDemoUITests/testInteractiveNavigationAndVotingFlow \
+            -resultBundlePath /tmp/cupthread-ui-test.xcresult \
             -quiet
+      - name: Print UI test failure summary
+        if: failure()
+        run: |
+          if [ -d /tmp/cupthread-ui-test.xcresult ]; then
+            xcrun xcresulttool get test-results summary --path /tmp/cupthread-ui-test.xcresult || true
+          else
+            echo "No result bundle was produced — the failure happened before testing started."
+          fi
+      - name: Upload UI test result bundle
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-test-failure-xcresult
+          path: /tmp/cupthread-ui-test.xcresult
+          retention-days: 7
   release-dry-run:
     name: Release Dry-Run
     if: github.event_name == 'push'
