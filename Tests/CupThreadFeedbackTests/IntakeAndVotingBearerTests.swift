@@ -226,7 +226,7 @@ struct IntakeAndVotingBearerTests {
             baseURL: Self.baseURL,
             authenticationProvider: { nil }
         )
-        let draft = FeatureRequestDraft(title: "Title", description: "Desc")
+        let draft = FeatureRequestDraft(title: "Title", description: "Desc ok")
         _ = try await clientNil.submitFeatureRequest(draft, userToken: "user_fr_nil")
         let requestNil = try #require(captureNil.value)
         #expect(requestNil.value(forHTTPHeaderField: "Authorization") == nil)
@@ -258,7 +258,7 @@ struct IntakeAndVotingBearerTests {
         defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
 
         let client = makeClient(baseURL: Self.baseURL)
-        let draft = FeatureRequestDraft(title: "Title", description: "Desc")
+        let draft = FeatureRequestDraft(title: "Title", description: "Desc ok")
         _ = try await client.submitFeatureRequest(draft, userToken: "user_fr_anon")
         let request = try #require(capture.value)
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)

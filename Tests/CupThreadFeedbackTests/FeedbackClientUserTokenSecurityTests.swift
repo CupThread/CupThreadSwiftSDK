@@ -178,7 +178,14 @@ struct FeedbackClientUserTokenSecurityTests {
         }
         let client = makeClient(baseURL: URL(string: "https://\(host)")!)
         let maliciousToken = "malicious\r\nX-Injected: value"
-        var draft = FeedbackDraft(platform: .ios)
+        // BUG-32: intake content must pass the local minimum-length gate so
+        // this test reaches the wire path it actually pins (the tokenStore
+        // fallback for a newline-bearing caller token).
+        var draft = FeedbackDraft(
+            title: "Attachment fallback",
+            description: "Valid description",
+            platform: .ios
+        )
         draft.attachments = [FeedbackAttachment(
             kind: .image,
             uploadId: "upl-123",

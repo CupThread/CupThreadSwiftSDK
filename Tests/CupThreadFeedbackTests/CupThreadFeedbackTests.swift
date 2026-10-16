@@ -905,7 +905,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
 
         let req = try #require(capture.value)
         #expect(req.value(forHTTPHeaderField: "Content-Type") == "application/json")
@@ -951,7 +951,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let draft = FeedbackDraft(title: "T", description: "Desc", platform: .ios, appVersion: "2.5.0")
+        let draft = FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios, appVersion: "2.5.0")
         _ = try await client.submit(draft)
 
         let rawData = try #require(capture.value)
@@ -971,7 +971,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let draft = FeedbackDraft(title: "T", description: "Desc ok", reporterName: "   ", platform: .ios)
+        let draft = FeedbackDraft(title: "Title", description: "Desc ok", reporterName: "   ", platform: .ios)
         _ = try await client.submit(draft)
 
         let rawData = try #require(capture.value)
@@ -989,7 +989,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let draft = FeedbackDraft(title: "T", description: "Desc ok", reporterEmail: "user@example.com", platform: .ios)
+        let draft = FeedbackDraft(title: "Title", description: "Desc ok", reporterEmail: "user@example.com", platform: .ios)
         _ = try await client.submit(draft)
 
         let rawData = try #require(capture.value)
@@ -1009,7 +1009,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let result = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        let result = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
         #expect(result.submissionId == "sub-xyz")
         #expect(result.forwardedToGithub == true)
         #expect(result.githubDiscussionId == "D_abc")
@@ -1025,7 +1025,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let result = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        let result = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
         #expect(result.submissionId == "sub-201")
         #expect(result.forwardedToGithub == false)
         #expect(result.githubDiscussionId == nil)
@@ -1044,7 +1044,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let result = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        let result = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
         #expect(result.submissionId == "sub-202")
         #expect(result.forwardedToGithub == false)
         #expect(result.warning == "Stored but not forwarded yet")
@@ -1062,7 +1062,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let result = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        let result = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
         #expect(result.submissionId == "sub-warn")
         #expect(result.forwardedToGithub == false)
         #expect(result.warning == "Attachment signing unconfigured on server")
@@ -1076,7 +1076,7 @@ struct FeedbackClientSubmitTests {
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
-            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(let code, _, _) = error {
@@ -1094,7 +1094,7 @@ struct FeedbackClientSubmitTests {
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
-            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(let code, _, _) = error {
@@ -1152,7 +1152,7 @@ struct FeedbackClientSubmitTests {
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
-            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(let code, let message, _) = error {
@@ -1171,7 +1171,7 @@ struct FeedbackClientSubmitTests {
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
-            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(let code, let message, _) = error {
@@ -1198,7 +1198,7 @@ struct FeedbackClientSubmitTests {
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
-            _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+            _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(_, _, let requestId) = error {
@@ -1224,7 +1224,7 @@ struct FeedbackClientSubmitTests {
             requestID: "stable-run-identifier-1"
         )
         let client = FeedbackClient(configuration: config, session: makeMockSession())
-        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
 
         #expect(capture.value == "stable-run-identifier-1")
     }
@@ -1299,7 +1299,7 @@ struct FeedbackClientSubmitTests {
             requestID: "session_123\r\nX-Injected: attack"
         )
         let client = FeedbackClient(configuration: config, session: makeMockSession())
-        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
 
         let header = try #require(capture.value)
         #expect(header != "session_123\r\nX-Injected: attack")
@@ -1314,7 +1314,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
 
         let versionHeader = try #require(capture.value)
         #expect(versionHeader == FeedbackClient.sdkVersion)
@@ -1337,7 +1337,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        var draft = FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios)
         draft.attachments = [
             FeedbackAttachment(kind: .image, uploadId: "upl-1", key: "upl-1", url: URL(string: "https://example.com/1")!),
             FeedbackAttachment(kind: .r2, uploadId: "upl-2", key: "upl-2", url: URL(string: "https://example.com/2")!),
@@ -1361,7 +1361,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        _ = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        _ = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
 
         let rawData = try #require(capture.value)
         let json = try #require(parseJSONDict(rawData))
@@ -1377,7 +1377,7 @@ struct FeedbackClientSubmitTests {
 
         let isolated = makeIsolatedTokenStore()
         let client = makeClient(baseURL: baseURL, appKey: appKey, tokenStore: isolated.store)
-        var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        var draft = FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios)
         draft.attachments = [
             FeedbackAttachment(kind: .image, uploadId: "upl-1", key: "upl-1", url: URL(string: "https://example.com/1")!)
         ]
@@ -1398,7 +1398,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        var draft = FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios)
         draft.attachments = [
             FeedbackAttachment(kind: .image, uploadId: "upl-1", key: "upl-1", url: URL(string: "https://example.com/1")!)
         ]
@@ -1416,7 +1416,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        let draft = FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios)
         _ = try await client.submit(draft, userToken: nil)
 
         let req = try #require(capture.value)
@@ -1431,7 +1431,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let result = try await client.submit(FeedbackDraft(title: "T", description: "Desc ok", platform: .ios))
+        let result = try await client.submit(FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios))
         #expect(result.submissionId == "abc-123")
         #expect(result.forwardedToGithub == false)
         #expect(result.warning == nil)
@@ -1445,7 +1445,7 @@ struct FeedbackClientSubmitTests {
         }
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
-        let draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .macos)
+        let draft = FeedbackDraft(title: "Title", description: "Desc ok", platform: .macos)
         _ = try await client.submit(draft)
 
         let rawData = try #require(capture.value)
@@ -1612,7 +1612,7 @@ struct FeedbackClientUploadTests {
             userToken: nil
         )
 
-        var draft = FeedbackDraft(title: "T", description: "Desc ok", platform: .ios)
+        var draft = FeedbackDraft(title: "Title", description: "Desc ok", platform: .ios)
         draft.attachments = [attachment]
         _ = try await client.submit(draft, userToken: nil)
 

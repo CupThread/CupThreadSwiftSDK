@@ -29,7 +29,7 @@ struct AlreadyFinalizedErrorMappingTests {
 
         do {
             _ = try await Self.makeAPIClient().submit(
-                FeedbackDraft(title: "Test", description: "Body", platform: .ios),
+                FeedbackDraft(title: "Test", description: "Body text", platform: .ios),
                 userToken: "token-123"
             )
             Issue.record("Expected alreadyFinalized")
@@ -58,7 +58,7 @@ struct AlreadyFinalizedErrorMappingTests {
 
         do {
             _ = try await Self.makeAPIClient().submit(
-                FeedbackDraft(title: "Test", description: "Body", platform: .ios),
+                FeedbackDraft(title: "Test", description: "Body text", platform: .ios),
                 userToken: "token-123"
             )
             Issue.record("Expected alreadyFinalized")
@@ -85,7 +85,7 @@ struct AlreadyFinalizedErrorMappingTests {
 
         do {
             _ = try await Self.makeAPIClient().submit(
-                FeedbackDraft(title: "Test", description: "Body", platform: .ios),
+                FeedbackDraft(title: "Test", description: "Body text", platform: .ios),
                 userToken: "token-123"
             )
             Issue.record("Expected unexpectedStatus")
@@ -106,7 +106,7 @@ struct AlreadyFinalizedErrorMappingTests {
 
         do {
             _ = try await Self.makeAPIClient().submit(
-                FeedbackDraft(title: "Test", description: "Body", platform: .ios),
+                FeedbackDraft(title: "Test", description: "Body text", platform: .ios),
                 userToken: "token-123"
             )
             Issue.record("Expected unexpectedStatus")
