@@ -122,7 +122,7 @@ struct PhotoUploadAdmissionTests {
         let preflight = content[deferOwnership.upperBound..<networkCall.lowerBound]
         #expect(
             preflight.contains("PhotoUploadAdmission.resolve("),
-            "uploadPhotoItem must re-validate admission between receiving the spooled file and spending a backend upload session (issue #423)"
+            "uploadPhotoItem must re-validate admission between spooling the file and spending a backend upload session (issue #423)"
         )
     }
 }

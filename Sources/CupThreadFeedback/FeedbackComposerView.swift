@@ -375,6 +375,75 @@ public struct FeedbackComposerView: View {
         }
     }
 
+    #endif
+
+    private var submitBar: some View {
+        FeedbackSubmitBarView(isSubmitting: isSubmitting, canSubmit: attachmentState.canSubmit(draft: draft)) {
+            Task { await submitDraft() }
+        }
+    }
+
+    // MARK: - Submit
+
+    @MainActor
+    private func submitDraft() async {
+        guard submissionDenial == .none else { return }
+        guard attachmentState.canSubmit(draft: draft) && !isSubmitting else { return }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        errorMessage = nil
+        let currentDraft = draft
+        let currentClient = client
+
+        do {
+            let result = try await currentClient.submit(currentDraft, userToken: userToken)
+            onSubmit(result)
+            withAnimation(.snappy(duration: 0.3)) {
+                self.result = result
+                self.resetForm()
+            }
+        } catch {
+            guard !error.isSdkCancellation else { return }
+            if Self.clearsConsumedAttachments(for: error) {
+                // The server rejected a duplicate attachment (#257): the upload ID was already
+                // finalized into another submission. Clear upload-bearing attachments from the
+                // draft so the user does not retry the same consumed IDs.
+                for attachment in draft.attachments where attachment.uploadId != nil {
+                    attachmentState.removeAttachment(id: attachment.id, draft: &draft)
+                }
+            }
+            errorMessage = FriendlyError.message(for: error)
+        }
+    }
+
+    /// Cancels the in-flight upload at an explicit, user-intent-bearing
+    /// point: the uploading row's cancel button, a form reset after submit
+    /// success, or teardown via ``FeedbackUploadHandle``. Never called from
+    /// view lifecycle events — transient disappearances must not stop uploads.
+    @MainActor
+    private func cancelUpload() {
+        #if canImport(PhotosUI) && !os(tvOS)
+        selectionCoordinator.cancel()
+        #endif
+        attachmentState.cancelUpload()
+    }
+
+    @MainActor
+    private func resetForm() {
+        cancelUpload()
+        attachmentState.reset(draft: &draft, defaultPlatform: client.configuration.defaultPlatform)
+        errorMessage = nil
+    }
+}
+
+// MARK: - Photo upload pipeline
+
+/// Extracted from the composer's main type body to keep it within the
+/// 350-line `type_body_length` budget (`.swiftlint.yml`); it stays in this
+/// file because the pipeline drives the view's file-private `@State` (same
+/// one-surface-per-file policy as the header note).
+extension FeedbackComposerView {
+    #if canImport(PhotosUI) && !os(tvOS)
     @MainActor
     private func uploadPhotoItem(_ item: PhotosPickerItem, uploadId: UUID) async {
         attachmentState.clearError()
@@ -512,62 +581,4 @@ public struct FeedbackComposerView: View {
         )
     }
     #endif
-
-    private var submitBar: some View {
-        FeedbackSubmitBarView(isSubmitting: isSubmitting, canSubmit: attachmentState.canSubmit(draft: draft)) {
-            Task { await submitDraft() }
-        }
-    }
-
-    // MARK: - Submit
-
-    @MainActor
-    private func submitDraft() async {
-        guard submissionDenial == .none else { return }
-        guard attachmentState.canSubmit(draft: draft) && !isSubmitting else { return }
-        isSubmitting = true
-        defer { isSubmitting = false }
-        errorMessage = nil
-        let currentDraft = draft
-        let currentClient = client
-
-        do {
-            let result = try await currentClient.submit(currentDraft, userToken: userToken)
-            onSubmit(result)
-            withAnimation(.snappy(duration: 0.3)) {
-                self.result = result
-                self.resetForm()
-            }
-        } catch {
-            guard !error.isSdkCancellation else { return }
-            if Self.clearsConsumedAttachments(for: error) {
-                // The server rejected a duplicate attachment (#257): the upload ID was already
-                // finalized into another submission. Clear upload-bearing attachments from the
-                // draft so the user does not retry the same consumed IDs.
-                for attachment in draft.attachments where attachment.uploadId != nil {
-                    attachmentState.removeAttachment(id: attachment.id, draft: &draft)
-                }
-            }
-            errorMessage = FriendlyError.message(for: error)
-        }
-    }
-
-    /// Cancels the in-flight upload at an explicit, user-intent-bearing
-    /// point: the uploading row's cancel button, a form reset after submit
-    /// success, or teardown via ``FeedbackUploadHandle``. Never called from
-    /// view lifecycle events — transient disappearances must not stop uploads.
-    @MainActor
-    private func cancelUpload() {
-        #if canImport(PhotosUI) && !os(tvOS)
-        selectionCoordinator.cancel()
-        #endif
-        attachmentState.cancelUpload()
-    }
-
-    @MainActor
-    private func resetForm() {
-        cancelUpload()
-        attachmentState.reset(draft: &draft, defaultPlatform: client.configuration.defaultPlatform)
-        errorMessage = nil
-    }
 }
