@@ -375,6 +375,75 @@ public struct FeedbackComposerView: View {
         }
     }
 
+    #endif
+
+    private var submitBar: some View {
+        FeedbackSubmitBarView(isSubmitting: isSubmitting, canSubmit: attachmentState.canSubmit(draft: draft)) {
+            Task { await submitDraft() }
+        }
+    }
+
+    // MARK: - Submit
+
+    @MainActor
+    private func submitDraft() async {
+        guard submissionDenial == .none else { return }
+        guard attachmentState.canSubmit(draft: draft) && !isSubmitting else { return }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        errorMessage = nil
+        let currentDraft = draft
+        let currentClient = client
+
+        do {
+            let result = try await currentClient.submit(currentDraft, userToken: userToken)
+            onSubmit(result)
+            withAnimation(.snappy(duration: 0.3)) {
+                self.result = result
+                self.resetForm()
+            }
+        } catch {
+            guard !error.isSdkCancellation else { return }
+            if Self.clearsConsumedAttachments(for: error) {
+                // The server rejected a duplicate attachment (#257): the upload ID was already
+                // finalized into another submission. Clear upload-bearing attachments from the
+                // draft so the user does not retry the same consumed IDs.
+                for attachment in draft.attachments where attachment.uploadId != nil {
+                    attachmentState.removeAttachment(id: attachment.id, draft: &draft)
+                }
+            }
+            errorMessage = FriendlyError.message(for: error)
+        }
+    }
+
+    /// Cancels the in-flight upload at an explicit, user-intent-bearing
+    /// point: the uploading row's cancel button, a form reset after submit
+    /// success, or teardown via ``FeedbackUploadHandle``. Never called from
+    /// view lifecycle events — transient disappearances must not stop uploads.
+    @MainActor
+    private func cancelUpload() {
+        #if canImport(PhotosUI) && !os(tvOS)
+        selectionCoordinator.cancel()
+        #endif
+        attachmentState.cancelUpload()
+    }
+
+    @MainActor
+    private func resetForm() {
+        cancelUpload()
+        attachmentState.reset(draft: &draft, defaultPlatform: client.configuration.defaultPlatform)
+        errorMessage = nil
+    }
+}
+
+// MARK: - Photo upload pipeline
+
+/// Extracted from the composer's main type body to keep it within the
+/// 350-line `type_body_length` budget (`.swiftlint.yml`); it stays in this
+/// file because the pipeline drives the view's file-private `@State` (same
+/// one-surface-per-file policy as the header note).
+extension FeedbackComposerView {
+    #if canImport(PhotosUI) && !os(tvOS)
     @MainActor
     private func uploadPhotoItem(_ item: PhotosPickerItem, uploadId: UUID) async {
         attachmentState.clearError()
@@ -382,6 +451,25 @@ public struct FeedbackComposerView: View {
         do {
             guard let prepared = try await preparePhotoForUpload(item, uploadId: uploadId) else { return }
             defer { PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL) }
+
+            // Re-validate across the resume boundary (#423): the checks in
+            // `preparePhotoForUpload` only held at its return, and a
+            // superseding selection or handle cancel can land during the hop
+            // back to the main actor. Skip the doomed network round-trip
+            // instead of creating a backend upload session and streaming
+            // obsolete bytes over it.
+            switch PhotoUploadAdmission.resolve(
+                isCancelled: Task.isCancelled,
+                isActiveUpload: attachmentState.activeUploadId == uploadId
+            ) {
+            case .proceed:
+                break
+            case .cancelledWhileActive:
+                attachmentState.cancelUpload()
+                return
+            case .superseded:
+                return
+            }
 
             let uploaded = try await client.uploadAttachment(
                 fileURL: prepared.fileURL,
@@ -444,8 +532,11 @@ public struct FeedbackComposerView: View {
     /// bytes are released when this returns.
     ///
     /// Returns `nil` when the upload was superseded or cancelled before
-    /// preparation finished. Delete the returned file with
-    /// ``PhotoAttachmentHelper/removeTempUploadFile(at:)`` when done.
+    /// preparation finished — including while the spooled file was being
+    /// written, in which case the file is removed before returning so no
+    /// orphan is left behind in the temporary directory (#423). Delete the
+    /// returned file with ``PhotoAttachmentHelper/removeTempUploadFile(at:)``
+    /// when done.
     private func preparePhotoForUpload(
         _ item: PhotosPickerItem,
         uploadId: UUID
@@ -459,6 +550,27 @@ public struct FeedbackComposerView: View {
             fileExtension: prepared.fileExtension,
             id: uploadId
         )
+
+        // The spool ran across awaits, so the write may have been racing a
+        // cancellation or a superseding selection the whole time. Re-validate
+        // before handing the file out, removing it when the upload is already
+        // doomed (#423).
+        switch PhotoUploadAdmission.resolve(
+            isCancelled: Task.isCancelled,
+            isActiveUpload: attachmentState.activeUploadId == uploadId
+        ) {
+        case .proceed:
+            break
+        case .cancelledWhileActive:
+            PhotoAttachmentHelper.removeTempUploadFile(at: fileURL)
+            // Same unwind as the pre-spool `checkCancellation`: the catch in
+            // `uploadPhotoItem` resets the still-active machine.
+            throw CancellationError()
+        case .superseded:
+            PhotoAttachmentHelper.removeTempUploadFile(at: fileURL)
+            return nil
+        }
+
         return PreparedPhotoUpload(
             fileURL: fileURL,
             filename: PhotoAttachmentHelper.makeFilename(
@@ -469,62 +581,4 @@ public struct FeedbackComposerView: View {
         )
     }
     #endif
-
-    private var submitBar: some View {
-        FeedbackSubmitBarView(isSubmitting: isSubmitting, canSubmit: attachmentState.canSubmit(draft: draft)) {
-            Task { await submitDraft() }
-        }
-    }
-
-    // MARK: - Submit
-
-    @MainActor
-    private func submitDraft() async {
-        guard submissionDenial == .none else { return }
-        guard attachmentState.canSubmit(draft: draft) && !isSubmitting else { return }
-        isSubmitting = true
-        defer { isSubmitting = false }
-        errorMessage = nil
-        let currentDraft = draft
-        let currentClient = client
-
-        do {
-            let result = try await currentClient.submit(currentDraft, userToken: userToken)
-            onSubmit(result)
-            withAnimation(.snappy(duration: 0.3)) {
-                self.result = result
-                self.resetForm()
-            }
-        } catch {
-            guard !error.isSdkCancellation else { return }
-            if Self.clearsConsumedAttachments(for: error) {
-                // The server rejected a duplicate attachment (#257): the upload ID was already
-                // finalized into another submission. Clear upload-bearing attachments from the
-                // draft so the user does not retry the same consumed IDs.
-                for attachment in draft.attachments where attachment.uploadId != nil {
-                    attachmentState.removeAttachment(id: attachment.id, draft: &draft)
-                }
-            }
-            errorMessage = FriendlyError.message(for: error)
-        }
-    }
-
-    /// Cancels the in-flight upload at an explicit, user-intent-bearing
-    /// point: the uploading row's cancel button, a form reset after submit
-    /// success, or teardown via ``FeedbackUploadHandle``. Never called from
-    /// view lifecycle events — transient disappearances must not stop uploads.
-    @MainActor
-    private func cancelUpload() {
-        #if canImport(PhotosUI) && !os(tvOS)
-        selectionCoordinator.cancel()
-        #endif
-        attachmentState.cancelUpload()
-    }
-
-    @MainActor
-    private func resetForm() {
-        cancelUpload()
-        attachmentState.reset(draft: &draft, defaultPlatform: client.configuration.defaultPlatform)
-        errorMessage = nil
-    }
 }

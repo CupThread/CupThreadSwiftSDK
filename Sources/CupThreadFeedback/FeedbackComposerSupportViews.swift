@@ -330,3 +330,26 @@ struct PreparedPhotoUpload {
     let filename: String
     let mimeType: String
 }
+
+/// Admission decision for a photo upload whose preparation awaits have been
+/// racing a task cancellation or a superseding selection (#423). Shared by
+/// the post-spool gate in `preparePhotoForUpload` and the preflight gate in
+/// `uploadPhotoItem`, which must unwind identically.
+enum PhotoUploadAdmission: Equatable {
+    case proceed
+    /// The upload task was cancelled while the state machine still tracks it
+    /// (an explicit `FeedbackUploadHandle` cancel leaves it pointing here):
+    /// the caller must reset the machine on the way out.
+    case cancelledWhileActive
+    /// A newer selection re-pointed the state machine; bail out silently.
+    case superseded
+
+    /// - Parameters:
+    ///   - isCancelled: Whether the upload task has been cancelled.
+    ///   - isActiveUpload: Whether the state machine still tracks this
+    ///     upload's id as the active upload.
+    static func resolve(isCancelled: Bool, isActiveUpload: Bool) -> PhotoUploadAdmission {
+        guard isActiveUpload else { return .superseded }
+        return isCancelled ? .cancelledWhileActive : .proceed
+    }
+}
