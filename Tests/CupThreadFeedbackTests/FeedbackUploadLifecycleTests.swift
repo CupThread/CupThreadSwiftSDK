@@ -473,4 +473,25 @@ struct FeedbackUploadOriginSecurityTests {
         let matching = try? client.uploadURL(from: "http://localhost:8080/api/v1/uploads")
         #expect(matching == URL(string: "http://localhost:8080/api/v1/uploads"))
     }
+
+    @Test func uploadURLRejectsEmbeddedUserinfo() {
+        let client = makeClient(baseURL: baseURL)
+        let userinfoURLs = [
+            "https://user:pass@api.example.com/api/v1/uploads/slot-1",
+            "https://admin@api.example.com/api/v1/uploads/slot-1",
+            "https://:secret@api.example.com/api/v1/uploads/slot-1",
+            "https://api.example.com@attacker.com/api/v1/uploads/slot-1"
+        ]
+
+        for item in userinfoURLs {
+            do {
+                _ = try client.uploadURL(from: item)
+                Issue.record("Expected \(item) to be rejected by uploadURL")
+            } catch let error as FeedbackClientError {
+                #expect(error == .invalidResponse, "Expected invalidResponse for \(item)")
+            } catch {
+                Issue.record("Expected FeedbackClientError, got \(error)")
+            }
+        }
+    }
 }

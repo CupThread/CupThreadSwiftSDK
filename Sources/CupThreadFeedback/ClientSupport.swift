@@ -54,11 +54,16 @@ extension FeedbackClient {
     /// The `X-Request-Id` to send with a request (OPS-01): the
     /// configuration's stable id when set, otherwise a fresh UUID per request.
     /// The server honors ids matching `RequestIDGrammar`
-    /// (`^[A-Za-z0-9._-]{8,64}$`) and replaces anything else; response echoes
-    /// are validated against the same grammar before being attached to
-    /// errors (SEC-12).
+    /// (`^[A-Za-z0-9._-]{8,64}$`) and replaces anything else, so a
+    /// configuration id that violates the grammar (too short or long,
+    /// whitespace, illegal symbols, CRLF) is never transmitted — the SDK
+    /// falls back to a generated UUID, keeping the outgoing header
+    /// injection-safe and conformant (API-34). Response echoes are validated
+    /// against the same grammar before being attached to errors (SEC-12).
     func nextRequestID() -> String {
-        if let requestID = configuration.requestID, !requestID.isEmpty {
+        if let requestID = configuration.requestID?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            RequestIDGrammar.isValid(requestID) {
             return requestID
         }
         return UUID().uuidString.lowercased()

@@ -56,6 +56,24 @@ struct RedirectPolicyDecisionTests {
             redirectURL: URL(string: "https://sub.api.example.com/")!
         ))
 
+        // Userinfo credentials are refused.
+        #expect(!SameOriginRedirectLimiter.isSameOrigin(
+            api,
+            redirectURL: URL(string: "https://user:pass@api.example.com/x")!
+        ))
+        #expect(!SameOriginRedirectLimiter.isSameOrigin(
+            api,
+            redirectURL: URL(string: "https://admin@api.example.com/x")!
+        ))
+        #expect(!SameOriginRedirectLimiter.isSameOrigin(
+            api,
+            redirectURL: URL(string: "https://:secret@api.example.com/x")!
+        ))
+        #expect(!SameOriginRedirectLimiter.isSameOrigin(
+            URL(string: "https://user:pass@api.example.com/x")!,
+            redirectURL: api
+        ))
+
         // Missing URLs or unusable origins never match.
         #expect(!SameOriginRedirectLimiter.isSameOrigin(nil, redirectURL: api))
         #expect(!SameOriginRedirectLimiter.isSameOrigin(api, redirectURL: nil))
@@ -113,6 +131,11 @@ struct RedirectPolicyDecisionTests {
         let followed = try decision(for: "https://\(host)/api/v1/uploads/upl-rp-1/content")
         #expect(followed.called)
         #expect(followed.followedRequest?.url == URL(string: "https://\(host)/api/v1/uploads/upl-rp-1/content"))
+
+        // Userinfo credentials: refused.
+        let userinfoRefused = try decision(for: "https://attacker:secret@\(host)/api/v1/uploads/upl-rp-1/content")
+        #expect(userinfoRefused.called)
+        #expect(userinfoRefused.followedRequest == nil)
     }
 
     // MARK: Default session wiring

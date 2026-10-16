@@ -122,6 +122,22 @@ public enum PhotoAttachmentHelper {
         return nil
     }
 
+    /// Sanitizes an attachment file extension by trimming whitespace and leading dots,
+    /// enforcing an alphanumeric character set, and falling back to `"jpg"` if empty or invalid.
+    ///
+    /// - Parameter raw: The raw file extension string.
+    /// - Returns: A sanitized lowercase alphanumeric extension without leading dots or path separators.
+    public static func sanitizeFileExtension(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .drop(while: { $0 == "." })
+        let cleaned = String(trimmed)
+        guard !cleaned.isEmpty,
+              cleaned.allSatisfy({ $0.isLetter || $0.isNumber }) else {
+            return "jpg"
+        }
+        return cleaned.lowercased()
+    }
+
     /// Generates a collision-resistant filename incorporating a unique UUID.
     ///
     /// - Parameters:
@@ -129,7 +145,8 @@ public enum PhotoAttachmentHelper {
     ///   - id: The unique identifier for the attachment.
     /// - Returns: A filename string formatted as `"screenshot_<uuid>.<ext>"`.
     public static func makeFilename(fileExtension: String, id: UUID = UUID()) -> String {
-        "screenshot_\(id.uuidString.lowercased()).\(fileExtension)"
+        let sanitizedExtension = sanitizeFileExtension(fileExtension)
+        return "screenshot_\(id.uuidString.lowercased()).\(sanitizedExtension)"
     }
 
     /// Validates that raw data size does not exceed the allowed byte budget.
@@ -187,18 +204,30 @@ public enum PhotoAttachmentHelper {
     /// transform to the decoded pixel buffer. The fresh encode also drops any
     /// embedded metadata, so this doubles as a sanitizer for transcoded paths.
     ///
-    /// - Parameter data: The raw image bytes.
+    /// When `maxDimension` is non-nil and positive, ImageIO decodes the image
+    /// with its longest pixel edge capped at `maxDimension`, bounding peak
+    /// memory usage on large sources (such as 48MP iPhone photos).
+    ///
+    /// - Parameters:
+    ///   - data: The raw image bytes.
+    ///   - maxDimension: Maximum allowed pixel size for the longest edge of the decoded bitmap, or `nil` for unconstrained decoding. Defaults to `4096`.
     /// - Returns: JPEG bytes, or `nil` when the data cannot be decoded as an image.
-    public static func jpegRepresentationResampled(from data: Data) -> Data? {
+    public static func jpegRepresentationResampled(
+        from data: Data,
+        maxDimension: CGFloat? = 4096
+    ) -> Data? {
         guard !data.isEmpty,
               let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else {
             return nil
         }
-        let thumbnailOptions: [CFString: Any] = [
+        var thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCache: false
         ]
+        if let maxDimension, maxDimension > 0 {
+            thumbnailOptions[kCGImageSourceThumbnailMaxPixelSize] = maxDimension
+        }
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
             ?? CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: false] as CFDictionary) else {
             return nil

@@ -22,11 +22,14 @@ func isAllowedWebURL(_ url: URL) -> Bool {
 /// Checks whether a URL is an allowed secure remote image URL:
 /// - Must have `https` scheme.
 /// - Must have a non-empty, non-whitespace host.
+/// - Must not contain embedded credentials (user or password).
 func isAllowedSecureImageURL(_ url: URL) -> Bool {
     guard let scheme = url.scheme?.lowercased(),
           scheme == "https",
           let host = url.host?.trimmingCharacters(in: .whitespacesAndNewlines),
-          !host.isEmpty else {
+          !host.isEmpty,
+          url.user == nil,
+          url.password == nil else {
         return false
     }
     return true

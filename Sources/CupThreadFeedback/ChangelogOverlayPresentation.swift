@@ -201,34 +201,54 @@ struct DefaultChangelogOverlayPresenter: ChangelogOverlayPresenter {
     #endif
 
     #if os(macOS)
-    private func presentAppKit(
+    @discardableResult
+    func presentAppKit(
         client: FeedbackClient,
         entries: [ChangelogEntry],
         appearance: SdkAppearance,
-        context: ChangelogOverlayPresentationContext
-    ) {
-        guard let controller = NSApp.keyWindow?.contentViewController ?? NSApp.windows.first?.contentViewController else {
+        context: ChangelogOverlayPresentationContext,
+        presentingController: NSViewController? = nil
+    ) -> NSViewController? {
+        let app = NSApplication.shared
+        guard let controller = presentingController
+            ?? app.keyWindow?.contentViewController
+            ?? app.windows.first?.contentViewController else {
             context.markRefused()
-            return
+            return nil
         }
+        weak var weakHost: NSViewController?
         let host = NSHostingController(
             rootView: ChangelogOverlayView(
                 client: client,
                 entries: entries,
                 appearance: appearance,
-                onPrimary: {
-                    controller.dismiss(nil)
+                onPrimary: { [weak controller] in
+                    if let host = weakHost {
+                        if let controller {
+                            controller.dismiss(host)
+                        } else {
+                            host.dismiss(nil)
+                        }
+                    }
                     context.markDismissed()
                 },
-                onClose: {
-                    controller.dismiss(nil)
+                onClose: { [weak controller] in
+                    if let host = weakHost {
+                        if let controller {
+                            controller.dismiss(host)
+                        } else {
+                            host.dismiss(nil)
+                        }
+                    }
                     context.markDismissed()
                 }
             )
             .onAppear { context.markPresented() }
             .onDisappear { context.markDismissed() }
         )
+        weakHost = host
         controller.presentAsSheet(host)
+        return host
     }
     #endif
 }
