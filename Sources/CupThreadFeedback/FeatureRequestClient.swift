@@ -116,22 +116,33 @@ extension FeedbackClient {
     ///   - userToken: Optional stable UUID string identifying this user.
     /// - Returns: The matching feature request.
     /// - Throws: ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
-    ///   when the request does not exist, is unapproved, or belongs to an app
-    ///   with public access disabled (HTTP 404),
+    ///   when the server answers HTTP 404 with the documented JSON error
+    ///   envelope (the request does not exist, is unapproved, or belongs to
+    ///   an app with public access disabled), or locally with no request
+    ///   sent when `id` cannot be a valid feature-request id (empty,
+    ///   whitespace-padded to nothing, or containing path/query/percent
+    ///   characters — deep-link ids are untrusted input),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   when a 404 arrives *without* the JSON envelope (router fallback,
+    ///   deploy skew, or a wrong `baseURL` — distinguishable from a real
+    ///   missing request),
     ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous access
     ///   is disabled for the app (HTTP 401/403),
     ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the per-client-IP
     ///   rate limit is exceeded (HTTP 429),
-    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
-    ///   ``FeedbackClientError/invalidResponse``.
+    ///   or ``FeedbackClientError/invalidResponse`` when a success body or
+    ///   any other response cannot be decoded.
     public func fetchFeatureRequest(
         id: String,
         userToken: String? = nil
     ) async throws -> FeatureRequestItem {
         let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedID.isEmpty else {
-            throw FeedbackClientError.invalidResponse
+        guard FeatureRequestIDGrammar.isValid(trimmedID) else {
+            // Deep-link ids are untrusted input (API-24): an id that cannot
+            // be a single opaque path segment can never name an existing
+            // request, so report not-found without building a URL from it.
+            throw FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)
         }
         let url = configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)")
         var request = URLRequest(url: url)
@@ -143,19 +154,26 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode == 404 {
-            let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
-            let rawMessage = envelope?.error ?? String(data: data, encoding: .utf8)
-            let trimmed = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let message = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        if httpResponse.statusCode == 404,
+           let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data),
+           let message = envelope.error?.nilIfEmpty {
+            // Only the API's documented resource-404 envelope means "this
+            // request does not exist". A bare router fallback (text/plain
+            // "404 Not Found", empty body — what production answers on
+            // deploy skew or a wrong baseURL) falls through to
+            // `validateResponse` and surfaces as `.unexpectedStatus`.
             throw FeedbackClientError.featureRequestNotFound(
                 message: message,
                 requestId: httpResponse.cupthreadRequestID
             )
         }
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        let result = try decoder.decode(FeatureRequestResponse.self, from: data)
-        return result.request
+        do {
+            let result = try decoder.decode(FeatureRequestResponse.self, from: data)
+            return result.request
+        } catch {
+            throw FeedbackClientError.invalidResponse
+        }
     }
 
     /// Fetches a single feature request by its id (alias for ``fetchFeatureRequest(id:userToken:)``).
