@@ -147,15 +147,23 @@ extension FeedbackClient {
     ///
     /// - Parameters:
     ///   - sessionToken: The authenticated session token, sent as
-    ///     `Authorization: Bearer <sessionToken>`.
-    ///   - userToken: Anonymous user token sent as `X-User-Token`.
+    ///     `Authorization: Bearer <sessionToken>`. Blank, whitespace-only, or
+    ///     multi-line values are rejected locally — a blank session would
+    ///     dispatch `Bearer ` with no identity, and a newline can never be
+    ///     carried as a header value (#416).
+    ///   - userToken: Anonymous user token sent as `X-User-Token`. Blank,
+    ///     whitespace-only, or multi-line values are rejected locally — the
+    ///     header plumbing would silently drop them and dispatch the link
+    ///     with no anonymous identity to attach (#416).
     /// - Returns: The confirmed link, including the authenticated identity.
     /// - Note: The Clerk session bearer is never re-sent to a redirect
     ///   target: a redirect off the configured API origin is refused and the
     ///   3xx response surfaces as
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` when the
-    ///   session is missing or invalid (HTTP 401),
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when
+    ///   `sessionToken` or `userToken` is blank, whitespace-only, or
+    ///   contains a newline (all rejected before any network round trip),
+    ///   when the session is missing or invalid (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
     ///   server policy forbids the link (HTTP 403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
@@ -166,11 +174,26 @@ extension FeedbackClient {
         sessionToken: String,
         userToken: String
     ) async throws -> EndUserLinkResult {
+        // A blank session token would go out as `Bearer ` and can only come
+        // back 401; a newline-containing one can never be carried as a
+        // header value. A blank userToken would be silently dropped by
+        // applyUserToken, dispatching the link with no anonymous identity
+        // to attach. Fail fast locally instead (#416) — the trimmed values
+        // are what get sent, so both headers always carry the same identity
+        // the caller validated.
+        guard let sessionBearer = sessionToken.nilIfEmpty,
+              !sessionBearer.contains(where: \.isNewline) else {
+            throw FeedbackClientError.authenticationRequired
+        }
+        guard let identityToken = userToken.nilIfEmpty,
+              !identityToken.contains(where: \.isNewline) else {
+            throw FeedbackClientError.authenticationRequired
+        }
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/me/link"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
-        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        request.setValue("Bearer \(sessionBearer)", forHTTPHeaderField: "Authorization")
+        try applyCorrelationHeaders(userToken: identityToken, requestID: nextRequestID(), to: &request)
         request.httpBody = try encoder.encode(MeAppKeyPayload(appKey: configuration.appKey))
 
         let (data, response) = try await session.data(for: request)

@@ -28,9 +28,14 @@ extension FeedbackClient {
     /// identifies the workspace and recipient, so this method — unlike the
     /// changelog unsubscribe — does not append the configured app key.
     /// - Parameter token: The signed token from the digest unsubscribe link.
+    ///   Blank or whitespace-only values are rejected locally — the signed
+    ///   token alone identifies the workspace and recipient, so dispatching
+    ///   with `token=` can only come back rejected (#416).
     /// - Returns: Whether the address was removed from the weekly digest.
     /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   (status 400 when the token is missing, invalid, or expired),
+    ///   (status 400 when the token is blank — rejected locally with no
+    ///   network round trip and no server request id — or missing, invalid,
+    ///   or expired on the server),
     ///   ``FeedbackClientError/authenticationRequired`` (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` (HTTP 403),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429, or
@@ -38,11 +43,22 @@ extension FeedbackClient {
     public func unsubscribeFromWeeklyDigest(
         token: String
     ) async throws -> WeeklyDigestUnsubscribeResult {
+        // A blank token has no signature to verify and can only come back
+        // rejected, so fail fast instead of dispatching the mutating POST
+        // with `token=` (#416) — same contract as the changelog
+        // unsubscribe sibling (#419).
+        guard let trimmedToken = token.nilIfEmpty else {
+            throw FeedbackClientError.unexpectedStatus(
+                code: 400,
+                message: "Unsubscribe token cannot be empty",
+                requestId: nil
+            )
+        }
         let base = configuration.baseURL.appending(path: "/api/v1/public/digest/unsubscribe")
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
             throw FeedbackClientError.invalidResponse
         }
-        components.queryItems = [URLQueryItem(name: "token", value: token)]
+        components.queryItems = [URLQueryItem(name: "token", value: trimmedToken)]
         guard let url = components.url else {
             throw FeedbackClientError.invalidResponse
         }
