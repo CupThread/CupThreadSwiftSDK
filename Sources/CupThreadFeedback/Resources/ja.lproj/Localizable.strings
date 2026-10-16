@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "フィードバックサーバーが無効な応答を返しました。";
 "cupthread.error.unreadable_upload_response" = "フィードバックサーバーが判読できないアップロード応答を返しました。";
+"cupthread.error.invalid_configuration" = "アプリの設定が無効です。アプリキーを確認してもう一度お試しください。";
 "cupthread.error.auth_required" = "この操作はサインイン済みのユーザーのみ利用できます。";
 "cupthread.error.scan_rejected" = "参照された添付ファイルはコンテンツ検査で拒否されたため、アップロードできませんでした。";
 "cupthread.error.unsupported_media" = "この画像の種類はサポートされていません。PNG、JPEG、WebP、GIF のいずれかを添付してください。";

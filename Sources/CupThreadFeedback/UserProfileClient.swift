@@ -45,7 +45,7 @@ extension FeedbackClient {
         }
         var request = URLRequest(url: profileURL)
         request.httpMethod = "GET"
-        applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)

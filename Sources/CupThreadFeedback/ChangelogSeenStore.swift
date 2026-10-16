@@ -67,17 +67,24 @@ final class ChangelogSeenStore: @unchecked Sendable {
     private static let registry = StoreRegistry()
 
     /// Retrieves or creates the shared store for the given `appKey`.
+    /// The key is trimmed like `UserTokenStore.scopedKey` so registry
+    /// lookups and the underlying `UserDefaults` key stay in one-to-one
+    /// correspondence (SEC-22).
     static func shared(
         for appKey: String,
         userDefaults: UserDefaults = .standard,
         maxCapacity: Int = defaultMaxCapacity
     ) -> ChangelogSeenStore {
-        registry.store(for: appKey, userDefaults: userDefaults, maxCapacity: maxCapacity)
+        registry.store(
+            for: AppKeyGrammar.normalized(appKey),
+            userDefaults: userDefaults,
+            maxCapacity: maxCapacity
+        )
     }
 
     /// Registers a custom store for the given `appKey` (primarily for testing).
     static func register(_ store: ChangelogSeenStore, for appKey: String) {
-        registry.register(store, for: appKey)
+        registry.register(store, for: AppKeyGrammar.normalized(appKey))
     }
 
     /// Resets the in-memory registry of stores (for test isolation).
@@ -105,10 +112,12 @@ final class ChangelogSeenStore: @unchecked Sendable {
         userDefaults: UserDefaults = .standard,
         maxCapacity: Int = ChangelogSeenStore.defaultMaxCapacity
     ) {
-        self.appKey = appKey
+        // Trimmed like `shared(for:)` so a padded key cannot alias a storage
+        // entry distinct from its trimmed form (SEC-22).
+        self.appKey = AppKeyGrammar.normalized(appKey)
         self.userDefaults = userDefaults
         self.maxCapacity = max(1, maxCapacity)
-        self.storageKey = Self.keyPrefix + appKey
+        self.storageKey = Self.keyPrefix + self.appKey
     }
 
     /// Checks if the version has already been recorded as seen.

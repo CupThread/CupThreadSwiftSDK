@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "피드백 서버에서 잘못된 응답을 반환했습니다.";
 "cupthread.error.unreadable_upload_response" = "피드백 서버에서 읽을 수 없는 업로드 응답을 반환했습니다.";
+"cupthread.error.invalid_configuration" = "앱 구성이 잘못되었습니다. 앱 키를 확인하고 다시 시도해 주세요.";
 "cupthread.error.auth_required" = "이 작업은 로그인한 사용자만 사용할 수 있습니다.";
 "cupthread.error.scan_rejected" = "첨부 파일이 콘텐츠 검사에서 거부되어 업로드할 수 없습니다.";
 "cupthread.error.unsupported_media" = "이 이미지 형식은 지원되지 않습니다. PNG, JPEG, WebP, GIF 형식을 첨부해 주세요.";

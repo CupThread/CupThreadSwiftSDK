@@ -135,15 +135,21 @@ public final class UserTokenStore: @unchecked Sendable {
     }
 
     /// The storage key for one app key's identity (UserDefaults) and the
-    /// Keychain account used alongside the default service.
+    /// Keychain account used alongside the default service. The app key is
+    /// trimmed so a whitespace-padded value cannot mint an identity alias
+    /// distinct from its trimmed form (SEC-22); a key that remains blank or
+    /// otherwise violates ``AppKeyGrammar`` is inert here — dispatch rejects
+    /// it before any network call — but hosts should pass the same trimmed
+    /// key to ``init(appKey:)`` as to ``FeedbackClientConfiguration``.
     static func scopedKey(for appKey: String) -> String {
-        "\(defaultKey).\(appKey)"
+        "\(defaultKey).\(AppKeyGrammar.normalized(appKey))"
     }
 
     /// The `UserDefaults` flag key marking a scoped store's one-shot legacy
-    /// adoption as done.
+    /// adoption as done. Trimmed exactly like ``scopedKey(for:)`` so the flag
+    /// always tracks the store whose account it names (SEC-22).
     static func legacyAdoptionFlagKey(for appKey: String) -> String {
-        "\(defaultKey).\(appKey).legacyAdopted"
+        "\(defaultKey).\(AppKeyGrammar.normalized(appKey)).legacyAdopted"
     }
 
     /// Deletes the stored identity and reports whether the deletion was confirmed.

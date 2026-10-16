@@ -65,7 +65,7 @@ extension FeedbackClient {
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/me/erase"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(MeAppKeyPayload(appKey: configuration.appKey))
 
@@ -158,7 +158,7 @@ extension FeedbackClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         request.httpBody = try encoder.encode(MeAppKeyPayload(appKey: configuration.appKey))
 
         let (data, response) = try await session.data(for: request)

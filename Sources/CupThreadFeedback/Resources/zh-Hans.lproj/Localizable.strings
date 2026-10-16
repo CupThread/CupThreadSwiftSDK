@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "反馈服务器返回了无效的响应。";
 "cupthread.error.unreadable_upload_response" = "反馈服务器返回了无法解读的上传响应。";
+"cupthread.error.invalid_configuration" = "应用配置无效，请检查 App Key 后重试。";
 "cupthread.error.auth_required" = "此操作仅限已登录用户使用。";
 "cupthread.error.scan_rejected" = "引用的附件未通过内容安全检查，无法上传。";
 "cupthread.error.unsupported_media" = "不支持该图片类型，请附上 PNG、JPEG、WebP 或 GIF 格式的图片。";

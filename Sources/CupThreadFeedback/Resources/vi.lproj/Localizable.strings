@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Máy chủ phản hồi đã trả về một phản hồi không hợp lệ.";
 "cupthread.error.unreadable_upload_response" = "Máy chủ phản hồi đã trả về một phản hồi tải lên không thể đọc được.";
+"cupthread.error.invalid_configuration" = "Cấu hình ứng dụng không hợp lệ. Hãy kiểm tra khóa ứng dụng và thử lại.";
 "cupthread.error.auth_required" = "Thao tác này chỉ khả dụng cho người dùng đã đăng nhập.";
 "cupthread.error.scan_rejected" = "Tệp đính kèm được tham chiếu đã bị từ chối khi kiểm tra nội dung và không thể tải lên.";
 "cupthread.error.unsupported_media" = "Không hỗ trợ loại hình ảnh này. Vui lòng đính kèm ảnh PNG, JPEG, WebP hoặc GIF.";

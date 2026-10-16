@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Le serveur de retour a renvoyé une réponse invalide.";
 "cupthread.error.unreadable_upload_response" = "Le serveur de retour a renvoyé une réponse de téléversement illisible.";
+"cupthread.error.invalid_configuration" = "La configuration de l’app est invalide. Vérifie la clé de l’app et réessaie.";
 "cupthread.error.auth_required" = "Cette action est réservée aux utilisateurs connectés.";
 "cupthread.error.scan_rejected" = "La pièce jointe référencée a été rejetée par l’inspection du contenu et n’a pas pu être envoyée.";
 "cupthread.error.unsupported_media" = "Ce type d’image n’est pas pris en charge. Veuillez joindre une image PNG, JPEG, WebP ou GIF.";

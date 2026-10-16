@@ -153,7 +153,7 @@ extension FeedbackClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
@@ -225,7 +225,7 @@ extension FeedbackClient {
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)/comments"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
         request.httpBody = try encodedIntakeBody(payload)
 

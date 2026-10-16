@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Feedbackserveren returnerede et ugyldigt svar.";
 "cupthread.error.unreadable_upload_response" = "Feedbackserveren returnerede et ulæseligt uploadsvar.";
+"cupthread.error.invalid_configuration" = "App-konfigurationen er ugyldig. Kontrollér app-nøglen, og prøv igen.";
 "cupthread.error.auth_required" = "Denne handling er kun tilgængelig for brugere, der er logget ind.";
 "cupthread.error.scan_rejected" = "Den refererede vedhæftede fil blev afvist ved indholdskontrol og kunne ikke uploades.";
 "cupthread.error.unsupported_media" = "Denne billedtype understøttes ikke. Vedhæft et billede i PNG, JPEG, WebP eller GIF.";

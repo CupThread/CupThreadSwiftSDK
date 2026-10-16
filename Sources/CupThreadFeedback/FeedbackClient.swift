@@ -22,7 +22,13 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     /// The app key identifying your app in CupThread (starts with `app_`).
     ///
     /// Sent with most requests and embedded in public endpoint paths such as
-    /// `GET /api/v1/public/config/{appKey}`.
+    /// `GET /api/v1/public/config/{appKey}`. Surrounding whitespace is
+    /// trimmed when the configuration is created (SEC-22), and every request
+    /// validates the value against `^[A-Za-z0-9_.-]{1,64}$` before dispatch —
+    /// a key that violates the grammar (blank, path separators, traversal
+    /// sequences, control characters) throws
+    /// ``FeedbackClientError/invalidConfiguration(message:)`` instead of
+    /// reaching the network.
     public let appKey: String
 
     /// The platform value reported with feedback submissions.
@@ -60,6 +66,10 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     /// - Parameters:
     ///   - baseURL: The API root, normally `https://api.cupthread.com`.
     ///   - appKey: Your app's key from the CupThread developer console.
+    ///     Surrounding whitespace is trimmed (SEC-22); keys that remain
+    ///     blank, or contain characters outside `[A-Za-z0-9_.-]`, are
+    ///     rejected with ``FeedbackClientError/invalidConfiguration(message:)``
+    ///     when a request is dispatched.
     ///   - defaultPlatform: The platform reported with feedback submissions.
     ///     Defaults to `macos` on macOS and `ios` everywhere else (visionOS
     ///     and tvOS are iOS-family builds and report `ios`).
@@ -75,7 +85,7 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
         signingSecret: String? = nil
     ) {
         self.baseURL = baseURL
-        self.appKey = appKey
+        self.appKey = AppKeyGrammar.normalized(appKey)
         self.defaultPlatform = defaultPlatform
         self.requestID = requestID
         self.signingSecret = signingSecret
@@ -340,7 +350,7 @@ public struct FeedbackClient: Sendable {
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feedback"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            self.applyCorrelationHeaders(userToken: effectiveUserToken, requestID: requestID, to: &request)
+            try self.applyCorrelationHeaders(userToken: effectiveUserToken, requestID: requestID, to: &request)
             await self.applyBearerToken(to: &request)
             request.httpBody = try self.encodedIntakeBody(self.submissionPayload(
                 for: draft,

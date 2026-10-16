@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "El servidor de feedback devolvió una respuesta no válida.";
 "cupthread.error.unreadable_upload_response" = "El servidor de feedback devolvió una respuesta de subida ilegible.";
+"cupthread.error.invalid_configuration" = "La configuración de la app no es válida. Comprueba la clave de la app e inténtalo de nuevo.";
 "cupthread.error.auth_required" = "Esta acción solo está disponible para usuarios con la sesión iniciada.";
 "cupthread.error.scan_rejected" = "El archivo adjunto indicado fue rechazado por la inspección de contenido y no se pudo subir.";
 "cupthread.error.unsupported_media" = "No se admite ese tipo de imagen. Adjunta una imagen PNG, JPEG, WebP o GIF.";

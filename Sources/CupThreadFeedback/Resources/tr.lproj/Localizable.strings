@@ -210,6 +210,7 @@
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Geri bildirim sunucusu geçersiz bir yanıt döndürdü.";
 "cupthread.error.unreadable_upload_response" = "Geri bildirim sunucusu okunamayan bir yükleme yanıtı döndürdü.";
+"cupthread.error.invalid_configuration" = "Uygulama yapılandırması geçersiz. Uygulama anahtarını kontrol edip tekrar deneyin.";
 "cupthread.error.auth_required" = "Bu işlem yalnızca oturum açmış kullanıcılar tarafından kullanılabilir.";
 "cupthread.error.scan_rejected" = "Atıfta bulunulan ek, içerik incelemesi nedeniyle reddedildiği için yüklenemedi.";
 "cupthread.error.unsupported_media" = "Bu görsel türü desteklenmiyor. Lütfen PNG, JPEG, WebP veya GIF bir görsel ekleyin.";
