@@ -260,6 +260,11 @@ public struct FeatureRequestsView: View {
                         hasEmittedAdmissionNotice = true
                     }
                 case .fullScreenError(let message):
+                    // Admission never started a load, so settle the inherited
+                    // first-load flags here — otherwise `isLoading &&
+                    // !hasLoadedOnce` keeps the skeleton up and masks the
+                    // error (issue #418).
+                    loadState.settleAdmissionDenied()
                     loadError = message
                 }
                 return
@@ -285,11 +290,13 @@ public struct FeatureRequestsView: View {
     private var cardScroll: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                if isLoading && !hasLoadedOnce {
-                    SkeletonCardList()
-                } else if let loadError {
+                // A settled error outranks the first-load skeleton (issue
+                // #418): the skeleton must never mask a full-screen error.
+                if let loadError {
                     LoadErrorView(message: loadError) { await refreshFeatureRequests() }
                         .padding(.top, 32)
+                } else if isLoading && !hasLoadedOnce {
+                    SkeletonCardList()
                 } else if items.isEmpty {
                     emptyState
                         .padding(.top, 48)
@@ -333,11 +340,12 @@ public struct FeatureRequestsView: View {
     // tvOS: plain list rows keep the focus engine happy.
     private var tvList: some View {
         List {
-            if isLoading && !hasLoadedOnce {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-            } else if let loadError {
+            // A settled error outranks the first-load skeleton (issue #418).
+            if let loadError {
                 LoadErrorView(message: loadError) { await refreshFeatureRequests() }
+                    .frame(maxWidth: .infinity)
+            } else if isLoading && !hasLoadedOnce {
+                ProgressView()
                     .frame(maxWidth: .infinity)
             } else if items.isEmpty {
                 Text(emptyStateText)

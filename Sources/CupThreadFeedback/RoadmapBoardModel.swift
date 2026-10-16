@@ -125,6 +125,20 @@ struct RoadmapBoardLoadState: Equatable, Sendable {
         hasLoadedOnce = true
         loadError = nil
     }
+
+    /// Settles the lifecycle when search admission denies a query with nothing
+    /// to show (issue #418). Admission never starts a load, so the first-load
+    /// flags it inherited would otherwise keep the board on the skeleton and
+    /// mask `message` forever; settling in the same breath that records the
+    /// error makes the full-screen error immediately renderable. The
+    /// generation bump also invalidates any load still in flight from a
+    /// superseded task, so its late verdict cannot overwrite the denial.
+    mutating func settleAdmissionDenied(message: String) {
+        loadGeneration += 1
+        isLoading = false
+        hasLoadedOnce = true
+        loadError = message
+    }
 }
 
 /// The `.task` identity for the roadmap board's load lifecycle (issues #274,
@@ -167,6 +181,13 @@ enum RoadmapBoardDisplayState: Equatable, Sendable {
 /// fell through to an empty `ForEach` on zero-match searches, rendering a
 /// blank board instead of the "No Results" placeholder.
 ///
+/// A settled `loadError` outranks the first-load skeleton (issue #418): the
+/// skeleton must never mask a full-screen error — a denied initial search
+/// admission writes the error without ever running `load()`, so the skeleton
+/// branch would otherwise own the surface forever. Every production path that
+/// sets `loadError` also settles the lifecycle; the priority here keeps the
+/// derivation correct even if a future path forgets.
+///
 /// Accepts either raw or trimmed search queries; whitespace-only strings are
 /// treated as an empty query so unsearched empty columns are preserved.
 func makeBoardDisplayState(
@@ -176,11 +197,11 @@ func makeBoardDisplayState(
     searchText: String,
     groups: [RoadmapGroup]
 ) -> RoadmapBoardDisplayState {
-    if isLoading && !hasLoadedOnce {
-        return .loading
-    }
     if let loadError {
         return .error(loadError)
+    }
+    if isLoading && !hasLoadedOnce {
+        return .loading
     }
     let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     let visibleGroups = trimmedQuery.isEmpty ? groups : groups.filter { !$0.requests.isEmpty }
