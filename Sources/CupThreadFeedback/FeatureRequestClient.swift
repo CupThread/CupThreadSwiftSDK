@@ -28,6 +28,10 @@ private struct VotePayload: Encodable, Sendable {
 
 extension FeedbackClient {
 
+    /// The largest page size `GET /api/v1/feature-requests` accepts; the
+    /// gateway rejects requests outside the documented 1...200 range (#422).
+    private static let featureRequestsMaxPageSize = 200
+
     /// Fetches the feature requests list for the configured app.
     ///
     /// Results include each request's vote count and whether the current user
@@ -40,19 +44,31 @@ extension FeedbackClient {
     /// `allowAnonymousRoadmap = false`.
     /// - Parameters:
     ///   - userToken: A stable UUID string identifying this user (for own pending requests and vote state).
-    ///   - limit: Maximum number of results to return.
-    ///   - offset: Pagination offset.
+    ///     Blank or whitespace-only values throw
+    ///     ``FeedbackClientError/authenticationRequired`` before any network
+    ///     round trip — otherwise the header would be silently dropped and
+    ///     every `hasVoted`/`isOwnRequest` would read `false`.
+    ///   - limit: Maximum number of results to return. The server accepts
+    ///     1...200 (default 50); values outside that range are clamped to it.
+    ///   - offset: Pagination offset. Negative values are clamped to 0.
     ///   - versionId: Optional version filter (see `fetchVersions()`).
+    ///     Blank or whitespace-only values are dropped.
     ///   - query: Optional server-side search over title and description
     ///     (rate-limited per IP and briefly cached by the backend).
+    ///     Blank or whitespace-only values are dropped; surrounding
+    ///     whitespace is trimmed.
     ///   - cursor: Opaque keyset cursor from a previous page's
     ///     ``ListFeatureRequestsResult/nextCursor`` — the cheaper way to page
     ///     deeply; takes the place of large `offset` values.
+    ///     Blank or whitespace-only values are dropped.
     /// - Returns: The matching requests, the unpaginated `total`, and cursor
     ///   paging fields.
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` or
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when
+    ///   `userToken` is blank or whitespace-only (rejected locally, before
+    ///   any network round trip) or when anonymous access is disabled for the
+    ///   app (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   access is disabled for the app (HTTP 401/403),
+    ///   access is disabled for the app (HTTP 403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchFeatureRequests(
@@ -63,22 +79,32 @@ extension FeedbackClient {
         query: String? = nil,
         cursor: String? = nil
     ) async throws -> ListFeatureRequestsResult {
+        // A blank token would be silently dropped by applyUserToken, so the
+        // request would go out anonymous and every `hasVoted`/`isOwnRequest`
+        // would read `false` — fail fast instead of returning silent
+        // falsehoods (#422).
+        guard userToken.nilIfEmpty != nil else {
+            throw FeedbackClientError.authenticationRequired
+        }
         let base = configuration.baseURL.appending(path: "/api/v1/feature-requests")
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
             throw FeedbackClientError.invalidResponse
         }
+        // The gateway rejects page sizes outside 1...200 with 400, so clamp
+        // here instead of letting invalid values reach it (#422).
+        let effectiveLimit = min(max(1, limit), Self.featureRequestsMaxPageSize)
         var queryItems = [
             URLQueryItem(name: "appKey", value: configuration.appKey),
-            URLQueryItem(name: "limit", value: String(limit)),
-            URLQueryItem(name: "offset", value: String(offset))
+            URLQueryItem(name: "limit", value: String(effectiveLimit)),
+            URLQueryItem(name: "offset", value: String(max(0, offset)))
         ]
-        if let versionId {
+        if let versionId = versionId?.nilIfEmpty {
             queryItems.append(URLQueryItem(name: "versionId", value: versionId))
         }
-        if let query, !query.isEmpty {
+        if let query = query?.nilIfEmpty {
             queryItems.append(URLQueryItem(name: "q", value: query))
         }
-        if let cursor, !cursor.isEmpty {
+        if let cursor = cursor?.nilIfEmpty {
             queryItems.append(URLQueryItem(name: "cursor", value: cursor))
         }
         components.queryItems = queryItems

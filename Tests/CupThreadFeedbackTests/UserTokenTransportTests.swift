@@ -220,8 +220,8 @@ struct UserTokenTransportTests {
         #expect(!url.absoluteString.contains(Self.token))
     }
 
-    @Test("A blank user token omits the header and stays out of the query")
-    func blankTokenKeepsRequestAnonymousAndClean() async throws {
+    @Test("A blank user token is rejected before any request leaves (#422)")
+    func blankTokenKeepsRequestAnonymousAndClean() async {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.host) { request in
             capture.value = request
@@ -229,10 +229,13 @@ struct UserTokenTransportTests {
         }
         let client = makeClient(baseURL: URL(string: "https://\(Self.host)")!)
 
-        _ = try await client.fetchFeatureRequests(userToken: "   ")
-
-        let request = try #require(capture.value)
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == nil)
-        #expect(request.url?.query?.contains("userToken=") == false)
+        // fetchFeatureRequests requires an identity for hasVoted/isOwnRequest
+        // personalization, so a whitespace-only token fails fast instead of
+        // silently dispatching an anonymous request (#422) — which also keeps
+        // the token out of the query by never building one.
+        await #expect(throws: FeedbackClientError.authenticationRequired) {
+            try await client.fetchFeatureRequests(userToken: "   ")
+        }
+        #expect(capture.value == nil)
     }
 }
