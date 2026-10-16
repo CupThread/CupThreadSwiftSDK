@@ -416,12 +416,40 @@ public struct FeatureRequestsView: View {
     }
 }
 
-// MARK: - Actions
+// MARK: - Version Filter Load
 
-private extension FeatureRequestsView {
+extension FeatureRequestsView {
+    /// Resolves authentication and evaluates the roadmap permission verdict
+    /// in one step (CONC-15, issue #408): the verdict is computed from the
+    /// resolved identity instead of the fail-closed pre-resolution default,
+    /// so a load that resolves access itself is gated on the real answer.
+    /// Plain return values — rather than `@State` writes — also make the
+    /// gate drivable from view-level tests outside a SwiftUI hierarchy.
+    @MainActor
+    static func resolveRoadmapAccess(
+        client: FeedbackClient,
+        config: PublicAppConfig?
+    ) async -> (supportsAuthentication: Bool, isPermitted: Bool) {
+        let supportsAuthentication = await client.resolveAuthenticatedAccess()
+        let isPermitted = roadmapLoadPlan(
+            config: config,
+            supportsAuthentication: supportsAuthentication
+        ) == .load
+        return (supportsAuthentication, isPermitted)
+    }
+
+    /// Loads the version-filter options (issue #285). Internal — rather than
+    /// living in the `private` actions extension — so view-level tests can
+    /// drive it directly and pin the CONC-15 contract: authentication resolves
+    /// *here*, before the permission verdict, instead of depending on the
+    /// concurrent search task to resolve it as a side effect.
     @MainActor
     func loadVersions() async {
-        guard isRoadmapPermitted else { return }
+        let access = await Self.resolveRoadmapAccess(client: client, config: activeConfig)
+        isAuthenticated = access.supportsAuthentication
+        hasResolvedAuthentication = true
+        guard !Task.isCancelled else { return }
+        guard access.isPermitted else { return }
         versionFilterState.loadStarted()
         do {
             versionFilterState.loadFinished(try await client.fetchVersions())
@@ -433,7 +461,11 @@ private extension FeatureRequestsView {
             versionFilterState.loadFailed(error)
         }
     }
+}
 
+// MARK: - Actions
+
+private extension FeatureRequestsView {
     @MainActor
     private func refreshFeatureRequests() async {
         guard isRoadmapPermitted else { return }
