@@ -299,7 +299,13 @@ struct FeedbackSubmitBarView: View {
 /// config-derived values for those machines.
 enum FeedbackComposerAttachmentLimit {
     static func resolve(config: PublicAppConfig?, lastKnownLimit: Int?) -> Int? {
-        config?.maxAttachmentBytes ?? lastKnownLimit
+        if let configLimit = config?.maxAttachmentBytes, configLimit > 0 {
+            return configLimit
+        }
+        if let lastKnown = lastKnownLimit, lastKnown > 0 {
+            return lastKnown
+        }
+        return nil
     }
 }
 
