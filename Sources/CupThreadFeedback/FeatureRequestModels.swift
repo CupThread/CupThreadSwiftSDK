@@ -151,7 +151,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.recentCommenters = recentCommenters
         self.hasMoreCommenters = hasMoreCommenters
         self.approved = approved
-        self.voteCount = voteCount
+        self.voteCount = max(0, voteCount)
         self.importedVotes = importedVotes
         self.hasVoted = hasVoted
         self.isOwnRequest = isOwnRequest
@@ -179,7 +179,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
             recentCommenters: recentCommenters,
             hasMoreCommenters: hasMoreCommenters,
             approved: approved,
-            voteCount: count,
+            voteCount: max(0, count),
             importedVotes: importedVotes,
             hasVoted: voted,
             isOwnRequest: isOwnRequest,
@@ -207,7 +207,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.recentCommenters = try container.decodeIfPresent([RecentCommenter].self, forKey: .recentCommenters) ?? []
         self.hasMoreCommenters = try container.decodeIfPresent(Bool.self, forKey: .hasMoreCommenters) ?? false
         self.approved = try container.decodeIfPresent(Bool.self, forKey: .approved) ?? false
-        self.voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0
+        self.voteCount = max(0, try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0)
         self.importedVotes = try container.decodeIfPresent(Int.self, forKey: .importedVotes)
         self.commentCount = try container.decodeIfPresent(Int.self, forKey: .commentCount)
         self.hasVoted = try container.decodeIfPresent(Bool.self, forKey: .hasVoted) ?? false

@@ -94,7 +94,7 @@ struct FeatureRequestsListState: Equatable, Sendable {
         votingIds.insert(itemId)
         items[index] = current.withVoteState(
             voted: !originalVoted,
-            count: originalVoted ? originalCount - 1 : originalCount + 1
+            count: originalVoted ? max(0, originalCount - 1) : originalCount + 1
         )
 
         return (originalVoted, originalCount)
