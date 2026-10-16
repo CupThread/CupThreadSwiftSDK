@@ -269,13 +269,23 @@ extension FeedbackClient {
     /// bearer token is attached as `Authorization: Bearer …` so subscription
     /// succeeds when `allowAnonymousChangelog = false`.
     /// - Parameters:
-    ///   - email: The address to notify. Trimmed before sending.
+    ///   - email: The address to notify. Trimmed before sending. Must be
+    ///     plausibly shaped (``EmailShape/isPlausible(_:)``) — the same check
+    ///     the subscribe sheet applies locally (#283); anything else is
+    ///     rejected before dispatch instead of earning a guaranteed HTTP 400.
     ///   - userToken: Anonymous user token sent as `X-User-Token`, linking the
-    ///     subscription to the end-user identity.
+    ///     subscription to the end-user identity. Blank, whitespace-only, or
+    ///     multi-line values are rejected locally — the header plumbing would
+    ///     silently drop them and record the subscription anonymously.
     ///   - turnstileToken: Optional Cloudflare Turnstile token (10-2048 chars)
     ///     for bot challenge verification on anonymous subscriptions.
     /// - Returns: Whether the subscription was recorded (pending confirmation).
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   with code `400` (and `requestId == nil`, marking it local) when
+    ///   `email` fails the plausibility shape check,
+    ///   ``FeedbackClientError/authenticationRequired`` when `userToken` is
+    ///   blank, whitespace-only, or contains a newline (all rejected before
+    ///   any network round trip), or when anonymous
     ///   changelog access is disabled (HTTP 401),
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when
     ///   human verification is required or rejected (HTTP 403 `turnstile_verification_failed`),
@@ -291,6 +301,25 @@ extension FeedbackClient {
         userToken: String,
         turnstileToken: String? = nil
     ) async throws -> ChangelogSubscriptionResult {
+        // A blank or multi-line token would be silently dropped by
+        // applyUserToken, so the subscription would be recorded without its
+        // end-user identity — fail fast instead of returning a silent
+        // falsehood (#419).
+        guard let identityToken = userToken.nilIfEmpty,
+              !identityToken.contains(where: \.isNewline) else {
+            throw FeedbackClientError.authenticationRequired
+        }
+        // The subscribe sheet applies the same shape check before enabling
+        // its submit button (#283); the programmatic path must not put an
+        // address the server can only reject with 400 on the wire (#419).
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard EmailShape.isPlausible(trimmedEmail) else {
+            throw FeedbackClientError.unexpectedStatus(
+                code: 400,
+                message: "Invalid email address format",
+                requestId: nil
+            )
+        }
         let normalizedToken = turnstileToken?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
@@ -298,10 +327,10 @@ extension FeedbackClient {
             "POST",
             path: "/api/v1/public/apps/\(configuration.appKey)/changelog/subscribe",
             body: ChangelogEmailPayload(
-                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                email: trimmedEmail,
                 turnstileToken: normalizedToken
             ),
-            userToken: userToken,
+            userToken: identityToken,
             acceptedStatuses: [200, 201],
             mapsPermissionErrors: true
         )
@@ -325,12 +354,17 @@ extension FeedbackClient {
     /// A token whose signature verifies for this app unsubscribes even after
     /// the token's `exp` has passed and even when the app's public surfaces
     /// are disabled — links already sitting in inboxes keep working (#294).
-    /// The SDK never judges a token locally, so a `200` is final in
+    /// The SDK never judges a *signed* token locally, so a `200` is final in
     /// both previously-failing cases; do not drop a signed link for its age
-    /// or for a since-privatized board.
-    /// - Parameter token: The signed token from the unsubscribe link.
+    /// or for a since-privatized board. A blank token has no signature to
+    /// verify, so it is rejected locally instead of dispatching the POST.
+    /// - Parameter token: The signed token from the unsubscribe link. Blank
+    ///   or whitespace-only values are rejected before any network round trip.
     /// - Returns: Whether the address was removed.
-    /// - Throws: ``FeedbackClientError/forbidden(message:requestId:)`` when
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   with code `400` (and `requestId == nil`, marking it local) when
+    ///   `token` is blank or whitespace-only,
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when
     ///   the token is missing or not valid for this app while the app's
     ///   public surfaces are disabled (HTTP 403; the response does not say
     ///   whether the app exists),
@@ -340,13 +374,23 @@ extension FeedbackClient {
     ///   hits the non-destructive GET form) or
     ///   ``FeedbackClientError/invalidResponse``.
     public func unsubscribeFromChangelog(token: String) async throws -> ChangelogUnsubscribeResult {
+        // A blank token has no signature to verify and can only come back
+        // rejected, so fail fast instead of dispatching the destructive
+        // POST with `token=` (#419).
+        guard let trimmedToken = token.nilIfEmpty else {
+            throw FeedbackClientError.unexpectedStatus(
+                code: 400,
+                message: "Unsubscribe token cannot be empty",
+                requestId: nil
+            )
+        }
         let base = configuration.baseURL.appending(
             path: "/api/v1/public/apps/\(configuration.appKey)/changelog/unsubscribe"
         )
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
             throw FeedbackClientError.invalidResponse
         }
-        components.queryItems = [URLQueryItem(name: "token", value: token)]
+        components.queryItems = [URLQueryItem(name: "token", value: trimmedToken)]
         guard let url = components.url else {
             throw FeedbackClientError.invalidResponse
         }
