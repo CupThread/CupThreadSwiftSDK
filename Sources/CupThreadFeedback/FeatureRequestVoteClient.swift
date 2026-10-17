@@ -38,6 +38,17 @@ extension FeedbackClient {
         shipNotifyEmail: String? = nil,
         turnstileToken: String? = nil
     ) async throws -> VoteResult {
+        // A blank or newline-bearing token would be silently dropped by
+        // applyUserToken, so the request would leave with no identity in the
+        // `X-User-Token` header and an invalid one in the JSON body — and the
+        // cast path consults the Turnstile provider first, burning a
+        // single-use challenge token on a request that cannot succeed. Fail
+        // fast locally (#493); the trimmed token rides in both the body and
+        // the header so the two transports always agree.
+        guard let identityToken = userToken.nilIfEmpty,
+              !identityToken.contains(where: \.isNewline) else {
+            throw FeedbackClientError.authenticationRequired
+        }
         let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard FeatureRequestIDGrammar.isValid(trimmedID) else {
             // An id that cannot be a single opaque path segment (API-24
@@ -65,7 +76,7 @@ extension FeedbackClient {
         if method == "POST" {
             return try await sendVoteCastRequest(
                 trimmedID: trimmedID,
-                userToken: userToken,
+                userToken: identityToken,
                 shipNotifyEmail: normalizedShipNotifyEmail,
                 turnstileToken: normalizedTurnstileToken,
                 mapNotFound: mapNotFound
@@ -73,7 +84,7 @@ extension FeedbackClient {
         } else {
             return try await sendVoteRemovalRequest(
                 trimmedID: trimmedID,
-                userToken: userToken,
+                userToken: identityToken,
                 mapNotFound: mapNotFound
             )
         }
@@ -209,7 +220,13 @@ extension FeedbackClient {
     ///     path/query/percent characters — API-24 grammar) throw
     ///     ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
     ///     locally, before any request is sent.
-    ///   - userToken: A stable UUID string identifying this user.
+    ///   - userToken: A stable UUID string identifying this user. Blank,
+    ///     whitespace-only, or newline-bearing values throw
+    ///     ``FeedbackClientError/authenticationRequired`` before any network
+    ///     round trip — otherwise the header would be silently dropped and
+    ///     the vote would be recorded without a usable identity. A valid
+    ///     token is trimmed once and sent identically in the JSON body and
+    ///     the `X-User-Token` header.
     ///   - shipNotifyEmail: Optional email address (max 254 characters) to
     ///     enroll in ship notifications for this request; `nil` keeps the
     ///     payload unchanged and sends no opt-in.
@@ -224,12 +241,15 @@ extension FeedbackClient {
     ///   envelope (the request was deleted, is unapproved, or never existed —
     ///   API-27), or locally with no request sent when `featureRequestId`
     ///   cannot be a valid id,
+    ///   ``FeedbackClientError/authenticationRequired`` when `userToken` is
+    ///   blank, whitespace-only, or contains newlines (rejected locally, with
+    ///   no request built and no Turnstile token minted), or when anonymous
+    ///   voting is disabled for the app (HTTP 401),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when human
     ///   verification is required or rejected (HTTP 403 `turnstile_verification_failed`),
-    ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   voting is disabled for the app (HTTP 401/403),
+    ///   voting is disabled for the app (HTTP 403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func castVote(
@@ -269,17 +289,24 @@ extension FeedbackClient {
     ///     path/query/percent characters — API-24 grammar) throw
     ///     ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
     ///     locally, before any request is sent.
-    ///   - userToken: A stable UUID string identifying this user.
+    ///   - userToken: A stable UUID string identifying this user. Blank,
+    ///     whitespace-only, or newline-bearing values throw
+    ///     ``FeedbackClientError/authenticationRequired`` before any network
+    ///     round trip. A valid token is trimmed once and sent identically in
+    ///     the JSON body and the `X-User-Token` header.
     /// - Returns: The new vote state (`voted: false`) and authoritative vote count.
     /// - Throws: ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
     ///   when the server answers HTTP 404 with the documented JSON error
     ///   envelope (the request was deleted, is unapproved, or never existed —
     ///   API-27), or locally with no request sent when `featureRequestId`
     ///   cannot be a valid id,
+    ///   ``FeedbackClientError/authenticationRequired`` when `userToken` is
+    ///   blank, whitespace-only, or contains newlines (rejected locally, with
+    ///   no request built), or when anonymous voting is disabled for the app
+    ///   (HTTP 401),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
-    ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   voting is disabled for the app (HTTP 401/403),
+    ///   voting is disabled for the app (HTTP 403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func removeVote(
