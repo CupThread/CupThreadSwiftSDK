@@ -213,9 +213,22 @@ extension FeedbackClient {
     /// both are present; the SDK sends both.
     /// - Parameters:
     ///   - draft: Title, description, and optional requester name.
-    ///   - userToken: A stable UUID string identifying this user.
+    ///   - userToken: A stable UUID string identifying this user. Blank,
+    ///     whitespace-only, or newline-bearing values throw
+    ///     ``FeedbackClientError/authenticationRequired`` before any network
+    ///     round trip — otherwise the header would be silently dropped and
+    ///     the proposal could be recorded anonymous. A valid token is
+    ///     trimmed once and sent identically as `requesterToken` in the JSON
+    ///     body and in the `X-User-Token` header.
     /// - Returns: The created request's id and whether it is pending review.
-    /// - Throws: ``FeedbackClientError/submissionQuotaExceeded(message:)`` when
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when
+    ///   `userToken` is blank, whitespace-only, or contains newlines
+    ///   (rejected locally, before the Turnstile token provider is consulted
+    ///   or any request is sent), when the app's roadmap requires sign-in
+    ///   (`allowAnonymousRoadmap = false`) and no end-user session is
+    ///   presented (HTTP 401 `authentication_required` — the same gate as
+    ///   browsing a private board, so hosts can reuse their sign-in prompt),
+    ///   ``FeedbackClientError/submissionQuotaExceeded(message:)`` when
     ///   the app's workspace has reached its monthly submission quota
     ///   (HTTP 402 `tier_limit_submissions`),
     ///   ``FeedbackClientError/subscriptionInactive(message:)`` when the
@@ -223,12 +236,7 @@ extension FeedbackClient {
     ///   `subscription_inactive`),
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when the
     ///   server's Turnstile gate rejects the submission and no fresh token
-    ///   could be presented (HTTP 403),
-    ///   ``FeedbackClientError/authenticationRequired`` when the app's roadmap
-    ///   requires sign-in (`allowAnonymousRoadmap = false`) and no end-user
-    ///   session is presented (HTTP 401 `authentication_required` — the same
-    ///   gate as browsing a private board, so hosts can reuse their sign-in
-    ///   prompt), or
+    ///   could be presented (HTTP 403), or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app's
     ///   permission policy rejects the proposal for this caller (HTTP 403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
@@ -253,6 +261,18 @@ extension FeedbackClient {
         _ draft: FeatureRequestDraft,
         userToken: String
     ) async throws -> FeatureRequestSubmissionResult {
+        // A blank or newline-bearing token would be silently dropped from the
+        // `X-User-Token` header while the raw value still rode in the body as
+        // `requesterToken` — and the Turnstile provider would mint a
+        // single-use challenge token for the doomed request first. If the
+        // server treated the empty token as anonymous, the proposal would be
+        // recorded with no end-user identity, silently breaking own-request
+        // detection and vote linkage. Fail fast locally instead (#493); the
+        // trimmed token is sent identically in both transports.
+        guard let identityToken = userToken.nilIfEmpty,
+              !identityToken.contains(where: \.isNewline) else {
+            throw FeedbackClientError.authenticationRequired
+        }
         try validateIntakeMinimums(in: draft)
         let data = try await sendWithTurnstileRetry(
             accepted: [200, 201],
@@ -261,14 +281,14 @@ extension FeedbackClient {
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            try self.applyCorrelationHeaders(userToken: userToken, requestID: requestID, to: &request)
+            try self.applyCorrelationHeaders(userToken: identityToken, requestID: requestID, to: &request)
             await self.applyBearerToken(to: &request)
             request.httpBody = try self.encodedIntakeBody(FeatureRequestSubmitPayload(
                 appKey: self.configuration.appKey,
                 title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
                 description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
                 requesterName: draft.requesterName.nilIfEmpty,
-                requesterToken: userToken,
+                requesterToken: identityToken,
                 turnstileToken: token
             ))
             return request
