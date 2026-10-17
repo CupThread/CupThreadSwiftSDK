@@ -108,7 +108,7 @@ extension FeedbackClient {
             throw FeedbackClientError.invalidResponse
         }
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        return try decoder.decode(ListFeatureRequestsResult.self, from: data)
+        return try decodeSuccess(ListFeatureRequestsResult.self, from: data)
     }
 
     /// Fetches a single feature request by its id (`GET /api/v1/feature-requests/{id}`).
@@ -181,12 +181,7 @@ extension FeedbackClient {
             )
         }
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        do {
-            let result = try decoder.decode(FeatureRequestResponse.self, from: data)
-            return result.request
-        } catch {
-            throw FeedbackClientError.invalidResponse
-        }
+        return try decodeSuccess(FeatureRequestResponse.self, from: data).request
     }
 
     /// Fetches a single feature request by its id (alias for ``fetchFeatureRequest(id:userToken:)``).
@@ -271,6 +266,6 @@ extension FeedbackClient {
             ))
             return request
         }
-        return try decoder.decode(FeatureRequestSubmissionResult.self, from: data)
+        return try decodeSuccess(FeatureRequestSubmissionResult.self, from: data)
     }
 }

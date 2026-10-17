@@ -86,7 +86,7 @@ extension FeedbackClient {
             return request
         }
 
-        return try decoder.decode(FeedbackUploadSession.self, from: data)
+        return try decodeSuccess(FeedbackUploadSession.self, from: data)
     }
 
     /// Uploads a file into a pre-allocated session slot by streaming its

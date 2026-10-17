@@ -105,7 +105,7 @@ extension FeedbackClient {
             request.httpBody = try self.encoder.encode(payload)
             return request
         }
-        return try decoder.decode(VoteResult.self, from: data)
+        return try decodeSuccess(VoteResult.self, from: data)
     }
 
     /// Sends the idempotent `DELETE` vote removal (never Turnstile-gated).
@@ -141,7 +141,7 @@ extension FeedbackClient {
             mapsPermissionErrors: true,
             mapResourceNotFound: mapNotFound
         )
-        return try decoder.decode(VoteResult.self, from: data)
+        return try decodeSuccess(VoteResult.self, from: data)
     }
 
     /// Casts a vote on a feature request.

@@ -403,7 +403,7 @@ public struct FeedbackClient: Sendable {
             ))
             return request
         }
-        return try decoder.decode(FeedbackSubmissionResult.self, from: data)
+        return try decodeSuccess(FeedbackSubmissionResult.self, from: data)
     }
 
     private static let acceptedSubmitStatuses: Set<Int> = [200, 201, 202]

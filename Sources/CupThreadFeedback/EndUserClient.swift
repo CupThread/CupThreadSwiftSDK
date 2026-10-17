@@ -93,7 +93,7 @@ extension FeedbackClient {
         // disabled self-service erasure; map them to the typed permission
         // errors like the sibling identity-bound endpoints (#359).
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        return try decoder.decode(DataErasureResult.self, from: data)
+        return try decodeSuccess(DataErasureResult.self, from: data)
     }
 
     /// Erases the end user's profile using the identity held by a
@@ -204,6 +204,6 @@ extension FeedbackClient {
         // policy forbids the link; map them to the typed permission errors
         // like the sibling identity-bound endpoints (#359).
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        return try decoder.decode(EndUserLinkResult.self, from: data)
+        return try decodeSuccess(EndUserLinkResult.self, from: data)
     }
 }

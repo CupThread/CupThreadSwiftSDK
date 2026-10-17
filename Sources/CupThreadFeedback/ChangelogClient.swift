@@ -252,7 +252,7 @@ extension FeedbackClient {
         // the server's permission policy rejected the read; map them to the
         // typed permission errors like the sibling endpoints (#358).
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        return try decoder.decode(ListChangelogResult.self, from: data)
+        return try decodeSuccess(ListChangelogResult.self, from: data)
     }
 
     /// Subscribes an email address to changelog notifications.
@@ -411,7 +411,7 @@ extension FeedbackClient {
         // surfaces and the token is missing or not valid for it (#294);
         // map it to the typed permission error like the sibling endpoints.
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        return try decoder.decode(ChangelogUnsubscribeResult.self, from: data)
+        return try decodeSuccess(ChangelogUnsubscribeResult.self, from: data)
     }
 }
 

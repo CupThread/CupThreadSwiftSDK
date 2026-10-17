@@ -83,13 +83,9 @@ extension FeedbackClient {
                 FeedbackClientError.userProfileNotFound(message: $0, requestId: $1)
             }
         )
-        do {
-            return try decoder.decode(PublicUserProfileResponse.self, from: data)
-        } catch is DecodingError {
-            // A 200 with an unexpected or malformed payload is a transport/
-            // server contract failure, not profile data — never leak the raw
-            // `DecodingError` (API-26).
-            throw FeedbackClientError.invalidResponse
-        }
+        // A 200 with an unexpected or malformed payload is a transport/
+        // server contract failure, not profile data — never leak the raw
+        // `DecodingError` (API-26, API-25).
+        return try decodeSuccess(PublicUserProfileResponse.self, from: data)
     }
 }

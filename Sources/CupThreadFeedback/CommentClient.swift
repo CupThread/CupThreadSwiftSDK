@@ -187,7 +187,7 @@ extension FeedbackClient {
         // server's permission policy rejected the read; map them to the typed
         // permission errors like the sibling endpoints (#358).
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        return try decoder.decode(ListCommentsResult.self, from: data)
+        return try decodeSuccess(ListCommentsResult.self, from: data)
     }
 
     /// Submits a new comment on a feature request.
@@ -274,6 +274,6 @@ extension FeedbackClient {
         // server's permission policy rejected the comment; map them to the
         // typed permission errors like the sibling endpoints (#358).
         try validateResponse(httpResponse, data: data, accepted: [200, 201], mapsPermissionErrors: true)
-        return try decoder.decode(CreatedCommentResponse.self, from: data).comment
+        return try decodeSuccess(CreatedCommentResponse.self, from: data).comment
     }
 }

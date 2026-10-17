@@ -78,6 +78,6 @@ extension FeedbackClient {
         // Map 401 (invalid/expired identity token) and 403 (public surfaces
         // or digest unsubscribes disabled) to typed permission errors (issue #372).
         try validateResponse(httpResponse, data: data, accepted: [200], mapsPermissionErrors: true)
-        return try decoder.decode(WeeklyDigestUnsubscribeResult.self, from: data)
+        return try decodeSuccess(WeeklyDigestUnsubscribeResult.self, from: data)
     }
 }
