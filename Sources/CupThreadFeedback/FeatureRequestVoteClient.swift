@@ -16,6 +16,16 @@ private struct VotePayload: Encodable, Sendable {
     let turnstileToken: String?
 }
 
+/// The corrected `DELETE /api/v1/feature-requests/{id}/vote` body component:
+/// exactly `appKey` and `userToken` (issue #407, SaaS#837). The shared
+/// `VotePayload` would add `"shipNotifyEmail": null` / `"turnstileToken": null`
+/// keys the removal schema never declared, so removals encode this dedicated
+/// struct instead.
+private struct VoteRemovalPayload: Encodable, Sendable {
+    let appKey: String
+    let userToken: String
+}
+
 // MARK: - FeedbackClient voting extension
 
 extension FeedbackClient {
@@ -114,11 +124,12 @@ extension FeedbackClient {
         userToken: String,
         mapNotFound: @escaping (String, String?) -> FeedbackClientError
     ) async throws -> VoteResult {
-        let payload = VotePayload(
+        // The corrected removal schema documents exactly {appKey, userToken}
+        // (issue #407, SaaS#837), so the removal body encodes the dedicated
+        // payload instead of the shared vote payload with null fields.
+        let payload = VoteRemovalPayload(
             appKey: configuration.appKey,
-            userToken: userToken,
-            shipNotifyEmail: nil,
-            turnstileToken: nil
+            userToken: userToken
         )
 
         var request = URLRequest(
@@ -152,7 +163,10 @@ extension FeedbackClient {
     /// ``removeVote(featureRequestId:userToken:)``.
     ///
     /// Authenticated callers attach the client's bearer token via the
-    /// configured `authenticationProvider`.
+    /// configured `authenticationProvider`. The anonymous end-user token is
+    /// accepted in the JSON body or the `X-User-Token` header — the body field
+    /// wins when both are present (SaaS#837); the SDK sends both, so no
+    /// header-only fallback is ever needed.
     ///
     /// The vote endpoints are rate limited per client IP (20 requests/minute);
     /// exceeding the limit throws ``FeedbackClientError/rateLimited``, which
@@ -239,6 +253,13 @@ extension FeedbackClient {
     /// `{ "voted": false, "voteCount": <n> }` with HTTP 200 rather than an
     /// error. Authenticated callers attach the client's bearer token via the
     /// configured `authenticationProvider`.
+    ///
+    /// The removal always sends a JSON body carrying `appKey` and `userToken`
+    /// — the endpoint reads the anonymous token from the body field or the
+    /// `X-User-Token` header (the body field wins when both are present;
+    /// SaaS#837 corrected the spec to match this behavior). A spec-following
+    /// client that omits the body gets a 400, so the SDK never sends a bare
+    /// `DELETE`.
     ///
     /// The vote endpoints are rate limited per client IP (20 requests/minute);
     /// exceeding the limit throws ``FeedbackClientError/rateLimited``.

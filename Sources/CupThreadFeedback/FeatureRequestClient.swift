@@ -204,6 +204,13 @@ extension FeedbackClient {
     /// is also how the console recognizes "own" requests (those can't be
     /// self-voted). Authenticated callers attach the client's bearer token
     /// via the configured `authenticationProvider`.
+    ///
+    /// The payload matches the corrected `CreateFeatureRequestInput` schema
+    /// (SaaS#837): `appKey`, `title`, and `description` are required;
+    /// `requesterName`, `requesterToken`, and `turnstileToken` are optional;
+    /// there is no `requesterEmail` field. The anonymous token is accepted in
+    /// the JSON body or the `X-User-Token` header — the body field wins when
+    /// both are present; the SDK sends both.
     /// - Parameters:
     ///   - draft: Title, description, and optional requester name.
     ///   - userToken: A stable UUID string identifying this user.
