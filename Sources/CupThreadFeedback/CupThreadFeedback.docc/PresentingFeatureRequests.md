@@ -113,7 +113,7 @@ let client = FeedbackClient(
 )
 ```
 
-Without a provider, a gated submission fails after a single attempt with a localized, user-safe message instead of the raw server response. The shared provider contract — bindings, retry semantics, and host verification flows — is described in <doc:PresentingFeedbackComposer>.
+Without a provider, the compose sheet resolves the rejection with the in-SDK challenge when the app configuration publishes a Turnstile site key (``PublicAppConfig/turnstile``): ``TurnstileChallengeSheet`` loads the portal's hosted challenge page in a `WKWebView`, captures the minted token, and resubmits the proposal automatically, leaving the draft intact across a cancelled or failed challenge. When no site key is published (or on tvOS, which has no WebKit), a gated submission fails after a single attempt with a localized, user-safe message instead of the raw server response. The shared provider contract — bindings, retry semantics, and host verification flows — is described in <doc:PresentingFeedbackComposer>.
 
 ## See also
 

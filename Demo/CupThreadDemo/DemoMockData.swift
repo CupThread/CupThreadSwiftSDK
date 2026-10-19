@@ -11,8 +11,21 @@ enum DemoMockData {
         (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)
     }
 
+    /// Debug-grade site key from `-mockTurnstileSiteKey <key>` (issue #53
+    /// Phase 2 harness): when present, the mock public config publishes
+    /// `turnstile.siteKey`, so a token-less submission opens the SDK's
+    /// challenge sheet instead of stopping at the error banner. Pair it with
+    /// `-turnstileChallengeURL <url>` to serve the page locally.
+    private static var mockTurnstileSiteKey: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-mockTurnstileSiteKey"),
+              index + 1 < args.count,
+              !args[index + 1].hasPrefix("-") else { return nil }
+        return args[index + 1]
+    }
+
     static var appConfigJSON: Data {
-        encodeJSON([
+        var payload: [String: Any] = [
             "appId": "app_demo_1",
             "appKey": "app_demo_placeholder",
             "slug": "cupthread-demo",
@@ -45,7 +58,11 @@ enum DemoMockData {
                     "entryCount": 3
                 ]
             ]
-        ])
+        ]
+        if let siteKey = mockTurnstileSiteKey {
+            payload["turnstile"] = ["siteKey": siteKey]
+        }
+        return encodeJSON(payload)
     }
 
     static var columnsJSON: Data {

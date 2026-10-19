@@ -124,6 +124,9 @@
 "cupthread.error.timed_out" = "요청 시간이 초과되었습니다. 다시 시도해 주세요.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "사람임 확인 검사 때문에 전송이 차단되었습니다. 잠시 후 다시 시도해 주세요.";
+/* Issue #53 Phase 2: in-SDK Turnstile challenge sheet */
+"cupthread.turnstile.challenge_title" = "사람 확인";
+"cupthread.turnstile.challenge_failed" = "확인을 완료하지 못했습니다. 다시 시도해 주세요.";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "이메일 업데이트";

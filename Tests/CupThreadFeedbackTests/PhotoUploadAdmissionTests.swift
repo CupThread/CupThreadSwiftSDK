@@ -111,18 +111,48 @@ struct PhotoUploadAdmissionTests {
         // (issue #423).
         let content = try readSource("FeedbackComposerView.swift")
 
-        let deferOwnership = try #require(
-            content.range(of: "defer { PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL) }"),
-            "the temp-file ownership transfer in uploadPhotoItem not found"
+        let admission = try #require(
+            content.range(of: "switch PhotoUploadAdmission.resolve("),
+            "the upload-path admission preflight not found"
         )
         let networkCall = try #require(
-            content.range(of: "client.uploadAttachment(", range: deferOwnership.upperBound..<content.endIndex),
-            "the network upload call not found after the ownership transfer"
+            content.range(of: "client.uploadAttachment(", range: admission.upperBound..<content.endIndex),
+            "the network upload call not found after the admission preflight"
         )
-        let preflight = content[deferOwnership.upperBound..<networkCall.lowerBound]
+        let preflight = content[admission.upperBound..<networkCall.lowerBound]
         #expect(
-            preflight.contains("PhotoUploadAdmission.resolve("),
-            "uploadPhotoItem must re-validate admission between spooling the file and spending a backend upload session (issue #423)"
+            preflight.contains("case .cancelledWhileActive") && preflight.contains("case .superseded"),
+            "the upload path must re-validate cancellation and the active upload before spending a session (issue #423)"
         )
+
+        // `sendPreparedPhoto` owns the spooled file explicitly rather than
+        // through `defer`: a Turnstile challenge can suspend the attempt while
+        // the sheet is on screen, so the file must survive that hand-off and
+        // be removed on each terminal branch instead (#53 Phase 2).
+        let attempt = try #require(content.range(of: "private func sendPreparedPhoto"))
+        let helper = try #require(
+            content.range(of: "private func presentUploadChallenge", range: attempt.upperBound..<content.endIndex)
+        )
+        let attemptBody = content[attempt.upperBound..<helper.lowerBound]
+        let attemptRemovals = attemptBody.components(
+            separatedBy: "removeTempUploadFile(at: prepared.fileURL)"
+        ).count - 1
+        #expect(
+            attemptRemovals >= 4,
+            "every terminal attempt branch must remove the spooled file, found \(attemptRemovals)"
+        )
+        #expect(
+            !attemptBody.contains("defer {"),
+            "a defer would delete the spooled file while the challenge sheet is open"
+        )
+
+        let helperEnd = try #require(
+            content.range(of: "private func recordUploadFailure", range: helper.upperBound..<content.endIndex)
+        )
+        let helperBody = content[helper.upperBound..<helperEnd.lowerBound]
+        let handOffRemovals = helperBody.components(
+            separatedBy: "removeTempUploadFile(at: prepared.fileURL)"
+        ).count - 1
+        #expect(handOffRemovals == 2, "challenge resume and cancel must both remove the spooled file")
     }
 }

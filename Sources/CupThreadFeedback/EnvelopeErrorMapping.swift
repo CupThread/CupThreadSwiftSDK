@@ -25,11 +25,16 @@ extension FeedbackClient {
             // server-side content inspection (PRIV-02 media policy).
             return .scanRejected(message: envelopeMessage ?? "", requestId: requestId)
         case (403, let turnstileCode) where isTurnstileRejection(code: turnstileCode, message: envelopeMessage):
-            // The Turnstile human-verification gate (#53): the uploads
-            // sessions route rejects with a machine-readable code; the intake
-            // endpoints return only the human message until their Phase 0
-            // code ships, so the message matches as a fallback.
+            // The Turnstile human-verification gate (#53): every guarded
+            // handler carries a machine-readable code since SaaS #1052, and
+            // pre-#1052 intake bodies still match on the human message.
             return .turnstileRequired(message: envelopeMessage, requestId: requestId)
+        case (403, "turnstile_not_configured"):
+            // The deployment enforces Turnstile without a configured secret
+            // (SaaS #1052): no client-minted token can pass, so this surfaces
+            // as a server-side failure instead of sign-in guidance or a
+            // challenge the user cannot solve.
+            return .unexpectedStatus(code: statusCode, message: envelopeMessage ?? "", requestId: requestId)
         case (400, _):
             return badRequestTypedError(
                 code: code,

@@ -71,6 +71,17 @@ final class DemoAppModel: ObservableObject {
         return args[index + 1]
     }()
 
+    /// Debug-grade hosted challenge page override from
+    /// `-turnstileChallengeURL <url>` (issue #53 Phase 2 harness): point the
+    /// SDK's challenge sheet at a locally served page to exercise the WebView
+    /// bridge without the production deployment.
+    private static let turnstileChallengeURL: URL? = {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-turnstileChallengeURL"),
+              index + 1 < args.count else { return nil }
+        return URL(string: args[index + 1])
+    }()
+
     init() {
         // When mocks are on, the injected session bypasses the SDK's default
         // session (whose same-origin redirect limiter protects real-backend
@@ -78,7 +89,8 @@ final class DemoAppModel: ObservableObject {
         client = FeedbackClient(
             configuration: FeedbackClientConfiguration(
                 baseURL: URL(string: Self.baseURL)!,
-                appKey: Self.appKey
+                appKey: Self.appKey,
+                turnstileChallengeURL: Self.turnstileChallengeURL
             ),
             session: Self.usesMockTransport ? Self.mockSession : FeedbackClient.defaultSession,
             turnstileTokenProvider: Self.mockTurnstileToken.map { token in

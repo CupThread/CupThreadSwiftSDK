@@ -61,6 +61,8 @@ let client = FeedbackClient(
 
 The provider contract — the `(action, cdata)` binding per endpoint and the automatic single retry after a gate rejection — is described in <doc:PresentingFeedbackComposer>.
 
+Hosts that would rather let the SDK run the challenge can skip the provider. When the app configuration publishes a Turnstile site key (``PublicAppConfig/turnstile``), ``FeedbackComposerView`` and the feature-request compose sheet present ``TurnstileChallengeSheet`` after a gated submission is rejected: it loads the portal's hosted challenge page in a `WKWebView`, captures the minted token from the page's bridge, and resubmits with it. The draft stays intact across a cancelled or failed challenge. The sheet is available on iOS, macOS, and visionOS; tvOS has no WebKit, so token-gated intake there needs a provider.
+
 ### Reporting paying users securely
 
 Reports of `isPaying`, `plan`, `mrr`, and `currency` feed revenue-weighted triage, so `PUT /api/v1/public/apps/{appKey}/user` only accepts them **verified** — HMAC-SHA256 signed with your app's SDK signing secret. Keep that secret on your own server (where the entitlement truth already lives: StoreKit server notifications, RevenueCat webhooks, …) and hand signing to a `userAttributesSigner` provider, so the secret never ships inside the app binary:

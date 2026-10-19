@@ -49,6 +49,8 @@ public struct FeedbackComposerView: View {
     @State private var attachmentState: FeedbackAttachmentStateMachine
     @State private var errorMessage: String?
     @State private var result: FeedbackSubmissionResult?
+    /// Human-verification challenge awaiting the widget's token (#53 Phase 2).
+    @State private var pendingChallenge: PendingTurnstileChallenge?
     /// Bearer-token availability right now; fail-closed until `.task` resolves it (issue #297).
     @State private var isAuthenticated = false
     /// Whether `isAuthenticated` has been resolved at least once. Before that,
@@ -233,6 +235,7 @@ public struct FeedbackComposerView: View {
             hasResolvedAuthentication = true
         }
         .sdkSurface(client: client, feature: .feedback)
+        .turnstileChallengeSheet($pendingChallenge)
     }
 
     private var composer: some View {
@@ -386,7 +389,7 @@ public struct FeedbackComposerView: View {
     // MARK: - Submit
 
     @MainActor
-    private func submitDraft() async {
+    private func submitDraft(turnstileToken: String? = nil) async {
         guard submissionDenial == .none else { return }
         guard attachmentState.canSubmit(draft: draft) && !isSubmitting else { return }
         isSubmitting = true
@@ -396,7 +399,11 @@ public struct FeedbackComposerView: View {
         let currentClient = client
 
         do {
-            let result = try await currentClient.submit(currentDraft, userToken: userToken)
+            let result = try await currentClient.submit(
+                currentDraft,
+                userToken: userToken,
+                turnstileToken: turnstileToken
+            )
             onSubmit(result)
             withAnimation(.snappy(duration: 0.3)) {
                 self.result = result
@@ -404,6 +411,9 @@ public struct FeedbackComposerView: View {
             }
         } catch {
             guard !error.isSdkCancellation else { return }
+            if presentChallengeIfNeeded(for: error, challenge: .feedback(appKey: currentClient.configuration.appKey)) {
+                return
+            }
             if Self.clearsConsumedAttachments(for: error) {
                 // The server rejected a duplicate attachment (#257): the upload ID was already
                 // finalized into another submission. Clear upload-bearing attachments from the
@@ -434,6 +444,29 @@ public struct FeedbackComposerView: View {
         attachmentState.reset(draft: &draft, defaultPlatform: client.configuration.defaultPlatform)
         errorMessage = nil
     }
+
+    /// Presents the human-verification sheet when a rejected submission can be
+    /// resolved with the hosted challenge (#53 Phase 2), keeping the draft
+    /// intact. Returns `true` when the sheet took over the failure.
+    @MainActor
+    private func presentChallengeIfNeeded(for error: Error, challenge: TurnstileChallenge) -> Bool {
+        guard let clientError = error as? FeedbackClientError,
+              case .turnstileRequired = clientError,
+              let presentation = client.turnstileChallengePresentation(
+                  for: challenge,
+                  config: activeConfig,
+                  theme: activeConfig?.sdk.theme ?? .system
+              )
+        else { return false }
+        pendingChallenge = PendingTurnstileChallenge(
+            presentation: presentation,
+            resume: { token in
+                Task { await submitDraft(turnstileToken: token) }
+            },
+            cancel: { errorMessage = FriendlyError.message(for: error) }
+        )
+        return true
+    }
 }
 
 // MARK: - Photo upload pipeline
@@ -450,54 +483,131 @@ extension FeedbackComposerView {
 
         do {
             guard let prepared = try await preparePhotoForUpload(item, uploadId: uploadId) else { return }
-            defer { PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL) }
+            try await sendPreparedPhoto(prepared, uploadId: uploadId, turnstileToken: nil)
+        } catch {
+            recordUploadFailure(error, uploadId: uploadId)
+        }
+    }
 
-            // Re-validate across the resume boundary (#423): the checks in
-            // `preparePhotoForUpload` only held at its return, and a
-            // superseding selection or handle cancel can land during the hop
-            // back to the main actor. Skip the doomed network round-trip
-            // instead of creating a backend upload session and streaming
-            // obsolete bytes over it.
-            switch PhotoUploadAdmission.resolve(
-                isCancelled: Task.isCancelled,
-                isActiveUpload: attachmentState.activeUploadId == uploadId
-            ) {
-            case .proceed:
-                break
-            case .cancelledWhileActive:
-                attachmentState.cancelUpload()
-                return
-            case .superseded:
-                return
-            }
+    /// Streams prepared bytes into an upload session and records the outcome.
+    ///
+    /// When the server's Turnstile gate rejects the session creation and this
+    /// client can present the hosted challenge, the sheet takes over: the
+    /// spooled file stays alive until the widget answers, then the upload
+    /// resumes with the freshly minted token (#53 Phase 2). Every terminal
+    /// path removes the spooled file.
+    @MainActor
+    private func sendPreparedPhoto(
+        _ prepared: PreparedPhotoUpload,
+        uploadId: UUID,
+        turnstileToken: String?
+    ) async throws {
+        // Re-validate across the resume boundary (#423): the checks in
+        // `preparePhotoForUpload` only held at its return, and a
+        // superseding selection or handle cancel can land during the hop
+        // back to the main actor. Skip the doomed network round-trip
+        // instead of creating a backend upload session and streaming
+        // obsolete bytes over it.
+        switch PhotoUploadAdmission.resolve(
+            isCancelled: Task.isCancelled,
+            isActiveUpload: attachmentState.activeUploadId == uploadId
+        ) {
+        case .proceed:
+            break
+        case .cancelledWhileActive:
+            PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL)
+            attachmentState.cancelUpload()
+            return
+        case .superseded:
+            PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL)
+            return
+        }
 
-            let uploaded = try await client.uploadAttachment(
+        let uploaded: FeedbackAttachment
+        do {
+            uploaded = try await client.uploadAttachment(
                 fileURL: prepared.fileURL,
                 filename: prepared.filename,
                 mimeType: prepared.mimeType,
-                userToken: userToken
+                userToken: userToken,
+                turnstileToken: turnstileToken
             )
-
-            // Cancellation discards the result. Reset only when this upload
-            // is still the active one: an explicit cancel button or a
-            // superseding selection has already re-pointed the machine,
-            // while an external FeedbackUploadHandle cancel leaves it
-            // pointing here and needs this unwind to reset it.
-            if Task.isCancelled {
-                if attachmentState.activeUploadId == uploadId {
-                    attachmentState.cancelUpload()
-                }
-                return
-            }
-            guard attachmentState.activeUploadId == uploadId else { return }
-            _ = attachmentState.uploadSucceeded(id: uploadId, attachment: uploaded, draft: &draft)
         } catch {
-            guard attachmentState.activeUploadId == uploadId else { return }
-            if error.isSdkCancellation || Task.isCancelled {
-                attachmentState.cancelUpload()
-            } else {
-                _ = attachmentState.uploadFailed(id: uploadId, error: error)
+            guard turnstileToken == nil,
+                  !error.isSdkCancellation,
+                  attachmentState.activeUploadId == uploadId,
+                  let clientError = error as? FeedbackClientError,
+                  case .turnstileRequired = clientError
+            else {
+                PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL)
+                throw error
             }
+            presentUploadChallenge(for: clientError, prepared: prepared, uploadId: uploadId)
+            return
+        }
+
+        PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL)
+
+        // Cancellation discards the result. Reset only when this upload
+        // is still the active one: an explicit cancel button or a
+        // superseding selection has already re-pointed the machine,
+        // while an external FeedbackUploadHandle cancel leaves it
+        // pointing here and needs this unwind to reset it.
+        if Task.isCancelled {
+            if attachmentState.activeUploadId == uploadId {
+                attachmentState.cancelUpload()
+            }
+            return
+        }
+        guard attachmentState.activeUploadId == uploadId else { return }
+        _ = attachmentState.uploadSucceeded(id: uploadId, attachment: uploaded, draft: &draft)
+    }
+
+    /// Presents the hosted challenge for a gated upload-session creation and
+    /// resumes the spooled upload once the widget mints a token. Without a
+    /// resolvable presentation the typed gate error lands on the row.
+    @MainActor
+    private func presentUploadChallenge(
+        for error: FeedbackClientError,
+        prepared: PreparedPhotoUpload,
+        uploadId: UUID
+    ) {
+        guard let presentation = client.turnstileChallengePresentation(
+            for: .feedback(appKey: client.configuration.appKey),
+            config: activeConfig,
+            theme: activeConfig?.sdk.theme ?? .system
+        ) else {
+            PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL)
+            recordUploadFailure(error, uploadId: uploadId)
+            return
+        }
+        pendingChallenge = PendingTurnstileChallenge(
+            presentation: presentation,
+            resume: { token in
+                Task {
+                    do {
+                        try await sendPreparedPhoto(prepared, uploadId: uploadId, turnstileToken: token)
+                    } catch {
+                        recordUploadFailure(error, uploadId: uploadId)
+                    }
+                }
+            },
+            cancel: {
+                PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL)
+                recordUploadFailure(error, uploadId: uploadId)
+            }
+        )
+    }
+
+    /// Records a terminal upload error for `uploadId` — cancellation resets
+    /// the machine, any other failure shows on the attachment row.
+    @MainActor
+    private func recordUploadFailure(_ error: Error, uploadId: UUID) {
+        guard attachmentState.activeUploadId == uploadId else { return }
+        if error.isSdkCancellation || Task.isCancelled {
+            attachmentState.cancelUpload()
+        } else {
+            _ = attachmentState.uploadFailed(id: uploadId, error: error)
         }
     }
 

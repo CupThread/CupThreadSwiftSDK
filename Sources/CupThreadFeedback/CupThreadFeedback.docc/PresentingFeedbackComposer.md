@@ -134,8 +134,21 @@ let client = FeedbackClient(
 )
 ```
 
-Without a provider, a gated submission fails after a single attempt with a
-localized, user-safe message instead of the raw server response.
+Without a provider, the composer resolves the rejection with the in-SDK
+challenge when the app configuration publishes a Turnstile site key
+(``PublicAppConfig/turnstile``): ``TurnstileChallengeSheet`` loads the portal's
+hosted challenge page — `https://app.cupthread.com/turnstile/verify` by
+default, or ``FeedbackClientConfiguration/turnstileChallengeURL`` — in a
+`WKWebView`, captures the minted token from the page's bridge, and resubmits
+automatically. The draft, including attachments, survives a cancelled or
+failed challenge. When no site key is published (or on tvOS, which has no
+WebKit), a gated submission fails after a single attempt with a localized,
+user-safe message instead of the raw server response.
+
+Hosts building their own submission UI can do the same explicitly:
+``FeedbackClient/turnstileChallengePresentation(for:config:theme:locale:)``
+returns the page URL for a rejected attempt, and
+``FeedbackClient/submit(_:userToken:turnstileToken:)`` accepts the minted token.
 
 ## Attachment upload lifecycle
 
