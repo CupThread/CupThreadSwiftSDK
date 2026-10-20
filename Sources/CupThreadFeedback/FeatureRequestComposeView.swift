@@ -36,6 +36,8 @@ struct FeatureRequestComposeView: View {
     @State private var draft = FeatureRequestDraft()
     @State private var isSubmitting = false
     @State private var submitError: String?
+    /// Human-verification challenge awaiting the widget's token (#53 Phase 2).
+    @State private var pendingChallenge: PendingTurnstileChallenge?
     /// Whether a request sent right now could carry the signed-in identity's
     /// bearer token. Resolved when the sheet appears (issue #297); fail-closed
     /// until then, so a locked-down console never opens the form for a
@@ -141,6 +143,7 @@ struct FeatureRequestComposeView: View {
                 }
             }
         }
+        .turnstileChallengeSheet($pendingChallenge)
     }
 
     private var formContent: some View {
@@ -201,7 +204,7 @@ struct FeatureRequestComposeView: View {
     /// Sends the current draft. Internal so view-level tests can drive the
     /// submission flow directly.
     @MainActor
-    func submit() async {
+    func submit(turnstileToken: String? = nil) async {
         guard SdkSubmissionDenial.forFeatureRequest(
             config: activeConfig,
             supportsAuthentication: isAuthenticated
@@ -210,7 +213,11 @@ struct FeatureRequestComposeView: View {
         submitError = nil
         defer { isSubmitting = false }
         do {
-            _ = try await client.submitFeatureRequest(draft, userToken: userToken)
+            _ = try await client.submitFeatureRequest(
+                draft,
+                userToken: userToken,
+                turnstileToken: turnstileToken
+            )
             // The proposal is saved server-side: drop the draft immediately so
             // `canSubmit` turns off and the accidental-dismiss guard releases
             // even while the host tears the sheet down — a stale draft would
@@ -220,7 +227,31 @@ struct FeatureRequestComposeView: View {
             onSubmitted()
         } catch {
             guard !error.isSdkCancellation else { return }
+            if presentChallengeIfNeeded(for: error) { return }
             submitError = FriendlyError.message(for: error)
         }
+    }
+
+    /// Presents the human-verification sheet when the gate rejected the
+    /// proposal and the hosted challenge can resolve it (#53 Phase 2); the
+    /// draft stays intact. Returns `true` when the sheet took over the failure.
+    @MainActor
+    private func presentChallengeIfNeeded(for error: Error) -> Bool {
+        guard let clientError = error as? FeedbackClientError,
+              case .turnstileRequired = clientError,
+              let presentation = client.turnstileChallengePresentation(
+                  for: .featureRequest(appKey: client.configuration.appKey),
+                  config: activeConfig,
+                  theme: activeConfig?.sdk.theme ?? .system
+              )
+        else { return false }
+        pendingChallenge = PendingTurnstileChallenge(
+            presentation: presentation,
+            resume: { token in
+                Task { await submit(turnstileToken: token) }
+            },
+            cancel: { submitError = FriendlyError.message(for: error) }
+        )
+        return true
     }
 }

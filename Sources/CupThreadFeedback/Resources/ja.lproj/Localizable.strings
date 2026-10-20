@@ -124,6 +124,9 @@
 "cupthread.error.timed_out" = "リクエストがタイムアウトしました。もう一度お試しください。";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "ボット対策の確認により送信がブロックされました。しばらくしてからもう一度お試しください。";
+/* Issue #53 Phase 2: in-SDK Turnstile challenge sheet */
+"cupthread.turnstile.challenge_title" = "ボット対策の確認";
+"cupthread.turnstile.challenge_failed" = "確認が完了しませんでした。もう一度お試しください。";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "メールでアップデート";

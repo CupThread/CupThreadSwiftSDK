@@ -231,6 +231,10 @@ extension FeedbackClient {
     ///   - mimeType: The file's MIME type, e.g. `"image/png"`. Only PNG,
     ///     JPEG, WebP, and GIF are accepted by the server.
     ///   - userToken: Anonymous token; when given it is sent as `X-User-Token`.
+    ///   - turnstileToken: Optional Turnstile token for the upload-session
+    ///     creation, minted under the ``TurnstileAction/feedback`` binding
+    ///     (e.g. by ``TurnstileChallengeSheet``). When `nil`, the client's
+    ///     `turnstileTokenProvider` is consulted as a fallback.
     /// - Returns: The uploaded attachment, carrying its `uploadId` for
     ///   `FeedbackDraft.attachments`.
     /// - Throws: ``FeedbackClientError/unsupportedMediaType`` when the type
@@ -251,7 +255,8 @@ extension FeedbackClient {
         data: Data,
         filename: String,
         mimeType: String,
-        userToken: String? = nil
+        userToken: String? = nil,
+        turnstileToken: String? = nil
     ) async throws -> FeedbackAttachment {
         let uploadSession = try await createUploadSession(
             files: [FeedbackUploadFileSpec(
@@ -260,7 +265,8 @@ extension FeedbackClient {
                 contentType: mimeType,
                 sizeBytes: data.count
             )],
-            userToken: userToken
+            userToken: userToken,
+            turnstileToken: turnstileToken
         )
         return try await uploadAttachment(
             data: data,
@@ -286,6 +292,10 @@ extension FeedbackClient {
     ///   - mimeType: The file's MIME type, e.g. `"image/png"`. Only PNG,
     ///     JPEG, WebP, and GIF are accepted by the server.
     ///   - userToken: Anonymous token; when given it is sent as `X-User-Token`.
+    ///   - turnstileToken: Optional Turnstile token for the upload-session
+    ///     creation, minted under the ``TurnstileAction/feedback`` binding
+    ///     (e.g. by ``TurnstileChallengeSheet``). When `nil`, the client's
+    ///     `turnstileTokenProvider` is consulted as a fallback.
     /// - Returns: The uploaded attachment, carrying its `uploadId` for
     ///   `FeedbackDraft.attachments`.
     /// - Throws: ``FeedbackClientError/unsupportedMediaType`` when the type
@@ -306,7 +316,8 @@ extension FeedbackClient {
         fileURL: URL,
         filename: String,
         mimeType: String,
-        userToken: String? = nil
+        userToken: String? = nil,
+        turnstileToken: String? = nil
     ) async throws -> FeedbackAttachment {
         let uploadSession = try await createUploadSession(
             files: [FeedbackUploadFileSpec(
@@ -315,7 +326,8 @@ extension FeedbackClient {
                 contentType: mimeType,
                 sizeBytes: try fileSize(at: fileURL)
             )],
-            userToken: userToken
+            userToken: userToken,
+            turnstileToken: turnstileToken
         )
         return try await uploadAttachment(
             fileURL: fileURL,

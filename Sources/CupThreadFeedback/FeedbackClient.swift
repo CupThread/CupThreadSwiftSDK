@@ -71,6 +71,20 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     /// builds.
     public let signingSecret: String?
 
+    /// The hosted Turnstile challenge page the in-SDK human-verification
+    /// sheet loads when an intake call is rejected by the API's gate and no
+    /// `turnstileTokenProvider` is installed.
+    ///
+    /// When `nil` (the default) the page is derived from ``baseURL``: a
+    /// leading `api.` host label becomes `app.` and `/turnstile/verify` is
+    /// appended, so the default `https://api.cupthread.com` resolves to
+    /// `https://app.cupthread.com/turnstile/verify`. Set this explicitly for
+    /// self-hosted deployments whose portal (or challenge page) lives on
+    /// another origin. The page only needs to accept the widget parameters
+    /// ``FeedbackClientConfiguration/makeTurnstileChallengeURL(for:siteKey:theme:locale:)``
+    /// appends and bridge its result to the `turnstileBridge` message handler.
+    public let turnstileChallengeURL: URL?
+
     /// Creates a configuration for a CupThread app.
     /// - Parameters:
     ///   - baseURL: The API root, normally `https://api.cupthread.com`.
@@ -90,18 +104,23 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
     ///     > from the app binary forge verified payment attributes. Prefer the
     ///     > backend-delegated `userAttributesSigner` provider on
     ///     > ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``.
+    ///   - turnstileChallengeURL: Optional hosted challenge page for the
+    ///     in-SDK human-verification sheet; defaults to `…/turnstile/verify`
+    ///     on the portal origin derived from `baseURL`.
     public init(
         baseURL: URL,
         appKey: String,
         defaultPlatform: FeedbackPlatform = FeedbackPlatform.current,
         requestID: String? = nil,
-        signingSecret: String? = nil
+        signingSecret: String? = nil,
+        turnstileChallengeURL: URL? = nil
     ) {
         self.baseURL = baseURL
         self.appKey = AppKeyGrammar.normalized(appKey)
         self.defaultPlatform = defaultPlatform
         self.requestID = requestID
         self.signingSecret = signingSecret
+        self.turnstileChallengeURL = turnstileChallengeURL
     }
 }
 
@@ -350,6 +369,11 @@ public struct FeedbackClient: Sendable {
     ///     the SDK falls back to this client's app-key-scoped store so anonymous flows keep a stable
     ///     identity across session creation and feedback submission. Authenticated callers attach
     ///     the client's bearer token via the configured `authenticationProvider`.
+    ///   - turnstileToken: Optional Turnstile token minted outside this client —
+    ///     e.g. by ``TurnstileChallengeSheet`` after the gate rejected an earlier
+    ///     attempt. Used for the first attempt verbatim; the configured
+    ///     `turnstileTokenProvider` (when any) still backs the single automatic
+    ///     retry. Mint it under the ``TurnstileAction/feedback`` binding.
     /// - Returns: The server's receipt, including the submission id, any warning, and any warning code.
     /// - Throws: ``FeedbackClientError/scanRejected(message:requestId:)`` when an attachment
     ///   referenced in the submission was rejected by server-side content scan (HTTP 422 `scan_rejected`);
@@ -382,14 +406,16 @@ public struct FeedbackClient: Sendable {
     ///   Turnstile token provider is consulted or any request is sent.
     public func submit(
         _ draft: FeedbackDraft,
-        userToken: String? = nil
+        userToken: String? = nil,
+        turnstileToken: String? = nil
     ) async throws -> FeedbackSubmissionResult {
         try validateIntakeMinimums(in: draft)
         let uploadIds = draft.attachments.compactMap(\.uploadId).nilIfEmpty
         let effectiveUserToken = resolvedSubmitUserToken(userToken, hasAttachments: uploadIds != nil)
         let data = try await sendWithTurnstileRetry(
             accepted: Self.acceptedSubmitStatuses,
-            challenge: .feedback(appKey: configuration.appKey)
+            challenge: .feedback(appKey: configuration.appKey),
+            initialToken: turnstileToken
         ) { token, requestID in
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feedback"))
             request.httpMethod = "POST"

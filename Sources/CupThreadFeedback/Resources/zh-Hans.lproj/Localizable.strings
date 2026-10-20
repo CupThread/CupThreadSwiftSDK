@@ -124,6 +124,9 @@
 "cupthread.error.timed_out" = "请求耗时过长，请重试。";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "发送已被人机验证拦截，请稍后再试。";
+/* Issue #53 Phase 2: in-SDK Turnstile challenge sheet */
+"cupthread.turnstile.challenge_title" = "人机验证";
+"cupthread.turnstile.challenge_failed" = "验证未完成，请重试。";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "邮件更新";

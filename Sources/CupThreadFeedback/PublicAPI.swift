@@ -77,6 +77,15 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     public let allowAnonymousVote: Bool
     /// Whether developers require human verification (Cloudflare Turnstile token) for anonymous votes.
     public let requireAnonymousVoteTurnstile: Bool
+    /// Public Cloudflare Turnstile widget configuration, when the deployment
+    /// publishes one (SaaS #1052).
+    ///
+    /// Present only when a public site key is configured, so
+    /// `config.turnstile?.siteKey` doubles as the "this deployment can serve
+    /// the hosted challenge page" signal. Absent — or carrying a `nil`
+    /// site key — means intake on a gated deployment needs a host-supplied
+    /// token from the `turnstileTokenProvider`.
+    public let turnstile: TurnstileConfig?
     /// Whether signed-out users may submit feedback.
     public let allowAnonymousFeedback: Bool
     /// Whether signed-out users may read the changelog. `false` makes
@@ -106,6 +115,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         case allowAnonymousRoadmap
         case allowAnonymousVote
         case requireAnonymousVoteTurnstile
+        case turnstile
         case allowAnonymousFeedback
         case allowAnonymousChangelog
         case sdk
@@ -132,6 +142,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         allowAnonymousRoadmap: Bool = true,
         allowAnonymousVote: Bool = true,
         requireAnonymousVoteTurnstile: Bool = false,
+        turnstile: TurnstileConfig? = nil,
         allowAnonymousFeedback: Bool = true,
         allowAnonymousChangelog: Bool = true,
         sdk: SdkAppearance = .defaults
@@ -161,6 +172,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         self.allowAnonymousRoadmap = allowAnonymousRoadmap
         self.allowAnonymousVote = allowAnonymousVote
         self.requireAnonymousVoteTurnstile = requireAnonymousVoteTurnstile
+        self.turnstile = turnstile
         self.allowAnonymousFeedback = allowAnonymousFeedback
         self.allowAnonymousChangelog = allowAnonymousChangelog
         self.sdk = sdk
@@ -191,6 +203,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         allowAnonymousRoadmap = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousRoadmap) ?? true
         allowAnonymousVote = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousVote) ?? true
         requireAnonymousVoteTurnstile = try container.decodeIfPresent(Bool.self, forKey: .requireAnonymousVoteTurnstile) ?? false
+        turnstile = try container.decodeIfPresent(TurnstileConfig.self, forKey: .turnstile)?.cleaned()
         allowAnonymousFeedback = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousFeedback) ?? true
         allowAnonymousChangelog = try container.decodeIfPresent(Bool.self, forKey: .allowAnonymousChangelog) ?? true
         sdk = try container.decodeIfPresent(SdkAppearance.self, forKey: .sdk) ?? .defaults
@@ -217,6 +230,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
         try container.encode(allowAnonymousRoadmap, forKey: .allowAnonymousRoadmap)
         try container.encode(allowAnonymousVote, forKey: .allowAnonymousVote)
         try container.encode(requireAnonymousVoteTurnstile, forKey: .requireAnonymousVoteTurnstile)
+        try container.encodeIfPresent(turnstile, forKey: .turnstile)
         try container.encode(allowAnonymousFeedback, forKey: .allowAnonymousFeedback)
         try container.encode(allowAnonymousChangelog, forKey: .allowAnonymousChangelog)
         try container.encode(sdk, forKey: .sdk)

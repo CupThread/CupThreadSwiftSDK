@@ -124,6 +124,9 @@
 "cupthread.error.timed_out" = "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "Việc gửi đã bị chặn bởi xác minh con người. Vui lòng thử lại sau.";
+/* Issue #53 Phase 2: in-SDK Turnstile challenge sheet */
+"cupthread.turnstile.challenge_title" = "Xác minh con người";
+"cupthread.turnstile.challenge_failed" = "Xác minh chưa hoàn tất. Vui lòng thử lại.";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "Cập nhật qua email";

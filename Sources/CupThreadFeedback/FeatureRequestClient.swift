@@ -220,6 +220,12 @@ extension FeedbackClient {
     ///     the proposal could be recorded anonymous. A valid token is
     ///     trimmed once and sent identically as `requesterToken` in the JSON
     ///     body and in the `X-User-Token` header.
+    ///   - turnstileToken: Optional Turnstile token minted outside this client —
+    ///     e.g. by ``TurnstileChallengeSheet`` after the gate rejected an earlier
+    ///     attempt. Used for the first attempt verbatim under the
+    ///     ``TurnstileAction/featureRequest`` binding; the configured
+    ///     `turnstileTokenProvider` (when any) still backs the single automatic
+    ///     retry.
     /// - Returns: The created request's id and whether it is pending review.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when
     ///   `userToken` is blank, whitespace-only, or contains newlines
@@ -259,7 +265,8 @@ extension FeedbackClient {
     /// before throwing.
     public func submitFeatureRequest(
         _ draft: FeatureRequestDraft,
-        userToken: String
+        userToken: String,
+        turnstileToken: String? = nil
     ) async throws -> FeatureRequestSubmissionResult {
         // A blank or newline-bearing token would be silently dropped from the
         // `X-User-Token` header while the raw value still rode in the body as
@@ -276,7 +283,8 @@ extension FeedbackClient {
         try validateIntakeMinimums(in: draft)
         let data = try await sendWithTurnstileRetry(
             accepted: [200, 201],
-            challenge: .featureRequest(appKey: configuration.appKey)
+            challenge: .featureRequest(appKey: configuration.appKey),
+            initialToken: turnstileToken
         ) { token, requestID in
             var request = URLRequest(url: self.configuration.baseURL.appending(path: "/api/v1/feature-requests"))
             request.httpMethod = "POST"

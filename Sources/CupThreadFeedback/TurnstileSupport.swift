@@ -105,10 +105,11 @@ extension FeedbackClient {
 
     /// Whether a rejection body represents the server's Turnstile
     /// human-verification gate. The machine-readable `code` wins when
-    /// present — `turnstile_verification_failed` (the uploads-sessions route,
-    /// already live) and `turnstile_required` (the intake endpoints, Phase 0)
-    /// — falling back to the human-readable message until the intake
-    /// endpoints ship their code.
+    /// present — `turnstile_required` (no token presented) and
+    /// `turnstile_verification_failed` (siteverify rejected the token) — and
+    /// `turnstile_not_configured` deliberately stays out (no client token can
+    /// pass a deployment without a secret). Releases from before SaaS #1052
+    /// carried no code on intake, so the message matches as a fallback.
     static func isTurnstileRejection(code: String?, message: String?) -> Bool {
         if code == "turnstile_required" || code == "turnstile_verification_failed" {
             return true

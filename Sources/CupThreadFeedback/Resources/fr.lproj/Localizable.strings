@@ -124,6 +124,9 @@
 "cupthread.error.timed_out" = "La demande a pris trop de temps. Veuillez réessayer.";
 /* Issue #53: Turnstile-gated intake — typed error copy */
 "cupthread.error.turnstile_required" = "L'envoi a été bloqué par la vérification humaine. Veuillez réessayer plus tard.";
+/* Issue #53 Phase 2: in-SDK Turnstile challenge sheet */
+"cupthread.turnstile.challenge_title" = "Vérification humaine";
+"cupthread.turnstile.challenge_failed" = "La vérification n'a pas abouti. Veuillez réessayer.";
 
 /* Issue #9: subscribe sheet, feature gates, roadmap empty states, a11y copy */
 "cupthread.subscribe.title" = "Mises à jour par e-mail";
