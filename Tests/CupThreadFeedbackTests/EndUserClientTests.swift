@@ -159,6 +159,7 @@ struct EndUserClientTests {
         let result = try await client.eraseMyData(store: isolated.store, subscriptionStore: subscription.store)
 
         #expect(result.erased == true)
+        #expect(result.localCleanupPending == false)
         #expect(subscription.store.subscribedEmail() == nil)
     }
 

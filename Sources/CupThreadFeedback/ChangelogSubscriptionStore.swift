@@ -283,13 +283,20 @@ final class ChangelogSubscriptionStore: @unchecked Sendable {
         removeLegacyPlaintext()
     }
 
-    /// Removes the remembered subscription.
-    func clear() {
+    /// Removes the remembered subscription and reports whether the deletion
+    /// was confirmed by the backing store (SEC-29).
+    ///
+    /// The in-memory cache and the legacy `UserDefaults` plaintext are only
+    /// cleared when the store confirms the deletion — a locked Keychain keeps
+    /// the record readable and retryable instead of pretending it is gone.
+    @discardableResult
+    func clear() -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        storage.delete()
+        guard storage.deleteConfirmed() else { return false }
         updateMemoryCache(with: nil)
         removeLegacyPlaintext()
+        return true
     }
 
     private func removeLegacyPlaintext() {
