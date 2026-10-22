@@ -150,37 +150,36 @@ struct FeedbackClientUserTokenSecurityTests {
         #expect(client.resolvedSubmitUserToken(validToken, hasAttachments: true) == validToken)
     }
 
-    @Test("Wire level: requests omit X-User-Token header when userToken contains newlines")
-    func testWireLevelEndpointOmitsHeaderWhenUserTokenContainsNewline() async throws {
+    @Test("Wire level: fetchFeatureRequests rejects newline-bearing userToken without network (SEC-30, #497)")
+    func testWireLevelEndpointRejectsNewlineBearingUserToken() async {
         let capture = CaptureBox<URLRequest>()
         let host = "usertoken-crlf-test.example.com"
         MockURLProtocol.setHandler(forHost: host) { request in
             capture.value = request
             return (makeHTTPResponse(), try encodeJSON(["requests": [String](), "total": 0]))
         }
+        defer { MockURLProtocol.setHandler(forHost: host, nil) }
         let client = makeClient(baseURL: URL(string: "https://\(host)")!)
         let maliciousToken = "malicious\r\nX-Injected: value"
 
-        _ = try await client.fetchFeatureRequests(userToken: maliciousToken)
+        await #expect(throws: FeedbackClientError.authenticationRequired) {
+            _ = try await client.fetchFeatureRequests(userToken: maliciousToken)
+        }
 
-        let request = try #require(capture.value)
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == nil)
-        #expect(request.value(forHTTPHeaderField: "X-Injected") == nil)
+        #expect(capture.value == nil)
     }
 
-    @Test("Wire level: submit with attachments falls back to tokenStore when userToken contains newline")
-    func testWireLevelSubmitWithAttachmentsFallsBackToSafeStoredToken() async throws {
+    @Test("Wire level: submit with attachments rejects newline-bearing userToken without falling back to tokenStore (SEC-30, #497)")
+    func testWireLevelSubmitWithAttachmentsRejectsNewlineBearingUserToken() async {
         let capture = CaptureBox<URLRequest>()
         let host = "usertoken-crlf-submit.example.com"
         MockURLProtocol.setHandler(forHost: host) { request in
             capture.value = request
             return (makeHTTPResponse(status: 201), try encodeJSON(["feedbackId": "fb-123"]))
         }
+        defer { MockURLProtocol.setHandler(forHost: host, nil) }
         let client = makeClient(baseURL: URL(string: "https://\(host)")!)
         let maliciousToken = "malicious\r\nX-Injected: value"
-        // BUG-32: intake content must pass the local minimum-length gate so
-        // this test reaches the wire path it actually pins (the tokenStore
-        // fallback for a newline-bearing caller token).
         var draft = FeedbackDraft(
             title: "Attachment fallback",
             description: "Valid description",
@@ -193,10 +192,10 @@ struct FeedbackClientUserTokenSecurityTests {
             url: URL(string: "https://\(host)/shot.png")!
         )]
 
-        _ = try await client.submit(draft, userToken: maliciousToken)
+        await #expect(throws: FeedbackClientError.authenticationRequired) {
+            _ = try await client.submit(draft, userToken: maliciousToken)
+        }
 
-        let request = try #require(capture.value)
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == client.tokenStore.token)
-        #expect(request.value(forHTTPHeaderField: "X-Injected") == nil)
+        #expect(capture.value == nil)
     }
 }

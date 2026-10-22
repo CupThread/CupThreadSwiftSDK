@@ -145,10 +145,7 @@ extension FeedbackClient {
         // A blank or multi-line token would be silently dropped by
         // applyUserToken, dispatching the erasure without any identity —
         // fail fast locally instead of letting the server 401 (#417).
-        guard let identityToken = userToken.nilIfEmpty,
-              !identityToken.contains(where: \.isNewline) else {
-            throw FeedbackClientError.authenticationRequired
-        }
+        let identityToken = try validatedUserToken(userToken)
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/me/erase"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -280,14 +277,8 @@ extension FeedbackClient {
         // to attach. Fail fast locally instead (#416) — the trimmed values
         // are what get sent, so both headers always carry the same identity
         // the caller validated.
-        guard let sessionBearer = sessionToken.nilIfEmpty,
-              !sessionBearer.contains(where: \.isNewline) else {
-            throw FeedbackClientError.authenticationRequired
-        }
-        guard let identityToken = userToken.nilIfEmpty,
-              !identityToken.contains(where: \.isNewline) else {
-            throw FeedbackClientError.authenticationRequired
-        }
+        let sessionBearer = try validatedUserToken(sessionToken)
+        let identityToken = try validatedUserToken(userToken)
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/me/link"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

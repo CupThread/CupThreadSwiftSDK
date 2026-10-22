@@ -232,6 +232,9 @@ extension FeedbackClient {
         draft: CommentDraft,
         userToken: String
     ) async throws -> FeatureRequestComment {
+        // Reject a blank, whitespace-only, or newline-bearing userToken
+        // locally so the correlation header is never silently omitted (#497).
+        let identityToken = try validatedUserToken(userToken)
         let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
         // Same untrusted-input grammar as `fetchComments` (BUG-31): never
         // build a URL path from an id that cannot be a single opaque segment.
@@ -255,7 +258,7 @@ extension FeedbackClient {
         var request = URLRequest(url: configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)/comments"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: identityToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
         request.httpBody = try encodedIntakeBody(payload)
 

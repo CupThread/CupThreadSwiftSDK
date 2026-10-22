@@ -53,6 +53,10 @@ extension FeedbackClient {
         userToken: String?,
         turnstileToken: String? = nil
     ) async throws -> FeedbackUploadSession {
+        // Reject a non-nil blank or newline-bearing caller token before the
+        // Turnstile provider is consulted or store fallback runs (#497); `nil`
+        // preserves the app-key-scoped store fallback.
+        let validatedToken = try validatedUserToken(userToken)
         try validateUploadFileCount(files)
 
         struct CreateSessionPayload: Encodable, Sendable {
@@ -62,7 +66,7 @@ extension FeedbackClient {
             let files: [FeedbackUploadFileSpec]
         }
 
-        let effectiveIdentity = resolvedIdentity(userToken)
+        let effectiveIdentity = resolvedIdentity(validatedToken)
         let data = try await sendWithTurnstileRetry(
             accepted: [201],
             challenge: .feedback(appKey: configuration.appKey),
@@ -319,6 +323,7 @@ extension FeedbackClient {
         userToken: String? = nil,
         turnstileToken: String? = nil
     ) async throws -> FeedbackAttachment {
+        let validatedToken = try validatedUserToken(userToken)
         let uploadSession = try await createUploadSession(
             files: [FeedbackUploadFileSpec(
                 clientFileId: "file-1",
@@ -326,7 +331,7 @@ extension FeedbackClient {
                 contentType: mimeType,
                 sizeBytes: try fileSize(at: fileURL)
             )],
-            userToken: userToken,
+            userToken: validatedToken,
             turnstileToken: turnstileToken
         )
         return try await uploadAttachment(

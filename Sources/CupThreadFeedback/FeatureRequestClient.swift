@@ -66,13 +66,11 @@ extension FeedbackClient {
         query: String? = nil,
         cursor: String? = nil
     ) async throws -> ListFeatureRequestsResult {
-        // A blank token would be silently dropped by applyUserToken, so the
-        // request would go out anonymous and every `hasVoted`/`isOwnRequest`
-        // would read `false` — fail fast instead of returning silent
-        // falsehoods (#422).
-        guard userToken.nilIfEmpty != nil else {
-            throw FeedbackClientError.authenticationRequired
-        }
+        // A blank or newline-bearing token would be silently dropped by
+        // applyUserToken, so the request would go out anonymous and every
+        // `hasVoted`/`isOwnRequest` would read `false` — fail fast instead of
+        // returning silent falsehoods (#422, #497).
+        let identityToken = try validatedUserToken(userToken)
         let base = configuration.baseURL.appending(path: "/api/v1/feature-requests")
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
             throw FeedbackClientError.invalidResponse
@@ -100,7 +98,7 @@ extension FeedbackClient {
         }
 
         var request = URLRequest(url: url)
-        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: identityToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
@@ -157,10 +155,11 @@ extension FeedbackClient {
             // request, so report not-found without building a URL from it.
             throw FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)
         }
+        let identityToken = try validatedUserToken(userToken)
         let url = configuration.baseURL.appending(path: "/api/v1/feature-requests/\(trimmedID)")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        try applyCorrelationHeaders(userToken: userToken, requestID: nextRequestID(), to: &request)
+        try applyCorrelationHeaders(userToken: identityToken, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
 
         let (data, response) = try await session.data(for: request)
@@ -276,10 +275,7 @@ extension FeedbackClient {
         // recorded with no end-user identity, silently breaking own-request
         // detection and vote linkage. Fail fast locally instead (#493); the
         // trimmed token is sent identically in both transports.
-        guard let identityToken = userToken.nilIfEmpty,
-              !identityToken.contains(where: \.isNewline) else {
-            throw FeedbackClientError.authenticationRequired
-        }
+        let identityToken = try validatedUserToken(userToken)
         try validateIntakeMinimums(in: draft)
         let data = try await sendWithTurnstileRetry(
             accepted: [200, 201],

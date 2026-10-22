@@ -305,10 +305,7 @@ extension FeedbackClient {
         // applyUserToken, so the subscription would be recorded without its
         // end-user identity — fail fast instead of returning a silent
         // falsehood (#419).
-        guard let identityToken = userToken.nilIfEmpty,
-              !identityToken.contains(where: \.isNewline) else {
-            throw FeedbackClientError.authenticationRequired
-        }
+        let identityToken = try validatedUserToken(userToken)
         // The subscribe sheet applies the same shape check before enabling
         // its submit button (#283); the programmatic path must not put an
         // address the server can only reject with 400 on the wire (#419).
