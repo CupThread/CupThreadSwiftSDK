@@ -9,6 +9,81 @@ public struct DataErasureResult: Codable, Equatable, Sendable {
     public let erased: Bool
     /// The erased end-user profile id, when one existed.
     public let endUserId: String?
+    /// Whether the *local* cleanup that follows an erasure — dropping the
+    /// anonymous identity and the remembered changelog-subscription email —
+    /// could not be confirmed because the Keychain refused the deletions
+    /// (e.g. locked before first unlock) (SEC-29).
+    ///
+    /// The server-side erasure itself succeeded; only the on-device records
+    /// are still present. The next ``FeedbackClient/eraseMyData(store:)``
+    /// call retries the cleanup (even on an `erased: false` replay), so the
+    /// host should invoke it again once the Keychain is readable instead of
+    /// treating this as a failed erasure.
+    public let localCleanupPending: Bool
+
+    /// Creates a result. `localCleanupPending` defaults to `false`; the
+    /// server-facing initializers keep it local-only.
+    init(erased: Bool, endUserId: String?, localCleanupPending: Bool = false) {
+        self.erased = erased
+        self.endUserId = endUserId
+        self.localCleanupPending = localCleanupPending
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case erased, endUserId
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        erased = try container.decode(Bool.self, forKey: .erased)
+        endUserId = try container.decodeIfPresent(String.self, forKey: .endUserId)
+        localCleanupPending = false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(erased, forKey: .erased)
+        try container.encodeIfPresent(endUserId, forKey: .endUserId)
+    }
+}
+
+/// Persists whether a completed `eraseMyData` round trip left local PII
+/// cleanup unconfirmed (SEC-29).
+///
+/// A transient Keychain failure (locked before first unlock, entitlement
+/// errors) can make `UserTokenStore.reset()` or
+/// `ChangelogSubscriptionStore.clear()` report an unconfirmed deletion after
+/// the server already erased the profile. The flag makes the next
+/// `eraseMyData(store:)` call retry the cleanup even when the idempotent
+/// replay answers `erased: false`, so one transient failure cannot strand
+/// the identity or the subscriber email on the device.
+struct DataErasureCleanupState {
+    private static func key(for appKey: String) -> String {
+        "com.cupthread.feedback.erasureCleanupPending.\(AppKeyGrammar.normalized(appKey))"
+    }
+
+    let defaults: UserDefaults
+    let key: String
+
+    init(appKey: String, defaults: UserDefaults = .standard) {
+        // Normalized like the other per-app-key storage identities (SEC-22)
+        // so a whitespace-padded app key cannot alias the marker.
+        self.key = Self.key(for: appKey)
+        self.defaults = defaults
+    }
+
+    /// Whether a previous erasure left local cleanup unconfirmed.
+    var isPending: Bool {
+        defaults.bool(forKey: key)
+    }
+
+    func setPending(_ pending: Bool) {
+        if pending {
+            defaults.set(true, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
 }
 
 /// Result of `POST /api/v1/me/link`.
@@ -110,6 +185,14 @@ extension FeedbackClient {
     /// When the result is `erased: false` (no profile matched the identity),
     /// both stores are left untouched.
     ///
+    /// Local cleanup is confirmed, not best-effort: when the Keychain refuses
+    /// the deletions (e.g. locked before first unlock), the returned result
+    /// reports `localCleanupPending == true` and a cleanup-pending marker is
+    /// persisted. The next ``eraseMyData(store:)`` call retries the cleanup —
+    /// including on the idempotent `erased: false` replay — so a single
+    /// transient Keychain failure cannot leave the identity or the subscriber
+    /// email stranded on the device (SEC-29).
+    ///
     /// Like ``eraseMyData(userToken:)``, a resolved authentication-provider
     /// token is presented as `Authorization: Bearer …`, so for a signed-in
     /// user erasure covers every profile linked to their identity in this
@@ -117,28 +200,44 @@ extension FeedbackClient {
     /// no token resolved, only the anonymous row is addressed.
     ///
     /// - Parameter store: The store whose identity is erased and reset.
-    /// - Returns: Whether a profile was erased.
+    /// - Returns: Whether a profile was erased, plus
+    ///   ``DataErasureResult/localCleanupPending`` when the on-device cleanup
+    ///   still needs a retry.
     /// - Throws: Same errors as ``eraseMyData(userToken:)``.
     public func eraseMyData(store: UserTokenStore) async throws -> DataErasureResult {
         try await eraseMyData(
             store: store,
-            subscriptionStore: ChangelogSubscriptionStore(appKey: configuration.appKey)
+            subscriptionStore: ChangelogSubscriptionStore(appKey: configuration.appKey),
+            cleanupState: DataErasureCleanupState(appKey: configuration.appKey)
         )
     }
 
     /// Test seam for ``eraseMyData(store:)``: the same erasure flow with an
     /// injectable subscription store. `nil` skips the local subscription
-    /// cleanup.
+    /// cleanup. `cleanupState` backs the cleanup-pending marker; `nil`
+    /// disables marker persistence (unit tests that don't exercise the
+    /// retry path).
     func eraseMyData(
         store: UserTokenStore,
-        subscriptionStore: ChangelogSubscriptionStore?
+        subscriptionStore: ChangelogSubscriptionStore?,
+        cleanupState: DataErasureCleanupState? = nil
     ) async throws -> DataErasureResult {
         let result = try await eraseMyData(userToken: store.token)
-        if result.erased {
-            store.reset()
-            subscriptionStore?.clear()
+        // A previous call may have failed to confirm local cleanup (locked
+        // Keychain); its marker forces the idempotent `erased: false` replay
+        // to retry the cleanup instead of skipping it (#496).
+        guard result.erased || (cleanupState?.isPending ?? false) else {
+            return result
         }
-        return result
+        let identityReset = store.reset()
+        let subscriptionCleared = subscriptionStore?.clear() ?? true
+        let cleanupPending = !(identityReset && subscriptionCleared)
+        cleanupState?.setPending(cleanupPending)
+        return DataErasureResult(
+            erased: result.erased,
+            endUserId: result.endUserId,
+            localCleanupPending: cleanupPending
+        )
     }
 
     /// Links the anonymous end-user profile to an authenticated user session

@@ -1,4 +1,5 @@
 import Foundation
+import Security
 @testable import CupThreadFeedback
 
 // MARK: - Shared test helpers
@@ -163,4 +164,44 @@ func makeConfigJSON() -> [String: Any] {
         "allowAnonymousVote": false,
         "allowAnonymousFeedback": true
     ]
+}
+
+// MARK: - Scripted-Keychain helper (SEC-29 delete-confirmation coverage)
+
+/// Mutable backing item for `makeScriptedKeychainStorage`. Tests flip
+/// `failDeletion` to simulate a locked Keychain becoming readable again.
+final class ScriptedKeychainItem: @unchecked Sendable {
+    var data: Data?
+    /// While `true`, `SecItemDelete` reports `errSecInteractionNotAllowed`.
+    var failDeletion = true
+}
+
+/// A `KeychainTokenStorage` whose Security-framework outcomes are scripted
+/// in memory: confirmed writes capture into `item`, reads serve `item.data`,
+/// and deletion fails with `errSecInteractionNotAllowed` until
+/// `item.failDeletion` is cleared. Never touches the real Keychain.
+func makeScriptedKeychainStorage(item: ScriptedKeychainItem) -> KeychainTokenStorage {
+    KeychainTokenStorage(
+        service: "com.cupthread.test.scriptedDelete",
+        account: "scripted.\(UUID().uuidString)",
+        accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+        addItem: { attributes in
+            item.data = (attributes as NSDictionary)[kSecValueData] as? Data
+            return errSecSuccess
+        },
+        updateItem: { _, attributes in
+            item.data = (attributes as NSDictionary)[kSecValueData] as? Data
+            return errSecSuccess
+        },
+        copyItem: { _, result in
+            guard let data = item.data else { return errSecItemNotFound }
+            result?.pointee = data as CFTypeRef
+            return errSecSuccess
+        },
+        deleteItem: { _ in
+            if item.failDeletion { return errSecInteractionNotAllowed }
+            item.data = nil
+            return errSecSuccess
+        }
+    )
 }
