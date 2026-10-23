@@ -2,10 +2,14 @@ import Foundation
 import Testing
 @testable import CupThreadFeedback
 
-// Issue #438: when posting a comment on a deleted or comment-disabled
-// feature request, the server responds with HTTP 404. The client must map
-// this to the typed `FeedbackClientError.commentsUnavailable` error, and
-// `CommentsView.submitComment()` must collapse the composer.
+// Issue #438 added 404 mapping when posting a comment on a deleted or
+// comment-disabled feature request. Issue #530 narrows it to the same
+// envelope-only contract as the GET path (BUG-31): only a documented JSON
+// error envelope with a non-empty `error` string means
+// `commentsUnavailable`; router-fallback 404s (text/plain, empty body, or
+// JSON without an error string) surface as `.unexpectedStatus` so an
+// infrastructure misconfiguration is not misreported as a per-request
+// comments-disabled state.
 @Suite("CommentClient 404 Mapping", .serialized)
 struct CommentClient404MappingTests {
     static let apiHost = "comment-404.example.com"
@@ -81,11 +85,11 @@ struct CommentClient404MappingTests {
         }
     }
 
-    @Test func postCommentMaps404PlainTextToCommentsUnavailable() async throws {
+    @Test func postCommentMaps404EnvelopeMessageTrimmed() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
-                makeHTTPResponse(status: 404),
-                Data("Feature request not found".utf8)
+                makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-trimmed-404"]),
+                try encodeJSON(["error": "  Comments are disabled  "])
             )
         }
 
@@ -101,12 +105,38 @@ struct CommentClient404MappingTests {
                 Issue.record("Expected .commentsUnavailable, got \(error)")
                 return
             }
-            #expect(message == "Feature request not found")
-            #expect(requestId == nil)
+            #expect(message == "Comments are disabled")
+            #expect(requestId == "req-trimmed-404")
         }
     }
 
-    @Test func postCommentMaps404EmptyBodyToCommentsUnavailable() async throws {
+    @Test func postCommentSurfacesPlainTextRouter404AsUnexpectedStatus() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-router-404"]),
+                Data("404 Not Found".utf8)
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().postComment(
+                featureRequestId: "fr-123",
+                draft: CommentDraft(body: "Test"),
+                userToken: "token-123"
+            )
+            Issue.record("Expected unexpectedStatus")
+        } catch let error as FeedbackClientError {
+            guard case .unexpectedStatus(let code, let message, let requestId) = error else {
+                Issue.record("Expected .unexpectedStatus, got \(error)")
+                return
+            }
+            #expect(code == 404)
+            #expect(message == "404 Not Found")
+            #expect(requestId == "req-router-404")
+        }
+    }
+
+    @Test func postCommentSurfacesEmptyBody404AsUnexpectedStatus() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
                 makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-empty-404"]),
@@ -120,18 +150,18 @@ struct CommentClient404MappingTests {
                 draft: CommentDraft(body: "Test"),
                 userToken: "token-123"
             )
-            Issue.record("Expected commentsUnavailable")
+            Issue.record("Expected unexpectedStatus")
         } catch let error as FeedbackClientError {
-            guard case .commentsUnavailable(let message, let requestId) = error else {
-                Issue.record("Expected .commentsUnavailable, got \(error)")
+            guard case .unexpectedStatus(let code, _, let requestId) = error else {
+                Issue.record("Expected .unexpectedStatus, got \(error)")
                 return
             }
-            #expect(message == nil)
+            #expect(code == 404)
             #expect(requestId == "req-empty-404")
         }
     }
 
-    @Test func postCommentMaps404WhitespaceOnlyBodyToCommentsUnavailable() async throws {
+    @Test func postCommentSurfacesWhitespaceOnlyBody404AsUnexpectedStatus() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
                 makeHTTPResponse(status: 404),
@@ -145,13 +175,66 @@ struct CommentClient404MappingTests {
                 draft: CommentDraft(body: "Test"),
                 userToken: "token-123"
             )
-            Issue.record("Expected commentsUnavailable")
+            Issue.record("Expected unexpectedStatus")
         } catch let error as FeedbackClientError {
-            guard case .commentsUnavailable(let message, _) = error else {
-                Issue.record("Expected .commentsUnavailable, got \(error)")
+            guard case .unexpectedStatus(let code, _, _) = error else {
+                Issue.record("Expected .unexpectedStatus, got \(error)")
                 return
             }
-            #expect(message == nil)
+            #expect(code == 404)
+        }
+    }
+
+    @Test func postCommentSurfacesBlankEnvelopeErrorAsUnexpectedStatus() async throws {
+        // The envelope shape alone is not enough: an empty (`nilIfEmpty`)
+        // error string cannot describe a comments-disabled verdict, so the
+        // 404 must not consume the load-path presentation (BUG-31, #530).
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-blank-envelope"]),
+                try encodeJSON(["error": "   ", "code": "comments_disabled"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().postComment(
+                featureRequestId: "fr-123",
+                draft: CommentDraft(body: "Test"),
+                userToken: "token-123"
+            )
+            Issue.record("Expected unexpectedStatus")
+        } catch let error as FeedbackClientError {
+            guard case .unexpectedStatus(let code, _, let requestId) = error else {
+                Issue.record("Expected .unexpectedStatus, got \(error)")
+                return
+            }
+            #expect(code == 404)
+            #expect(requestId == "req-blank-envelope")
+        }
+    }
+
+    @Test func postCommentSurfacesEnvelopeWithoutErrorFieldAsUnexpectedStatus() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-no-error-field"]),
+                try encodeJSON(["code": "comments_disabled"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().postComment(
+                featureRequestId: "fr-123",
+                draft: CommentDraft(body: "Test"),
+                userToken: "token-123"
+            )
+            Issue.record("Expected unexpectedStatus")
+        } catch let error as FeedbackClientError {
+            guard case .unexpectedStatus(let code, _, let requestId) = error else {
+                Issue.record("Expected .unexpectedStatus, got \(error)")
+                return
+            }
+            #expect(code == 404)
+            #expect(requestId == "req-no-error-field")
         }
     }
 }

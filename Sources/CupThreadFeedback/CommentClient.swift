@@ -214,7 +214,8 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
     ///   server's permission policy rejects the comment (HTTP 403),
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
-    ///   comments are not available or disabled (HTTP 404),
+    ///   the documented JSON envelope reports the feature request is missing
+    ///   or its comments are disabled (HTTP 404 with a non-empty `error`),
     ///   ``FeedbackClientError/invalidParent(message:requestId:)`` when the
     ///   reply target is missing, hidden, or not on this feature request
     ///   (HTTP 400 `invalid_parent`),
@@ -266,17 +267,24 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode == 404 {
-            let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
-            let rawMessage = envelope?.error ?? String(data: data, encoding: .utf8)
-            let trimmed = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let message = (trimmed?.isEmpty ?? true) ? nil : trimmed
-            throw FeedbackClientError.commentsUnavailable(message: message, requestId: httpResponse.cupthreadRequestID)
-        }
         // The route's 401/403 mean the caller is not signed in or the
         // server's permission policy rejected the comment; map them to the
         // typed permission errors like the sibling endpoints (#358).
-        try validateResponse(httpResponse, data: data, accepted: [200, 201], mapsPermissionErrors: true)
+        // Only the API's documented resource-404 envelope means "comments are
+        // unavailable" (BUG-31, #530). A bare router fallback (text/plain,
+        // empty body, or JSON without an `error` string — what production
+        // answers on deploy skew or a wrong `baseURL`) falls through to
+        // `.unexpectedStatus`, so infrastructure misconfiguration is not
+        // misreported as a per-request comments-disabled state.
+        try validateResponse(
+            httpResponse,
+            data: data,
+            accepted: [200, 201],
+            mapsPermissionErrors: true,
+            mapResourceNotFound: { message, requestId in
+                .commentsUnavailable(message: message, requestId: requestId)
+            }
+        )
         return try decodeSuccess(CreatedCommentResponse.self, from: data).comment
     }
 }

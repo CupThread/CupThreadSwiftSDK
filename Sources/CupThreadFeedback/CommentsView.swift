@@ -324,9 +324,9 @@ public struct CommentsView: View {
             draft.clearReplyTarget()
         } catch {
             guard !error.isSdkCancellation else { return }
-            if let clientError = error as? FeedbackClientError, case .commentsUnavailable = clientError {
-                isCommentsUnavailable = true
-            }
+            // A submit failure must not consume the load path's unavailable
+            // verdict (#530): that flag removes `composerForm` — and the
+            // `submitError` banner with it. Only `loadComments()` owns it.
             if Self.invalidatesReplyTarget(for: error) {
                 // The server rejected the stale reply target (#237): clear
                 // it so the next submit succeeds as a top-level comment.
