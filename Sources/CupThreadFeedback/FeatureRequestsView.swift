@@ -58,7 +58,9 @@ public struct FeatureRequestsView: View {
     /// The server answered `401 authentication_required` on a fetch whose
     /// preflight passed (e.g. the token expired between the check and the
     /// send): the permission placeholder replaces the list (issue #363).
-    @State private var rejectedByServer = false
+    /// A verdict belongs to one load cycle and is cleared when the next one
+    /// starts (BUG-42, issue #523).
+    @State private var serverRejection = ServerRejectionLatch()
 
     @Environment(\.sdkAppConfig) private var sdkAppConfig
     private let configOverride: PublicAppConfig?
@@ -91,8 +93,22 @@ public struct FeatureRequestsView: View {
         isSurfacePermissionBlocked(
             verdictResolved: isRoadmapVerdictResolved,
             permitted: isRoadmapPermitted,
-            rejectedByServer: rejectedByServer
+            rejectedByServer: serverRejection.isRejected
         )
+    }
+
+    /// Whether the placeholder can offer a retry: the client-side preflight
+    /// permits access, so only a stale server rejection is blocking the
+    /// surface. A preflight denial cannot be resolved by another request.
+    var canRetryServerRejection: Bool {
+        serverRejection.isRejected && isRoadmapPermitted
+    }
+
+    /// The placeholder's retry closure, present only when another request can
+    /// change the verdict (see ``canRetryServerRejection``).
+    var permissionRetryAction: (@MainActor () async -> Void)? {
+        guard canRetryServerRejection else { return nil }
+        return { await refreshFeatureRequests() }
     }
 
     /// Whether the compose sheet and toolbar should offer the composer rather
@@ -173,7 +189,8 @@ public struct FeatureRequestsView: View {
             if isRoadmapPermissionBlocked {
                 SdkPermissionDeniedView(
                     titleKey: "cupthread.permission.roadmap_title",
-                    descriptionKey: "cupthread.permission.roadmap_description"
+                    descriptionKey: "cupthread.permission.roadmap_description",
+                    retryAction: permissionRetryAction
                 )
             } else {
                 #if os(tvOS)
@@ -445,17 +462,32 @@ extension FeatureRequestsView {
     /// concurrent search task to resolve it as a side effect.
     @MainActor
     func loadVersions() async {
+        // The latest versions request owns the filter state and its verdict; a
+        // superseded request must not write either. A list rejection is
+        // preserved until a list load starts (BUG-42, issue #523).
+        let versionsGenerationAtStart = serverRejection.beginVersionsLoadCycle()
+        // A list load started while these versions were in flight owns the
+        // surface verdict: its fresh request re-tested the server after this one.
+        let listGenerationAtStart = loadGeneration
         let access = await Self.resolveRoadmapAccess(client: client, config: activeConfig)
         isAuthenticated = access.supportsAuthentication
         hasResolvedAuthentication = true
         guard !Task.isCancelled else { return }
         guard access.isPermitted else { return }
+        guard serverRejection.isCurrentVersionsLoad(versionsGenerationAtStart) else { return }
         versionFilterState.loadStarted()
         do {
-            versionFilterState.loadFinished(try await client.fetchVersions())
+            let versions = try await client.fetchVersions()
+            guard serverRejection.isCurrentVersionsLoad(versionsGenerationAtStart) else { return }
+            versionFilterState.loadFinished(versions)
         } catch {
+            guard serverRejection.isCurrentVersionsLoad(versionsGenerationAtStart) else { return }
             if isSdkPermissionRejection(error) {
-                rejectedByServer = true
+                // This request's filter state settles even when a newer list
+                // load owns the surface verdict.
+                versionFilterState.loadFailed(error)
+                guard loadGeneration == listGenerationAtStart else { return }
+                serverRejection.rejectVersions()
                 return
             }
             versionFilterState.loadFailed(error)
@@ -485,6 +517,9 @@ private extension FeatureRequestsView {
         loadError = nil
         reloadNotice = nil
         pageError = nil
+        // Every fresh load re-tests the server verdict, so a stale 401 from a
+        // previous cycle cannot keep the surface blocked (BUG-42, issue #523).
+        serverRejection.beginListLoadCycle()
         defer {
             // Only a completed verdict of the newest, non-cancelled load may
             // resolve the lifecycle. A cancelled or superseded load never
@@ -521,7 +556,7 @@ private extension FeatureRequestsView {
             // token expired (or was revoked) between the check and the
             // send. The signed-out permission placeholder replaces the
             // list instead of the generic error state (issue #297, #363).
-            rejectedByServer = true
+            serverRejection.rejectList()
             return
         }
         guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty)
@@ -562,7 +597,7 @@ private extension FeatureRequestsView {
         } catch {
             guard loadGeneration == generationAtStart, !error.isSdkCancellation else { return }
             if isSdkPermissionRejection(error) {
-                rejectedByServer = true
+                serverRejection.rejectList()
                 return
             }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
@@ -709,6 +744,7 @@ extension FeatureRequestsView {
         configOverride: PublicAppConfig? = nil,
         preResolvedAuthentication: Bool? = nil,
         rejectedByServer: Bool = false,
+        serverRejection: ServerRejectionLatch? = nil,
         autoPresentCompose: Bool = false,
         initialSearchText: String = ""
     ) {
@@ -720,8 +756,26 @@ extension FeatureRequestsView {
         _showSubmittedBanner = State(initialValue: showsSubmittedBanner)
         _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
         _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
-        _rejectedByServer = State(initialValue: rejectedByServer)
+        let latch = serverRejection ?? ServerRejectionLatch()
+        if rejectedByServer { latch.rejectList() }
+        _serverRejection = State(initialValue: latch)
         _isComposePresented = State(initialValue: autoPresentCompose)
         _searchText = State(initialValue: initialSearchText)
+    }
+
+    /// Drives the private list load from view-level tests (BUG-42). A view
+    /// outside a SwiftUI hierarchy cannot persist `@State` writes, so the
+    /// injected latch is the observable verdict.
+    @MainActor
+    func loadFeatureRequestsForTesting() async {
+        await loadFeatureRequests()
+    }
+
+    /// Drives the list failure branch from view-level tests. `loadGeneration`
+    /// never advances outside a SwiftUI hierarchy, so its initial value is
+    /// the generation the load path would have recorded.
+    @MainActor
+    func handleLoadFailureForTesting(_ error: Error) async {
+        await handleLoadFailure(error, generation: loadGeneration)
     }
 }
