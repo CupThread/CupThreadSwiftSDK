@@ -77,7 +77,7 @@ A rerun of the same version recognizes already-completed matching stages:
 | Uncommitted generated `SDKVersion.swift` for this version | Tolerated; committed for this release |
 | Local tag `vX.Y.Z` at `HEAD` | Kept; pushed if not on origin yet |
 | Remote tag `vX.Y.Z` at `HEAD` | Recognized as done |
-| Draft GitHub release `vX.Y.Z` | Reused; assets replaced (`--clobber`) |
+| Draft GitHub release `vX.Y.Z` | Reused; assets replaced (`--clobber`). When the draft notes advertise a checksum from the previous build, the notes are regenerated (`gh release edit --notes`) before the draft is published |
 | Published release with matching asset checksum | Recognized as done; left untouched |
 | CDN object with matching sha256 | Upload skipped |
 | All three (tag + release + CDN) match | “Already fully released” — exits 0 without touching anything |
@@ -113,9 +113,11 @@ version is published.
 - **CDN checksum verification fails** — the object exists but serves
   different bytes (or 404s). The release is still a draft; overwrite the R2
   object (rerun does this) and re-verify.
-- **Publishing the draft fails** — everything else is verified. Check the
-  asset one final time, then publish manually:
-  `gh release edit vX.Y.Z --draft=false`.
+- **Publishing the draft fails** — everything else is verified. A rerun
+  regenerates stale draft notes and retries publication; to finish manually,
+  update the notes from `build/release/release-info.json` first when the
+  checksum changed, then publish:
+  `gh release edit vX.Y.Z --notes <fresh notes> --draft=false`.
 - **After a successful release** — push `main`
   (`git push origin main`) so the version-bump commit is on the branch, and
   update the README install snippet if this version becomes the documented
