@@ -34,6 +34,17 @@ public enum PhotoAttachmentHelper {
     /// Default maximum attachment upload size in bytes (20 MB), mirroring `PublicAppConfig.maxAttachmentBytes`.
     public static let defaultMaxAttachmentBytes = 20_000_000
 
+    /// Maximum number of pixels one decode pass will materialize (100 MP, about 400 MB as RGBA).
+    ///
+    /// ``PhotoAttachmentHelper/strippingSensitiveMetadata(from:)`` compares
+    /// the dimensions a container declares in its header against this bound
+    /// before decoding, and returns `nil` above it. A compressed file that
+    /// claims an enormous canvas while staying small on disk — a
+    /// decompression bomb — is refused instead of decoded, so the strip pass
+    /// cannot materialize a multi-gigabyte bitmap. Images at or below the
+    /// bound are decoded at their own dimensions and keep their pixels.
+    public static let maxDecodedPixelCount = 100_000_000
+
     #if canImport(UniformTypeIdentifiers)
     /// Detects the most accurate MIME type and file extension from raw data and optional source content types.
     ///
@@ -260,11 +271,16 @@ public enum PhotoAttachmentHelper {
     /// cannot be safely parsed fall back to a single-frame re-encode, so unverified bytes are
     /// never returned (SEC-10).
     ///
+    /// The re-encode decodes at the image's own dimensions, so it is bounded by
+    /// ``PhotoAttachmentHelper/maxDecodedPixelCount``: images above that bound are refused
+    /// rather than decoded, and images at or below it keep their exact pixel dimensions.
+    ///
     /// - Parameter data: The raw image data.
-    /// - Returns: Sanitized image bytes, or `nil` if the data is corrupt or cannot be decoded.
+    /// - Returns: Sanitized image bytes, or `nil` if the data is corrupt, cannot be decoded,
+    ///   or declares more than ``PhotoAttachmentHelper/maxDecodedPixelCount`` pixels.
     public static func strippingSensitiveMetadata(from data: Data) -> Data? {
         guard !data.isEmpty else { return nil }
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               CGImageSourceGetCount(source) > 0 else {
             return nil
         }
@@ -281,12 +297,24 @@ public enum PhotoAttachmentHelper {
             return sanitized
         }
 
+        // The re-encode below is the only decode in the SDK that would
+        // materialize the bitmap at its declared size: without a
+        // `kCGImageSourceThumbnailMaxPixelSize` cap, ImageIO's "thumbnail" is
+        // the full image, and the `CGImageSourceCreateImageAtIndex` fallback is
+        // a full uncapped decode too (PERF-6). Dimensions come from the
+        // container header, so the bound costs no decode and a bomb is refused
+        // before any pixels are touched.
+        guard !exceedsDecodeBound(source) else {
+            return nil
+        }
+
         let thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCache: false
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
-            ?? CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            ?? CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: false] as CFDictionary) else {
             return nil
         }
 
@@ -302,6 +330,27 @@ public enum PhotoAttachmentHelper {
         }
 
         return outputData as Data
+    }
+
+    /// Whether a container's declared pixel dimensions exceed
+    /// ``PhotoAttachmentHelper/maxDecodedPixelCount``.
+    ///
+    /// Reads `kCGImagePropertyPixelWidth`/`kCGImagePropertyPixelHeight` from
+    /// the container header, so it answers without decoding pixels and is cheap
+    /// enough to run before a decode pass. A container that declares no usable
+    /// dimensions counts as exceeding the bound: its size cannot be verified,
+    /// and the guarded decode is the only place the buffer would be
+    /// materialized.
+    static func exceedsDecodeBound(_ source: CGImageSource) -> Bool {
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              width > 0, height > 0 else {
+            return true
+        }
+        let (pixelCount, overflowed) = width.multipliedReportingOverflow(by: height)
+        // A product that overflows `Int` is larger than the bound by construction.
+        return overflowed || pixelCount > maxDecodedPixelCount
     }
 
     static func isAnimatedImageContainer(source: CGImageSource, data: Data) -> Bool {
