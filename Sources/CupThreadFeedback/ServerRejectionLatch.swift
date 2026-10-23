@@ -21,6 +21,16 @@ final class ServerRejectionLatch {
     /// Whether the current load cycle ended in a server-side rejection.
     private(set) var isRejected = false
     private var source: Source?
+    /// Monotonic counter for overlapping versions requests. The latest
+    /// request owns the filter state and the versions verdict; a superseded
+    /// request must not write either.
+    private(set) var versionsGeneration = 0
+
+    /// Whether the versions request that started with `generation` is still
+    /// the latest one.
+    func isCurrentVersionsLoad(_ generation: Int) -> Bool {
+        versionsGeneration == generation
+    }
 
     /// Starts a list load, discarding any previous verdict.
     func beginListLoadCycle() {
@@ -28,12 +38,16 @@ final class ServerRejectionLatch {
         source = nil
     }
 
-    /// Starts a versions load. A versions-owned verdict is re-tested; a
-    /// list-owned rejection stays until a list load starts.
-    func beginVersionsLoadCycle() {
-        guard source != .list else { return }
+    /// Starts a versions load and returns its generation. A versions-owned
+    /// verdict is re-tested; a list-owned rejection stays until a list load
+    /// starts.
+    @discardableResult
+    func beginVersionsLoadCycle() -> Int {
+        versionsGeneration += 1
+        guard source != .list else { return versionsGeneration }
         isRejected = false
         source = nil
+        return versionsGeneration
     }
 
     /// Records a server-side permission rejection from a list load.

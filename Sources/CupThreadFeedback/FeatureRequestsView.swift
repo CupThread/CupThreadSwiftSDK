@@ -462,22 +462,30 @@ extension FeatureRequestsView {
     /// concurrent search task to resolve it as a side effect.
     @MainActor
     func loadVersions() async {
+        // The latest versions request owns the filter state and its verdict; a
+        // superseded request must not write either. A list rejection is
+        // preserved until a list load starts (BUG-42, issue #523).
+        let versionsGenerationAtStart = serverRejection.beginVersionsLoadCycle()
         // A list load started while these versions were in flight owns the
-        // verdict: its fresh request re-tested the server after this one.
+        // surface verdict: its fresh request re-tested the server after this one.
         let listGenerationAtStart = loadGeneration
         let access = await Self.resolveRoadmapAccess(client: client, config: activeConfig)
         isAuthenticated = access.supportsAuthentication
         hasResolvedAuthentication = true
         guard !Task.isCancelled else { return }
         guard access.isPermitted else { return }
-        // A fresh versions load re-tests its own verdict; a list rejection is
-        // preserved until a list load starts (BUG-42, issue #523).
-        serverRejection.beginVersionsLoadCycle()
+        guard serverRejection.isCurrentVersionsLoad(versionsGenerationAtStart) else { return }
         versionFilterState.loadStarted()
         do {
-            versionFilterState.loadFinished(try await client.fetchVersions())
+            let versions = try await client.fetchVersions()
+            guard serverRejection.isCurrentVersionsLoad(versionsGenerationAtStart) else { return }
+            versionFilterState.loadFinished(versions)
         } catch {
+            guard serverRejection.isCurrentVersionsLoad(versionsGenerationAtStart) else { return }
             if isSdkPermissionRejection(error) {
+                // This request's filter state settles even when a newer list
+                // load owns the surface verdict.
+                versionFilterState.loadFailed(error)
                 guard loadGeneration == listGenerationAtStart else { return }
                 serverRejection.rejectVersions()
                 return

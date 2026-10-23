@@ -143,6 +143,15 @@ struct FeatureRequestsServerRejectionTests {
         #expect(!latch.isRejected)
     }
 
+    @Test func onlyTheLatestVersionsRequestIsCurrent() {
+        let latch = ServerRejectionLatch()
+        let first = latch.beginVersionsLoadCycle()
+        let second = latch.beginVersionsLoadCycle()
+
+        #expect(!latch.isCurrentVersionsLoad(first))
+        #expect(latch.isCurrentVersionsLoad(second))
+    }
+
     // MARK: - Load cycles re-test the server
 
     @Test @MainActor func transientVersionsRejectionClearsOnTheNextSuccessfulLoad() async {
