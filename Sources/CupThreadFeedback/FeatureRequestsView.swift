@@ -184,6 +184,18 @@ public struct FeatureRequestsView: View {
         "features|\(activeConfig?.allowsAnonymousRoadmap ?? true)|\(trimmedSearchText)|\(selectedVersionID ?? "")"
     }
 
+    /// Whether this instance already rendered the results for its current
+    /// search key. The throttle's duplicate gate is shared for the lifetime
+    /// of the client, so a fresh instance must not honor a skip armed by a
+    /// previous presentation (issue #529).
+    var hasRenderedCurrentSearchKey: Bool {
+        SearchDuplicateSkipPolicy.decision(
+            hasLoadedOnce: loadState.hasLoadedOnce,
+            lastExecutedKey: listState.lastExecutedFilterKey,
+            currentKey: filterKey
+        ) == .honor
+    }
+
     public var body: some View {
         Group {
             if isRoadmapPermissionBlocked {
@@ -266,6 +278,15 @@ public struct FeatureRequestsView: View {
             guard !Task.isCancelled else { return }
             let verdict = await client.searchThrottle.admissionVerdict(key: filterKey)
             guard verdict == .admitted else {
+                // Another instance armed the shared duplicate gate for this
+                // key, or this presentation's predecessor was cancelled
+                // before rendering. This surface has no verdict for the key,
+                // so skipping would strand the first-load skeleton; clear
+                // the gate and load (issue #529).
+                if await recoversFromDuplicateSkip(verdict) {
+                    await loadFeatureRequests()
+                    return
+                }
                 guard let outcome = SearchAdmissionOutcome.outcome(
                     for: verdict,
                     hasExistingContent: !items.isEmpty
@@ -505,6 +526,17 @@ private extension FeatureRequestsView {
         await loadFeatureRequests()
     }
 
+    /// Clears a duplicate skip this instance may not honor, so the caller can
+    /// run the load. Returns `true` when a fresh-surface duplicate skip was
+    /// recovered; the surface has already rendered the key otherwise and the
+    /// skip stays silent (issue #529).
+    @MainActor
+    private func recoversFromDuplicateSkip(_ verdict: SearchAdmissionVerdict?) async -> Bool {
+        guard verdict == .duplicateSkipped, !hasRenderedCurrentSearchKey else { return false }
+        await client.searchThrottle.resetLastAdmittedKey()
+        return true
+    }
+
     @MainActor
     private func loadFeatureRequests(recordsThrottle: Bool = true) async {
         await resolveAuthenticationAccess()
@@ -539,10 +571,18 @@ private extension FeatureRequestsView {
             )
             // A newer replacing load (search/version change, pull-to-refresh)
             // superseded this one — applying its page would render the older
-            // filter's results.
-            guard loadGeneration == generationAtStart else { return }
+            // filter's results. A cancelled load reached no verdict either:
+            // the replacement may not have called `startLoading()` yet, so the
+            // generation check alone can pass for a dismissed or superseded
+            // task.
+            guard loadGeneration == generationAtStart, !Task.isCancelled else { return }
             hasEmittedAdmissionNotice = false
-            listState.applyPage(result, replacesExisting: true, executedQuery: trimmedSearchText)
+            listState.applyPage(
+                result,
+                replacesExisting: true,
+                executedQuery: trimmedSearchText,
+                executedFilterKey: filterKey
+            )
         } catch {
             await handleLoadFailure(error, generation: generationAtStart)
         }

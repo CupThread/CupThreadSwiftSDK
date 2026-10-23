@@ -136,7 +136,8 @@ func loadRoadmapGroups(
     userToken: String,
     query: String?,
     config: PublicAppConfig?,
-    skipInitialAdmissionRecord: Bool = false
+    skipInitialAdmissionRecord: Bool = false,
+    searchThrottleKey: String? = nil
 ) async throws -> [RoadmapGroup]? {
     let supportsAuthentication = await client.resolveAuthenticatedAccess()
     guard roadmapLoadPlan(config: config, supportsAuthentication: supportsAuthentication) == .load else {
@@ -149,7 +150,10 @@ func loadRoadmapGroups(
             if cursor == nil && skipInitialAdmissionRecord {
                 // The caller already committed an admission slot for the initial page via `waitForAdmission`.
             } else {
-                await client.searchThrottle.recordQueryFetch()
+                // The key re-arms the duplicate gate after a fresh-surface
+                // recovery cleared it; without one, only the sliding-window
+                // budget is charged (issue #529).
+                await client.searchThrottle.recordQueryFetch(key: searchThrottleKey)
             }
         }
         return try await client.fetchFeatureRequests(

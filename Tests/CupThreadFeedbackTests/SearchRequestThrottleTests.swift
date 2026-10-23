@@ -204,6 +204,22 @@ struct SearchRequestThrottleTests {
         #expect(await throttle.waitForAdmission(key: "features|before|"))
     }
 
+    /// Issue #529: a fresh surface inherits the shared duplicate gate, clears
+    /// it, and records the fetch it actually performs so the gate is armed
+    /// again for the results it now renders.
+    @Test func freshSurfaceRecoveryClearsAndReArmsTheDuplicateGate() async {
+        let (throttle, _) = makeThrottle()
+        let key = "features|true|abc|"
+        #expect(await throttle.admissionVerdict(key: key) == .admitted)
+        #expect(await throttle.admissionVerdict(key: key) == .duplicateSkipped)
+
+        await throttle.resetLastAdmittedKey()
+        await throttle.recordQueryFetch(key: key)
+
+        #expect(await throttle.isDuplicateKey(key))
+        #expect(await throttle.admissionVerdict(key: key) == .duplicateSkipped)
+    }
+
     @Test func recordingCountsAgainstTheWindow() async {
         let (throttle, clock) = makeThrottle(minimumInterval: .zero, windowCapacity: 28)
         for index in 0..<26 {
@@ -337,6 +353,30 @@ struct SearchRequestThrottleTests {
         )
         #expect(result != nil)
         #expect(await throttle.admittedCount == 3, "3 query pages fetched must record exactly 3 times in the throttle")
+    }
+
+    /// Issue #529: the fresh-surface recovery clears the duplicate gate, so
+    /// the load must record the key it actually fetched. Otherwise the next
+    /// identical search is admitted instead of skipped.
+    @Test func roadmapPaginationRecordsTheSearchKeyForDuplicateSuppression() async throws {
+        let (throttle, _) = makeThrottle()
+        let host = "test-roadmap-key.example.com"
+        MockURLProtocol.setHandler(forHost: host, Self.makeThreePageMockHandler())
+
+        let client = makeClient(
+            baseURL: URL(string: "https://\(host)")!,
+            searchThrottle: throttle
+        )
+
+        let result = try await loadRoadmapGroups(
+            client: client,
+            userToken: "tok",
+            query: "swift",
+            config: nil,
+            searchThrottleKey: "roadmap|swift"
+        )
+        #expect(result != nil)
+        #expect(await throttle.isDuplicateKey("roadmap|swift"))
     }
 
     @Test func emptyQueryLoadsRecordNothingInThrottle() async throws {

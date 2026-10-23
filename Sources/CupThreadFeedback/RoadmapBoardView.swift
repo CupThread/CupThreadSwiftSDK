@@ -86,6 +86,30 @@ public struct RoadmapBoardView: View {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// The throttle key for a query. The `roadmap|` prefix keeps board
+    /// searches distinct from the feature-request list's keys.
+    private func searchThrottleKey(for query: String) -> String {
+        "roadmap|\(query)"
+    }
+
+    /// The throttle key for the query currently in the search field.
+    private var searchThrottleKey: String {
+        searchThrottleKey(for: trimmedSearchText)
+    }
+
+    /// Whether this instance already rendered the results for its current
+    /// search key. The throttle's duplicate gate is shared for the lifetime
+    /// of the client, so a fresh instance must not honor a skip armed by a
+    /// previous presentation or by an in-flight search that was superseded
+    /// (issue #529).
+    var hasRenderedCurrentSearchKey: Bool {
+        SearchDuplicateSkipPolicy.decision(
+            hasLoadedOnce: loadState.hasLoadedOnce,
+            lastExecutedKey: "roadmap|\(lastExecutedQuery)",
+            currentKey: searchThrottleKey
+        ) == .honor
+    }
+
     /// Restarts the load lifecycle whenever the config's anonymous-roadmap
     /// switch or the search query changes (issue #274). Keyed on the resolved
     /// permission verdict, the task cancelled and restarted itself: its first
@@ -129,19 +153,24 @@ public struct RoadmapBoardView: View {
     ///     view-level tests — `nil` leaves the verdict unsettled so the board
     ///     resolves in `.task` (the production presentation), while
     ///     `true`/`false` inject a settled verdict without awaiting `.task`.
+    ///   - lastExecutedQueryOverride: The query whose results the preloaded
+    ///     groups represent; defaults to `initialSearchText`. Lets tests model
+    ///     a board still showing an older query's results while the search
+    ///     field holds a newer one (issue #529).
     init(
         client: FeedbackClient,
         userToken: String,
         initialSearchText: String = "",
         initialGroups: [RoadmapGroup]?,
         configOverride: PublicAppConfig? = nil,
-        preResolvedAuthentication: Bool? = nil
+        preResolvedAuthentication: Bool? = nil,
+        lastExecutedQueryOverride: String? = nil
     ) {
         self.client = client
         self.userToken = userToken
         self.configOverride = configOverride
         _searchText = State(initialValue: initialSearchText)
-        _lastExecutedQuery = State(initialValue: initialSearchText)
+        _lastExecutedQuery = State(initialValue: lastExecutedQueryOverride ?? initialSearchText)
         if let initialGroups {
             _groups = State(initialValue: initialGroups)
             _loadState = State(initialValue: RoadmapBoardLoadState(isLoading: false, hasLoadedOnce: true))
@@ -203,8 +232,17 @@ public struct RoadmapBoardView: View {
             // fetches below the 30/min per-IP budget and skips duplicates.
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            let verdict = await client.searchThrottle.admissionVerdict(key: "roadmap|\(trimmedSearchText)")
+            let verdict = await client.searchThrottle.admissionVerdict(key: searchThrottleKey)
             guard verdict == .admitted else {
+                // Another instance armed the shared duplicate gate for this
+                // key, or an earlier admitted search was superseded before it
+                // rendered. This board has no verdict for the key, so
+                // skipping would leave the search unexecuted; clear the gate
+                // and load (issue #529).
+                if await recoversFromDuplicateSkip(verdict) {
+                    await load()
+                    return
+                }
                 guard let outcome = SearchAdmissionOutcome.outcome(
                     for: verdict,
                     hasExistingContent: !groups.isEmpty
@@ -443,6 +481,17 @@ extension RoadmapBoardView {
         await load()
     }
 
+    /// Clears a duplicate skip this board may not honor, so the caller can
+    /// run the load. Returns `true` when a fresh-surface duplicate skip was
+    /// recovered; the board has already rendered the key otherwise and the
+    /// skip stays silent (issue #529).
+    @MainActor
+    private func recoversFromDuplicateSkip(_ verdict: SearchAdmissionVerdict?) async -> Bool {
+        guard verdict == .duplicateSkipped, !hasRenderedCurrentSearchKey else { return false }
+        await client.searchThrottle.resetLastAdmittedKey()
+        return true
+    }
+
     @MainActor
     private func load(alreadyAdmitted: Bool = false) async {
         await resolveAuthenticationAccess()
@@ -464,7 +513,8 @@ extension RoadmapBoardView {
                 userToken: userToken,
                 query: query,
                 config: activeConfig,
-                skipInitialAdmissionRecord: alreadyAdmitted
+                skipInitialAdmissionRecord: alreadyAdmitted,
+                searchThrottleKey: searchThrottleKey(for: queryText)
             ) {
                 // A newer load, cancellation, or a permission denial owns the board now.
                 guard loadState.isCurrent(generation: generation), !Task.isCancelled else { return }

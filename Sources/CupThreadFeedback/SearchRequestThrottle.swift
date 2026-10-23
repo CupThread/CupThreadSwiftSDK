@@ -19,7 +19,10 @@ import Foundation
 ///   fetches in any `windowPeriod` (60 s) sliding window.
 /// - A fetch whose key (trimmed query plus version filter) matches the last
 ///   admitted fetch is skipped outright — re-emitting an unchanged query
-///   never re-hits the network.
+///   never re-hits the network. The key is shared by every surface that uses
+///   the same ``FeedbackClient``, so `.duplicateSkipped` is only safe to honor
+///   on a surface that already rendered that key's results; a fresh surface
+///   must clear the gate and load (``SearchDuplicateSkipPolicy``, issue #529).
 /// - After an HTTP 429 the throttle enters a `cooldownDuration` (60 s)
 ///   during which query-bearing admissions are denied; the next emission
 ///   after the cooldown resumes searching.
@@ -225,6 +228,43 @@ enum SearchAdmissionVerdict: Equatable, Sendable {
     case rateLimited
 }
 
+// MARK: - Duplicate-skip policy
+
+/// Whether a surface may honor a shared-throttle duplicate skip.
+///
+/// A ``SearchRequestThrottle`` lives for the lifetime of its
+/// ``FeedbackClient``, while surface instances come and go. A fresh instance
+/// can therefore inherit `.duplicateSkipped` for a query it never rendered — a
+/// deep-link re-entry, a second window, or a presentation whose predecessor
+/// was cancelled mid-fetch. Honoring that skip would return without any state
+/// write and leave the first-load skeleton up forever (issue #529), so the
+/// skip is only safe when *this* surface already rendered the exact throttle
+/// key (query plus version filter) it is now being asked to skip.
+enum SearchDuplicateSkipPolicy: Equatable, Sendable {
+    /// The rendered page belongs to the duplicated key — stay silent.
+    case honor
+    /// This instance has no rendered verdict for the key — clear the
+    /// throttle's duplicate gate and load.
+    case reload
+
+    /// Decides whether a `.duplicateSkipped` verdict may be honored.
+    ///
+    /// - Parameters:
+    ///   - hasLoadedOnce: Whether the surface completed a load cycle.
+    ///   - lastExecutedKey: The throttle key whose results the surface last
+    ///     rendered, or `nil` when it has no keyed page.
+    ///   - currentKey: The throttle key the search task is evaluating.
+    /// - Returns: `.honor` only when the surface rendered `currentKey`'s
+    ///   results; otherwise `.reload`.
+    static func decision(
+        hasLoadedOnce: Bool,
+        lastExecutedKey: String?,
+        currentKey: String
+    ) -> SearchDuplicateSkipPolicy {
+        hasLoadedOnce && lastExecutedKey == currentKey ? .honor : .reload
+    }
+}
+
 // MARK: - Search admission outcome presentation
 
 /// How a denied search-throttle admission should be presented.
@@ -250,6 +290,12 @@ enum SearchAdmissionOutcome: Equatable {
     ///   - verdict: The admission verdict from the search throttle.
     ///   - hasExistingContent: Whether the surface already shows results.
     /// - Returns: `nil` if admitted or duplicate-skipped; otherwise the outcome for rate limiting.
+    ///
+    /// A `nil` result for `.duplicateSkipped` is only valid when the surface
+    /// already rendered the duplicated key's results. The gate is shared
+    /// across surface instances, so a fresh surface must consult
+    /// ``SearchDuplicateSkipPolicy`` and reload instead of returning into its
+    /// first-load skeleton (issue #529).
     static func outcome(
         for verdict: SearchAdmissionVerdict,
         hasExistingContent: Bool
