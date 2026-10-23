@@ -166,12 +166,15 @@ struct UserProfileClientTests {
 
         let response = try await Self.makeAPIClient().fetchUserProfile(userId: Self.authoritativeID)
         #expect(response.profile.clerkUserId == Self.authoritativeID)
-        #expect(response.apps.count == 1)
-        #expect(response.apps[0].slug == "alpha-app")
-        #expect(response.apps[0].workspaceSlug == "ws-alpha")
+        #expect(response.publicApps.count == 1)
+        #expect(response.publicApps[0].appSlug == "alpha-app")
+        #expect(response.publicApps[0].workspaceSlug == "ws-alpha")
+        #expect(response.publicApps[0].workspaceName == "Alpha")
+        #expect(response.publicApps[0].slug == "alpha-app")
         #expect(response.recentComments.count == 1)
         #expect(response.recentComments[0].appId == nil)
         #expect(response.recentComments[0].workspaceSlug == "ws-alpha")
+        #expect(response.recentComments[0].appSlug == "alpha-app")
     }
 
     @Test func fetchUserProfileThrowsUserProfileNotFoundOnEnvelope404() async throws {

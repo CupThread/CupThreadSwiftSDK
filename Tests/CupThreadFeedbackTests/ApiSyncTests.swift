@@ -637,6 +637,8 @@ struct PseudonymousUserIdentifiersTests {
         #expect(response.profile.displayName == nil)
         #expect(response.publicApps.isEmpty)
         #expect(response.recentComments.isEmpty)
+        // `hideComments` is retired; the server expresses the opt-out by
+        // serving an empty `recentComments` array (#505).
         #expect(response.hideComments == false)
     }
 

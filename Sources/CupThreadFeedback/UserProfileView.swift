@@ -29,13 +29,15 @@ public struct UserProfileView: View {
                 } else if let response = profile {
                     profileHeader(response.profile)
 
-                    if !response.apps.isEmpty {
-                        appsSection(response.apps)
+                    if !response.publicApps.isEmpty {
+                        appsSection(response.publicApps)
                     }
 
-                    if !response.hideComments && !response.profile.hideComments {
-                        commentsSection(response.recentComments)
-                    }
+                    // Comment visibility is applied server-side: a user who
+                    // hides comments receives an empty `recentComments`
+                    // array, so the section's empty state is the correct
+                    // presentation (issue #505).
+                    commentsSection(response.recentComments)
                 }
             }
             .padding(16)

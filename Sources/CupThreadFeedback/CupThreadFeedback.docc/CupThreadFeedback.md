@@ -57,6 +57,7 @@ Comment creation is signed-in-only on the CupThread API — create the client wi
 - ``UserProfile``: A public developer or user profile.
 - ``PublicUserProfileResponse``: User profile with public apps and comments.
 - ``PublicAppSummary``: Summary of a public app.
+- ``PublicUserProfileApp``: The corrected component name for an app in a profile's `publicApps` array.
 - ``UserProfileComment``: Recent public comment on a profile.
 - ``UserProfileView``: Public user profile page.
 - ``FeedbackClient/fetchUserProfile(userId:)``
