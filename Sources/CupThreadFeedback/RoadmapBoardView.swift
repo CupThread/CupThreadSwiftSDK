@@ -86,10 +86,15 @@ public struct RoadmapBoardView: View {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// The throttle key for the current query. The `roadmap|` prefix keeps
-    /// board searches distinct from the feature-request list's keys.
+    /// The throttle key for a query. The `roadmap|` prefix keeps board
+    /// searches distinct from the feature-request list's keys.
+    private func searchThrottleKey(for query: String) -> String {
+        "roadmap|\(query)"
+    }
+
+    /// The throttle key for the query currently in the search field.
     private var searchThrottleKey: String {
-        "roadmap|\(trimmedSearchText)"
+        searchThrottleKey(for: trimmedSearchText)
     }
 
     /// Whether this instance already rendered the results for its current
@@ -508,7 +513,8 @@ extension RoadmapBoardView {
                 userToken: userToken,
                 query: query,
                 config: activeConfig,
-                skipInitialAdmissionRecord: alreadyAdmitted
+                skipInitialAdmissionRecord: alreadyAdmitted,
+                searchThrottleKey: searchThrottleKey(for: queryText)
             ) {
                 // A newer load, cancellation, or a permission denial owns the board now.
                 guard loadState.isCurrent(generation: generation), !Task.isCancelled else { return }

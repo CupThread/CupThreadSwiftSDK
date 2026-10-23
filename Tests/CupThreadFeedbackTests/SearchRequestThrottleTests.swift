@@ -355,6 +355,30 @@ struct SearchRequestThrottleTests {
         #expect(await throttle.admittedCount == 3, "3 query pages fetched must record exactly 3 times in the throttle")
     }
 
+    /// Issue #529: the fresh-surface recovery clears the duplicate gate, so
+    /// the load must record the key it actually fetched. Otherwise the next
+    /// identical search is admitted instead of skipped.
+    @Test func roadmapPaginationRecordsTheSearchKeyForDuplicateSuppression() async throws {
+        let (throttle, _) = makeThrottle()
+        let host = "test-roadmap-key.example.com"
+        MockURLProtocol.setHandler(forHost: host, Self.makeThreePageMockHandler())
+
+        let client = makeClient(
+            baseURL: URL(string: "https://\(host)")!,
+            searchThrottle: throttle
+        )
+
+        let result = try await loadRoadmapGroups(
+            client: client,
+            userToken: "tok",
+            query: "swift",
+            config: nil,
+            searchThrottleKey: "roadmap|swift"
+        )
+        #expect(result != nil)
+        #expect(await throttle.isDuplicateKey("roadmap|swift"))
+    }
+
     @Test func emptyQueryLoadsRecordNothingInThrottle() async throws {
         let (throttle, _) = makeThrottle()
         let host = "test-empty-query.example.com"

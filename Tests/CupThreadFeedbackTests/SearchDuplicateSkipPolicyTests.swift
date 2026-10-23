@@ -231,6 +231,12 @@ struct DuplicateSkipRecoveryWiringTests {
         #expect(branch.contains("recoversFromDuplicateSkip(verdict)"))
         #expect(branch.contains("await loadFeatureRequests()"))
         #expect(content.contains("executedFilterKey: filterKey"))
+
+        // A cancelled replacing load reached no verdict: it must not apply
+        // its page (or record a query/key) when the replacement has not yet
+        // bumped the generation.
+        let load = try Self.functionBody(named: "func loadFeatureRequests(", in: content)
+        #expect(load.contains("guard loadGeneration == generationAtStart, !Task.isCancelled else { return }"))
     }
 
     @Test func roadmapBoardViewRecoversFreshSurfaceDuplicates() throws {

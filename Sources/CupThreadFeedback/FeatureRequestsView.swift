@@ -571,8 +571,11 @@ private extension FeatureRequestsView {
             )
             // A newer replacing load (search/version change, pull-to-refresh)
             // superseded this one — applying its page would render the older
-            // filter's results.
-            guard loadGeneration == generationAtStart else { return }
+            // filter's results. A cancelled load reached no verdict either:
+            // the replacement may not have called `startLoading()` yet, so the
+            // generation check alone can pass for a dismissed or superseded
+            // task.
+            guard loadGeneration == generationAtStart, !Task.isCancelled else { return }
             hasEmittedAdmissionNotice = false
             listState.applyPage(
                 result,
