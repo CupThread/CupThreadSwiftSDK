@@ -6,7 +6,10 @@ import Testing
 
 @Suite("UserProfileModels")
 struct UserProfileModelsTests {
-    @Test func userProfileDecodesWithAllFields() throws {
+    @Test func userProfileDecodesCorrectedShapeAndIgnoresRetiredFields() throws {
+        // `hideComments` and `updatedAt` are not part of the corrected
+        // `UserProfile` component (#505); a payload that still carries them
+        // must not resurrect them.
         let json = Data("""
         {
             "clerkUserId": "user_123",
@@ -14,7 +17,7 @@ struct UserProfileModelsTests {
             "avatarUrl": "https://example.com/avatar.png",
             "bio": "Developer",
             "websiteUrl": "https://example.com",
-            "hideComments": false,
+            "hideComments": true,
             "createdAt": "2026-01-01T00:00:00.000Z",
             "updatedAt": "2026-01-02T00:00:00.000Z"
         }
@@ -26,15 +29,34 @@ struct UserProfileModelsTests {
         #expect(profile.avatarUrl == "https://example.com/avatar.png")
         #expect(profile.bio == "Developer")
         #expect(profile.websiteUrl == "https://example.com")
-        #expect(profile.hideComments == false)
         #expect(profile.createdAt == "2026-01-01T00:00:00.000Z")
-        #expect(profile.updatedAt == "2026-01-02T00:00:00.000Z")
+        #expect(profile.hideComments == false)
+        #expect(profile.updatedAt == nil)
     }
 
-    @Test func userProfileDecodesWithRequiredFieldsOnly() throws {
+    @Test func userProfileRequiresTheSixDocumentedKeys() {
+        // The corrected `UserProfile` component marks all six keys
+        // required; an absent key is contract drift (issue #505).
         let json = Data("""
         {
             "clerkUserId": "user_456"
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(UserProfile.self, from: json)
+        }
+    }
+
+    @Test func userProfileAcceptsNullForNullableKeys() throws {
+        let json = Data("""
+        {
+            "clerkUserId": "user_456",
+            "displayName": null,
+            "avatarUrl": null,
+            "bio": null,
+            "websiteUrl": null,
+            "createdAt": "2026-01-01T00:00:00.000Z"
         }
         """.utf8)
 
@@ -44,9 +66,17 @@ struct UserProfileModelsTests {
         #expect(profile.avatarUrl == nil)
         #expect(profile.bio == nil)
         #expect(profile.websiteUrl == nil)
-        #expect(profile.hideComments == false)
-        #expect(profile.createdAt == nil)
-        #expect(profile.updatedAt == nil)
+        #expect(profile.createdAt == "2026-01-01T00:00:00.000Z")
+    }
+
+    @Test func userProfileRefusesToEncodeWithoutCreatedAt() {
+        // Encoding a profile with no timestamp would emit JSON null, which
+        // the corrected decoder rejects; fail at encode instead (issue #505).
+        let profile = UserProfile(clerkUserId: "user_789")
+
+        #expect(throws: EncodingError.self) {
+            _ = try JSONEncoder().encode(profile)
+        }
     }
 
     @Test func userProfileDecodesFromAuthoritativeBackendShapeWithoutHideCommentsAndUpdatedAt() throws {
@@ -122,9 +152,9 @@ struct UserProfileModelsTests {
         #expect(response.profile.hideComments == false)
         #expect(response.hideComments == false)
 
-        #expect(response.apps.count == 1)
         #expect(response.publicApps.count == 1)
-        let app = response.apps[0]
+        #expect(response.apps == response.publicApps)
+        let app = response.publicApps[0]
         #expect(app.id == "app-1")
         #expect(app.slug == "app-one")
         #expect(app.appSlug == "app-one")
@@ -141,60 +171,103 @@ struct UserProfileModelsTests {
         #expect(comment.appName == "App One")
     }
 
-    @Test func publicUserProfileResponseDecodesLegacyShape() throws {
+    @Test func publicUserProfileResponseRejectsThePhantomAppsKey() {
+        // The server has always served `publicApps`; the documented `apps`
+        // key was the spec defect this issue corrected (#505). A payload
+        // that still uses it must fail loudly instead of rendering an empty
+        // profile.
         let json = Data("""
         {
             "profile": {
                 "clerkUserId": "user_2",
+                "displayName": null,
+                "avatarUrl": null,
+                "bio": null,
+                "websiteUrl": null,
+                "createdAt": "2026-01-01T00:00:00.000Z",
                 "hideComments": true
             },
-            "apps": [
-                {
-                    "id": "app-2",
-                    "name": "App Two",
-                    "slug": "app-two",
-                    "requestCount": 12
-                }
-            ],
+            "apps": [],
             "recentComments": [],
             "hideComments": true
         }
         """.utf8)
 
-        let response = try JSONDecoder().decode(PublicUserProfileResponse.self, from: json)
-        #expect(response.profile.clerkUserId == "user_2")
-        #expect(response.apps.count == 1)
-        #expect(response.apps[0].slug == "app-two")
-        #expect(response.apps[0].requestCount == 12)
-        #expect(response.hideComments == true)
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(PublicUserProfileResponse.self, from: json)
+        }
     }
 
-    @Test func publicUserProfileResponseEncodesCanonicalKeyWithoutDuplicateApps() throws {
+    @Test func publicUserProfileResponseRequiresRecentComments() {
+        // `recentComments` is always emitted, even when the user hides
+        // comments; treating it as optional hides contract drift (#505).
+        let json = Data("""
+        {
+            "profile": {
+                "clerkUserId": "user_2",
+                "displayName": null,
+                "avatarUrl": null,
+                "bio": null,
+                "websiteUrl": null,
+                "createdAt": "2026-01-01T00:00:00.000Z"
+            },
+            "publicApps": []
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(PublicUserProfileResponse.self, from: json)
+        }
+    }
+
+    @Test func publicUserProfileResponseEncodesOnlyTheCorrectedKeys() throws {
         let profile = UserProfile(
             clerkUserId: "u1",
             displayName: "Alice",
             avatarUrl: nil,
             bio: nil,
             websiteUrl: nil,
-            hideComments: false
+            hideComments: false,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-02T00:00:00.000Z"
         )
         let app = PublicAppSummary(
             id: "app1",
             name: "Demo",
             slug: "demo"
         )
+        let comment = UserProfileComment(
+            id: "c1",
+            body: "Hello",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            featureRequestId: "fr1",
+            featureRequestTitle: "Feature",
+            appId: "retired-app-id",
+            appName: "Demo",
+            workspaceSlug: "ws",
+            appSlug: "demo"
+        )
         let response = PublicUserProfileResponse(
             profile: profile,
             apps: [app],
-            recentComments: [],
-            hideComments: false
+            recentComments: [comment],
+            hideComments: true
         )
 
         let data = try JSONEncoder().encode(response)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let encodedProfile = json?["profile"] as? [String: Any]
+        let encodedComments = json?["recentComments"] as? [[String: Any]]
+        let encodedApps = json?["publicApps"] as? [[String: Any]]
 
         #expect(json?["publicApps"] != nil)
-        #expect(json?["apps"] == nil, "Legacy fallback key 'apps' should not be redundantly encoded")
+        #expect(json?["apps"] == nil, "Legacy fallback key 'apps' should not be encoded")
+        #expect(json?["hideComments"] == nil, "Retired top-level hideComments should not be encoded")
+        #expect(encodedProfile?["hideComments"] == nil)
+        #expect(encodedProfile?["updatedAt"] == nil)
+        #expect(encodedComments?.first?["appId"] == nil)
+        #expect(encodedApps?.first?["slug"] == nil, "The phantom 'slug' key should not be encoded")
+        #expect(encodedApps?.first?["requestCount"] == nil)
 
         let decoded = try JSONDecoder().decode(PublicUserProfileResponse.self, from: data)
         #expect(decoded == response)
@@ -207,7 +280,9 @@ struct UserProfileModelsTests {
             "name": "App Three",
             "appSlug": "app-three",
             "workspaceSlug": "ws-3",
-            "workspaceName": "Workspace Three"
+            "workspaceName": "Workspace Three",
+            "description": null,
+            "iconUrl": null
         }
         """.utf8)
 
@@ -219,6 +294,61 @@ struct UserProfileModelsTests {
         #expect(app.workspaceSlug == "ws-3")
         #expect(app.workspaceName == "Workspace Three")
         #expect(app.requestCount == nil)
+    }
+
+    @Test func publicAppSummaryRequiresAppSlug() {
+        // The profile endpoint has always served `appSlug`; the documented
+        // `slug` name belonged to the showcase item, not this component.
+        let json = Data("""
+        {
+            "id": "app-4",
+            "name": "App Four",
+            "slug": "app-four",
+            "workspaceSlug": "ws-4",
+            "workspaceName": "Workspace Four",
+            "description": null,
+            "iconUrl": null
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(PublicAppSummary.self, from: json)
+        }
+    }
+
+    @Test func publicAppSummaryRequiresEveryComponentKey() {
+        // All seven `PublicUserProfileApp` keys are required; the nullable
+        // ones may be null but must be present (issue #505).
+        let json = Data("""
+        {
+            "id": "app-5",
+            "name": "App Five",
+            "appSlug": "app-five",
+            "workspaceSlug": "ws-5",
+            "workspaceName": "Workspace Five"
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(PublicAppSummary.self, from: json)
+        }
+    }
+
+    @Test func userProfileCommentRequiresWorkspaceAndAppSlugs() {
+        let json = Data("""
+        {
+            "id": "c-3",
+            "body": "Missing scoping slugs",
+            "createdAt": "2026-01-02T00:00:00.000Z",
+            "featureRequestId": "fr-3",
+            "featureRequestTitle": "FR 3",
+            "appName": "App Three"
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(UserProfileComment.self, from: json)
+        }
     }
 
     @Test func userProfileCommentDecodesWithoutAppId() throws {
@@ -241,5 +371,22 @@ struct UserProfileModelsTests {
         #expect(comment.workspaceSlug == "ws-2")
         #expect(comment.appSlug == "app-two")
         #expect(comment.appName == "App Two")
+    }
+
+    @Test func userProfileCommentRefusesToEncodeWithoutSlugs() {
+        // Encoding without either required slug would omit a key the
+        // corrected decoder requires; fail at encode instead (issue #505).
+        let comment = UserProfileComment(
+            id: "c-4",
+            body: "Missing slugs",
+            createdAt: "2026-01-02T00:00:00.000Z",
+            featureRequestId: "fr-4",
+            featureRequestTitle: "FR 4",
+            appName: "App Four"
+        )
+
+        #expect(throws: EncodingError.self) {
+            _ = try JSONEncoder().encode(comment)
+        }
     }
 }

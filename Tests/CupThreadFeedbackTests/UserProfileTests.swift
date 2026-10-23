@@ -4,6 +4,19 @@ import Testing
 
 // MARK: - UserProfileClientTests
 
+/// The corrected `UserProfile` component: all six keys are present and
+/// nullable ones are explicit nulls (issue #505).
+private func makeProfileJSON(identifier: String) -> [String: Any] {
+    [
+        "clerkUserId": identifier,
+        "displayName": NSNull(),
+        "avatarUrl": NSNull(),
+        "bio": NSNull(),
+        "websiteUrl": NSNull(),
+        "createdAt": "2026-01-01T00:00:00.000Z"
+    ]
+}
+
 @Suite("UserProfileClient", .serialized)
 struct UserProfileClientTests {
     static let apiHost = "profiles.example.com"
@@ -36,7 +49,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request.url
             let body: [String: Any] = [
-                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": makeProfileJSON(identifier: Self.profileID),
                 "publicApps": [],
                 "recentComments": []
             ]
@@ -58,7 +71,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request.url
             let body: [String: Any] = [
-                "profile": ["clerkUserId": appScopedID, "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": makeProfileJSON(identifier: appScopedID),
                 "publicApps": [],
                 "recentComments": []
             ]
@@ -84,7 +97,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request.url
             let body: [String: Any] = [
-                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": makeProfileJSON(identifier: Self.profileID),
                 "publicApps": [],
                 "recentComments": []
             ]
@@ -145,7 +158,8 @@ struct UserProfileClientTests {
                         "workspaceName": "Alpha",
                         "appSlug": "alpha-app",
                         "name": "Alpha App",
-                        "description": "Description"
+                        "description": "Description",
+                        "iconUrl": NSNull()
                     ]
                 ],
                 "recentComments": [
@@ -166,12 +180,15 @@ struct UserProfileClientTests {
 
         let response = try await Self.makeAPIClient().fetchUserProfile(userId: Self.authoritativeID)
         #expect(response.profile.clerkUserId == Self.authoritativeID)
-        #expect(response.apps.count == 1)
-        #expect(response.apps[0].slug == "alpha-app")
-        #expect(response.apps[0].workspaceSlug == "ws-alpha")
+        #expect(response.publicApps.count == 1)
+        #expect(response.publicApps[0].appSlug == "alpha-app")
+        #expect(response.publicApps[0].workspaceSlug == "ws-alpha")
+        #expect(response.publicApps[0].workspaceName == "Alpha")
+        #expect(response.publicApps[0].slug == "alpha-app")
         #expect(response.recentComments.count == 1)
         #expect(response.recentComments[0].appId == nil)
         #expect(response.recentComments[0].workspaceSlug == "ws-alpha")
+        #expect(response.recentComments[0].appSlug == "alpha-app")
     }
 
     @Test func fetchUserProfileThrowsUserProfileNotFoundOnEnvelope404() async throws {
@@ -302,7 +319,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             let body: [String: Any] = [
-                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": makeProfileJSON(identifier: Self.profileID),
                 "publicApps": [],
                 "recentComments": []
             ]
@@ -323,7 +340,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             let body: [String: Any] = [
-                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": makeProfileJSON(identifier: Self.profileID),
                 "publicApps": [],
                 "recentComments": []
             ]
@@ -342,7 +359,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             let body: [String: Any] = [
-                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": makeProfileJSON(identifier: Self.profileID),
                 "publicApps": [],
                 "recentComments": []
             ]

@@ -22,14 +22,20 @@ public struct UserProfile: Codable, Equatable, Sendable {
     public let bio: String?
     /// Personal or project website URL, when set.
     public let websiteUrl: String?
-    /// Whether the user has chosen to hide their comment history.
-    public let hideComments: Bool
-    /// ISO-8601 account creation timestamp.
+    /// Retired: the corrected public profile payload never carries this key
+    /// (comment visibility is applied server-side). Kept for source
+    /// compatibility and always `false` (issue #505).
+    public var hideComments: Bool { false }
+    /// ISO-8601 account creation timestamp, when served.
     public let createdAt: String?
-    /// ISO-8601 last-update timestamp.
-    public let updatedAt: String?
+    /// Retired: the corrected public profile payload never carries this key.
+    /// Kept for source compatibility and always `nil` (issue #505).
+    public var updatedAt: String? { nil }
 
     /// Creates a new user profile instance.
+    ///
+    /// `hideComments` and `updatedAt` are accepted but ignored: the corrected
+    /// `UserProfile` component has only the six documented keys (issue #505).
     public init(
         clerkUserId: String,
         displayName: String? = nil,
@@ -45,25 +51,47 @@ public struct UserProfile: Codable, Equatable, Sendable {
         self.avatarUrl = avatarUrl
         self.bio = bio
         self.websiteUrl = websiteUrl
-        self.hideComments = hideComments
         self.createdAt = createdAt
-        self.updatedAt = updatedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case clerkUserId, displayName, avatarUrl, bio, websiteUrl, hideComments, createdAt, updatedAt
+        case clerkUserId, displayName, avatarUrl, bio, websiteUrl, createdAt
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        // All six keys are required by the corrected component; the four
+        // nullable ones accept an explicit null but not an absent key
+        // (issue #505).
         clerkUserId = try container.decode(String.self, forKey: .clerkUserId)
-        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
-        avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
-        bio = try container.decodeIfPresent(String.self, forKey: .bio)
-        websiteUrl = try container.decodeIfPresent(String.self, forKey: .websiteUrl)
-        hideComments = try container.decodeIfPresent(Bool.self, forKey: .hideComments) ?? false
-        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
-        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        displayName = try container.decode(String?.self, forKey: .displayName)
+        avatarUrl = try container.decode(String?.self, forKey: .avatarUrl)
+        bio = try container.decode(String?.self, forKey: .bio)
+        websiteUrl = try container.decode(String?.self, forKey: .websiteUrl)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        // Write required-nullable keys as explicit nulls so a round trip
+        // produces a payload the corrected decoder accepts (issue #505).
+        try container.encode(clerkUserId, forKey: .clerkUserId)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(avatarUrl, forKey: .avatarUrl)
+        try container.encode(bio, forKey: .bio)
+        try container.encode(websiteUrl, forKey: .websiteUrl)
+        guard let createdAt else {
+            // The contract requires a non-null timestamp, so emitting null
+            // would create a payload this model cannot decode.
+            throw EncodingError.invalidValue(
+                self,
+                EncodingError.Context(
+                    codingPath: container.codingPath + [CodingKeys.createdAt],
+                    debugDescription: "UserProfile.createdAt is required by the public profile contract"
+                )
+            )
+        }
+        try container.encode(createdAt, forKey: .createdAt)
     }
 }
 
@@ -81,16 +109,26 @@ public struct UserProfileComment: Codable, Equatable, Identifiable, Sendable {
     public let featureRequestId: String
     /// Title of the feature request the comment belongs to.
     public let featureRequestTitle: String
-    /// App id the feature request belongs to, when available.
-    public let appId: String?
+    /// Retired: the corrected profile comment never carries an app id. Kept
+    /// for source compatibility and always `nil` (issue #505).
+    public var appId: String? { nil }
     /// App name the feature request belongs to.
     public let appName: String
-    /// Workspace slug the feature request belongs to, when available.
+    /// Workspace slug the feature request belongs to.
+    ///
+    /// Required on the corrected wire; optional here so existing callers
+    /// that read it as an optional keep compiling (issue #505).
     public let workspaceSlug: String?
-    /// App slug the feature request belongs to, when available.
+    /// App slug the feature request belongs to.
+    ///
+    /// Required on the corrected wire; optional here so existing callers
+    /// that read it as an optional keep compiling (issue #505).
     public let appSlug: String?
 
     /// Creates a new user profile comment instance.
+    ///
+    /// `appId` is accepted but ignored: the corrected profile comment has no
+    /// app id (issue #505).
     public init(
         id: String,
         body: String,
@@ -107,14 +145,13 @@ public struct UserProfileComment: Codable, Equatable, Identifiable, Sendable {
         self.createdAt = createdAt
         self.featureRequestId = featureRequestId
         self.featureRequestTitle = featureRequestTitle
-        self.appId = appId
         self.appName = appName
         self.workspaceSlug = workspaceSlug
         self.appSlug = appSlug
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, body, createdAt, featureRequestId, featureRequestTitle, appId, appName, workspaceSlug, appSlug
+        case id, body, createdAt, featureRequestId, featureRequestTitle, appName, workspaceSlug, appSlug
     }
 
     public init(from decoder: Decoder) throws {
@@ -124,10 +161,41 @@ public struct UserProfileComment: Codable, Equatable, Identifiable, Sendable {
         createdAt = try container.decode(String.self, forKey: .createdAt)
         featureRequestId = try container.decode(String.self, forKey: .featureRequestId)
         featureRequestTitle = try container.decode(String.self, forKey: .featureRequestTitle)
-        appId = try container.decodeIfPresent(String.self, forKey: .appId)
         appName = try container.decode(String.self, forKey: .appName)
-        workspaceSlug = try container.decodeIfPresent(String.self, forKey: .workspaceSlug)
-        appSlug = try container.decodeIfPresent(String.self, forKey: .appSlug)
+        // Required on the corrected wire: a missing slug is contract drift,
+        // so surface it instead of decoding a silently unscoped comment.
+        workspaceSlug = try container.decode(String.self, forKey: .workspaceSlug)
+        appSlug = try container.decode(String.self, forKey: .appSlug)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(body, forKey: .body)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(featureRequestId, forKey: .featureRequestId)
+        try container.encode(featureRequestTitle, forKey: .featureRequestTitle)
+        try container.encode(appName, forKey: .appName)
+        guard let workspaceSlug else {
+            throw EncodingError.invalidValue(
+                self,
+                EncodingError.Context(
+                    codingPath: container.codingPath + [CodingKeys.workspaceSlug],
+                    debugDescription: "UserProfileComment.workspaceSlug is required by the public profile contract"
+                )
+            )
+        }
+        try container.encode(workspaceSlug, forKey: .workspaceSlug)
+        guard let appSlug else {
+            throw EncodingError.invalidValue(
+                self,
+                EncodingError.Context(
+                    codingPath: container.codingPath + [CodingKeys.appSlug],
+                    debugDescription: "UserProfileComment.appSlug is required by the public profile contract"
+                )
+            )
+        }
+        try container.encode(appSlug, forKey: .appSlug)
     }
 }
 
@@ -148,15 +216,23 @@ public struct PublicUserProfileResponse: Codable, Equatable, Sendable {
     /// The user's public profile.
     public let profile: UserProfile
     /// Public apps associated with this user.
-    public let apps: [PublicAppSummary]
-    /// Alias for ``apps`` matching the backend's `publicApps` field name.
-    public var publicApps: [PublicAppSummary] { apps }
+    ///
+    /// The corrected `PublicUserProfileResponse` serves this collection as a
+    /// required `publicApps` array (issue #505).
+    public let publicApps: [PublicAppSummary]
+    /// Legacy alias for ``publicApps``.
+    public var apps: [PublicAppSummary] { publicApps }
     /// Recent public comments by this user.
+    ///
+    /// Always served; a user who hides comments receives an empty array.
     public let recentComments: [UserProfileComment]
-    /// Whether the user has chosen to hide their comment history.
-    public let hideComments: Bool
+    /// Retired: the corrected payload never carries this key; comment
+    /// visibility is applied server-side. Kept for source compatibility and
+    /// always `false` (issue #505).
+    public var hideComments: Bool { false }
 
-    /// Creates a new user profile response instance.
+    /// Creates a new user profile response instance using the legacy `apps`
+    /// label. `hideComments` is accepted but ignored (issue #505).
     public init(
         profile: UserProfile,
         apps: [PublicAppSummary] = [],
@@ -164,58 +240,73 @@ public struct PublicUserProfileResponse: Codable, Equatable, Sendable {
         hideComments: Bool? = nil
     ) {
         self.profile = profile
-        self.apps = apps
+        self.publicApps = apps
         self.recentComments = recentComments
-        self.hideComments = hideComments ?? profile.hideComments
+    }
+
+    /// Creates a new user profile response instance using the corrected
+    /// `publicApps` label.
+    public init(
+        profile: UserProfile,
+        publicApps: [PublicAppSummary],
+        recentComments: [UserProfileComment] = []
+    ) {
+        self.profile = profile
+        self.publicApps = publicApps
+        self.recentComments = recentComments
     }
 
     private enum CodingKeys: String, CodingKey {
-        case profile, publicApps, apps, recentComments, hideComments
+        case profile, publicApps, recentComments
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         profile = try container.decode(UserProfile.self, forKey: .profile)
-        apps = try container.decodeIfPresent([PublicAppSummary].self, forKey: .publicApps)
-            ?? (try container.decodeIfPresent([PublicAppSummary].self, forKey: .apps))
-            ?? []
-        recentComments = try container.decodeIfPresent([UserProfileComment].self, forKey: .recentComments) ?? []
-        hideComments = try container.decodeIfPresent(Bool.self, forKey: .hideComments) ?? profile.hideComments
+        // Required on the corrected wire: a renamed or dropped collection is
+        // contract drift, not an empty profile (#505).
+        publicApps = try container.decode([PublicAppSummary].self, forKey: .publicApps)
+        recentComments = try container.decode([UserProfileComment].self, forKey: .recentComments)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(profile, forKey: .profile)
-        try container.encode(apps, forKey: .publicApps)
+        try container.encode(publicApps, forKey: .publicApps)
         try container.encode(recentComments, forKey: .recentComments)
-        try container.encode(hideComments, forKey: .hideComments)
     }
 }
 
 // MARK: - Public app summary
 
-/// Summary of a public app, as returned in user profile or showcase responses.
+/// Summary of a public app, as returned in a user profile's `publicApps`.
+///
+/// Mirrors the corrected `PublicUserProfileApp` component (issue #505):
+/// `id`, `workspaceSlug`, `workspaceName`, `appSlug`, `name`, and nullable
+/// `description`/`iconUrl`.
 public struct PublicAppSummary: Codable, Equatable, Identifiable, Sendable {
     /// App id.
     public let id: String
     /// App display name.
     public let name: String
-    /// URL-safe slug.
-    public let slug: String
-    /// App URL slug alias for ``slug``.
-    public var appSlug: String { slug }
+    /// URL-safe app slug (the corrected `PublicUserProfileApp.appSlug`).
+    public let appSlug: String
+    /// Legacy alias for ``appSlug``.
+    public var slug: String { appSlug }
     /// App icon URL, when set.
     public let iconUrl: String?
     /// App description, when set.
     public let description: String?
-    /// Total feature request count, when available.
-    public let requestCount: Int?
+    /// Retired: not part of the corrected `PublicUserProfileApp` component.
+    /// Kept for source compatibility and always `nil` (issue #505).
+    public var requestCount: Int? { nil }
     /// Workspace slug the app belongs to, when present.
     public let workspaceSlug: String?
     /// Workspace display name, when present.
     public let workspaceName: String?
 
-    /// Creates a new public app summary instance.
+    /// Creates a new public app summary instance using the legacy `slug`
+    /// label. `requestCount` is accepted but ignored (issue #505).
     public init(
         id: String,
         name: String,
@@ -226,44 +317,71 @@ public struct PublicAppSummary: Codable, Equatable, Identifiable, Sendable {
         workspaceSlug: String? = nil,
         workspaceName: String? = nil
     ) {
+        self.init(
+            id: id,
+            name: name,
+            appSlug: slug,
+            iconUrl: iconUrl,
+            description: description,
+            workspaceSlug: workspaceSlug,
+            workspaceName: workspaceName
+        )
+    }
+
+    /// Creates a new public app summary instance using the corrected
+    /// `appSlug` label.
+    public init(
+        id: String,
+        name: String,
+        appSlug: String,
+        iconUrl: String? = nil,
+        description: String? = nil,
+        workspaceSlug: String? = nil,
+        workspaceName: String? = nil
+    ) {
         self.id = id
         self.name = name
-        self.slug = slug
+        self.appSlug = appSlug
         self.iconUrl = iconUrl
         self.description = description
-        self.requestCount = requestCount
         self.workspaceSlug = workspaceSlug
         self.workspaceName = workspaceName
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, slug, appSlug, iconUrl, description, requestCount, workspaceSlug, workspaceName
+        case id, name, appSlug, iconUrl, description, workspaceSlug, workspaceName
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
-        slug = try container.decodeIfPresent(String.self, forKey: .appSlug)
-            ?? (try container.decodeIfPresent(String.self, forKey: .slug))
-            ?? ""
-        iconUrl = try container.decodeIfPresent(String.self, forKey: .iconUrl)
-        description = try container.decodeIfPresent(String.self, forKey: .description)
-        requestCount = try container.decodeIfPresent(Int.self, forKey: .requestCount)
-        workspaceSlug = try container.decodeIfPresent(String.self, forKey: .workspaceSlug)
-        workspaceName = try container.decodeIfPresent(String.self, forKey: .workspaceName)
+        // Required on the corrected wire: the phantom `slug` key was never
+        // served, so accepting it would let a stale payload decode with an
+        // empty slug (#505).
+        appSlug = try container.decode(String.self, forKey: .appSlug)
+        // All seven keys are required by `PublicUserProfileApp`; nullable
+        // values accept an explicit null (issue #505).
+        iconUrl = try container.decode(String?.self, forKey: .iconUrl)
+        description = try container.decode(String?.self, forKey: .description)
+        workspaceSlug = try container.decode(String?.self, forKey: .workspaceSlug)
+        workspaceName = try container.decode(String?.self, forKey: .workspaceName)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
-        try container.encode(slug, forKey: .slug)
-        try container.encode(slug, forKey: .appSlug)
-        try container.encodeIfPresent(iconUrl, forKey: .iconUrl)
-        try container.encodeIfPresent(description, forKey: .description)
-        try container.encodeIfPresent(requestCount, forKey: .requestCount)
-        try container.encodeIfPresent(workspaceSlug, forKey: .workspaceSlug)
-        try container.encodeIfPresent(workspaceName, forKey: .workspaceName)
+        try container.encode(appSlug, forKey: .appSlug)
+        // Preserve required-nullable keys as explicit nulls on round trip.
+        try container.encode(iconUrl, forKey: .iconUrl)
+        try container.encode(description, forKey: .description)
+        try container.encode(workspaceSlug, forKey: .workspaceSlug)
+        try container.encode(workspaceName, forKey: .workspaceName)
     }
 }
+
+/// The corrected `PublicUserProfileApp` component served in a profile's
+/// `publicApps` array. ``PublicAppSummary`` is the historical name for the
+/// same shape (issue #505).
+public typealias PublicUserProfileApp = PublicAppSummary

@@ -605,7 +605,14 @@ struct PseudonymousUserIdentifiersTests {
         MockURLProtocol.setHandler(forHost: "priv06.example.com") { request in
             capture.value = request.url
             return (makeHTTPResponse(), try encodeJSON([
-                "profile": ["clerkUserId": Self.resolvablePseudonym, "displayName": NSNull()],
+                "profile": [
+                    "clerkUserId": Self.resolvablePseudonym,
+                    "displayName": NSNull(),
+                    "avatarUrl": NSNull(),
+                    "bio": NSNull(),
+                    "websiteUrl": NSNull(),
+                    "createdAt": "2026-01-01T00:00:00.000Z"
+                ],
                 "publicApps": [],
                 "recentComments": []
             ]))
@@ -625,7 +632,11 @@ struct PseudonymousUserIdentifiersTests {
         {
             "profile": {
                 "clerkUserId": "u_cafef00d",
-                "displayName": null
+                "displayName": null,
+                "avatarUrl": null,
+                "bio": null,
+                "websiteUrl": null,
+                "createdAt": "2026-01-01T00:00:00.000Z"
             },
             "publicApps": [],
             "recentComments": []
@@ -637,6 +648,8 @@ struct PseudonymousUserIdentifiersTests {
         #expect(response.profile.displayName == nil)
         #expect(response.publicApps.isEmpty)
         #expect(response.recentComments.isEmpty)
+        // `hideComments` is retired; the server expresses the opt-out by
+        // serving an empty `recentComments` array (#505).
         #expect(response.hideComments == false)
     }
 
