@@ -173,6 +173,17 @@ struct FeatureRequestsServerRejectionTests {
         #expect(sequence.requestCount == 2)
     }
 
+    @Test @MainActor func listPermissionFailureRecordsTheRejection() async {
+        let latch = ServerRejectionLatch()
+        let view = makeView(latch)
+
+        await view.handleLoadFailureForTesting(FeedbackClientError.authenticationRequired)
+
+        #expect(latch.isRejected)
+        #expect(view.isRoadmapPermissionBlocked)
+        #expect(viewTreeContains(view.body, SdkPermissionDeniedView.self))
+    }
+
     // MARK: - Retry affordance
 
     @Test @MainActor func retryIsOfferedOnlyForAServerRejectionUnderAPermittedPreflight() {

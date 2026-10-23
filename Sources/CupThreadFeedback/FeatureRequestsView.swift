@@ -770,4 +770,12 @@ extension FeatureRequestsView {
     func loadFeatureRequestsForTesting() async {
         await loadFeatureRequests()
     }
+
+    /// Drives the list failure branch from view-level tests. `loadGeneration`
+    /// never advances outside a SwiftUI hierarchy, so its initial value is
+    /// the generation the load path would have recorded.
+    @MainActor
+    func handleLoadFailureForTesting(_ error: Error) async {
+        await handleLoadFailure(error, generation: loadGeneration)
+    }
 }
