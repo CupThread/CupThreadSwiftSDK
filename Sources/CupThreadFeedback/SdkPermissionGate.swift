@@ -240,14 +240,35 @@ struct SdkPermissionDeniedView: View {
     let titleKey: String
     let descriptionKey: String
     var systemImage: String = "lock.circle"
+    /// Retries a load the server rejected. `nil` hides the control: a
+    /// client-side preflight denial cannot be resolved by another request.
+    var retryAction: (@MainActor () async -> Void)?
 
     var body: some View {
         ContentUnavailableView {
             Label(CupThreadStrings.tr(titleKey), systemImage: systemImage)
         } description: {
             Text(CupThreadStrings.tr(descriptionKey))
+        } actions: {
+            if let retryAction {
+                PermissionRetryButton(action: retryAction)
+            }
         }
         .padding()
         .accessibilityIdentifier("cupthread.permission.denied")
+    }
+}
+
+/// Retry control for a permission placeholder whose verdict can change after
+/// a fresh request (BUG-42, issue #523).
+struct PermissionRetryButton: View {
+    let action: @MainActor () async -> Void
+
+    var body: some View {
+        Button(CupThreadStrings.tr("cupthread.error.try_again")) {
+            Task { await action() }
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityIdentifier("cupthread.permission.retry")
     }
 }
