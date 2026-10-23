@@ -64,6 +64,36 @@ struct CommentModelsTests {
         #expect(comment.createdAt == "2026-01-01T00:00:00.000Z")
     }
 
+    @Test func featureRequestCommentDecodesServedRecordWithAppIdAndUpdatedAt() throws {
+        // The public comment record the server serves (#508): it carries the
+        // owning appId and an updatedAt, and never an author email.
+        let json = Data("""
+        {
+            "id": "c-1",
+            "featureRequestId": "fr-1",
+            "appId": "app-1",
+            "authorClerkId": "u_ab12cd34ef567890abcdef1234567890",
+            "authorName": "Lex",
+            "authorAvatarUrl": "https://example.com/avatar.png",
+            "body": "This is a comment",
+            "parentId": null,
+            "replyToClerkId": null,
+            "replyToAuthorName": null,
+            "isHidden": false,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-02T00:00:00.000Z"
+        }
+        """.utf8)
+
+        let comment = try JSONDecoder().decode(FeatureRequestComment.self, from: json)
+        #expect(comment.id == "c-1")
+        #expect(comment.appId == "app-1")
+        #expect(comment.authorName == "Lex")
+        #expect(comment.authorEmail == nil)
+        #expect(comment.isHidden == false)
+        #expect(comment.updatedAt == "2026-01-02T00:00:00.000Z")
+    }
+
     @Test func commentDraftDefaultValues() {
         let draft = CommentDraft()
         #expect(draft.body.isEmpty)

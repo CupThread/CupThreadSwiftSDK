@@ -12,9 +12,18 @@ public struct FeatureRequestComment: Codable, Identifiable, Equatable, Sendable 
     public let id: String
     /// The feature request this comment belongs to.
     public let featureRequestId: String
+    /// The app the comment belongs to, when served.
+    ///
+    /// The public comment record carries the owning app's id; older
+    /// deployments omitted it, so it stays optional here.
+    public let appId: String?
     /// Display name of the comment author, when given.
     public let authorName: String?
     /// Email of the comment author, when given.
+    ///
+    /// Retained for source compatibility only: no public comment path ever
+    /// emits an author email (SEC author identity is always derived
+    /// server-side), so this decodes as `nil` against the served payload.
     public let authorEmail: String?
     /// Avatar URL of the comment author, when given.
     public let authorAvatarUrl: String?
@@ -35,11 +44,17 @@ public struct FeatureRequestComment: Codable, Identifiable, Equatable, Sendable 
     public let isHidden: Bool?
     /// ISO-8601 creation timestamp as reported by the server.
     public let createdAt: String
+    /// ISO-8601 last-update timestamp as reported by the server, when served.
+    ///
+    /// The public comment record carries it; older deployments omitted it,
+    /// so it stays optional here.
+    public let updatedAt: String?
 
     /// Creates a comment item.
     public init(
         id: String,
         featureRequestId: String,
+        appId: String? = nil,
         authorName: String? = nil,
         authorEmail: String? = nil,
         authorAvatarUrl: String? = nil,
@@ -49,10 +64,12 @@ public struct FeatureRequestComment: Codable, Identifiable, Equatable, Sendable 
         replyToClerkId: String? = nil,
         replyToAuthorName: String? = nil,
         isHidden: Bool? = nil,
-        createdAt: String
+        createdAt: String,
+        updatedAt: String? = nil
     ) {
         self.id = id
         self.featureRequestId = featureRequestId
+        self.appId = appId
         self.authorName = authorName
         self.authorEmail = authorEmail
         self.authorAvatarUrl = authorAvatarUrl
@@ -63,6 +80,7 @@ public struct FeatureRequestComment: Codable, Identifiable, Equatable, Sendable 
         self.replyToAuthorName = replyToAuthorName
         self.isHidden = isHidden
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 
