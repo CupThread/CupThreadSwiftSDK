@@ -103,9 +103,21 @@ export function declaredSDKVersion(content) {
   return match ? match[1] : null;
 }
 
-function headSDKVersion(root) {
+function headVersionFileContent(root) {
   const out = probe("git", ["show", `HEAD:${VERSION_FILE}`], { cwd: root });
-  return out.ok ? declaredSDKVersion(out.stdout) : null;
+  return out.ok ? out.stdout : null;
+}
+
+function headSDKVersion(root) {
+  const content = headVersionFileContent(root);
+  return content === null ? null : declaredSDKVersion(content);
+}
+
+// A tagged HEAD is the release source: the build must not run from regenerated
+// content that the tag does not contain.
+export function versionFileContentProblem(version, content) {
+  if (content.trim() === sdkVersionFileContent(version).trim()) return null;
+  return `its committed ${VERSION_FILE} differs from the generated content for ${version}`;
 }
 
 // A tag already at HEAD pins that commit as the release source; adding a bump
@@ -901,6 +913,12 @@ async function main() {
     // stop before the bump commit invalidates it and the build is wasted.
     if (tagBlocksVersionBump({ tagAtHead: headTagged, headVersion, version })) {
       fail(`Tag v${version} already points at HEAD, whose ${VERSION_FILE} reports ${headVersion === null ? "no sdkVersion" : `version "${headVersion}"`}. Refusing to add a version bump commit under an existing tag — publish a new version instead.`);
+    }
+    if (headTagged) {
+      const contentProblem = versionFileContentProblem(version, headVersionFileContent(ROOT) ?? "");
+      if (contentProblem) {
+        fail(`Tag v${version} already points at HEAD, but ${contentProblem}. Refusing to build from content the tag does not contain — publish a new version instead.`);
+      }
     }
     const outcome = commitVersionFileIfNeeded(version, { headTagged });
     if (outcome.committed) {

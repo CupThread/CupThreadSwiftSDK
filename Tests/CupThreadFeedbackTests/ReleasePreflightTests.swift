@@ -58,6 +58,17 @@ check(
     '1.2.3'
 );
 check('commentOnlyDeclaresNothing', m.declaredSDKVersion('// public static let sdkVersion = "9.9.9"\n'), null);
+check(
+    'canonicalHeadContentAccepted',
+    m.versionFileContentProblem('1.2.3', m.sdkVersionFileContent('1.2.3')),
+    null
+);
+const altered = m.sdkVersionFileContent('1.2.3').replace('cupthread-apple', 'cupthread-apple-edited');
+check(
+    'alteredHeadContentRejected',
+    String(m.versionFileContentProblem('1.2.3', altered)).includes('differs'),
+    true
+);
 console.log(JSON.stringify(failures.length === 0 ? { ok: true } : { ok: false, failures }));
 """#
 

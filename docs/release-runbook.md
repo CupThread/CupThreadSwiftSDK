@@ -99,7 +99,7 @@ version is published.
 | Version not greater than latest tag | Pick a higher semver. |
 | Reserved version (`0.1.0`) | Publish `0.1.1` or later — see below. |
 | Tag exists elsewhere (local/remote) | Delete the local tag (`git tag -d vX.Y.Z`) only if you are sure it is from your own failed attempt; never move a remote tag. Release a new version instead. |
-| `HEAD`'s `SDKVersion.swift` declares another version | The script refuses to tag a mis-versioned source package: commit the generated `Sources/CupThreadFeedback/SDKVersion.swift` (or rerun the release, which commits it) before tagging. If `vX.Y.Z` already points at a commit without the bump, release a new version instead of moving the tag. |
+| `HEAD`'s `SDKVersion.swift` is not the generated file for the release version | The script refuses to tag a mis-versioned source package, and refuses to build from content a tag at `HEAD` does not contain: commit the generated `Sources/CupThreadFeedback/SDKVersion.swift` (or rerun the release, which commits it). If `vX.Y.Z` already points at a commit without the bump, release a new version instead of moving the tag. |
 
 ## Failure recovery per publication stage
 
