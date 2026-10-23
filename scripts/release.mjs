@@ -81,11 +81,13 @@ export function syncSDKVersion(version, root = ROOT) {
 // The generated version file is not hand-edited, so "the write changed
 // something" says nothing about whether the release commit carries the bump:
 // a rerun after a failed attempt finds the file already at the target version
-// while HEAD still declares the previous one. The commit decision therefore
-// compares HEAD against the target version; the write only ensures content
-// (issue #518).
-export function planVersionFileCommit({ fileMatchesTarget, headMatchesTarget }) {
-  const commit = !headMatchesTarget;
+// while HEAD still declares the previous one. Decide against repository state
+// instead: write when content differs, and commit when HEAD lacks the target
+// content or the file had to be regenerated. A tagged HEAD is pinned as the
+// release source and never receives another commit (issue #518).
+export function planVersionFileCommit({ fileMatchesTarget, headMatchesTarget, headTagged = false }) {
+  // A tagged HEAD is pinned as the release source: never add a commit under it.
+  const commit = !headTagged && (!headMatchesTarget || !fileMatchesTarget);
   return { write: !fileMatchesTarget, stage: commit, commit };
 }
 
@@ -94,23 +96,33 @@ function versionFileMatchesTarget(version, root) {
   return existsSync(versionFile) && readFileSync(versionFile, "utf8") === sdkVersionFileContent(version);
 }
 
-function sdkVersionDeclaredIn(content) {
-  const match = content.match(/sdkVersion\s*=\s*"([^"]*)"/);
+// Match the real declaration, so a commented-out line cannot vouch for the
+// version a tagged source package reports.
+export function declaredSDKVersion(content) {
+  const match = content.match(/^[ \t]*public\s+static\s+let\s+sdkVersion\s*=\s*"([^"]*)"/m);
   return match ? match[1] : null;
 }
 
 function headSDKVersion(root) {
   const out = probe("git", ["show", `HEAD:${VERSION_FILE}`], { cwd: root });
-  return out.ok ? sdkVersionDeclaredIn(out.stdout) : null;
+  return out.ok ? declaredSDKVersion(out.stdout) : null;
 }
 
-// Ensure the generated file is on disk and, when HEAD still declares another
-// version, stage and commit it. This is the path that makes the preflight's
-// "committed for this release" promise true for the tolerated pending state.
-export function commitVersionFileIfNeeded(version, { root = ROOT } = {}) {
+// A tag already at HEAD pins that commit as the release source; adding a bump
+// commit under it would leave the tag on the pre-bump source.
+export function tagBlocksVersionBump({ tagAtHead, headVersion, version }) {
+  return tagAtHead && headVersion !== version;
+}
+
+// Ensure the generated file is on disk and, when HEAD does not already carry
+// the target content, stage and commit it. This is the path that makes the
+// preflight's "committed for this release" promise true for the tolerated
+// pending state and for regenerated content that only differs by formatting.
+export function commitVersionFileIfNeeded(version, { root = ROOT, headTagged = false } = {}) {
   const plan = planVersionFileCommit({
     fileMatchesTarget: versionFileMatchesTarget(version, root),
-    headMatchesTarget: headSDKVersion(root) === version
+    headMatchesTarget: headSDKVersion(root) === version,
+    headTagged
   });
   if (plan.write) syncSDKVersion(version, root);
   if (!plan.stage) return { committed: false, version: headSDKVersion(root) };
@@ -131,7 +143,7 @@ export function versionBumpCommitProblem(version, { root = ROOT } = {}) {
   if (!out.ok) {
     return `Could not read ${VERSION_FILE} from HEAD (${out.stderr || `git show exited ${out.status}`}).`;
   }
-  const declared = sdkVersionDeclaredIn(out.stdout);
+  const declared = declaredSDKVersion(out.stdout);
   if (declared !== version) {
     const reported = declared === null ? "no sdkVersion" : `version "${declared}"`;
     return `HEAD reports ${reported} instead of "${version}" — refusing to tag v${version}, because the source package resolved from the tag would report the wrong version.`;
@@ -859,11 +871,12 @@ async function main() {
     return;
   }
 
+  let initialFacts = null;
   if (args.dryRun) {
     console.log("• [dry-run] skipping release preflight — branch, ancestry, tag, release, and CDN collision checks only guard real publications");
   } else {
     console.log("• preflight");
-    runPreflight(version, !args.skipUpload);
+    initialFacts = runPreflight(version, !args.skipUpload);
   }
 
   if (!args.dryRun && !args.yes) {
@@ -881,7 +894,15 @@ async function main() {
 
   if (!args.dryRun) {
     console.log(`• syncing SDK version to ${version}`);
-    const outcome = commitVersionFileIfNeeded(version);
+    const headTagged = initialFacts.localTagCommitSha === initialFacts.headSha
+      || initialFacts.remoteTagCommitSha === initialFacts.headSha;
+    const headVersion = headSDKVersion(ROOT);
+    // A stale tag at HEAD is unrecoverable without moving a published tag, so
+    // stop before the bump commit invalidates it and the build is wasted.
+    if (tagBlocksVersionBump({ tagAtHead: headTagged, headVersion, version })) {
+      fail(`Tag v${version} already points at HEAD, whose ${VERSION_FILE} reports ${headVersion === null ? "no sdkVersion" : `version "${headVersion}"`}. Refusing to add a version bump commit under an existing tag — publish a new version instead.`);
+    }
+    const outcome = commitVersionFileIfNeeded(version, { headTagged });
     if (outcome.committed) {
       console.log(`  committed the SDK version bump for ${version} at ${shortSha(gitHeadSha())}`);
     }

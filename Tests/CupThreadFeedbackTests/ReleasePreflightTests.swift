@@ -1,13 +1,19 @@
 import Foundation
 import Testing
 
-/// Drives the pure commit-plan helper through the three states a release run
-/// can find: a tolerated pending version file, a fresh write, and HEAD
-/// already at the target version (issue #518).
+/// Drives the pure commit decisions through the states a release run can
+/// find: a tolerated pending version file, a fresh write, HEAD already at the
+/// target version, regenerated content, and a tagged HEAD (issue #518).
 private let versionCommitPlanScript = #"""
 import { pathToFileURL } from 'node:url';
 const m = await import(pathToFileURL(process.env.RELEASE_SCRIPT_PATH));
-const cases = [
+const failures = [];
+function check(name, got, expected) {
+    if (JSON.stringify(got) !== JSON.stringify(expected)) {
+        failures.push({ name, got, expected });
+    }
+}
+const planCases = [
     {
         name: 'toleratedPending',
         input: { fileMatchesTarget: true, headMatchesTarget: false },
@@ -22,16 +28,37 @@ const cases = [
         name: 'headAlreadyAtTarget',
         input: { fileMatchesTarget: true, headMatchesTarget: true },
         expected: { write: false, stage: false, commit: false }
+    },
+    {
+        name: 'regeneratedContent',
+        input: { fileMatchesTarget: false, headMatchesTarget: true },
+        expected: { write: true, stage: true, commit: true }
+    },
+    {
+        name: 'taggedHeadIsPinned',
+        input: { fileMatchesTarget: false, headMatchesTarget: true, headTagged: true },
+        expected: { write: true, stage: false, commit: false }
     }
 ];
-for (const c of cases) {
-    const got = m.planVersionFileCommit(c.input);
-    if (JSON.stringify(got) !== JSON.stringify(c.expected)) {
-        console.log(JSON.stringify({ ok: false, case: c.name, got, expected: c.expected }));
-        process.exit(0);
-    }
+for (const c of planCases) {
+    check(c.name, m.planVersionFileCommit(c.input), c.expected);
 }
-console.log(JSON.stringify({ ok: true }));
+check('tagOnStaleHeadBlocks', m.tagBlocksVersionBump({
+    tagAtHead: true, headVersion: '1.2.2', version: '1.2.3'
+}), true);
+check('tagOnTargetHeadDoesNotBlock', m.tagBlocksVersionBump({
+    tagAtHead: true, headVersion: '1.2.3', version: '1.2.3'
+}), false);
+check('untaggedHeadDoesNotBlock', m.tagBlocksVersionBump({
+    tagAtHead: false, headVersion: '1.2.2', version: '1.2.3'
+}), false);
+check(
+    'declarationIgnoresComments',
+    m.declaredSDKVersion('// sdkVersion = "9.9.9"\npublic static let sdkVersion = "1.2.3"\n'),
+    '1.2.3'
+);
+check('commentOnlyDeclaresNothing', m.declaredSDKVersion('// public static let sdkVersion = "9.9.9"\n'), null);
+console.log(JSON.stringify(failures.length === 0 ? { ok: true } : { ok: false, failures }));
 """#
 
 /// Reproduces a run that died between writing `SDKVersion.swift` and
@@ -231,11 +258,11 @@ struct ReleasePreflightTests {
         #expect(output.trimmingCharacters(in: .whitespacesAndNewlines) == #"{"ok":true}"#, "unexpected helper result: \(output)")
     }
 
-    @Test func versionFileCommitPlanCoversToleratedPendingState() throws {
+    @Test func versionCommitDecisionsCoverPendingRerunAndTaggedStates() throws {
         let output = try evaluateJS(versionCommitPlanScript)
         #expect(
             output.trimmingCharacters(in: .whitespacesAndNewlines) == #"{"ok":true}"#,
-            "unexpected commit plan: \(output)"
+            "unexpected commit decisions: \(output)"
         )
     }
 
