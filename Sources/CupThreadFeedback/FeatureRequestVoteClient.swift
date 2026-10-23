@@ -45,10 +45,7 @@ extension FeedbackClient {
         // single-use challenge token on a request that cannot succeed. Fail
         // fast locally (#493); the trimmed token rides in both the body and
         // the header so the two transports always agree.
-        guard let identityToken = userToken.nilIfEmpty,
-              !identityToken.contains(where: \.isNewline) else {
-            throw FeedbackClientError.authenticationRequired
-        }
+        let identityToken = try validatedUserToken(userToken)
         let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard FeatureRequestIDGrammar.isValid(trimmedID) else {
             // An id that cannot be a single opaque path segment (API-24

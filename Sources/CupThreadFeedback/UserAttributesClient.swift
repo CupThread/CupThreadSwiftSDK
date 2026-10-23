@@ -379,10 +379,7 @@ extension FeedbackClient {
         // as a header value. Fail fast before anything is signed or sent
         // (#417) — the trimmed token is used for both the canonical string
         // and the header so the signature always matches.
-        guard let identityToken = userToken.nilIfEmpty,
-              !identityToken.contains(where: \.isNewline) else {
-            throw FeedbackClientError.authenticationRequired
-        }
+        let identityToken = try validatedUserToken(userToken)
         let signingSecretInUse = (signingSecret ?? configuration.signingSecret)?.nilIfEmpty
 
         // The signing clock is the device clock corrected by the server-time

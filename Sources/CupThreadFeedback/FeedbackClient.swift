@@ -409,9 +409,13 @@ public struct FeedbackClient: Sendable {
         userToken: String? = nil,
         turnstileToken: String? = nil
     ) async throws -> FeedbackSubmissionResult {
+        // Reject a non-nil blank or newline-bearing caller token before the
+        // Turnstile provider is consulted or any fallback runs (#497); `nil`
+        // preserves anonymous submission and attachment-store fallback.
+        let validatedToken = try validatedUserToken(userToken)
         try validateIntakeMinimums(in: draft)
         let uploadIds = draft.attachments.compactMap(\.uploadId).nilIfEmpty
-        let effectiveUserToken = resolvedSubmitUserToken(userToken, hasAttachments: uploadIds != nil)
+        let effectiveUserToken = resolvedSubmitUserToken(validatedToken, hasAttachments: uploadIds != nil)
         let data = try await sendWithTurnstileRetry(
             accepted: Self.acceptedSubmitStatuses,
             challenge: .feedback(appKey: configuration.appKey),

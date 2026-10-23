@@ -151,6 +151,27 @@ extension FeedbackClient {
         }
     }
 
+    /// Validates a required caller-supplied `userToken`: trims surrounding
+    /// whitespace and rejects blank or newline-bearing values with
+    /// ``FeedbackClientError/authenticationRequired`` (SEC-30, #422, #493, #497).
+    func validatedUserToken(_ token: String) throws -> String {
+        guard let trimmed = token.nilIfEmpty,
+              !trimmed.contains(where: \.isNewline) else {
+            throw FeedbackClientError.authenticationRequired
+        }
+        return trimmed
+    }
+
+    /// Validates an optional caller-supplied `userToken`: preserves `nil`
+    /// (allowing anonymous calls or store-backed fallback), while trimming a
+    /// non-nil value and rejecting blank or newline-bearing strings with
+    /// ``FeedbackClientError/authenticationRequired`` so a malformed identity
+    /// is never silently dropped or replaced with the store token (SEC-30, #497).
+    func validatedUserToken(_ token: String?) throws -> String? {
+        guard let token else { return nil }
+        return try validatedUserToken(token)
+    }
+
     /// Resolves an anonymous identity for requests that require one.
     /// Falls back to this client's app-key-scoped token store when the caller
     /// did not pass one, or when the supplied token contains newline characters,
