@@ -372,4 +372,21 @@ struct UserProfileModelsTests {
         #expect(comment.appSlug == "app-two")
         #expect(comment.appName == "App Two")
     }
+
+    @Test func userProfileCommentRefusesToEncodeWithoutSlugs() {
+        // Encoding without either required slug would omit a key the
+        // corrected decoder requires; fail at encode instead (issue #505).
+        let comment = UserProfileComment(
+            id: "c-4",
+            body: "Missing slugs",
+            createdAt: "2026-01-02T00:00:00.000Z",
+            featureRequestId: "fr-4",
+            featureRequestTitle: "FR 4",
+            appName: "App Four"
+        )
+
+        #expect(throws: EncodingError.self) {
+            _ = try JSONEncoder().encode(comment)
+        }
+    }
 }

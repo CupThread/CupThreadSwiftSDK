@@ -167,6 +167,36 @@ public struct UserProfileComment: Codable, Equatable, Identifiable, Sendable {
         workspaceSlug = try container.decode(String.self, forKey: .workspaceSlug)
         appSlug = try container.decode(String.self, forKey: .appSlug)
     }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(body, forKey: .body)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(featureRequestId, forKey: .featureRequestId)
+        try container.encode(featureRequestTitle, forKey: .featureRequestTitle)
+        try container.encode(appName, forKey: .appName)
+        guard let workspaceSlug else {
+            throw EncodingError.invalidValue(
+                self,
+                EncodingError.Context(
+                    codingPath: container.codingPath + [CodingKeys.workspaceSlug],
+                    debugDescription: "UserProfileComment.workspaceSlug is required by the public profile contract"
+                )
+            )
+        }
+        try container.encode(workspaceSlug, forKey: .workspaceSlug)
+        guard let appSlug else {
+            throw EncodingError.invalidValue(
+                self,
+                EncodingError.Context(
+                    codingPath: container.codingPath + [CodingKeys.appSlug],
+                    debugDescription: "UserProfileComment.appSlug is required by the public profile contract"
+                )
+            )
+        }
+        try container.encode(appSlug, forKey: .appSlug)
+    }
 }
 
 /// Response to `GET /api/v1/users/{userId}/profile`.
