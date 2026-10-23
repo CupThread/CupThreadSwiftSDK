@@ -15,6 +15,16 @@ import Foundation
 /// - **Resetting settings**: Wiping app settings or resetting defaults does not clear the Keychain item.
 ///   Call ``reset()`` to clear the identity explicitly.
 ///
+/// ### Token spelling
+/// Minted tokens are lowercase UUID strings. The server verifies a signed
+/// user-attribute report over the token exactly as presented and only folds
+/// it to lowercase afterwards, for identity storage (issue #511); minting the
+/// canonical spelling keeps the signed value, the `X-User-Token` header, and
+/// the stored profile key byte-identical. Tokens already persisted keep their
+/// original spelling and identity — only newly minted ones are canonicalized.
+/// Any code that signs with the token must sign exactly the value it sends,
+/// never an independently lowercased copy.
+///
 /// ### One identity per app
 ///
 /// The anonymous identity is scoped per CupThread app key, so a host embedding
@@ -41,6 +51,16 @@ public final class UserTokenStore: @unchecked Sendable {
 
     /// The default key used in storage to identify the anonymous token.
     static let defaultKey = "com.cupthread.featureRequestUserToken"
+
+    /// Mints a fresh identity token in the canonical lowercase UUID form.
+    ///
+    /// `UUID().uuidString` renders hex digits in uppercase. The server folds
+    /// the token to lowercase only after HMAC verification, so minting the
+    /// folded spelling keeps canonical strings and headers byte-identical
+    /// under either normalization order (issue #511).
+    private static func mintToken() -> String {
+        UUID().uuidString.lowercased()
+    }
 
     private static let processLock = NSLock()
 
@@ -208,7 +228,7 @@ public final class UserTokenStore: @unchecked Sendable {
             // The item is present but unreadable (locked Keychain, transient
             // status, undecodable contents). Never write behind its back;
             // serve an ephemeral token and let the next read retry.
-            return UUID().uuidString
+            return Self.mintToken()
         }
 
         switch adoptLegacyIdentityOnce() {
@@ -218,12 +238,12 @@ public final class UserTokenStore: @unchecked Sendable {
             // The legacy global item is present but unreadable (SEC-18).
             // Never mint or persist a fresh identity behind its back;
             // serve an ephemeral token and let the next read retry.
-            return UUID().uuidString
+            return Self.mintToken()
         case .notFound:
             break
         }
 
-        let new = UUID().uuidString
+        let new = Self.mintToken()
         guard storage.saveConfirmed(new) else {
             // The write could not be confirmed; serve an ephemeral token and
             // leave adoption retryable rather than minting an identity that
