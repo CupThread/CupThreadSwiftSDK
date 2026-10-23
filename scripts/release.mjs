@@ -178,6 +178,10 @@ export function evaluateReleaseReadiness(facts) {
   const errors = [];
   const warnings = [];
   const completed = { tag: false, githubRelease: false, cdnObject: false };
+  // A draft release is reused on rerun, but its body embeds the previous
+  // build's checksum. Publication rewrites the notes when that checksum no
+  // longer matches the freshly built artifact (issue #524).
+  let regenerateReleaseNotes = false;
   const version = facts.version;
   const tag = `v${version}`;
   const artifact = artifactFilename(version);
@@ -237,7 +241,12 @@ export function evaluateReleaseReadiness(facts) {
   const release = facts.githubRelease;
   if (release) {
     if (release.isDraft) {
-      warnings.push(`A draft GitHub release for ${tag} already exists; its assets will be replaced with the freshly built artifact.`);
+      if (facts.artifactSha256 && release.bodySha256 && release.bodySha256 !== facts.artifactSha256) {
+        regenerateReleaseNotes = true;
+        warnings.push(`Draft GitHub release ${tag} advertises checksum ${release.bodySha256} but this build is ${facts.artifactSha256}; its notes will be regenerated before publication.`);
+      } else {
+        warnings.push(`A draft GitHub release for ${tag} already exists; its assets will be replaced with the freshly built artifact.`);
+      }
     } else if (facts.artifactSha256) {
       if (!release.assetNames.includes(artifact)) {
         errors.push(`GitHub release ${tag} is already published but has no ${artifact} asset — treating ${version} as releasable would leave an ambiguous state. Publish a new version instead.`);
@@ -264,7 +273,17 @@ export function evaluateReleaseReadiness(facts) {
     }
   }
 
-  return { errors, warnings, completed };
+  return { errors, warnings, completed, regenerateReleaseNotes };
+}
+
+// Commands that publish the draft release. When the draft's notes still carry
+// the previous build's checksum, the fresh notes are written first so the
+// published release always advertises the checksum of the shipped artifact.
+export function releasePublicationCommands({ tag, notes, regenerateNotes = false }) {
+  const commands = [];
+  if (regenerateNotes) commands.push(["gh", ["release", "edit", tag, "--notes", notes]]);
+  commands.push(["gh", ["release", "edit", tag, "--draft=false"]]);
+  return commands;
 }
 
 // A dirty tree is fatal — except for exactly one state: the generated
@@ -1109,11 +1128,24 @@ async function main() {
   if (facts.githubRelease && !facts.githubRelease.isDraft) {
     console.log("  GitHub release was already published");
   } else {
-    withRecovery(
-      "publishing the draft release failed",
-      `the CDN artifact is uploaded and verified. After checking the ${filename} asset yourself, publish manually with: gh release edit ${tag} --draft=false`,
-      () => run("gh", ["release", "edit", tag, "--draft=false"])
-    );
+    if (decision.regenerateReleaseNotes) {
+      console.log(`  regenerating draft release notes for ${tag} (artifact checksum changed)`);
+    }
+    const publicationCommands = releasePublicationCommands({
+      tag,
+      notes,
+      regenerateNotes: decision.regenerateReleaseNotes
+    });
+    for (const [index, [command, commandArgs]] of publicationCommands.entries()) {
+      const regeneratingNotes = decision.regenerateReleaseNotes && index === 0;
+      withRecovery(
+        regeneratingNotes ? "regenerating the draft release notes failed" : "publishing the draft release failed",
+        regeneratingNotes
+          ? `the CDN artifact is uploaded and verified, but the draft still advertises the previous checksum. Rerun the release to regenerate the notes, or write them from build/release/release-info.json to /tmp/release-notes.md, verify the checksum is ${artifact.sha256}, and only then publish with: gh release edit ${tag} --notes-file /tmp/release-notes.md --draft=false`
+          : `the CDN artifact is uploaded and verified. After checking the ${filename} asset yourself, publish manually with: gh release edit ${tag} --draft=false`,
+        () => run(command, commandArgs)
+      );
+    }
   }
 
   console.log(`\n✓ Apple SDK v${version} successfully released!`);

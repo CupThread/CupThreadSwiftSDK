@@ -77,7 +77,7 @@ A rerun of the same version recognizes already-completed matching stages:
 | Uncommitted generated `SDKVersion.swift` for this version | Tolerated; committed for this release |
 | Local tag `vX.Y.Z` at `HEAD` | Kept; pushed if not on origin yet |
 | Remote tag `vX.Y.Z` at `HEAD` | Recognized as done |
-| Draft GitHub release `vX.Y.Z` | Reused; assets replaced (`--clobber`) |
+| Draft GitHub release `vX.Y.Z` | Reused; assets replaced (`--clobber`). When the draft notes advertise a checksum from the previous build, the notes are regenerated (`gh release edit --notes`) before the draft is published |
 | Published release with matching asset checksum | Recognized as done; left untouched |
 | CDN object with matching sha256 | Upload skipped |
 | All three (tag + release + CDN) match | “Already fully released” — exits 0 without touching anything |
@@ -113,6 +113,15 @@ version is published.
 - **CDN checksum verification fails** — the object exists but serves
   different bytes (or 404s). The release is still a draft; overwrite the R2
   object (rerun does this) and re-verify.
+- **Regenerating the draft notes fails** — the CDN artifact is uploaded and
+  verified, but the draft still advertises the previous build's checksum.
+  Rerun the release to regenerate the notes, or write them from
+  `build/release/release-info.json`, verify the checksum against the fresh
+  build, and only then publish:
+  ```sh
+  node -e 'const fs = require("fs"); const info = JSON.parse(fs.readFileSync("build/release/release-info.json", "utf8")); fs.writeFileSync("/tmp/release-notes.md", info.notes.map((line) => `- ${line}`).join("\n") + "\n")'
+  gh release edit vX.Y.Z --notes-file /tmp/release-notes.md --draft=false
+  ```
 - **Publishing the draft fails** — everything else is verified. Check the
   asset one final time, then publish manually:
   `gh release edit vX.Y.Z --draft=false`.

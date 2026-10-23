@@ -31,17 +31,30 @@ struct ReleasePreflightTests {
         let errors: [String]
         let warnings: [String]
         let completed: Completed
+        let regenerateReleaseNotes: Bool
+    }
+
+    private struct PublicationPlan: Decodable {
+        let stale: [String]
+        let fresh: [String]
     }
 
     private struct Expectation {
         let errorContains: [String]
         let warningContains: [String]
         let completed: Set<String>
+        let regenerateReleaseNotes: Bool
 
-        init(errorContains: [String] = [], warningContains: [String] = [], completed: Set<String> = []) {
+        init(
+            errorContains: [String] = [],
+            warningContains: [String] = [],
+            completed: Set<String> = [],
+            regenerateReleaseNotes: Bool = false
+        ) {
             self.errorContains = errorContains
             self.warningContains = warningContains
             self.completed = completed
+            self.regenerateReleaseNotes = regenerateReleaseNotes
         }
     }
 
@@ -156,6 +169,10 @@ struct ReleasePreflightTests {
                 result.errors.count == expectation.errorContains.count,
                 "[\(result.name)] unexpected extra errors: \(result.errors)"
             )
+            #expect(
+                result.regenerateReleaseNotes == expectation.regenerateReleaseNotes,
+                "[\(result.name)] regenerateReleaseNotes expected \(expectation.regenerateReleaseNotes)"
+            )
             for flag in result.completed.flags {
                 #expect(
                     flag.value == expectation.completed.contains(flag.name),
@@ -166,6 +183,32 @@ struct ReleasePreflightTests {
         #expect(
             seen == Set(expectations.keys),
             "scenario name drift between test and script; missing: \(Set(expectations.keys).subtracting(seen))"
+        )
+    }
+
+    @Test func draftNotesAreRegeneratedBeforePublishing() throws {
+        let output = try evaluateJS("""
+        import { pathToFileURL } from 'node:url';
+        const m = await import(pathToFileURL(process.env.RELEASE_SCRIPT_PATH));
+        const flatten = (commands) => commands.map(([command, args]) => [command, ...args].join(' '));
+        const stale = flatten(m.releasePublicationCommands({ tag: 'v0.1.1', notes: '- fresh notes', regenerateNotes: true }));
+        const fresh = flatten(m.releasePublicationCommands({ tag: 'v0.1.1', notes: '- fresh notes' }));
+        console.log(JSON.stringify({ stale, fresh }));
+        """)
+        let data = try #require(output.data(using: .utf8), "expected JSON, got: \(output)")
+        let plan = try JSONDecoder().decode(PublicationPlan.self, from: data)
+        let staleCommands = plan.stale
+        let freshCommands = plan.fresh
+        #expect(
+            staleCommands == [
+                "gh release edit v0.1.1 --notes - fresh notes",
+                "gh release edit v0.1.1 --draft=false"
+            ],
+            "stale draft notes must be rewritten before publication; got: \(staleCommands)"
+        )
+        #expect(
+            freshCommands == ["gh release edit v0.1.1 --draft=false"],
+            "matching draft notes must be published without a redundant edit; got: \(freshCommands)"
         )
     }
 
@@ -248,6 +291,14 @@ struct ReleasePreflightTests {
         { name: 'localTagAtHeadUnpushed', facts: base({ localTagCommitSha: HEAD }) },
         { name: 'tagFullyPushed', facts: base({ localTagCommitSha: HEAD, remoteTagCommitSha: HEAD }) },
         { name: 'draftReleaseExists', facts: base({ githubRelease: { isDraft: true, assetNames: [], bodySha256: null } }) },
+        { name: 'draftReleaseStaleNotesChecksum', facts: base({
+            artifactSha256: ARTIFACT,
+            githubRelease: { isDraft: true, assetNames: [ASSET], bodySha256: OTHER_ARTIFACT }
+        }) },
+        { name: 'draftReleaseMatchingNotesChecksum', facts: base({
+            artifactSha256: ARTIFACT,
+            githubRelease: { isDraft: true, assetNames: [ASSET], bodySha256: ARTIFACT }
+        }) },
         { name: 'publishedReleaseWithoutArtifactShaOnlyWarns', facts: base({
             githubRelease: { isDraft: false, assetNames: [], bodySha256: null }
         }) },
@@ -281,7 +332,13 @@ struct ReleasePreflightTests {
     ];
     const results = scenarios.map((scenario) => {
         const decision = m.evaluateReleaseReadiness(scenario.facts);
-        return { name: scenario.name, errors: decision.errors, warnings: decision.warnings, completed: decision.completed };
+        return {
+            name: scenario.name,
+            errors: decision.errors,
+            warnings: decision.warnings,
+            completed: decision.completed,
+            regenerateReleaseNotes: decision.regenerateReleaseNotes
+        };
     });
     console.log(JSON.stringify(results));
     """#
@@ -304,6 +361,11 @@ struct ReleasePreflightTests {
         "localTagAtHeadUnpushed": Expectation(warningContains: ["has not been pushed"]),
         "tagFullyPushed": Expectation(completed: ["tag"]),
         "draftReleaseExists": Expectation(warningContains: ["draft GitHub release"]),
+        "draftReleaseStaleNotesChecksum": Expectation(
+            warningContains: ["will be regenerated"],
+            regenerateReleaseNotes: true
+        ),
+        "draftReleaseMatchingNotesChecksum": Expectation(warningContains: ["draft GitHub release"]),
         "publishedReleaseWithoutArtifactShaOnlyWarns": Expectation(warningContains: ["already published"]),
         "publishedReleaseMatchesArtifact": Expectation(completed: ["githubRelease"]),
         "publishedReleaseMissingAsset": Expectation(errorContains: ["no CupThreadFeedback-0.1.1.xcframework.zip asset"]),
