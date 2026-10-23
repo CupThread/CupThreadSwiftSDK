@@ -204,6 +204,22 @@ struct SearchRequestThrottleTests {
         #expect(await throttle.waitForAdmission(key: "features|before|"))
     }
 
+    /// Issue #529: a fresh surface inherits the shared duplicate gate, clears
+    /// it, and records the fetch it actually performs so the gate is armed
+    /// again for the results it now renders.
+    @Test func freshSurfaceRecoveryClearsAndReArmsTheDuplicateGate() async {
+        let (throttle, _) = makeThrottle()
+        let key = "features|true|abc|"
+        #expect(await throttle.admissionVerdict(key: key) == .admitted)
+        #expect(await throttle.admissionVerdict(key: key) == .duplicateSkipped)
+
+        await throttle.resetLastAdmittedKey()
+        await throttle.recordQueryFetch(key: key)
+
+        #expect(await throttle.isDuplicateKey(key))
+        #expect(await throttle.admissionVerdict(key: key) == .duplicateSkipped)
+    }
+
     @Test func recordingCountsAgainstTheWindow() async {
         let (throttle, clock) = makeThrottle(minimumInterval: .zero, windowCapacity: 28)
         for index in 0..<26 {

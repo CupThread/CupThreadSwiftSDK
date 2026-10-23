@@ -25,19 +25,30 @@ struct FeatureRequestsListState: Equatable, Sendable {
     /// against a newer query that was throttled or cancelled before executing.
     var lastExecutedQuery: String
 
+    /// The full search-throttle key (query, version filter, and the
+    /// anonymous-roadmap verdict) whose results this state holds, or `nil`
+    /// before a keyed replacing load. The search throttle's duplicate gate is
+    /// shared per ``FeedbackClient``, so a fresh surface consults this to
+    /// tell "already rendered" from "inherited another instance's skip"
+    /// (issue #529).
+    var lastExecutedFilterKey: String?
+
     /// Creates a list state with optional initial items and in-flight voting IDs.
     /// - Parameters:
     ///   - items: Initial items in the list.
     ///   - votingIds: Initial item IDs with in-flight vote requests.
     ///   - lastExecutedQuery: Search query that produced `items`.
+    ///   - lastExecutedFilterKey: Full throttle key that produced `items`.
     init(
         items: [FeatureRequestItem] = [],
         votingIds: Set<String> = [],
-        lastExecutedQuery: String = ""
+        lastExecutedQuery: String = "",
+        lastExecutedFilterKey: String? = nil
     ) {
         self.items = items
         self.votingIds = votingIds
         self.lastExecutedQuery = lastExecutedQuery
+        self.lastExecutedFilterKey = lastExecutedFilterKey
         self.nextCursor = nil
         self.hasMorePages = false
     }
@@ -53,16 +64,22 @@ struct FeatureRequestsListState: Equatable, Sendable {
     ///   - result: The fetched page, including `hasMore`/`nextCursor`.
     ///   - replacesExisting: `true` for a fresh load, `false` to append.
     ///   - executedQuery: The search query that produced this replacement page.
+    ///   - executedFilterKey: The full search-throttle key that produced this
+    ///     replacement page, when the caller evaluated one.
     mutating func applyPage(
         _ result: ListFeatureRequestsResult,
         replacesExisting: Bool,
-        executedQuery: String? = nil
+        executedQuery: String? = nil,
+        executedFilterKey: String? = nil
     ) {
         nextCursor = result.nextCursor
         hasMorePages = result.hasMore && result.nextCursor != nil
         if replacesExisting {
             if let executedQuery {
                 lastExecutedQuery = executedQuery
+            }
+            if let executedFilterKey {
+                lastExecutedFilterKey = executedFilterKey
             }
             mergeReloadedItems(result.requests)
         } else {
