@@ -1131,14 +1131,18 @@ async function main() {
     if (decision.regenerateReleaseNotes) {
       console.log(`  regenerating draft release notes for ${tag} (artifact checksum changed)`);
     }
-    for (const [command, commandArgs] of releasePublicationCommands({
+    const publicationCommands = releasePublicationCommands({
       tag,
       notes,
       regenerateNotes: decision.regenerateReleaseNotes
-    })) {
+    });
+    for (const [index, [command, commandArgs]] of publicationCommands.entries()) {
+      const regeneratingNotes = decision.regenerateReleaseNotes && index === 0;
       withRecovery(
-        "publishing the draft release failed",
-        `the CDN artifact is uploaded and verified. After checking the ${filename} asset yourself, publish manually with: gh release edit ${tag} --draft=false`,
+        regeneratingNotes ? "regenerating the draft release notes failed" : "publishing the draft release failed",
+        regeneratingNotes
+          ? `the CDN artifact is uploaded and verified, but the draft still advertises the previous checksum. Rerun the release to regenerate the notes, or write them from build/release/release-info.json to /tmp/release-notes.md, verify the checksum is ${artifact.sha256}, and only then publish with: gh release edit ${tag} --notes-file /tmp/release-notes.md --draft=false`
+          : `the CDN artifact is uploaded and verified. After checking the ${filename} asset yourself, publish manually with: gh release edit ${tag} --draft=false`,
         () => run(command, commandArgs)
       );
     }

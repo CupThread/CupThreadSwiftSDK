@@ -113,11 +113,18 @@ version is published.
 - **CDN checksum verification fails** — the object exists but serves
   different bytes (or 404s). The release is still a draft; overwrite the R2
   object (rerun does this) and re-verify.
-- **Publishing the draft fails** — everything else is verified. A rerun
-  regenerates stale draft notes and retries publication; to finish manually,
-  update the notes from `build/release/release-info.json` first when the
-  checksum changed, then publish:
-  `gh release edit vX.Y.Z --notes <fresh notes> --draft=false`.
+- **Regenerating the draft notes fails** — the CDN artifact is uploaded and
+  verified, but the draft still advertises the previous build's checksum.
+  Rerun the release to regenerate the notes, or write them from
+  `build/release/release-info.json`, verify the checksum against the fresh
+  build, and only then publish:
+  ```sh
+  node -e 'const fs = require("fs"); const info = JSON.parse(fs.readFileSync("build/release/release-info.json", "utf8")); fs.writeFileSync("/tmp/release-notes.md", info.notes.map((line) => `- ${line}`).join("\n") + "\n")'
+  gh release edit vX.Y.Z --notes-file /tmp/release-notes.md --draft=false
+  ```
+- **Publishing the draft fails** — everything else is verified. Check the
+  asset one final time, then publish manually:
+  `gh release edit vX.Y.Z --draft=false`.
 - **After a successful release** — push `main`
   (`git push origin main`) so the version-bump commit is on the branch, and
   update the README install snippet if this version becomes the documented
