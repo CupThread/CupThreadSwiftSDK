@@ -45,7 +45,10 @@ real publications.
    - no CDN object `CupThreadFeedback-X.Y.Z.xcframework.zip` (a matching
      object is recognized; an unpublished mismatching object is overwritten).
 2. Syncs `Sources/CupThreadFeedback/SDKVersion.swift` to the version and
-   commits it (`chore: bump SDK version to X.Y.Z`).
+   commits it (`chore: bump SDK version to X.Y.Z`). The commit decision is
+   made against `HEAD`, so the tolerated pending file from a failed attempt
+   is committed too. The script then refuses to continue unless the committed
+   file declares `X.Y.Z` — the tag must resolve to that exact source.
 3. `swift test` (unless `--skip-tests`).
 4. Archives all seven platform slices and verifies them (archs via `lipo`,
    symbols via `nm`, privacy manifest, swiftmodule interfaces), assembles the
@@ -96,6 +99,7 @@ version is published.
 | Version not greater than latest tag | Pick a higher semver. |
 | Reserved version (`0.1.0`) | Publish `0.1.1` or later — see below. |
 | Tag exists elsewhere (local/remote) | Delete the local tag (`git tag -d vX.Y.Z`) only if you are sure it is from your own failed attempt; never move a remote tag. Release a new version instead. |
+| `HEAD`'s `SDKVersion.swift` declares another version | The script refuses to tag a mis-versioned source package: commit the generated `Sources/CupThreadFeedback/SDKVersion.swift` (or rerun the release, which commits it) before tagging. If `vX.Y.Z` already points at a commit without the bump, release a new version instead of moving the tag. |
 
 ## Failure recovery per publication stage
 

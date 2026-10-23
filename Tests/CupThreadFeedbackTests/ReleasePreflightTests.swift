@@ -1,6 +1,97 @@
 import Foundation
 import Testing
 
+/// Drives the pure commit-plan helper through the three states a release run
+/// can find: a tolerated pending version file, a fresh write, and HEAD
+/// already at the target version (issue #518).
+private let versionCommitPlanScript = #"""
+import { pathToFileURL } from 'node:url';
+const m = await import(pathToFileURL(process.env.RELEASE_SCRIPT_PATH));
+const cases = [
+    {
+        name: 'toleratedPending',
+        input: { fileMatchesTarget: true, headMatchesTarget: false },
+        expected: { write: false, stage: true, commit: true }
+    },
+    {
+        name: 'freshWrite',
+        input: { fileMatchesTarget: false, headMatchesTarget: false },
+        expected: { write: true, stage: true, commit: true }
+    },
+    {
+        name: 'headAlreadyAtTarget',
+        input: { fileMatchesTarget: true, headMatchesTarget: true },
+        expected: { write: false, stage: false, commit: false }
+    }
+];
+for (const c of cases) {
+    const got = m.planVersionFileCommit(c.input);
+    if (JSON.stringify(got) !== JSON.stringify(c.expected)) {
+        console.log(JSON.stringify({ ok: false, case: c.name, got, expected: c.expected }));
+        process.exit(0);
+    }
+}
+console.log(JSON.stringify({ ok: true }));
+"""#
+
+/// Reproduces a run that died between writing `SDKVersion.swift` and
+/// committing it, then asserts the rerun creates exactly one bump commit and
+/// that the annotated tag names a commit carrying the target version
+/// (issue #518).
+private let versionCommitRerunScript = #"""
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const m = await import(pathToFileURL(process.env.RELEASE_SCRIPT_PATH));
+const root = mkdtempSync(path.join(tmpdir(), 'cupthread-release-rerun-'));
+const versionFile = path.join(root, 'Sources/CupThreadFeedback/SDKVersion.swift');
+const git = (...args) => execFileSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+});
+
+mkdirSync(path.dirname(versionFile), { recursive: true });
+git('init', '-q');
+git('config', 'user.email', 'release-test@example.com');
+git('config', 'user.name', 'Release Test');
+git('config', 'commit.gpgsign', 'false');
+git('config', 'tag.gpgsign', 'false');
+writeFileSync(versionFile, m.sdkVersionFileContent('1.2.2'));
+git('add', '.');
+git('commit', '-qm', 'previous release');
+
+const problemBefore = m.versionBumpCommitProblem('1.2.3', { root });
+
+// Run 1 died after the version write and before the bump commit.
+writeFileSync(versionFile, m.sdkVersionFileContent('1.2.3'));
+const first = m.commitVersionFileIfNeeded('1.2.3', { root });
+const firstProblem = m.versionBumpCommitProblem('1.2.3', { root });
+const logAfterFirst = git('log', '--format=%s');
+git('tag', '-a', 'v1.2.3', '-m', 'Release v1.2.3');
+const tagged = git('show', 'v1.2.3:Sources/CupThreadFeedback/SDKVersion.swift');
+
+// A rerun of the commit step recognizes the bump and stays a no-op.
+const second = m.commitVersionFileIfNeeded('1.2.3', { root });
+const logAfterSecond = git('log', '--format=%s');
+
+const result = {
+    firstCommitted: first.committed,
+    firstVersion: first.version,
+    firstProblem,
+    problemBefore,
+    secondCommitted: second.committed,
+    commitsAfterFirst: logAfterFirst.trim().split('\n').length,
+    commitsAfterSecond: logAfterSecond.trim().split('\n').length,
+    tagDeclaresTarget: tagged.includes('sdkVersion = "1.2.3"'),
+    versionFileStatus: git('status', '--porcelain')
+};
+console.log('RESULT:' + JSON.stringify(result));
+"""#
+
 /// Guards the release pipeline's preflight and idempotency rules by driving
 /// the pure helpers exported from `scripts/release.mjs` with `node`. The
 /// script's publication order (tag → draft release → R2 → CDN verification →
@@ -31,6 +122,18 @@ struct ReleasePreflightTests {
         let errors: [String]
         let warnings: [String]
         let completed: Completed
+    }
+
+    private struct RerunResult: Decodable {
+        let firstCommitted: Bool
+        let firstVersion: String
+        let firstProblem: String?
+        let problemBefore: String?
+        let secondCommitted: Bool
+        let commitsAfterFirst: Int
+        let commitsAfterSecond: Int
+        let tagDeclaresTarget: Bool
+        let versionFileStatus: String
     }
 
     private struct Expectation {
@@ -126,6 +229,34 @@ struct ReleasePreflightTests {
         console.log(JSON.stringify({ ok: true }));
         """)
         #expect(output.trimmingCharacters(in: .whitespacesAndNewlines) == #"{"ok":true}"#, "unexpected helper result: \(output)")
+    }
+
+    @Test func versionFileCommitPlanCoversToleratedPendingState() throws {
+        let output = try evaluateJS(versionCommitPlanScript)
+        #expect(
+            output.trimmingCharacters(in: .whitespacesAndNewlines) == #"{"ok":true}"#,
+            "unexpected commit plan: \(output)"
+        )
+    }
+
+    @Test func rerunCommitsToleratedPendingVersionFileBeforeTagging() throws {
+        let output = try evaluateJS(versionCommitRerunScript)
+        let line = try #require(
+            output.split(separator: "\n").last(where: { $0.hasPrefix("RESULT:") }),
+            "expected a RESULT marker from the rerun simulation, got: \(output)"
+        )
+        let result = try JSONDecoder().decode(RerunResult.self, from: Data(line.dropFirst("RESULT:".count).utf8))
+        let staleHead = try #require(result.problemBefore, "a tag on a stale HEAD must be rejected")
+        #expect(staleHead.contains(#""1.2.2""#), "the rejection must name the version found in HEAD; got: \(staleHead)")
+        #expect(staleHead.contains("refusing to tag"), "the rejection must stop the tag; got: \(staleHead)")
+        #expect(result.firstCommitted, "the tolerated pending version file must be committed before the build")
+        #expect(result.firstVersion == "1.2.3")
+        #expect(result.firstProblem == nil, "HEAD must carry the bump before tagging; got: \(result.firstProblem ?? "nil")")
+        #expect(!result.secondCommitted, "a rerun must not create a second bump commit")
+        #expect(result.commitsAfterFirst == 2, "expected the previous release plus one version bump commit")
+        #expect(result.commitsAfterSecond == 2, "a rerun must not add commits")
+        #expect(result.tagDeclaresTarget, "the annotated tag must resolve to a commit with the target SDKVersion.swift")
+        #expect(result.versionFileStatus.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     @Test func readinessDecisionsCoverPreflightAndRerunStates() throws {
