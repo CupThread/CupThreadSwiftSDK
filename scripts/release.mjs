@@ -133,7 +133,10 @@ export function tagBlocksVersionBump({ tagAtHead, headVersion, version }) {
 export function commitVersionFileIfNeeded(version, { root = ROOT, headTagged = false } = {}) {
   const plan = planVersionFileCommit({
     fileMatchesTarget: versionFileMatchesTarget(version, root),
-    headMatchesTarget: headSDKVersion(root) === version,
+    // Compare the committed content, not just the declared version: a HEAD
+    // that reports the target version but differs from the generated file
+    // would otherwise leave the tag pointing at content the build never used.
+    headMatchesTarget: headVersionFileContent(root)?.trim() === sdkVersionFileContent(version).trim(),
     headTagged
   });
   if (plan.write) syncSDKVersion(version, root);
