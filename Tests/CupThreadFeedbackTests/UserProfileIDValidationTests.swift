@@ -29,7 +29,14 @@ struct UserProfileIDValidationTests {
 
     static func makeProfileBody(identifier: String) -> [String: Any] {
         [
-            "profile": ["clerkUserId": identifier, "createdAt": "2026-01-01T00:00:00.000Z"],
+            "profile": [
+                "clerkUserId": identifier,
+                "displayName": NSNull(),
+                "avatarUrl": NSNull(),
+                "bio": NSNull(),
+                "websiteUrl": NSNull(),
+                "createdAt": "2026-01-01T00:00:00.000Z"
+            ],
             "publicApps": [],
             "recentComments": []
         ]

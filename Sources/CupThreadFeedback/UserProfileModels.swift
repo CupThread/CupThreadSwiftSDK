@@ -60,12 +60,27 @@ public struct UserProfile: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        // All six keys are required by the corrected component; the four
+        // nullable ones accept an explicit null but not an absent key
+        // (issue #505).
         clerkUserId = try container.decode(String.self, forKey: .clerkUserId)
-        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
-        avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
-        bio = try container.decodeIfPresent(String.self, forKey: .bio)
-        websiteUrl = try container.decodeIfPresent(String.self, forKey: .websiteUrl)
-        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        displayName = try container.decode(String?.self, forKey: .displayName)
+        avatarUrl = try container.decode(String?.self, forKey: .avatarUrl)
+        bio = try container.decode(String?.self, forKey: .bio)
+        websiteUrl = try container.decode(String?.self, forKey: .websiteUrl)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        // Write required-nullable keys as explicit nulls so a round trip
+        // produces a payload the corrected decoder accepts (issue #505).
+        try container.encode(clerkUserId, forKey: .clerkUserId)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(avatarUrl, forKey: .avatarUrl)
+        try container.encode(bio, forKey: .bio)
+        try container.encode(websiteUrl, forKey: .websiteUrl)
+        try container.encode(createdAt, forKey: .createdAt)
     }
 }
 
@@ -304,10 +319,12 @@ public struct PublicAppSummary: Codable, Equatable, Identifiable, Sendable {
         // served, so accepting it would let a stale payload decode with an
         // empty slug (#505).
         appSlug = try container.decode(String.self, forKey: .appSlug)
-        iconUrl = try container.decodeIfPresent(String.self, forKey: .iconUrl)
-        description = try container.decodeIfPresent(String.self, forKey: .description)
-        workspaceSlug = try container.decodeIfPresent(String.self, forKey: .workspaceSlug)
-        workspaceName = try container.decodeIfPresent(String.self, forKey: .workspaceName)
+        // All seven keys are required by `PublicUserProfileApp`; nullable
+        // values accept an explicit null (issue #505).
+        iconUrl = try container.decode(String?.self, forKey: .iconUrl)
+        description = try container.decode(String?.self, forKey: .description)
+        workspaceSlug = try container.decode(String?.self, forKey: .workspaceSlug)
+        workspaceName = try container.decode(String?.self, forKey: .workspaceName)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -315,10 +332,11 @@ public struct PublicAppSummary: Codable, Equatable, Identifiable, Sendable {
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(appSlug, forKey: .appSlug)
-        try container.encodeIfPresent(iconUrl, forKey: .iconUrl)
-        try container.encodeIfPresent(description, forKey: .description)
-        try container.encodeIfPresent(workspaceSlug, forKey: .workspaceSlug)
-        try container.encodeIfPresent(workspaceName, forKey: .workspaceName)
+        // Preserve required-nullable keys as explicit nulls on round trip.
+        try container.encode(iconUrl, forKey: .iconUrl)
+        try container.encode(description, forKey: .description)
+        try container.encode(workspaceSlug, forKey: .workspaceSlug)
+        try container.encode(workspaceName, forKey: .workspaceName)
     }
 }
 

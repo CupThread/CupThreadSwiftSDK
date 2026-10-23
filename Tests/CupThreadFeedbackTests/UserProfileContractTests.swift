@@ -19,7 +19,14 @@ struct UserProfileContractTests {
         // (issue #505).
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             let body: [String: Any] = [
-                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": [
+                    "clerkUserId": Self.profileID,
+                    "displayName": NSNull(),
+                    "avatarUrl": NSNull(),
+                    "bio": NSNull(),
+                    "websiteUrl": NSNull(),
+                    "createdAt": "2026-01-01T00:00:00.000Z"
+                ],
                 "recentComments": []
             ]
             return (makeHTTPResponse(), try encodeJSON(body))

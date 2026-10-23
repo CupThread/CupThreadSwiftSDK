@@ -34,10 +34,29 @@ struct UserProfileModelsTests {
         #expect(profile.updatedAt == nil)
     }
 
-    @Test func userProfileDecodesWithRequiredFieldsOnly() throws {
+    @Test func userProfileRequiresTheSixDocumentedKeys() {
+        // The corrected `UserProfile` component marks all six keys
+        // required; an absent key is contract drift (issue #505).
         let json = Data("""
         {
             "clerkUserId": "user_456"
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(UserProfile.self, from: json)
+        }
+    }
+
+    @Test func userProfileAcceptsNullForNullableKeys() throws {
+        let json = Data("""
+        {
+            "clerkUserId": "user_456",
+            "displayName": null,
+            "avatarUrl": null,
+            "bio": null,
+            "websiteUrl": null,
+            "createdAt": "2026-01-01T00:00:00.000Z"
         }
         """.utf8)
 
@@ -47,9 +66,7 @@ struct UserProfileModelsTests {
         #expect(profile.avatarUrl == nil)
         #expect(profile.bio == nil)
         #expect(profile.websiteUrl == nil)
-        #expect(profile.hideComments == false)
-        #expect(profile.createdAt == nil)
-        #expect(profile.updatedAt == nil)
+        #expect(profile.createdAt == "2026-01-01T00:00:00.000Z")
     }
 
     @Test func userProfileDecodesFromAuthoritativeBackendShapeWithoutHideCommentsAndUpdatedAt() throws {
@@ -153,6 +170,11 @@ struct UserProfileModelsTests {
         {
             "profile": {
                 "clerkUserId": "user_2",
+                "displayName": null,
+                "avatarUrl": null,
+                "bio": null,
+                "websiteUrl": null,
+                "createdAt": "2026-01-01T00:00:00.000Z",
                 "hideComments": true
             },
             "apps": [],
@@ -171,7 +193,14 @@ struct UserProfileModelsTests {
         // comments; treating it as optional hides contract drift (#505).
         let json = Data("""
         {
-            "profile": {"clerkUserId": "user_2"},
+            "profile": {
+                "clerkUserId": "user_2",
+                "displayName": null,
+                "avatarUrl": null,
+                "bio": null,
+                "websiteUrl": null,
+                "createdAt": "2026-01-01T00:00:00.000Z"
+            },
             "publicApps": []
         }
         """.utf8)
@@ -189,6 +218,7 @@ struct UserProfileModelsTests {
             bio: nil,
             websiteUrl: nil,
             hideComments: false,
+            createdAt: "2026-01-01T00:00:00.000Z",
             updatedAt: "2026-01-02T00:00:00.000Z"
         )
         let app = PublicAppSummary(
@@ -240,7 +270,9 @@ struct UserProfileModelsTests {
             "name": "App Three",
             "appSlug": "app-three",
             "workspaceSlug": "ws-3",
-            "workspaceName": "Workspace Three"
+            "workspaceName": "Workspace Three",
+            "description": null,
+            "iconUrl": null
         }
         """.utf8)
 
@@ -263,7 +295,27 @@ struct UserProfileModelsTests {
             "name": "App Four",
             "slug": "app-four",
             "workspaceSlug": "ws-4",
-            "workspaceName": "Workspace Four"
+            "workspaceName": "Workspace Four",
+            "description": null,
+            "iconUrl": null
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(PublicAppSummary.self, from: json)
+        }
+    }
+
+    @Test func publicAppSummaryRequiresEveryComponentKey() {
+        // All seven `PublicUserProfileApp` keys are required; the nullable
+        // ones may be null but must be present (issue #505).
+        let json = Data("""
+        {
+            "id": "app-5",
+            "name": "App Five",
+            "appSlug": "app-five",
+            "workspaceSlug": "ws-5",
+            "workspaceName": "Workspace Five"
         }
         """.utf8)
 
