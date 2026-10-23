@@ -347,6 +347,29 @@ struct EndUserClientTests {
             }
         }
     }
+
+    /// The API answers 404 uniformly for an unknown appKey and for an app
+    /// whose public surfaces are disabled (issue #504); the SDK surfaces
+    /// that single outcome as `.unexpectedStatus(404)` and never invents a
+    /// second code path for the disabled-app case.
+    @Test func linkMaps404ToUnexpectedStatusForUnknownOrPrivateApp() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(status: 404), try encodeJSON(["error": "App not found"]))
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        do {
+            _ = try await client.linkEndUser(sessionToken: "sess", userToken: "tok")
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            if case .unexpectedStatus(let code, let message, _) = error {
+                #expect(code == 404)
+                #expect(message == "App not found")
+            } else {
+                Issue.record("Unexpected error type: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - PUT /user rate-limit retry

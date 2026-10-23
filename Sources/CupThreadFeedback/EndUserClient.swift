@@ -263,8 +263,11 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
     ///   server policy forbids the link (HTTP 403),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   with status 404 when no profile matches and 409 when the profile
-    ///   is already confirmed to a different identity, or
+    ///   with status 404 for an unknown `appKey` **or** an app whose public
+    ///   surfaces are disabled — the API answers both with the same
+    ///   `"App not found"` body by design, so callers must treat the two as
+    ///   one outcome (issue #504) — and with status 409 when the profile is
+    ///   already confirmed to a different identity, or
     ///   ``FeedbackClientError/invalidResponse``.
     public func linkEndUser(
         sessionToken: String,
