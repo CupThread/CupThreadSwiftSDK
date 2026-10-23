@@ -80,6 +80,17 @@ public struct UserProfile: Codable, Equatable, Sendable {
         try container.encode(avatarUrl, forKey: .avatarUrl)
         try container.encode(bio, forKey: .bio)
         try container.encode(websiteUrl, forKey: .websiteUrl)
+        guard let createdAt else {
+            // The contract requires a non-null timestamp, so emitting null
+            // would create a payload this model cannot decode.
+            throw EncodingError.invalidValue(
+                self,
+                EncodingError.Context(
+                    codingPath: container.codingPath + [CodingKeys.createdAt],
+                    debugDescription: "UserProfile.createdAt is required by the public profile contract"
+                )
+            )
+        }
         try container.encode(createdAt, forKey: .createdAt)
     }
 }

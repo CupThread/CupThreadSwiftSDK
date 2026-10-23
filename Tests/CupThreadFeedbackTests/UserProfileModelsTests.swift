@@ -69,6 +69,16 @@ struct UserProfileModelsTests {
         #expect(profile.createdAt == "2026-01-01T00:00:00.000Z")
     }
 
+    @Test func userProfileRefusesToEncodeWithoutCreatedAt() {
+        // Encoding a profile with no timestamp would emit JSON null, which
+        // the corrected decoder rejects; fail at encode instead (issue #505).
+        let profile = UserProfile(clerkUserId: "user_789")
+
+        #expect(throws: EncodingError.self) {
+            _ = try JSONEncoder().encode(profile)
+        }
+    }
+
     @Test func userProfileDecodesFromAuthoritativeBackendShapeWithoutHideCommentsAndUpdatedAt() throws {
         let json = Data("""
         {
