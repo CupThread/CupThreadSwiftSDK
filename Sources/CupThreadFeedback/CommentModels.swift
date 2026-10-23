@@ -19,7 +19,7 @@ public struct FeatureRequestComment: Codable, Identifiable, Equatable, Sendable 
     /// Avatar URL of the comment author, when given.
     public let authorAvatarUrl: String?
     /// App-scoped pseudonymous user identifier of the comment author (e.g.
-    /// `u_ab12cd34`), when given. Stable within one app only — never assume
+    /// `u_ab12cd34ef567890abcdef1234567890`), when given. Stable within one app only — never assume
     /// a `user_` prefix or compare it across apps.
     public let authorClerkId: String?
     /// The comment body text.
@@ -90,7 +90,7 @@ public struct CommentDraft: Equatable, Sendable {
     /// Id of the parent comment this is a reply to, when replying.
     public var parentId: String?
     /// App-scoped pseudonymous identifier of the author being replied to
-    /// (e.g. `u_ab12cd34`). Not transmitted — the server derives reply
+    /// (e.g. `u_ab12cd34ef567890abcdef1234567890`). Not transmitted — the server derives reply
     /// identity from `parentId`.
     public var replyToClerkId: String?
     /// Display name of the author being replied to, when replying.
@@ -200,7 +200,7 @@ public struct CommentDisplayModel: Equatable, Identifiable, Sendable {
     /// Avatar URL, or nil if redacted due to moderation.
     public let authorAvatarUrl: String?
     /// App-scoped pseudonymous user id for profile navigation (e.g.
-    /// `u_ab12cd34`), or nil if redacted.
+    /// `u_ab12cd34ef567890abcdef1234567890`), or nil if redacted.
     public let authorClerkId: String?
     /// Whether users can reply to this comment.
     public let canReply: Bool

@@ -8,6 +8,20 @@ import Testing
 struct UserProfileClientTests {
     static let apiHost = "profiles.example.com"
 
+    // App-scoped pseudonyms (`u_` + 32 lowercase hex) are the only
+    // identifier shape the public profile endpoint resolves (PRIV-06,
+    // SaaS#1322); every other shape is rejected locally.
+    static let profileID = "u_1a2b3c4d5e6f708192a3b4c5d6e7f809"
+    static let rateLimitedID = "u_2b3c4d5e6f708192a3b4c5d6e7f8091a"
+    static let authoritativeID = "u_3c4d5e6f708192a3b4c5d6e7f8091a2b"
+    static let unknownID = "u_4d5e6f708192a3b4c5d6e7f8091a2b3c"
+    static let empty404ID = "u_5e6f708192a3b4c5d6e7f8091a2b3c4d"
+    static let router404ID = "u_6f708192a3b4c5d6e7f8091a2b3c4d5e"
+    static let malformed200ID = "u_708192a3b4c5d6e7f8091a2b3c4d5e6f"
+    static let p500ID = "u_8192a3b4c5d6e7f8091a2b3c4d5e6f70"
+    static let forbiddenID = "u_92a3b4c5d6e7f8091a2b3c4d5e6f7081"
+    static let unauthedID = "u_a3b4c5d6e7f8091a2b3c4d5e6f708192"
+
     static func makeAPIClient(
         authenticationProvider: (@Sendable () async -> String?)? = nil
     ) -> FeedbackClient {
@@ -22,17 +36,17 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request.url
             let body: [String: Any] = [
-                "profile": ["clerkUserId": "user_123", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
                 "publicApps": [],
                 "recentComments": []
             ]
             return (makeHTTPResponse(), try encodeJSON(body))
         }
 
-        _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_123")
+        _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.profileID)
 
         let url = try #require(capture.value)
-        #expect(url.path == "/api/v1/users/user_123/profile")
+        #expect(url.path == "/api/v1/users/\(Self.profileID)/profile")
     }
 
     @Test func fetchUserProfileSendsAppKeyForAppScopedPublicIds() async throws {
@@ -62,25 +76,26 @@ struct UserProfileClientTests {
         #expect(queryItems.first?.value == "app_testkey123456")
     }
 
-    @Test func fetchUserProfileOmitsAppKeyForRawClerkIds() async throws {
-        // Raw Clerk ids (`user_*`) keep working for existing /u/ bookmarks
-        // without the app-scoped lookup parameter.
+    @Test func fetchUserProfileAlwaysSendsAppKeyForPseudonyms() async throws {
+        // The profile endpoint resolves app-scoped pseudonyms within one app,
+        // so every accepted lookup carries the `appKey` query parameter; a
+        // pseudonym without it answers 404 for an existing user (#139, #512).
         let capture = CaptureBox<URL>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request.url
             let body: [String: Any] = [
-                "profile": ["clerkUserId": "user_bookmark", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
                 "publicApps": [],
                 "recentComments": []
             ]
             return (makeHTTPResponse(), try encodeJSON(body))
         }
 
-        _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_bookmark")
+        _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.profileID)
 
         let url = try #require(capture.value)
         let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
-        #expect(components.queryItems?.contains { $0.name == "appKey" } != true)
+        #expect(components.queryItems?.contains { $0.name == "appKey" } == true)
     }
 
     @Test func fetchUserProfileThrowsRateLimitedOn429() async throws {
@@ -95,7 +110,7 @@ struct UserProfileClientTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_ratelimited")
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.rateLimitedID)
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .rateLimited(let message, let requestId) = error {
@@ -116,7 +131,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             let body: [String: Any] = [
                 "profile": [
-                    "clerkUserId": "user_authoritative",
+                    "clerkUserId": Self.authoritativeID,
                     "displayName": "Alex",
                     "avatarUrl": "https://example.com/avatar.png",
                     "bio": "Engineer",
@@ -149,8 +164,8 @@ struct UserProfileClientTests {
             return (makeHTTPResponse(), try encodeJSON(body))
         }
 
-        let response = try await Self.makeAPIClient().fetchUserProfile(userId: "user_authoritative")
-        #expect(response.profile.clerkUserId == "user_authoritative")
+        let response = try await Self.makeAPIClient().fetchUserProfile(userId: Self.authoritativeID)
+        #expect(response.profile.clerkUserId == Self.authoritativeID)
         #expect(response.apps.count == 1)
         #expect(response.apps[0].slug == "alpha-app")
         #expect(response.apps[0].workspaceSlug == "ws-alpha")
@@ -171,7 +186,7 @@ struct UserProfileClientTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_unknown")
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.unknownID)
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .userProfileNotFound(let message, let requestId) = error {
@@ -199,7 +214,7 @@ struct UserProfileClientTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_empty_404")
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.empty404ID)
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(let code, let message, let requestId) = error {
@@ -226,7 +241,7 @@ struct UserProfileClientTests {
             }
 
             do {
-                _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_router_404")
+                _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.router404ID)
                 Issue.record("Expected error to be thrown")
             } catch let error as FeedbackClientError {
                 if case .unexpectedStatus(let code, let message, let requestId) = error {
@@ -254,7 +269,7 @@ struct UserProfileClientTests {
             }
 
             do {
-                _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_malformed_200")
+                _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.malformed200ID)
                 Issue.record("Expected error to be thrown")
             } catch let error as FeedbackClientError {
                 #expect(error == .invalidResponse, "Got \(error)")
@@ -270,7 +285,7 @@ struct UserProfileClientTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_500")
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.p500ID)
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             if case .unexpectedStatus(let code, let message, _) = error {
@@ -287,7 +302,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             let body: [String: Any] = [
-                "profile": ["clerkUserId": "user_123", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
                 "publicApps": [],
                 "recentComments": []
             ]
@@ -295,7 +310,7 @@ struct UserProfileClientTests {
         }
 
         let client = Self.makeAPIClient(authenticationProvider: { "token-123" })
-        _ = try await client.fetchUserProfile(userId: "user_123")
+        _ = try await client.fetchUserProfile(userId: Self.profileID)
 
         let request = try #require(capture.value)
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-123")
@@ -308,7 +323,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             let body: [String: Any] = [
-                "profile": ["clerkUserId": "user_123", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
                 "publicApps": [],
                 "recentComments": []
             ]
@@ -316,7 +331,7 @@ struct UserProfileClientTests {
         }
 
         let client = Self.makeAPIClient(authenticationProvider: { nil })
-        _ = try await client.fetchUserProfile(userId: "user_123")
+        _ = try await client.fetchUserProfile(userId: Self.profileID)
 
         let request = try #require(capture.value)
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
@@ -327,7 +342,7 @@ struct UserProfileClientTests {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             let body: [String: Any] = [
-                "profile": ["clerkUserId": "user_123", "createdAt": "2026-01-01T00:00:00.000Z"],
+                "profile": ["clerkUserId": Self.profileID, "createdAt": "2026-01-01T00:00:00.000Z"],
                 "publicApps": [],
                 "recentComments": []
             ]
@@ -335,7 +350,7 @@ struct UserProfileClientTests {
         }
 
         let client = Self.makeAPIClient()
-        _ = try await client.fetchUserProfile(userId: "user_123")
+        _ = try await client.fetchUserProfile(userId: Self.profileID)
 
         let request = try #require(capture.value)
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
@@ -350,7 +365,7 @@ struct UserProfileClientTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_forbidden")
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.forbiddenID)
             Issue.record("Expected forbidden error to be thrown")
         } catch let error as FeedbackClientError {
             if case .forbidden(let message, let requestId) = error {
@@ -371,7 +386,7 @@ struct UserProfileClientTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_unauthed")
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.unauthedID)
             Issue.record("Expected authenticationRequired error to be thrown")
         } catch let error as FeedbackClientError {
             #expect(error == .authenticationRequired)
@@ -390,7 +405,7 @@ struct UserProfileClientTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().fetchUserProfile(userId: "user_unauthed")
+            _ = try await Self.makeAPIClient().fetchUserProfile(userId: Self.unauthedID)
             Issue.record("Expected authenticationRequired error to be thrown")
         } catch let error as FeedbackClientError {
             #expect(error == .authenticationRequired)

@@ -11,23 +11,29 @@ extension FeedbackClient {
     /// load when `allowAnonymousRoadmap = false`.
     /// - Parameter userId: App-scoped pseudonymous user identifier (as found
     ///   in `authorClerkId`, `replyToClerkId`, `requesterClerkId`, and
-    ///   `recentCommenters[].clerkUserId` on public payloads); raw user IDs
-    ///   are accepted as well. App-scoped ids (`u_…`) are looked up within
-    ///   the configuration's app, so the request carries the `appKey` query
-    ///   parameter the server requires for them. The value is trimmed, and
-    ///   values that cannot be a single URL path segment (empty, whitespace,
-    ///   or containing path/query/percent characters — API-26 grammar) throw
-    ///   ``FeedbackClientError/userProfileNotFound(message:requestId:)``
-    ///   locally, before any request is sent. Profiles are opt-in:
-    ///   callers should expect
+    ///   `recentCommenters[].clerkUserId` on public payloads). This endpoint
+    ///   resolves app-scoped pseudonyms only: the value must be `u_` followed
+    ///   by 32 lowercase hex characters, and the request carries the
+    ///   `appKey` query parameter the server needs to resolve it within this
+    ///   app. Raw Clerk ids (`user_…`) and every other identifier are
+    ///   rejected locally with
+    ///   ``FeedbackClientError/userProfileNotFound(message:requestId:)`` —
+    ///   the server answers them with the same anonymous placeholder it uses
+    ///   for an opted-out user (PRIV-06, SaaS#1322), so dispatching one could
+    ///   only render an empty profile that looks like a real opt-out. The
+    ///   value is trimmed, and values that cannot be a single URL path
+    ///   segment (empty, whitespace, or containing path/query/percent
+    ///   characters — API-26 grammar) are rejected the same way, before any
+    ///   request is sent. Profiles are opt-in: callers should expect
     ///   ``FeedbackClientError/userProfileNotFound(message:requestId:)`` for
-    ///   unknown identifiers and an empty profile for users without a public
+    ///   unknown pseudonyms and an empty profile for users without a public
     ///   profile.
     /// - Returns: The user's public profile data.
     /// - Throws: ``FeedbackClientError/userProfileNotFound(message:requestId:)``
     ///   when the server answers HTTP 404 with the documented JSON error
     ///   envelope (the user has no public profile), or locally with no
-    ///   request sent when `userId` cannot be a valid id,
+    ///   request sent when `userId` is not an app-scoped pseudonym or cannot
+    ///   be a valid id,
     ///   ``FeedbackClientError/authenticationRequired`` or
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when
     ///   access is rejected by the server's permission policy (HTTP 401/403),
@@ -46,20 +52,27 @@ extension FeedbackClient {
             // not-found.
             throw FeedbackClientError.userProfileNotFound(message: nil, requestId: nil)
         }
+        guard UserProfileIDGrammar.isPseudonym(trimmedID) else {
+            // The unauthenticated profile endpoint resolves app-scoped
+            // pseudonyms only (PRIV-06, SaaS#1322). A raw Clerk id — or any
+            // other identifier — comes back as the anonymous placeholder
+            // (HTTP 200, `displayName: null`, empty collections), which is
+            // indistinguishable from a real user who opted out. Refuse
+            // locally so the caller gets the documented not-found error
+            // instead of rendering an empty profile as if it were data.
+            throw FeedbackClientError.userProfileNotFound(message: nil, requestId: nil)
+        }
         var profileURL = configuration.baseURL.appending(path: "/api/v1/users/\(trimmedID)/profile")
         // App-scoped public ids (`u_<32-hex>`) from board/comment payloads are
         // app-keyed on the server: without `appKey` an existing user answers
-        // 404 "User profile not found". Raw Clerk ids (`user_*`, from /u/
-        // bookmarks) remain accepted without it.
-        if trimmedID.hasPrefix("u_") {
-            var components = URLComponents(
-                url: profileURL,
-                resolvingAgainstBaseURL: false
-            )
-            components?.queryItems = [URLQueryItem(name: "appKey", value: configuration.appKey)]
-            if let keyedURL = components?.url {
-                profileURL = keyedURL
-            }
+        // 404 "User profile not found".
+        var components = URLComponents(
+            url: profileURL,
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "appKey", value: configuration.appKey)]
+        if let keyedURL = components?.url {
+            profileURL = keyedURL
         }
         var request = URLRequest(url: profileURL)
         request.httpMethod = "GET"
