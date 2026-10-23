@@ -462,20 +462,24 @@ extension FeatureRequestsView {
     /// concurrent search task to resolve it as a side effect.
     @MainActor
     func loadVersions() async {
+        // A list load started while these versions were in flight owns the
+        // verdict: its fresh request re-tested the server after this one.
+        let listGenerationAtStart = loadGeneration
         let access = await Self.resolveRoadmapAccess(client: client, config: activeConfig)
         isAuthenticated = access.supportsAuthentication
         hasResolvedAuthentication = true
         guard !Task.isCancelled else { return }
         guard access.isPermitted else { return }
-        // A fresh load re-tests the server; a rejection from an earlier cycle
-        // must not outlive it (BUG-42, issue #523).
-        serverRejection.beginLoadCycle()
+        // A fresh versions load re-tests its own verdict; a list rejection is
+        // preserved until a list load starts (BUG-42, issue #523).
+        serverRejection.beginVersionsLoadCycle()
         versionFilterState.loadStarted()
         do {
             versionFilterState.loadFinished(try await client.fetchVersions())
         } catch {
             if isSdkPermissionRejection(error) {
-                serverRejection.reject()
+                guard loadGeneration == listGenerationAtStart else { return }
+                serverRejection.rejectVersions()
                 return
             }
             versionFilterState.loadFailed(error)
@@ -507,7 +511,7 @@ private extension FeatureRequestsView {
         pageError = nil
         // Every fresh load re-tests the server verdict, so a stale 401 from a
         // previous cycle cannot keep the surface blocked (BUG-42, issue #523).
-        serverRejection.beginLoadCycle()
+        serverRejection.beginListLoadCycle()
         defer {
             // Only a completed verdict of the newest, non-cancelled load may
             // resolve the lifecycle. A cancelled or superseded load never
@@ -544,7 +548,7 @@ private extension FeatureRequestsView {
             // token expired (or was revoked) between the check and the
             // send. The signed-out permission placeholder replaces the
             // list instead of the generic error state (issue #297, #363).
-            serverRejection.reject()
+            serverRejection.rejectList()
             return
         }
         guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty)
@@ -585,7 +589,7 @@ private extension FeatureRequestsView {
         } catch {
             guard loadGeneration == generationAtStart, !error.isSdkCancellation else { return }
             if isSdkPermissionRejection(error) {
-                serverRejection.reject()
+                serverRejection.rejectList()
                 return
             }
             if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
@@ -745,7 +749,7 @@ extension FeatureRequestsView {
         _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
         _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
         let latch = serverRejection ?? ServerRejectionLatch()
-        if rejectedByServer { latch.reject() }
+        if rejectedByServer { latch.rejectList() }
         _serverRejection = State(initialValue: latch)
         _isComposePresented = State(initialValue: autoPresentCompose)
         _searchText = State(initialValue: initialSearchText)

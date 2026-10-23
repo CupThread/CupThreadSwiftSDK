@@ -81,6 +81,15 @@ struct FeatureRequestsServerRejectionTests {
         try encodeJSON(["error": "Sign in required", "code": "authentication_required"])
     }
 
+    private func viewTreeContains(_ node: Any, _ target: Any.Type) -> Bool {
+        if type(of: node) == target { return true }
+        for child in Mirror(reflecting: node).children
+        where viewTreeContains(child.value, target) {
+            return true
+        }
+        return false
+    }
+
     private func stubFeatureRequests(_ sequence: ResponseSequence) {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             guard request.url?.path.hasSuffix("/feature-requests") == true else {
@@ -107,12 +116,30 @@ struct FeatureRequestsServerRejectionTests {
 
     // MARK: - Latch semantics
 
-    @Test func beginLoadCycleDiscardsThePreviousVerdict() {
+    @Test func beginListLoadCycleDiscardsThePreviousVerdict() {
         let latch = ServerRejectionLatch()
-        latch.reject()
+        latch.rejectList()
         #expect(latch.isRejected)
 
-        latch.beginLoadCycle()
+        latch.beginListLoadCycle()
+        #expect(!latch.isRejected)
+    }
+
+    @Test func listRejectionSurvivesAVersionsCycle() {
+        let latch = ServerRejectionLatch()
+        latch.rejectList()
+
+        latch.beginVersionsLoadCycle()
+        latch.rejectVersions()
+        #expect(latch.isRejected, "versions must not clear or replace a list-owned rejection")
+    }
+
+    @Test func versionsRejectionIsRetestedByTheNextVersionsCycle() {
+        let latch = ServerRejectionLatch()
+        latch.rejectVersions()
+        #expect(latch.isRejected)
+
+        latch.beginVersionsLoadCycle()
         #expect(!latch.isRejected)
     }
 
@@ -127,10 +154,13 @@ struct FeatureRequestsServerRejectionTests {
         await view.loadVersions()
         #expect(latch.isRejected)
         #expect(view.isRoadmapPermissionBlocked)
+        #expect(viewTreeContains(view.body, SdkPermissionDeniedView.self))
 
         await view.loadVersions()
         #expect(!latch.isRejected)
         #expect(!view.isRoadmapPermissionBlocked)
+        #expect(!viewTreeContains(view.body, SdkPermissionDeniedView.self))
+        #expect(viewTreeContains(view.body, SkeletonCardList.self))
         #expect(sequence.requestCount == 2)
     }
 
@@ -138,7 +168,7 @@ struct FeatureRequestsServerRejectionTests {
 
     @Test @MainActor func retryIsOfferedOnlyForAServerRejectionUnderAPermittedPreflight() {
         let rejected = ServerRejectionLatch()
-        rejected.reject()
+        rejected.rejectList()
 
         let permitted = makeView(rejected)
         #expect(permitted.isRoadmapPermissionBlocked)
@@ -161,14 +191,17 @@ struct FeatureRequestsServerRejectionTests {
         let sequence = ResponseSequence(failures: 0)
         stubFeatureRequests(sequence)
         let latch = ServerRejectionLatch()
-        latch.reject()
+        latch.rejectList()
         let view = makeView(latch)
 
+        #expect(viewTreeContains(view.body, SdkPermissionDeniedView.self))
         #expect(view.canRetryServerRejection)
         await view.permissionRetryAction?()
 
         #expect(!latch.isRejected)
         #expect(!view.isRoadmapPermissionBlocked)
+        #expect(!viewTreeContains(view.body, SdkPermissionDeniedView.self))
+        #expect(viewTreeContains(view.body, SkeletonCardList.self))
         #expect(sequence.requestCount == 1)
     }
 }

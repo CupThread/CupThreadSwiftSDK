@@ -10,16 +10,43 @@ import Observation
 /// `@State` writes are not persisted.
 @Observable
 final class ServerRejectionLatch {
-    /// Whether the current load cycle ended in a server-side rejection.
-    private(set) var isRejected = false
-
-    /// Starts a new load cycle, discarding the previous cycle's verdict.
-    func beginLoadCycle() {
-        isRejected = false
+    /// The load that recorded the current rejection. A versions load may
+    /// clear only its own verdict; a list rejection survives until a list
+    /// load starts, because versions does not fetch the list.
+    private enum Source {
+        case list
+        case versions
     }
 
-    /// Records a server-side permission rejection for the current cycle.
-    func reject() {
+    /// Whether the current load cycle ended in a server-side rejection.
+    private(set) var isRejected = false
+    private var source: Source?
+
+    /// Starts a list load, discarding any previous verdict.
+    func beginListLoadCycle() {
+        isRejected = false
+        source = nil
+    }
+
+    /// Starts a versions load. A versions-owned verdict is re-tested; a
+    /// list-owned rejection stays until a list load starts.
+    func beginVersionsLoadCycle() {
+        guard source != .list else { return }
+        isRejected = false
+        source = nil
+    }
+
+    /// Records a server-side permission rejection from a list load.
+    func rejectList() {
         isRejected = true
+        source = .list
+    }
+
+    /// Records a server-side permission rejection from a versions load. A
+    /// list-owned rejection is never replaced by it.
+    func rejectVersions() {
+        guard source != .list else { return }
+        isRejected = true
+        source = .versions
     }
 }
