@@ -303,7 +303,7 @@ struct IntakeTextBudgetTests {
     @Test func featureRequestDraftOverLimitFieldMatrix() {
         let atCap = FeatureRequestDraft(
             title: String(repeating: "t", count: IntakeTextLimits.maxTitleLength),
-            description: String(repeating: "d", count: IntakeTextLimits.maxDescriptionLength),
+            description: String(repeating: "d", count: IntakeTextLimits.maxFeatureRequestDescriptionLength),
             requesterName: String(repeating: "n", count: IntakeTextLimits.maxNameLength)
         )
         #expect(IntakeTextLimits.overLimitField(in: atCap) == nil)
@@ -319,6 +319,39 @@ struct IntakeTextBudgetTests {
         var overName = atCap
         overName.requesterName += "!"
         #expect(IntakeTextLimits.overLimitField(in: overName) == .name)
+    }
+
+    /// The two intake endpoints cap `description` differently, so a
+    /// feature-request draft that fits the feedback bound must still be
+    /// rejected here — and the shared constant must not be used for both.
+    @Test func featureRequestDescriptionUsesItsOwnTighterCap() {
+        #expect(IntakeTextLimits.maxFeatureRequestDescriptionLength < IntakeTextLimits.maxDescriptionLength)
+
+        let betweenCaps = FeatureRequestDraft(
+            title: "Idea",
+            description: String(repeating: "d", count: IntakeTextLimits.maxFeatureRequestDescriptionLength + 1)
+        )
+        #expect(IntakeTextLimits.overLimitField(in: betweenCaps) == .description)
+
+        // The same length is within the feedback endpoint's bound.
+        let feedbackAtThatLength = FeedbackDraft(
+            title: "Feedback",
+            description: String(repeating: "d", count: IntakeTextLimits.maxFeatureRequestDescriptionLength + 1),
+            platform: .ios
+        )
+        #expect(IntakeTextLimits.overLimitField(in: feedbackAtThatLength) == nil)
+    }
+
+    /// Pins each cap to the value the live OpenAPI document serves, so a
+    /// future server-side change is a deliberate, visible edit here.
+    @Test func fieldCapsMatchThePublishedServerBounds() {
+        #expect(IntakeTextLimits.maxTitleLength == 160)
+        #expect(IntakeTextLimits.maxDescriptionLength == 10_000)
+        #expect(IntakeTextLimits.maxFeatureRequestDescriptionLength == 5_000)
+        #expect(IntakeTextLimits.maxNameLength == 120)
+        #expect(IntakeTextLimits.maxCommentLength == 2_000)
+        #expect(IntakeTextLimits.minTitleLength == 3)
+        #expect(IntakeTextLimits.minDescriptionLength == 5)
     }
 
     @Test func commentDraftOverLimitFieldMatrix() {

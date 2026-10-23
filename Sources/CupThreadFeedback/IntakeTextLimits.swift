@@ -38,16 +38,28 @@ public enum IntakeTextLimits: Sendable {
     /// composers disable submitting below it and the client methods refuse
     /// such drafts locally, before any network work.
     public static let minDescriptionLength = 5
-    /// Feedback and feature-request title cap, in characters.
-    public static let maxTitleLength = 200
-    /// Feedback and feature-request description cap, in characters.
-    public static let maxDescriptionLength = 20_000
-    /// Feedback reporter and feature-requester display-name cap, in characters.
-    public static let maxNameLength = 100
+    /// Feedback and feature-request title cap, in characters
+    /// (`FeedbackSubmissionInput.title` / `CreateFeatureRequestInput.title`).
+    public static let maxTitleLength = 160
+    /// Feedback description cap, in characters
+    /// (`FeedbackSubmissionInput.description`).
+    ///
+    /// The two intake endpoints enforce different description bounds: feature
+    /// requests cap at
+    /// ``maxFeatureRequestDescriptionLength``. Sending the larger value here
+    /// is answered with `400 Validation failed`, so the composers gate on the
+    /// matching constant.
+    public static let maxDescriptionLength = 10_000
+    /// Feature-request description cap, in characters
+    /// (`CreateFeatureRequestInput.description`).
+    public static let maxFeatureRequestDescriptionLength = 5_000
+    /// Feedback reporter and feature-requester display-name cap, in characters
+    /// (`FeedbackSubmissionInput.reporterName` / `CreateFeatureRequestInput.requesterName`).
+    public static let maxNameLength = 120
     /// Feedback contact-email cap, in characters.
     public static let maxEmailLength = 254
-    /// Comment body cap, in characters.
-    public static let maxCommentLength = 5_000
+    /// Comment body cap, in characters (`CreateFeatureRequestCommentInput.body`).
+    public static let maxCommentLength = 2_000
     /// Whole-payload byte budget for intake JSON bodies: half the server's
     /// 256 KB bounded-reader budget, leaving headroom for JSON structure and
     /// the SDK's reserved metadata. Measured on the encoded `httpBody`
@@ -74,10 +86,12 @@ public enum IntakeTextLimits: Sendable {
     }
 
     /// The feature-request draft field over its cap, or `nil` when every
-    /// field fits.
+    /// field fits. The description uses
+    /// ``maxFeatureRequestDescriptionLength``, which is tighter than the
+    /// feedback endpoint's bound.
     public static func overLimitField(in draft: FeatureRequestDraft) -> IntakeField? {
         if measuredLength(draft.title) > maxTitleLength { return .title }
-        if measuredLength(draft.description) > maxDescriptionLength { return .description }
+        if measuredLength(draft.description) > maxFeatureRequestDescriptionLength { return .description }
         if measuredLength(draft.requesterName) > maxNameLength { return .name }
         return nil
     }
