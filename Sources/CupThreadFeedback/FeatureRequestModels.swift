@@ -9,7 +9,7 @@ import Foundation
 public struct RecentCommenter: Codable, Equatable, Sendable {
     /// Display name of the commenter, when given.
     public let authorName: String?
-    /// App-scoped pseudonymous user identifier (e.g. `u_ab12cd34`), enabling
+    /// App-scoped pseudonymous user identifier (e.g. `u_ab12cd34ef567890abcdef1234567890`), enabling
     /// navigation to the commenter's profile. Stable within one app only —
     /// never assume a `user_` prefix or compare it across apps.
     public let clerkUserId: String?
@@ -52,7 +52,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     /// Avatar URL of the requester, when given.
     public let requesterAvatarUrl: String?
     /// App-scoped pseudonymous user identifier of the requester (e.g.
-    /// `u_ab12cd34`), when given. Stable within one app only — never assume
+    /// `u_ab12cd34ef567890abcdef1234567890`), when given. Stable within one app only — never assume
     /// a `user_` prefix or compare it across apps.
     public let requesterClerkId: String?
     /// Array of recent commenters.

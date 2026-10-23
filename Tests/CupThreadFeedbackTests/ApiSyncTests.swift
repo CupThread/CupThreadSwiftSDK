@@ -495,6 +495,9 @@ struct PhotoAttachmentHelperMediaPolicyTests {
 @Suite("PseudonymousUserIdentifiers")
 struct PseudonymousUserIdentifiersTests {
     static let pseudonym = "u_ab12cd34ef56"
+    /// A full app-scoped pseudonym (`u_` + 32 lowercase hex) — the only shape
+    /// `fetchUserProfile(userId:)` dispatches (#512).
+    static let resolvablePseudonym = "u_0123456789abcdef0123456789abcdef"
 
     static func makeItemJSON() -> [String: Any] {
         [
@@ -602,18 +605,18 @@ struct PseudonymousUserIdentifiersTests {
         MockURLProtocol.setHandler(forHost: "priv06.example.com") { request in
             capture.value = request.url
             return (makeHTTPResponse(), try encodeJSON([
-                "profile": ["clerkUserId": Self.pseudonym, "displayName": NSNull()],
+                "profile": ["clerkUserId": Self.resolvablePseudonym, "displayName": NSNull()],
                 "publicApps": [],
                 "recentComments": []
             ]))
         }
 
         let client = makeClient(baseURL: URL(string: "https://priv06.example.com")!)
-        let response = try await client.fetchUserProfile(userId: Self.pseudonym)
+        let response = try await client.fetchUserProfile(userId: Self.resolvablePseudonym)
 
         let url = try #require(capture.value)
-        #expect(url.path == "/api/v1/users/\(Self.pseudonym)/profile")
-        #expect(response.profile.clerkUserId == Self.pseudonym)
+        #expect(url.path == "/api/v1/users/\(Self.resolvablePseudonym)/profile")
+        #expect(response.profile.clerkUserId == Self.resolvablePseudonym)
     }
 
     @Test func profileOptOutShapeDecodesWithNullDisplayNameAndEmptyCollections() throws {

@@ -7,7 +7,7 @@ import Foundation
 /// Returned as part of ``PublicUserProfileResponse`` from
 /// `GET /api/v1/users/{userId}/profile`.
 public struct UserProfile: Codable, Equatable, Sendable {
-    /// App-scoped pseudonymous user identifier (e.g. `u_ab12cd34`).
+    /// App-scoped pseudonymous user identifier (e.g. `u_ab12cd34ef567890abcdef1234567890`).
     ///
     /// Public endpoints no longer expose global identity-provider IDs. The
     /// value is stable within a single app but is not comparable across
@@ -135,10 +135,13 @@ public struct UserProfileComment: Codable, Equatable, Identifiable, Sendable {
 ///
 /// Public profiles are opt-in: for a user who has not created a public
 /// profile the server returns an empty profile (`displayName` is `null`,
-/// `publicApps` and `recentComments` are empty), and unknown identifiers
+/// `publicApps` and `recentComments` are empty), and unknown pseudonyms
 /// yield a `404` (surfaced as
-/// ``FeedbackClientError/userProfileNotFound(message:requestId:)``). The endpoint is
-/// rate-limited per client IP; a spent budget yields a `429` (surfaced as
+/// ``FeedbackClientError/userProfileNotFound(message:requestId:)``). The
+/// endpoint resolves app-scoped pseudonyms only (PRIV-06, SaaS#1322), so
+/// ``FeedbackClient/fetchUserProfile(userId:)`` rejects raw Clerk ids and
+/// other identifier shapes locally instead of dispatching them. The endpoint
+/// is rate-limited per client IP; a spent budget yields a `429` (surfaced as
 /// ``FeedbackClientError/rateLimited(message:requestId:)`` — back off and
 /// retry).
 public struct PublicUserProfileResponse: Codable, Equatable, Sendable {
