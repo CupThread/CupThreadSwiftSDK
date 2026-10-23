@@ -158,7 +158,11 @@ struct FeatureRequestComposeView: View {
                 TextField(CupThreadStrings.tr("cupthread.feedback.description_label"), text: $draft.description, axis: .vertical)
                     .lineLimit(5...10)
                     .padding(.top, 2)
-                intakeCharacterCounter(draft.description, limit: IntakeTextLimits.maxDescriptionLength, styledAsFormRow: true)
+                intakeCharacterCounter(
+                    draft.description,
+                    limit: IntakeTextLimits.maxFeatureRequestDescriptionLength,
+                    styledAsFormRow: true
+                )
             } header: {
                 Text(CupThreadStrings.tr("cupthread.feedback.section_feedback"))
             } footer: {
