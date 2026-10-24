@@ -99,19 +99,22 @@ struct RemoteImageLoaderCancellationTests {
         }
     }
 
-    /// Waits until the load for `url` has registered its in-flight entry so a
-    /// following `cancel()` deterministically hits a running download.
-    private func waitUntilInFlight(
+    /// Waits until the download for `url` is blocked on the gate: the in-flight
+    /// entry is registered *and* the handler has been entered (it records
+    /// itself before holding), so a following `cancel()` deterministically
+    /// hits a running, gated download.
+    private func waitUntilDownloadIsGated(
         _ loader: RemoteImageLoader,
+        counter: CancellationRequestCounter,
         url: URL,
         timeout: TimeInterval = 2
     ) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if loader.inFlightCount == 1 { return true }
+            if loader.inFlightCount == 1 && counter.requestCount == 1 { return true }
             try? await Task.sleep(for: .milliseconds(2))
         }
-        return loader.inFlightCount == 1
+        return loader.inFlightCount == 1 && counter.requestCount == 1
     }
 
     @Test func callerCancellationStillWarmsCacheWhenUnderlyingDownloadSucceeds() async throws {
@@ -127,7 +130,10 @@ struct RemoteImageLoaderCancellationTests {
             try await loader.image(for: imageURL)
         }
 
-        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
+        try #require(
+            await waitUntilDownloadIsGated(loader, counter: counter, url: imageURL),
+            "download never reached the gated handler"
+        )
         callerTask.cancel()
 
         let result = await callerTask.result
@@ -166,7 +172,10 @@ struct RemoteImageLoaderCancellationTests {
             try await loader.image(for: imageURL)
         }
 
-        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
+        try #require(
+            await waitUntilDownloadIsGated(loader, counter: counter, url: imageURL),
+            "download never reached the gated handler"
+        )
 
         let secondCaller = Task { @MainActor in
             try await loader.image(for: imageURL)
@@ -202,7 +211,10 @@ struct RemoteImageLoaderCancellationTests {
             try await loader.image(for: imageURL)
         }
 
-        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
+        try #require(
+            await waitUntilDownloadIsGated(loader, counter: counter, url: imageURL),
+            "download never reached the gated handler"
+        )
         caller1.cancel()
 
         _ = await caller1.result
@@ -228,7 +240,10 @@ struct RemoteImageLoaderCancellationTests {
             try await loader.image(for: imageURL)
         }
 
-        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
+        try #require(
+            await waitUntilDownloadIsGated(loader, counter: counter, url: imageURL),
+            "download never reached the gated handler"
+        )
         caller.cancel()
         _ = await caller.result
 
@@ -295,7 +310,10 @@ struct RemoteImageLoaderCancellationTests {
         let caller = Task { @MainActor in
             try await loader.image(for: imageURL)
         }
-        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
+        try #require(
+            await waitUntilDownloadIsGated(loader, counter: counter, url: imageURL),
+            "download never reached the gated handler"
+        )
         caller.cancel()
 
         guard case .failure(let error) = await caller.result else {
