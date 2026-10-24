@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Testing
 @testable import CupThreadFeedback
@@ -493,5 +494,63 @@ struct FeedbackUploadOriginSecurityTests {
                 Issue.record("Expected FeedbackClientError, got \(error)")
             }
         }
+    }
+
+    // MARK: Download-path effective-port parity (SEC-32)
+
+    @Test func downloadURLRejectsPortMismatch() {
+        let client = makeClient(baseURL: baseURL)
+        // Same host, apex, and CDN-widened registrable-domain hosts are all
+        // rejected once the port leg differs — matching the upload-slot and
+        // redirect policies.
+        let rejected = [
+            "https://api.example.com:8443/key",
+            "https://example.com:8443/key",
+            "https://cdn.example.com:8443/key",
+            "https://api.example.com:80/key"
+        ]
+        for item in rejected {
+            #expect(client.resolvedDownloadURL(from: item) == nil, "Expected \(item) to be rejected by resolvedDownloadURL")
+        }
+    }
+
+    @Test func downloadURLAcceptsDefaultPortEquivalence() {
+        let client = makeClient(baseURL: baseURL)
+        // The effective port (443 for https) is compared, not the literal
+        // `port` property: an explicit `:443` is equivalent to no port, and
+        // registrable-domain widening still applies with and without it.
+        let accepted = [
+            "https://api.example.com/key",
+            "https://api.example.com:443/key",
+            "https://cdn.example.com/key",
+            "https://cdn.example.com:443/key",
+            "/api/v1/attachments/file"
+        ]
+        for item in accepted {
+            #expect(client.resolvedDownloadURL(from: item) != nil, "Expected \(item) to resolve")
+        }
+    }
+
+    @Test func downloadURLKeepsHTTPBaseURLSemanticsWithPortLeg() {
+        // http-based baseURL keeps accepting http candidates (no downgrade
+        // guard) and now enforces the port leg: 8080 stays same-origin,
+        // 9000 does not.
+        let client = makeClient(baseURL: URL(string: "http://localhost:8080")!)
+        #expect(client.resolvedDownloadURL(from: "http://localhost:8080/file") != nil)
+        #expect(client.resolvedDownloadURL(from: "http://localhost:9000/file") == nil)
+
+        // Explicit :80 matches the implicit http default port.
+        let plainHTTPClient = makeClient(baseURL: URL(string: "http://api.example.com")!)
+        #expect(plainHTTPClient.resolvedDownloadURL(from: "http://api.example.com:80/file") != nil)
+    }
+
+    @Test func uploadURLAcceptsExplicitDefaultPort() throws {
+        // The upload fence compares effective ports too: an explicit `:443`
+        // on an https base is the same origin as the implicit default.
+        let client = makeClient(baseURL: baseURL)
+        let explicitDefaultPort = try client.uploadURL(from: "https://api.example.com:443/api/v1/uploads/slot-1")
+        #expect(explicitDefaultPort.host?.lowercased() == "api.example.com")
+        #expect(explicitDefaultPort.path == "/api/v1/uploads/slot-1")
+        #expect(explicitDefaultPort.port == nil || explicitDefaultPort.port == 443)
     }
 }
