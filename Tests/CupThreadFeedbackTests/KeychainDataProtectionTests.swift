@@ -18,7 +18,8 @@ struct KeychainDataProtectionTests {
     /// seam so the tests can assert the exact attributes the storage sends.
     private final class SeamCapture: @unchecked Sendable {
         var add: NSDictionary?
-        var update: NSDictionary?
+        var updateQuery: NSDictionary?
+        var updateChanges: NSDictionary?
         var copy: NSDictionary?
         var delete: NSDictionary?
     }
@@ -34,8 +35,11 @@ struct KeychainDataProtectionTests {
                 // Force the duplicate-item path so `SecItemUpdate` runs too.
                 return errSecDuplicateItem
             },
-            updateItem: { _, changes in
-                capture.update = changes as NSDictionary
+            updateItem: { query, changes in
+                // `SecItemUpdate` searches with the first dictionary, so the
+                // keychain targeting must arrive there, not in the changes.
+                capture.updateQuery = query as NSDictionary
+                capture.updateChanges = changes as NSDictionary
                 return errSecSuccess
             },
             copyItem: { query, _ in
@@ -57,7 +61,7 @@ struct KeychainDataProtectionTests {
         let operations: [(String, NSDictionary?)] = [
             ("SecItemCopyMatching (read)", capture.copy),
             ("SecItemAdd (write)", capture.add),
-            ("SecItemUpdate (overwrite)", capture.update),
+            ("SecItemUpdate (overwrite query)", capture.updateQuery),
             ("SecItemDelete (delete)", capture.delete)
         ]
         for (name, dictionary) in operations {
@@ -78,7 +82,7 @@ struct KeychainDataProtectionTests {
                 == kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
         )
         #expect(
-            capture.update?[kSecAttrAccessible as String] as? String
+            capture.updateChanges?[kSecAttrAccessible as String] as? String
                 == kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
         )
     }

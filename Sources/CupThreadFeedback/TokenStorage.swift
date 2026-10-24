@@ -243,16 +243,20 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
     func saveConfirmed(_ token: String) -> Bool {
         guard let data = token.data(using: .utf8) else { return false }
 
+        // The data-protection selector lives in the shared query, not the
+        // update attributes: `SecItemUpdate` searches with the query, so on
+        // macOS it must name the data-protection keychain to find (and
+        // overwrite) the item `SecItemAdd` created there.
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         var addAttributes = baseQuery
         addAttributes[kSecValueData as String] = data
         addAttributes[kSecAttrAccessible as String] = accessibility
-        addAttributes[kSecUseDataProtectionKeychain as String] = true
 
         let status = addItem(addAttributes as CFDictionary)
         guard status == errSecDuplicateItem else {
@@ -260,8 +264,7 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
         }
         let updateAttributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: accessibility,
-            kSecUseDataProtectionKeychain as String: true
+            kSecAttrAccessible as String: accessibility
         ]
         return updateItem(baseQuery as CFDictionary, updateAttributes as CFDictionary) == errSecSuccess
     }
