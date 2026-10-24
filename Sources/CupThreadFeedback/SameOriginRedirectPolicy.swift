@@ -26,9 +26,12 @@ import Foundation
 /// ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` — there
 /// is no silent success path.
 ///
-/// Sessions injected through `FeedbackClient.init(session:)` are not touched;
-/// install this delegate (or an equivalent policy) on such sessions to opt
-/// them into the same guarantee.
+/// Sessions injected through `FeedbackClient.init(session:)` are not modified;
+/// the SDK's upload PUTs (`uploadAttachment`) install this limiter as a
+/// **per-task delegate** on every call, so the upload guarantee holds on any
+/// session (#561). Every other request run on an injected session relies on
+/// the session's own policy — install this delegate (or an equivalent) on
+/// such sessions to opt them into the same guarantee there.
 final class SameOriginRedirectLimiter: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     /// The redirect policy for one redirect decision: `true` when
     /// `redirectURL` stays within `originalURL`'s origin, neither URL contains
