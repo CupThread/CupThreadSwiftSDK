@@ -278,13 +278,11 @@ private struct TurnstileWebView: TurnstileNativeViewRepresentable {
             _ webView: WKWebView,
             decidePolicyFor navigationAction: WKNavigationAction
         ) async -> WKNavigationActionPolicy {
-            if let frame = navigationAction.targetFrame, !frame.isMainFrame {
-                // The widget renders in a `challenges.cloudflare.com` iframe.
-                return .allow
-            }
-            let staysOnPage = navigationAction.targetFrame?.isMainFrame == true
-                && SameOriginRedirectLimiter.isSameOrigin(challengeURL, redirectURL: navigationAction.request.url)
-            return staysOnPage ? .allow : .cancel
+            TurnstileNavigationPolicy.isAllowed(
+                isMainFrame: navigationAction.targetFrame?.isMainFrame,
+                requestURL: navigationAction.request.url,
+                challengeURL: challengeURL
+            ) ? .allow : .cancel
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
