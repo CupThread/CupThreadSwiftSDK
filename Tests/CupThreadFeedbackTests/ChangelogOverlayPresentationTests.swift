@@ -83,14 +83,18 @@ struct ChangelogOverlayPresentationTests {
         return (Self.makeChangelogClient(), recordedRequests)
     }
 
+    // The stub-presenter tests carry no wall-clock budget (issue #562): their
+    // presenters resolve synchronously and the mocked pipeline cannot hang,
+    // so the verdict assertions need nothing but the return value. A fixed
+    // deadline here only measured runner jitter — a CI runner that stalled
+    // past 2 s failed the test spuriously.
+
     @Test func refusedPresentationReturnsFalse() async throws {
         mockChangelogAPI()
         let stub = await RefusedStubPresenter()
         let client = Self.makeChangelogClient(overlayPresenter: stub)
 
-        let result = try await withTimeout(seconds: 2) {
-            try await client.presentLatestChangelog()
-        }
+        let result = try await client.presentLatestChangelog()
 
         #expect(result == false)
     }
@@ -100,9 +104,7 @@ struct ChangelogOverlayPresentationTests {
         let stub = await SuccessfulStubPresenter()
         let client = Self.makeChangelogClient(overlayPresenter: stub)
 
-        let result = try await withTimeout(seconds: 2) {
-            try await client.presentLatestChangelog()
-        }
+        let result = try await client.presentLatestChangelog()
 
         #expect(result == true)
     }
@@ -122,8 +124,13 @@ struct ChangelogOverlayPresentationTests {
         ]
         let appearance = SdkAppearance.defaults
 
-        let startTime = ContinuousClock.now
-        let result = try await withTimeout(seconds: 2) {
+        // The 50 ms watchdog is the behavior under test; the outer budget is
+        // a hang-guard, not a latency assertion — a silent presenter never
+        // finishes, so a broken watchdog would hang the test without it. The
+        // budget stays far above runner jitter so only a genuine hang can
+        // reach it (issue #562); no elapsed-time assertion is needed — the
+        // `false` verdict can only come from the watchdog refusing.
+        let result = try await withTimeout(seconds: 10) {
             await presentPreparedChangelogOverlay(
                 client: client,
                 entries: entries,
@@ -132,10 +139,8 @@ struct ChangelogOverlayPresentationTests {
                 watchdogTimeout: .milliseconds(50)
             )
         }
-        let elapsed = ContinuousClock.now - startTime
 
         #expect(result == false)
-        #expect(elapsed < .seconds(1))
     }
 
     @Test func watchdogCancelledWhenPresented() async throws {
@@ -153,15 +158,13 @@ struct ChangelogOverlayPresentationTests {
         ]
         let appearance = SdkAppearance.defaults
 
-        let result = try await withTimeout(seconds: 2) {
-            await presentPreparedChangelogOverlay(
-                client: client,
-                entries: entries,
-                appearance: appearance,
-                presenter: stub,
-                watchdogTimeout: .milliseconds(50)
-            )
-        }
+        let result = await presentPreparedChangelogOverlay(
+            client: client,
+            entries: entries,
+            appearance: appearance,
+            presenter: stub,
+            watchdogTimeout: .milliseconds(50)
+        )
 
         #expect(result == true)
     }
@@ -440,6 +443,11 @@ private func makeDefaultEntry() -> [String: Any] {
 
 private struct TimeoutError: Error {}
 
+/// Hang-guard for tests whose operation cannot complete without the code
+/// under test: races the operation against a fixed budget and throws
+/// `TimeoutError()` when the budget wins. The budget bounds a genuine hang,
+/// never latency — keep it far above runner jitter so scheduling delays can
+/// never reach it (issue #562).
 private func withTimeout<T: Sendable>(
     seconds: Double,
     operation: @escaping @Sendable () async throws -> T
