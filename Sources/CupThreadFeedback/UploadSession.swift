@@ -111,6 +111,10 @@ extension FeedbackClient {
     ///   session bearer and the attachment bytes are never re-sent to the
     ///   redirect target — and the 3xx response surfaces as
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
+    ///   The refusal is installed as a per-task delegate on this call, so it
+    ///   holds no matter which session the client runs in — including one
+    ///   injected through ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``
+    ///   that carries no redirect policy of its own (#561).
     /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
     ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
     ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
@@ -143,7 +147,12 @@ extension FeedbackClient {
         )
         request.httpBody = data
 
-        let (responseData, response) = try await session.data(for: request)
+        // Per-task redirect delegate (#561): injected sessions carry no
+        // session-level `SameOriginRedirectLimiter`, and Foundation's default
+        // redirect policy would replay the PUT — bearer and attachment bytes
+        // included — to whatever host a 3xx `Location` names. On the default
+        // session this duplicates the session-level limiter identically.
+        let (responseData, response) = try await session.data(for: request, delegate: SameOriginRedirectLimiter())
         try validateUploadResponse(response, data: responseData)
         return finalizedAttachment(
             from: responseData,
@@ -180,6 +189,10 @@ extension FeedbackClient {
     ///   session bearer and the streamed attachment bytes are never re-sent
     ///   to the redirect target — and the 3xx response surfaces as
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``.
+    ///   The refusal is installed as a per-task delegate on this call, so it
+    ///   holds no matter which session the client runs in — including one
+    ///   injected through ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``
+    ///   that carries no redirect policy of its own (#561).
     /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
     ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
     ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
@@ -211,7 +224,11 @@ extension FeedbackClient {
             sessionToken: uploadSession.session.sessionToken,
             contentType: contentType
         )
-        let (responseData, response) = try await session.upload(for: request, fromFile: fileURL)
+        let (responseData, response) = try await session.upload(
+            for: request,
+            fromFile: fileURL,
+            delegate: SameOriginRedirectLimiter()
+        )
         try validateUploadResponse(response, data: responseData)
         return finalizedAttachment(
             from: responseData,
