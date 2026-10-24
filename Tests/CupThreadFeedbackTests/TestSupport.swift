@@ -104,13 +104,17 @@ func makeClient(
 }
 
 /// Make an HTTPURLResponse.
-func makeHTTPResponse(status: Int = 200, headers: [String: String]? = nil) -> HTTPURLResponse {
+func makeHTTPResponse(
+    status: Int = 200,
+    url: URL = URL(string: "https://test.example.com")!,
+    headers: [String: String]? = nil
+) -> HTTPURLResponse {
     var allHeaders = ["Content-Type": "application/json"]
     if let headers {
         allHeaders.merge(headers) { _, new in new }
     }
     return HTTPURLResponse(
-        url: URL(string: "https://test.example.com")!,
+        url: url,
         statusCode: status,
         httpVersion: nil,
         headerFields: allHeaders

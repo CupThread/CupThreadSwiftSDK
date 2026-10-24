@@ -92,8 +92,16 @@ struct RemoteImageLoaderDecodeBoundTests {
         let svg = Data(
             #"<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096"></svg>"#.utf8
         )
-        MockURLProtocol.setHandler(forHost: host) { _ in
-            (makeHTTPResponse(headers: ["Content-Type": "image/svg+xml"]), svg)
+        MockURLProtocol.setHandler(forHost: host) { request in
+            // The response carries the request's URL, as a real response
+            // does; the transport rejects a response from another origin.
+            (
+                makeHTTPResponse(
+                    url: request.url ?? url,
+                    headers: ["Content-Type": "image/svg+xml"]
+                ),
+                svg
+            )
         }
         defer { MockURLProtocol.setHandler(forHost: host, nil) }
 

@@ -41,7 +41,9 @@ extension Image {
 /// Drop-in replacement for `AsyncImage` backed by `RemoteImageLoader`: same
 /// phase contract, but repeat appearances resolve from cache instantly and
 /// concurrent subscribers for one URL share a single download. Disallowed URL
-/// schemes collapse immediately to `.failure` without downloading.
+/// schemes collapse immediately to `.failure` without downloading, and the
+/// loader never follows a redirect off the URL's HTTPS origin, so the
+/// HTTPS-only guarantee covers the whole transfer rather than the first hop.
 struct CachedRemoteImage<Content: View>: View {
     let url: URL
     @ViewBuilder let content: (RemoteImagePhase) -> Content

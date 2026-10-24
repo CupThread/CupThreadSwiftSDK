@@ -78,7 +78,9 @@ struct CapsuleBadge: View {
 /// Avatar and app-icon URLs from the API are treated as untrusted and filtered
 /// by `WebURLPolicy` (`remoteImageURL(from:)`) so non-HTTPS URLs (`http:`) and disallowed
 /// schemes (`file:`, `data:`, `javascript:`, etc.) never trigger outbound network or
-/// sandbox fetches and safely fall back to the placeholder.
+/// sandbox fetches and safely fall back to the placeholder. That HTTPS-only
+/// rule also covers redirects: the image loader refuses a 30x that leaves the
+/// URL's origin or downgrades to plaintext.
 struct AvatarView: View {
     let url: String?
     var size: CGFloat = 20

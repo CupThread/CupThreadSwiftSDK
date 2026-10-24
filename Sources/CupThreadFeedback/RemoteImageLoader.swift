@@ -40,6 +40,11 @@ typealias PlatformImage = NSImage
 /// soon as it exceeds a byte cap, and the cache enforces a byte budget charged
 /// with each decoded bitmap's size in addition to its entry count.
 ///
+/// The transfer stays on the validated URL's origin for its whole lifetime:
+/// a redirect is followed only when it remains `https` on the same host and
+/// effective port, so a 30x cannot pivot an avatar/icon fetch off-origin or
+/// downgrade it to plaintext (SEC-31).
+///
 /// Public image delivery URLs (such as `https://api.cupthread.com/api/v1/files/{key}`)
 /// are handled as opaque URLs, preserving the path and query string (such as `?width=...`).
 /// Distinct thumbnail width hints are partitioned as separate cache entries in `NSCache`.
@@ -72,7 +77,11 @@ final class RemoteImageLoader {
 
     /// - Parameters:
     ///   - session: Session used for downloads; inject a test session to
-    ///     intercept requests.
+    ///     intercept requests. The loader rebuilds the session around its own
+    ///     delegate, and that delegate owns the image path's redirect policy:
+    ///     URLSession cannot compose delegates, so a limiter installed on the
+    ///     injected session does not carry over, and hosts do not need to
+    ///     install one for image fetches.
     ///   - cacheCountLimit: Maximum number of decoded images retained.
     ///   - cacheCostLimit: Byte budget for the decoded bitmaps retained in
     ///     the cache; each entry is charged its decoded bitmap size, so the
@@ -126,7 +135,11 @@ final class RemoteImageLoader {
     ///
     /// URLs are validated against `isAllowedSecureImageURL(_:)`; non-HTTPS or disallowed schemes
     /// (`http:`, `file:`, `data:`, `javascript:`, etc.) immediately throw `URLError(.badURL)`
-    /// without contacting the network or consulting the cache.
+    /// without contacting the network or consulting the cache. The HTTPS-only
+    /// rule applies to redirects too: a 3xx is followed only within the initial
+    /// URL's HTTPS origin. A refused redirect surfaces
+    /// `URLError(.badServerResponse)` without reaching the target, and a final
+    /// response from another origin is rejected as `URLError(.badURL)`.
     ///
 /// A download that fails is remembered for `failureRetryInterval`; calls
 /// inside that window rethrow the recorded error without a network request.
