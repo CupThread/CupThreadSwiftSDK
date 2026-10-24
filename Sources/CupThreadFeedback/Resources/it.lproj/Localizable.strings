@@ -207,6 +207,7 @@
 "cupthread.error.stale_signature" = "I dati di pagamento non sono stati aggiornati: la firma del report è scaduta. Controlla l'orologio del dispositivo e riprova.";
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "I dati di pagamento non sono stati aggiornati: i nomi di piano «unset» e «null» sono riservati. Scegli un nome di piano diverso.";
+"cupthread.error.attribute_not_clearable" = "I dati di pagamento non sono stati aggiornati: questo attributo non può essere cancellato. Solo piano e ricavo mensile possono essere azzerati; lasciare gli altri invariati o inviare un valore.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Questo feedback o allegato è già stato inviato.";

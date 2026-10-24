@@ -207,6 +207,7 @@
 "cupthread.error.stale_signature" = "Ödeme bilgileri güncellenmedi: raporun imzasının süresi doldu. Cihaz saatini kontrol edip yeniden deneyin.";
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Ödeme bilgileri güncellenmedi: «unset» ve «null» plan adları rezerve edilmiştir. Farklı bir plan adı seçin.";
+"cupthread.error.attribute_not_clearable" = "Ödeme ayrıntıları güncellenmedi: bu öznitelik temizlenemez. Yalnızca plan ve aylık gelir sıfırlanabilir; diğerlerini değiştirmeden bırakın veya bir değer gönderin.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Bu geri bildirim veya ek zaten gönderildi.";

@@ -11,6 +11,11 @@ public enum UserAttributesSigner {
         /// The field is omitted / absent from the payload.
         case unset
         /// The field is explicitly present with a `null` value in JSON.
+        /// Only `plan` and `mrr` accept a null on the wire:
+        /// ``FeedbackClient/updateUserAttributes`` rejects `.null` for
+        /// `isPaying` and `currency` with
+        /// ``FeedbackClientError/attributeNotClearable(attribute:)``
+        /// (issue #573).
         case null
         /// The field is present with the given value.
         case value(T)
@@ -30,13 +35,18 @@ public enum UserAttributesSigner {
         public let appKey: String
         /// The resolved end-user token.
         public let userToken: String
-        /// Paying user status.
+        /// Paying user status. `.null` is not a representable paying-status
+        /// report (the API cannot clear the attribute) and renders as the
+        /// `unset` sentinel.
         public let isPaying: Field<Bool>
-        /// Plan name.
+        /// Plan name. The one string field whose `.null` the server schema
+        /// accepts.
         public let plan: Field<String>
         /// Monthly recurring revenue.
         public let mrr: Field<Double>
-        /// Currency code as sent in the request.
+        /// Currency code as sent in the request. `.null` is not a
+        /// representable currency report (the API cannot clear the
+        /// attribute) and renders as the `unset` sentinel (issue #573).
         public let currency: Field<String>
         /// Integer Unix epoch seconds.
         public let timestamp: Int64
@@ -218,7 +228,7 @@ public enum UserAttributesSigner {
             arguments.isPaying.canonicalRepresentation,
             arguments.plan.canonicalRepresentation,
             arguments.mrr.canonicalRepresentation,
-            arguments.currency.canonicalRepresentation,
+            arguments.currency.canonicalCurrencyRepresentation,
             "\(arguments.timestamp)"
         ]
         return lines.joined(separator: "\n")
@@ -240,12 +250,16 @@ public enum UserAttributesSigner {
 extension UserAttributesSigner.Field: Equatable where T: Equatable {}
 
 extension UserAttributesSigner.Field where T == Bool {
+    /// The canonical grammar has no null slot for `isPaying`
+    /// (`<isPaying: true|false|unset>`, issue #573): the server's
+    /// `EndUserAttributesInput` schema cannot reconstruct a cleared
+    /// `isPaying`, so `.null` renders as the absent sentinel and
+    /// ``FeedbackClient/updateUserAttributes`` rejects it before any
+    /// canonical string is built or signed.
     var canonicalRepresentation: String {
         switch self {
-        case .unset:
+        case .unset, .null:
             return "unset"
-        case .null:
-            return "null"
         case .value(let bool):
             return bool ? "true" : "false"
         }
@@ -258,7 +272,28 @@ extension UserAttributesSigner.Field where T == String {
         case .unset:
             return "unset"
         case .null:
+            // The explicit-null sentinel is only valid for `plan` — the
+            // schema's one nullable string field. The `currency` line uses
+            // ``canonicalCurrencyRepresentation`` instead (issue #573).
             return "null"
+        case .value(let string):
+            // A raw value must never carry the record's "\n" delimiter onto a
+            // line of its own (SEC-3).
+            return UserAttributesSigner.sanitizedLine(string)
+        }
+    }
+
+    /// The canonical grammar has no null slot for `currency`
+    /// (`<currency: valueAsSent|unset>`, issue #573): the server's
+    /// `EndUserAttributesInput` schema cannot reconstruct a cleared
+    /// `currency`, so `.null` renders as the absent sentinel even for
+    /// direct `Arguments` construction —
+    /// ``FeedbackClient/updateUserAttributes`` rejects it before any
+    /// canonical string is built or signed.
+    var canonicalCurrencyRepresentation: String {
+        switch self {
+        case .unset, .null:
+            return "unset"
         case .value(let string):
             // A raw value must never carry the record's "\n" delimiter onto a
             // line of its own (SEC-3).

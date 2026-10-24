@@ -207,6 +207,7 @@
 "cupthread.error.stale_signature" = "Dane płatności nie zostały zaktualizowane: podpis zgłoszenia wygasł. Sprawdź zegar urządzenia i spróbuj ponownie.";
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Dane płatności nie zostały zaktualizowane: nazwy planów „unset“ i „null“ są zastrzeżone. Wybierz inną nazwę planu.";
+"cupthread.error.attribute_not_clearable" = "Dane płatności nie zostały zaktualizowane: tego atrybutu nie można wyczyścić. Tylko plan i przychód miesięczny można zresetować; pozostaw pozostałe bez zmian lub wyślij wartość.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Ta opinia lub załącznik zostały już przesłane.";

@@ -47,6 +47,7 @@ struct ErrorDescriptionLocalizationTests {
         "cupthread.error.comments_unavailable",
         "cupthread.error.email_not_verified",
         "cupthread.error.reserved_plan_value",
+        "cupthread.error.attribute_not_clearable",
         "cupthread.attachment.oversized",
         "cupthread.attachment.unprocessable",
         "cupthread.attachment.unsupported_type"
@@ -131,6 +132,10 @@ struct ErrorDescriptionLocalizationTests {
         #expect(
             FeedbackClientError.reservedPlanValue(message: nil, requestId: nil).errorDescription
                 == CupThreadStrings.tr("cupthread.error.reserved_plan_value")
+        )
+        #expect(
+            FeedbackClientError.attributeNotClearable(attribute: "isPaying").errorDescription
+                == CupThreadStrings.tr("cupthread.error.attribute_not_clearable")
         )
     }
 

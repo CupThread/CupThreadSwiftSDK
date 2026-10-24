@@ -119,7 +119,28 @@ struct UserAttributesPayload: Encodable, Sendable {
         }
     }
 
+    /// Rejects `.null` for the attributes the live `EndUserAttributesInput`
+    /// schema cannot clear (issue #573): only `plan` and `mrr` are
+    /// `nullable: true`, so an explicit JSON `null` for `isPaying` or
+    /// `currency` is schema-invalid — a deterministic HTTP 400 that silently
+    /// drops every sibling write in the same PUT. Enforced before signing
+    /// (a request that cannot succeed must not consume signing material or
+    /// a round trip) and again at encode time so no code path can put the
+    /// invalid shape on the wire.
+    static func validateClearableFields(
+        isPaying: UserAttributesSigner.Field<Bool>,
+        currency: UserAttributesSigner.Field<String>
+    ) throws {
+        if case .null = isPaying {
+            throw FeedbackClientError.attributeNotClearable(attribute: "isPaying")
+        }
+        if case .null = currency {
+            throw FeedbackClientError.attributeNotClearable(attribute: "currency")
+        }
+    }
+
     func encode(to encoder: Encoder) throws {
+        try Self.validateClearableFields(isPaying: isPaying, currency: currency)
         var container = encoder.container(keyedBy: CodingKeys.self)
         try encodeField(isPaying, forKey: .isPaying, into: &container)
         try encodeTextField(plan, forKey: .plan, into: &container)
@@ -157,8 +178,14 @@ extension FeedbackClient {
     /// > backend-delegated `userAttributesSigner` provider on
     /// > ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``.
     ///
-    /// To explicitly clear an attribute server-side (such as a churned subscription
-    /// plan or reset MRR), pass `.null` using the ``UserAttributesSigner/Field`` overload.
+    /// To explicitly clear an attribute server-side, pass `.null` using the
+    /// ``UserAttributesSigner/Field`` overload. Only `plan` and `mrr` can be
+    /// cleared: the live `EndUserAttributesInput` schema accepts an explicit
+    /// JSON `null` for those two attributes only, so `isPaying: .null` or
+    /// `currency: .null` is rejected locally with
+    /// ``FeedbackClientError/attributeNotClearable(attribute:)`` before
+    /// anything is signed or sent (issue #573). To end a paying status,
+    /// send a concrete value instead (e.g. `isPaying: false`).
     ///
     /// Two plan names are reserved: the byte-exact literals `"unset"` and
     /// `"null"` are the signature canonical string's "leave unchanged" /
@@ -232,8 +259,11 @@ extension FeedbackClient {
     /// Reports end-user attributes with explicit tri-state fields (`unset`, `null`, `value`) to
     /// `PUT /api/v1/public/apps/{appKey}/user`.
     ///
-    /// Use this overload to pass `.null` when clearing churned subscription plans or
-    /// resetting MRR on the server.
+    /// Use this overload to pass `.null` when clearing churned subscription
+    /// plans or resetting MRR on the server. Only `plan` and `mrr` can be
+    /// cleared — `isPaying: .null` and `currency: .null` are rejected
+    /// locally (``FeedbackClientError/attributeNotClearable(attribute:)``)
+    /// because the API schema has no null slot for them (issue #573).
     ///
     /// A `plan` of `.value("unset")` or `.value("null")` is rejected by the
     /// server with HTTP 400 `plan_reserved_sentinel` (issue #403) — those
@@ -253,11 +283,13 @@ extension FeedbackClient {
     /// > ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``.
     ///
     /// - Parameters:
-    ///   - isPaying: Whether the user is on a paid plan (`.value`, `.null`, or `.unset`).
+    ///   - isPaying: Whether the user is on a paid plan (`.value` or
+    ///     `.unset`; `.null` throws — the API cannot clear this attribute).
     ///   - plan: Host-app plan name (`.value`, `.null`, or `.unset`); a `.value`
     ///     is never the reserved literals `"unset"` or `"null"`.
     ///   - mrr: Monthly recurring revenue (`.value`, `.null`, or `.unset`).
-    ///   - currency: Currency code (`.value`, `.null`, or `.unset`).
+    ///   - currency: Currency code (`.value` or `.unset`; `.null` throws —
+    ///     the API cannot clear this attribute).
     ///   - userToken: Anonymous user token sent as `X-User-Token`. Blank,
     ///     whitespace-only, or multi-line values are rejected locally (#417).
     ///   - signingSecret: Optional override for the SDK signing secret configured
@@ -275,9 +307,13 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/paymentAttributesRequireSignature(message:requestId:)``,
     ///   ``FeedbackClientError/sdkSigningSecretNotConfigured(message:requestId:)``,
     ///   ``FeedbackClientError/invalidSignature(message:requestId:)``,
-    ///   ``FeedbackClientError/staleSignature(message:requestId:)``, and the
+    ///   ``FeedbackClientError/staleSignature(message:requestId:)``, the
     ///   reserved-plan validation error
-    ///   ``FeedbackClientError/reservedPlanValue(message:requestId:)``.
+    ///   ``FeedbackClientError/reservedPlanValue(message:requestId:)``, and
+    ///   ``FeedbackClientError/attributeNotClearable(attribute:)`` when
+    ///   `isPaying` or `currency` is passed `.null` (only `plan` and `mrr`
+    ///   can be cleared — issue #573; rejected before anything is signed or
+    ///   sent).
     public func updateUserAttributes(
         isPaying: UserAttributesSigner.Field<Bool> = .unset,
         plan: UserAttributesSigner.Field<String> = .unset,
@@ -380,6 +416,10 @@ extension FeedbackClient {
         // (#417) — the trimmed token is used for both the canonical string
         // and the header so the signature always matches.
         let identityToken = try validatedUserToken(userToken)
+        // `.null` is only a valid clear for the attributes the server schema
+        // marks nullable (`plan`, `mrr`); reject the rest before any signing
+        // material is consulted (issue #573).
+        try UserAttributesPayload.validateClearableFields(isPaying: isPaying, currency: currency)
         let signingSecretInUse = (signingSecret ?? configuration.signingSecret)?.nilIfEmpty
 
         // The signing clock is the device clock corrected by the server-time

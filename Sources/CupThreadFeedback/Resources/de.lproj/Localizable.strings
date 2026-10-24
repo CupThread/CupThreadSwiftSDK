@@ -207,6 +207,7 @@
 "cupthread.error.stale_signature" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Signatur des Berichts ist abgelaufen. Prüfen Sie die Geräteuhr und versuchen Sie es erneut.";
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Plan-Namen „unset“ und „null“ sind reserviert. Wählen Sie einen anderen Plan-Namen.";
+"cupthread.error.attribute_not_clearable" = "Zahlungsinformationen wurden nicht aktualisiert: Dieses Attribut kann nicht geleert werden. Nur Plan und monatlicher Umsatz können zurückgesetzt werden; lassen Sie die übrigen unverändert oder senden Sie einen Wert.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Dieses Feedback oder dieser Anhang wurde bereits übermittelt.";
