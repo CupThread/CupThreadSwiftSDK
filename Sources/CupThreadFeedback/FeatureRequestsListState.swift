@@ -88,6 +88,23 @@ struct FeatureRequestsListState: Equatable, Sendable {
         }
     }
 
+    /// Retires the pagination cursor while preserving the rendered page.
+    ///
+    /// A failed replacing load keeps the previously rendered rows (the
+    /// preserve-content contract, issues #59/#545), but the cursor it leaves
+    /// behind was minted by the filter that just failed to replace them —
+    /// paging would pair it with the view's current filter and silently blend
+    /// mismatched pages (issue #557). The next successful replacing load
+    /// restores a cursor for its own filter.
+    ///
+    /// Items, in-flight optimistic votes, and the executed-filter fields are
+    /// untouched, so the load-more affordance disappears with the stale
+    /// cursor and nothing else changes on screen.
+    mutating func invalidatePagination() {
+        nextCursor = nil
+        hasMorePages = false
+    }
+
     /// Attempts to apply an optimistic vote for the specified item.
     ///
     /// If an in-flight vote already exists for this item or if the item is not found,

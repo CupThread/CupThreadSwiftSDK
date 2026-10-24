@@ -393,4 +393,45 @@ struct FeatureRequestsListStateTests {
         )
         #expect(state.lastExecutedQuery.isEmpty)
     }
+
+    // MARK: invalidatePagination (issue #557)
+
+    @Test func invalidatePaginationRetiresCursorWhilePreservingRenderedPage() {
+        let item = makeItem(id: "fr-1", voteCount: 5, hasVoted: false)
+        var state = FeatureRequestsListState(
+            items: [item],
+            lastExecutedQuery: "swift",
+            lastExecutedFilterKey: "features|true|swift|"
+        )
+        _ = state.applyOptimisticVote(for: "fr-1")
+        state.applyPage(
+            makePageResult([makeItem(id: "fr-1")], total: 60, hasMore: true, nextCursor: "c1"),
+            replacesExisting: true,
+            executedQuery: "swift",
+            executedFilterKey: "features|true|swift|"
+        )
+        #expect(state.nextCursor == "c1")
+        #expect(state.hasMorePages == true)
+
+        state.invalidatePagination()
+
+        // The stale cursor and its load-more affordance are gone...
+        #expect(state.nextCursor == nil)
+        #expect(state.hasMorePages == false)
+        // ...while the rendered page and every preserved-content field stay.
+        #expect(state.items.map(\.id) == ["fr-1"])
+        #expect(state.votingIds == ["fr-1"])
+        #expect(state.items[0].hasVoted == true)
+        #expect(state.items[0].voteCount == 6)
+        #expect(state.lastExecutedQuery == "swift")
+        #expect(state.lastExecutedFilterKey == "features|true|swift|")
+    }
+
+    @Test func invalidatePaginationOnFreshStateIsANoOp() {
+        var state = FeatureRequestsListState()
+        state.invalidatePagination()
+        #expect(state.nextCursor == nil)
+        #expect(state.hasMorePages == false)
+        #expect(state.items.isEmpty)
+    }
 }
