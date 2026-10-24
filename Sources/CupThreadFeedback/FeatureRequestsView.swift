@@ -601,6 +601,14 @@ private extension FeatureRequestsView {
         }
         guard let outcome = SearchReloadOutcome.outcome(for: error, hasExistingContent: !items.isEmpty)
         else { return }
+        // A failed replacing load keeps the rendered rows but must retire the
+        // page's cursor: it was minted by the filter that just failed, and
+        // paging would pair it with the view's current filter (issue #557).
+        // Cancellation never reaches this point — the top guard rejects a
+        // cancelled task and `SearchReloadOutcome` returns `nil` for a
+        // cancellation error — so a cancelled load leaves the predecessor's
+        // pagination intact (preserve-content contract, issues #59/#545).
+        listState.invalidatePagination()
         if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
             await client.searchThrottle.enterCooldown()
             hasEmittedAdmissionNotice = true
@@ -616,26 +624,50 @@ private extension FeatureRequestsView {
     @MainActor
     private func loadNextPage() async {
         guard isRoadmapPermitted, !isLoadingNextPage, let cursor = listState.nextCursor else { return }
+        // The cursor was minted by the last *successful* replacing load's
+        // filter. While a replacing load for the current filter is pending or
+        // has failed without updating the list, paging here would send the
+        // current `q`/`versionId` with the previous filter's cursor and blend
+        // mismatched pages (issue #557) — the pending replacing load (retry
+        // or the successful `.task(id: filterKey)` rerun) is the path to a
+        // matching list.
+        guard listState.lastExecutedFilterKey == filterKey else { return }
+        // Capture the request identity before the first await: the pager runs
+        // in an unstructured task, so a filter edit neither cancels it nor
+        // bumps the generation (the debounced replacement only calls
+        // `startLoading()` after its sleep). Re-reading the view's filter at
+        // the fetch would pair the new query with this (old) cursor.
+        let requestFilterKey = filterKey
+        let requestQuery = trimmedSearchText
+        let requestVersionID = selectedVersionID
         let generationAtStart = loadGeneration
         isLoadingNextPage = true
         defer { isLoadingNextPage = false }
         do {
-            if !trimmedSearchText.isEmpty {
+            if !requestQuery.isEmpty {
                 await client.searchThrottle.recordQueryFetch()
             }
+            // The throttle hop is a suspension: revalidate before spending
+            // the cursor request on a filter the user has already left.
+            guard loadGeneration == generationAtStart,
+                  filterKey == requestFilterKey else { return }
             let result = try await client.fetchFeatureRequests(
                 userToken: userToken,
-                versionId: selectedVersionID,
-                query: trimmedSearchText.isEmpty ? nil : trimmedSearchText,
+                versionId: requestVersionID,
+                query: requestQuery.isEmpty ? nil : requestQuery,
                 cursor: cursor
             )
             // A newer replacing load (search/version change, pull-to-refresh)
             // superseded this cursor page — appending it would mix filters.
-            guard loadGeneration == generationAtStart else { return }
+            // The filter key covers the debounce window where the
+            // replacement has not reached `startLoading()` yet.
+            guard loadGeneration == generationAtStart,
+                  filterKey == requestFilterKey else { return }
             pageError = nil
             listState.applyPage(result, replacesExisting: false)
         } catch {
-            guard loadGeneration == generationAtStart, !error.isSdkCancellation else { return }
+            guard loadGeneration == generationAtStart,
+                  filterKey == requestFilterKey, !error.isSdkCancellation else { return }
             if isSdkPermissionRejection(error) {
                 serverRejection.rejectList()
                 return
@@ -817,5 +849,13 @@ extension FeatureRequestsView {
     @MainActor
     func handleLoadFailureForTesting(_ error: Error) async {
         await handleLoadFailure(error, generation: loadGeneration)
+    }
+
+    /// Drives the private cursor-page load from view-level tests (issue #557).
+    /// As with `loadFeatureRequestsForTesting`, `@State` writes do not persist
+    /// outside a SwiftUI hierarchy — the stub's request log is the observable.
+    @MainActor
+    func loadNextPageForTesting() async {
+        await loadNextPage()
     }
 }
