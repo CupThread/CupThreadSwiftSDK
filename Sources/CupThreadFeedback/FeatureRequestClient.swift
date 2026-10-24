@@ -241,11 +241,18 @@ extension FeedbackClient {
     ///   `subscription_inactive`),
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when the
     ///   server's Turnstile gate rejects the submission and no fresh token
-    ///   could be presented (HTTP 403), or
-    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app's
-    ///   permission policy rejects the proposal for this caller (HTTP 403),
+    ///   could be presented (HTTP 403 — since the uniform-404 convention of
+    ///   SaaS#1176 the only 403 this operation answers),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse``, or
+    ///   with status 404 when the `appKey` is unknown or the app has public
+    ///   proposals disabled — the API answers both identically with the
+    ///   `"App not found"` envelope (existence hiding: callers treat 404 as
+    ///   "not accepted here" without distinguishing the two, SaaS#1176), or
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
+    ///   server state answers it on this operation; the generic permission
+    ///   mapping is kept for deploy skew (pre-convention servers answered a
+    ///   non-Turnstile 403 for a disabled app), or
+    ///   ``FeedbackClientError/invalidResponse``, or
     ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds
     ///   the client-side intake byte budget (BUG-18) — rejected locally with
     ///   no network round trip; shorten the title/description and submit again.
