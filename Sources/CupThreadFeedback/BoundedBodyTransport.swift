@@ -12,9 +12,19 @@ import Foundation
 /// cross the cap, and resumes the caller with
 /// `URLError(.cannotDecodeContentData)` — so the cap applies during transfer,
 /// to the bytes URLSession actually delivers.
+///
+/// The transport also owns the transfer's redirect policy: every 3xx is
+/// checked against ``ImageFetchRedirectPolicy`` before URLSession may follow
+/// it, and the final response URL is re-checked before any bytes are accepted.
+/// Without this, the loader's HTTPS-only URL validation would cover only the
+/// first hop, and a 30x could pivot the fetch off-origin or downgrade it to
+/// plaintext (SEC-31).
 final class BoundedBodyTransport: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private struct PendingBody {
         let cap: Int
+        /// The URL the transfer started from; every redirect hop is anchored
+        /// to this origin, not to the previous hop.
+        let origin: URL
         var data: Data
         var continuation: CheckedContinuation<Data, Error>?
     }
@@ -36,22 +46,33 @@ final class BoundedBodyTransport: NSObject, URLSessionDataDelegate, @unchecked S
     func fetch(_ url: URL, using session: URLSession, maxBytes: Int) async throws -> Data {
         let task = session.dataTask(with: url)
         return try await withCheckedThrowingContinuation { continuation in
-            register(task, maxBytes: maxBytes, continuation: continuation)
+            register(task, origin: url, maxBytes: maxBytes, continuation: continuation)
             task.resume()
         }
     }
 
     private func register(
         _ task: URLSessionTask,
+        origin: URL,
         maxBytes: Int,
         continuation: CheckedContinuation<Data, Error>
     ) {
         let cap = max(0, maxBytes)
-        var body = PendingBody(cap: cap, data: Data(), continuation: continuation)
+        var body = PendingBody(cap: cap, origin: origin, data: Data(), continuation: continuation)
         body.data.reserveCapacity(min(cap, 64 * 1_024))
         lock.lock()
         pending[task.taskIdentifier] = body
         lock.unlock()
+    }
+
+    /// The URL a transfer started from: the registered origin while the
+    /// transfer is live, falling back to the task's original request so a
+    /// redirect decision stays anchored even after the pending entry is gone.
+    private func initialURL(for task: URLSessionTask) -> URL? {
+        lock.lock()
+        let registered = pending[task.taskIdentifier]?.origin
+        lock.unlock()
+        return registered ?? task.originalRequest?.url
     }
 
     private func finish(_ task: URLSessionTask, with result: Result<Data, any Error>) {
@@ -64,12 +85,46 @@ final class BoundedBodyTransport: NSObject, URLSessionDataDelegate, @unchecked S
         body.continuation?.resume(with: result)
     }
 
+    /// Follows a redirect only when it stays on the transfer's original origin.
+    ///
+    /// Refusing hands the 3xx back to URLSession as the final response, so the
+    /// existing non-2xx branch cancels the task and reports
+    /// `URLError(.badServerResponse)`; the redirect target is never contacted.
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        guard ImageFetchRedirectPolicy.isAllowed(
+            originalURL: initialURL(for: task),
+            redirectURL: request.url
+        ) else {
+            completionHandler(nil)
+            return
+        }
+        completionHandler(request)
+    }
+
     func urlSession(
         _ session: URLSession,
         dataTask: URLSessionDataTask,
         didReceive response: URLResponse,
         completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
+        // Defense in depth: the redirect delegate pins every hop, but a final
+        // response from anywhere else must never be buffered as image bytes,
+        // so a future delegate change cannot silently widen the policy.
+        if let responseURL = response.url,
+           !ImageFetchRedirectPolicy.isAllowed(
+               originalURL: initialURL(for: dataTask),
+               redirectURL: responseURL
+           ) {
+            completionHandler(.cancel)
+            finish(dataTask, with: .failure(URLError(.badURL)))
+            return
+        }
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             completionHandler(.cancel)
             finish(dataTask, with: .failure(URLError(.badServerResponse)))
