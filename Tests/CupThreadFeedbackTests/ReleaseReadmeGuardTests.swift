@@ -24,7 +24,7 @@ struct ReleaseReadmeGuardTests {
         let problems: [String]
     }
 
-    @Test func readmeInstallRequirementsResolveAgainstPublishedTags() throws {
+    @Test func readmeInstallRequirementsResolveAgainstPublishedTags() async throws {
         let readme = try String(
             contentsOf: Self.repoRoot().appendingPathComponent("README.md"),
             encoding: .utf8
@@ -36,7 +36,7 @@ struct ReleaseReadmeGuardTests {
             "README advertises no installable version; update the snippets or this guard"
         )
 
-        let tags = try Self.remoteVersionTags()
+        let tags = try await Self.remoteVersionTags()
         let output = try Self.evaluateJS(
             #"""
             import { pathToFileURL } from 'node:url';
@@ -108,7 +108,7 @@ struct ReleaseReadmeGuardTests {
     /// Lists the tags that actually exist on origin. The remote is probed —
     /// not the local clone — because CI checks out a single commit without
     /// tags, and a stale local clone must not green-light a stale README.
-    private static func remoteVersionTags() throws -> [String] {
+    private static func remoteVersionTags() async throws -> [String] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["git", "ls-remote", "--tags", "origin"]
@@ -124,7 +124,29 @@ struct ReleaseReadmeGuardTests {
             Issue.record("failed to launch git ls-remote: \(error)")
             return []
         }
-        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        // Bound the child: a stalled transport must fail the guard with a
+        // clear message instead of blocking the whole `swift test` run (and
+        // any release attempt that runs it) forever. Race the blocking read
+        // against a deadline; losing the race terminates git, which unblocks
+        // the reader before the group scope exits.
+        let outcome: Data? = await withTaskGroup(of: Data?.self) { group in
+            group.addTask { stdout.fileHandleForReading.readDataToEndOfFile() }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(30))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            if first == nil {
+                process.terminate()
+            }
+            return first
+        }
+        guard let data = outcome else {
+            process.waitUntilExit()
+            Issue.record("git ls-remote --tags origin did not finish within 30s; the README guard needs the real tag state")
+            return []
+        }
         process.waitUntilExit()
         try #require(
             process.terminationStatus == 0,
