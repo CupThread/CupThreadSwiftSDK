@@ -1,5 +1,8 @@
 import SwiftUI
 import ImageIO
+#if canImport(UniformTypeIdentifiers)
+import UniformTypeIdentifiers
+#endif
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -32,10 +35,10 @@ typealias PlatformImage = NSImage
 ///
 /// The memory profile is bounded rather than source-dependent: decode runs
 /// through an ImageIO thumbnail pass with a pixel-edge cap (avatars and icons
-/// render at 16–80 pt, so full-resolution sources are pure waste), oversized
-/// response bodies are rejected before decode, and the cache enforces a byte
-/// budget charged with each decoded bitmap's size in addition to its entry
-/// count.
+/// render at 16–80 pt, so full-resolution sources are pure waste), the
+/// response body is consumed incrementally and the download is cancelled as
+/// soon as it exceeds a byte cap, and the cache enforces a byte budget charged
+/// with each decoded bitmap's size in addition to its entry count.
 ///
 /// Public image delivery URLs (such as `https://api.cupthread.com/api/v1/files/{key}`)
 /// are handled as opaque URLs, preserving the path and query string (such as `?width=...`).
@@ -58,6 +61,7 @@ final class RemoteImageLoader {
     }
 
     private let session: URLSession
+    private let bodyTransport: BoundedBodyTransport
     private let cache = NSCache<NSURL, PlatformImage>()
     private let failureRetryInterval: TimeInterval
     private let now: @Sendable () -> Date
@@ -77,9 +81,11 @@ final class RemoteImageLoader {
     ///     edge; comfortably above the largest consumer (80 pt @3x = 240 px)
     ///     with headroom for future surfaces. Small sources are never
     ///     upscaled.
-    ///   - maxResponseBytes: Maximum encoded response body accepted for
-    ///     decode; larger bodies throw `URLError(.cannotDecodeContentData)`
-    ///     without being cached.
+    ///   - maxResponseBytes: Maximum body size accepted for decode, enforced
+    ///     on the bytes the transport delivers (after HTTP content decoding):
+    ///     crossing the cap cancels the download instead of buffering the
+    ///     whole body first. Larger bodies throw
+    ///     `URLError(.cannotDecodeContentData)` without being cached.
     ///   - failureRetryInterval: How long a failed fetch is remembered before
     ///     the URL becomes eligible for a new download attempt.
     ///   - now: Clock used for the negative-cache window; inject for tests.
@@ -92,13 +98,27 @@ final class RemoteImageLoader {
         failureRetryInterval: TimeInterval = 60,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
-        self.session = session
+        let transport = BoundedBodyTransport()
+        self.bodyTransport = transport
+        // The delegate-backed session shares the injected session's
+        // configuration (protocol classes, timeouts, cache policy) so tests
+        // and hosts keep intercepting requests, while giving the transport the
+        // delegate callbacks it needs to enforce the byte cap mid-transfer.
+        self.session = URLSession(
+            configuration: session.configuration,
+            delegate: transport,
+            delegateQueue: nil
+        )
         self.failureRetryInterval = failureRetryInterval
         self.now = now
         cache.countLimit = cacheCountLimit
         cache.totalCostLimit = cacheCostLimit
         self.maxDecodedPixelEdge = maxDecodedPixelEdge
         self.maxResponseBytes = maxResponseBytes
+    }
+
+    deinit {
+        session.invalidateAndCancel()
     }
 
     /// Returns the decoded image for `url`, downloading it at most once per
@@ -113,11 +133,12 @@ final class RemoteImageLoader {
 ///
 /// Memory is bounded end to end: the decoded bitmap's longest pixel edge is
 /// capped at `maxDecodedPixelEdge` via an ImageIO thumbnail decode (avatars
-/// and icons render at 16–80 pt), responses larger than `maxResponseBytes`
-/// are rejected before decode, and the cache carries a byte budget
-/// (`cacheCostLimit`, charged with each image's decoded bitmap size) on top
-/// of the entry-count limit — so a server-controlled oversized avatar can
-/// neither spike decode memory nor accumulate unbounded retained bitmaps.
+/// and icons render at 16–80 pt), the response body is streamed and the
+/// download cancelled as soon as it exceeds `maxResponseBytes`, and the cache
+/// carries a byte budget (`cacheCostLimit`, charged with each image's decoded
+/// bitmap size) on top of the entry-count limit — so a server-controlled
+/// oversized avatar can neither spike transfer memory, spike decode memory,
+/// nor accumulate unbounded retained bitmaps.
 func image(for url: URL) async throws -> PlatformImage {
         guard isAllowedSecureImageURL(url) else {
             throw URLError(.badURL)
@@ -138,20 +159,20 @@ func image(for url: URL) async throws -> PlatformImage {
         // Completion handling (cache storage and in-flight cleanup) is owned by
         // the detached task so caller cancellation never drops cache warming or
         // prematurely clears the in-flight coalescing entry.
-        let task: Task<PlatformImage, Error> = Task.detached { [session, maxResponseBytes, maxDecodedPixelEdge, weak self] in
+        let task: Task<PlatformImage, Error> = Task.detached { [session, bodyTransport, maxResponseBytes, maxDecodedPixelEdge, weak self] in
             do {
-                let (data, response) = try await session.data(from: url)
-                if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                    throw URLError(.badServerResponse)
-                }
-                // A server mistake must not turn an avatar fetch into a memory
-                // spike even before the pixel bound applies; the failure replays
-                // through the negative cache like any other.
-                guard data.count <= maxResponseBytes else {
+                let data = try await bodyTransport.fetch(
+                    url,
+                    using: session,
+                    maxBytes: maxResponseBytes
+                )
+                let image = try Self.decodeBoundedImage(from: data, maxPixelEdge: maxDecodedPixelEdge)
+                // A stored entry with a zero cost would escape the byte
+                // budget, so refuse it instead of caching it for free.
+                guard let cost = Self.storableCacheCost(of: image) else {
                     throw URLError(.cannotDecodeContentData)
                 }
-                let image = try Self.decodeBoundedImage(from: data, maxPixelEdge: maxDecodedPixelEdge)
-                await self?.recordCompletedImage(image, for: url)
+                await self?.recordCompletedImage(image, cost: cost, for: url)
                 return image
             } catch {
                 await self?.recordCompletedFailure(error, for: url)
@@ -171,6 +192,10 @@ func image(for url: URL) async throws -> PlatformImage {
     /// background task completion and table cleanup.
     var inFlightCount: Int { inFlight.count }
 
+    /// Largest number of response bytes buffered at once; internal so tests
+    /// can assert the transfer bound, not just the thrown error.
+    var peakBufferedBodyBytes: Int { bodyTransport.peakBufferedByteCount }
+
     /// The cached image for `url`, if any; internal so tests can inspect the
     /// cache without going back through the network path.
     func cachedImageIfPresent(for url: URL) -> PlatformImage? {
@@ -189,7 +214,8 @@ func image(for url: URL) async throws -> PlatformImage {
     /// the entry-count limit.
     nonisolated static let defaultCacheCostLimit = 128 * 1_024 * 1_024
 
-    /// Default cap on the encoded response body accepted for decode (10 MB).
+    /// Default cap on the response body accepted for decode (10 MB), enforced
+    /// on bytes delivered by the transport as the body streams in.
     nonisolated static let defaultMaxResponseBytes = 10 * 1_024 * 1_024
 
     /// Decodes image bytes with the longest pixel edge capped at `maxPixelEdge`
@@ -197,26 +223,99 @@ func image(for url: URL) async throws -> PlatformImage {
     /// never materialize a full-resolution bitmap — a socially linked 4000×3000
     /// photo decodes as a bounded thumbnail instead of ~48 MB of bitmap for a
     /// 16–80 pt view. Small sources come back at their native size; ImageIO
-    /// never upscales. Falls back to a direct `PlatformImage(data:)` decode
-    /// when ImageIO cannot produce a thumbnail.
+    /// never upscales. When ImageIO cannot produce a thumbnail, the direct
+    /// decode path accepts only a recognized bitmap container whose declared
+    /// pixel dimensions already fit the cap; documents and other payloads
+    /// `PlatformImage` could otherwise rasterize are rejected.
     nonisolated static func decodeBoundedImage(
         from data: Data,
         maxPixelEdge: CGFloat
     ) throws -> PlatformImage {
-        if let cgImage = makeThumbnail(from: data, maxPixelEdge: maxPixelEdge) {
+        guard !data.isEmpty,
+              let source = CGImageSourceCreateWithData(
+                  data as CFData,
+                  [kCGImageSourceShouldCache: false] as CFDictionary
+              ),
+              isBitmapImageSource(source)
+        else {
+            throw URLError(.cannotDecodeContentData)
+        }
+        if let cgImage = makeThumbnail(from: source, maxPixelEdge: maxPixelEdge) {
             return platformImage(from: cgImage)
         }
-        guard let image = PlatformImage(data: data) else {
+        guard let image = boundedFallbackImage(
+            from: data,
+            source: source,
+            maxPixelEdge: maxPixelEdge
+        ) else {
             throw URLError(.cannotDecodeContentData)
         }
         return image
     }
 
+    /// Whether ImageIO identifies `source` as a bitmap image container.
+    ///
+    /// The type gate runs before the thumbnail pass: ImageIO can thumbnail
+    /// some non-image documents (PDF on macOS), and an avatar URL must never
+    /// put a document in the image cache just because a thumbnail was
+    /// available.
+    private nonisolated static func isBitmapImageSource(_ source: CGImageSource) -> Bool {
+        #if canImport(UniformTypeIdentifiers)
+        guard let type = CGImageSourceGetType(source) else { return false }
+        return UTType(type as String)?.conforms(to: .image) == true
+        #else
+        return CGImageSourceGetCount(source) > 0
+        #endif
+    }
+
+    /// The direct-decode fallback used only when ImageIO cannot produce a
+    /// thumbnail. It accepts a recognized bitmap container whose declared
+    /// pixel dimensions already fit `maxPixelEdge`, so the decoded bitmap is
+    /// bounded by the same cap. Non-image documents (PDF) and containers
+    /// ImageIO does not identify as images (SVG) are refused instead of being
+    /// rasterized through `PlatformImage(data:)`; oversized sources are
+    /// refused rather than decoded at native size.
+    nonisolated static func boundedFallbackImage(
+        from data: Data,
+        source: CGImageSource,
+        maxPixelEdge: CGFloat
+    ) -> PlatformImage? {
+        guard CGImageSourceGetCount(source) > 0,
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              width > 0,
+              height > 0,
+              CGFloat(max(width, height)) <= maxPixelEdge
+        else {
+            return nil
+        }
+        #if canImport(UniformTypeIdentifiers)
+        guard let type = CGImageSourceGetType(source),
+              UTType(type as String)?.conforms(to: .image) == true
+        else {
+            return nil
+        }
+        #endif
+        return PlatformImage(data: data)
+    }
+
     /// Approximate decoded byte size of `image`, used as the `NSCache` cost so
     /// the cache respects a byte budget instead of only an entry count.
+    /// Returns `0` when the image has no bitmap representation;
+    /// ``storableCacheCost(of:)`` is the gate the fetch path uses so such an
+    /// entry can never bypass the budget.
     nonisolated static func cacheCost(of image: PlatformImage) -> Int {
         guard let cgImage = cgImage(of: image) else { return 0 }
         return cgImage.bytesPerRow * cgImage.height
+    }
+
+    /// The cache cost for an image that is safe to store, or `nil` when it has
+    /// no bitmap representation and would be charged zero against the byte
+    /// budget.
+    nonisolated static func storableCacheCost(of image: PlatformImage) -> Int? {
+        let cost = cacheCost(of: image)
+        return cost > 0 ? cost : nil
     }
 
     /// Pixel dimensions of `image`'s decoded bitmap; internal so tests can
@@ -229,12 +328,7 @@ func image(for url: URL) async throws -> PlatformImage {
     /// Mirrors `PhotoAttachmentHelper.downscaledImageData`: decode through
     /// ImageIO with a pixel-size cap instead of materializing the source at
     /// full resolution.
-    private nonisolated static func makeThumbnail(from data: Data, maxPixelEdge: CGFloat) -> CGImage? {
-        guard !data.isEmpty,
-              let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
-        else {
-            return nil
-        }
+    private nonisolated static func makeThumbnail(from source: CGImageSource, maxPixelEdge: CGFloat) -> CGImage? {
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
@@ -284,9 +378,9 @@ func image(for url: URL) async throws -> PlatformImage {
     /// storing the decoded bitmap in cache and clearing the in-flight entry so
     /// cache warming succeeds even if the caller task was cancelled (issue #174).
     @MainActor
-    private func recordCompletedImage(_ image: PlatformImage, for url: URL) {
+    private func recordCompletedImage(_ image: PlatformImage, cost: Int, for url: URL) {
         inFlight.removeValue(forKey: url)
-        cache.setObject(image, forKey: url as NSURL, cost: Self.cacheCost(of: image))
+        cache.setObject(image, forKey: url as NSURL, cost: cost)
         recentFailures.removeValue(forKey: url)
     }
 
@@ -369,72 +463,5 @@ func image(for url: URL) async throws -> PlatformImage {
         } onCancel: {
             state.resume(throwing: CancellationError())
         }
-    }
-}
-
-// MARK: - Phase
-
-/// AsyncImage-like phase for `CachedRemoteImage`. Failure collapses to a bare
-/// case because callers render the same placeholder while loading and on error.
-enum RemoteImagePhase {
-    /// Nothing loaded yet.
-    case empty
-    /// The image, ready to render.
-    case success(Image)
-    /// The download or decode failed; the loader remembers the failure for a
-    /// short negative-cache window (replaying it without a network request)
-    /// and retries the download on the next appearance after it lapses.
-    case failure
-
-    /// Whether a failed load attempt maps to `failure`. Task cancellation
-    /// does not: a scrolled-away or recycled cell keeps its current phase —
-    /// the detached download keeps running and may still land in the cache,
-    /// resolving the next appearance — instead of flashing the failure
-    /// placeholder for an error the user can never see (issue #421).
-    static func mapsToFailurePhase(_ error: any Error) -> Bool {
-        !(error.isSdkCancellation || Task.isCancelled)
-    }
-}
-
-// MARK: - View
-
-extension Image {
-    #if canImport(UIKit)
-    init(platformImage image: UIImage) {
-        self = Image(uiImage: image)
-    }
-    #elseif canImport(AppKit)
-    init(platformImage image: NSImage) {
-        self = Image(nsImage: image)
-    }
-    #endif
-}
-
-/// Drop-in replacement for `AsyncImage` backed by `RemoteImageLoader`: same
-/// phase contract, but repeat appearances resolve from cache instantly and
-/// concurrent subscribers for one URL share a single download. Disallowed URL
-/// schemes collapse immediately to `.failure` without downloading.
-struct CachedRemoteImage<Content: View>: View {
-    let url: URL
-    @ViewBuilder let content: (RemoteImagePhase) -> Content
-
-    @State private var phase: RemoteImagePhase = .empty
-
-    var body: some View {
-        content(phase)
-            .task(id: url) {
-                guard isAllowedSecureImageURL(url) else {
-                    phase = .failure
-                    return
-                }
-                do {
-                    phase = .success(
-                        Image(platformImage: try await RemoteImageLoader.shared.image(for: url))
-                    )
-                } catch {
-                    guard RemoteImagePhase.mapsToFailurePhase(error) else { return }
-                    phase = .failure
-                }
-            }
     }
 }
