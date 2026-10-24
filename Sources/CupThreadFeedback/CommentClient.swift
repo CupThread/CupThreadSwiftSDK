@@ -210,12 +210,18 @@ extension FeedbackClient {
     ///   - userToken: A stable UUID string identifying the commenting user.
     /// - Returns: The created comment, as echoed by the server.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when the
-    ///   caller is not signed in (HTTP 401),
-    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
-    ///   server's permission policy rejects the comment (HTTP 403),
+    ///   caller is not signed in (HTTP 401 — this sign-in gate fires before
+    ///   the lookup, so an anonymous caller receives it regardless of the id),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
+    ///   server state answers it on this operation; the generic permission
+    ///   mapping is kept for deploy skew (pre-convention servers answered an
+    ///   undocumented 403 for an unapproved request, which the uniform-404
+    ///   convention of SaaS#1171 now hides the same as a missing one),
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
-    ///   the documented JSON envelope reports the feature request is missing
-    ///   or its comments are disabled (HTTP 404 with a non-empty `error`),
+    ///   the documented JSON envelope reports the feature request is missing,
+    ///   unapproved, or its comments are disabled (HTTP 404 with a non-empty
+    ///   `error` — since SaaS#1171 an unapproved request answers the same
+    ///   uniform 404 body as a missing one),
     ///   ``FeedbackClientError/invalidParent(message:requestId:)`` when the
     ///   reply target is missing, hidden, or not on this feature request
     ///   (HTTP 400 `invalid_parent`),

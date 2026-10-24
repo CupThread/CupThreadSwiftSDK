@@ -368,13 +368,16 @@ extension FeedbackClient {
     /// bearer token is attached as `Authorization: Bearer …` so board columns
     /// load when `allowAnonymousRoadmap = false`.
     /// - Returns: The board's visible columns, sorted by ``BoardColumn/position``.
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` or
-    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   roadmap access is disabled for the app (HTTP 401/403),
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
+    ///   roadmap access is disabled for the app (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` — deploy-skew
+    ///   defense only (SaaS#1171 removed the disabled-app 403),
     ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse``.
+    ///   with status 404 for an unknown `appKey` or a disabled app — both
+    ///   answer the same `"App not found"` envelope (existence hiding,
+    ///   SaaS#1171) — or ``FeedbackClientError/invalidResponse``.
     public func fetchColumns() async throws -> [BoardColumn] {
         let response: ListColumnsResponse = try await get(
             "/api/v1/public/columns/\(configuration.appKey)",
@@ -393,13 +396,16 @@ extension FeedbackClient {
     /// bearer token is attached as `Authorization: Bearer …` so versions
     /// load when `allowAnonymousRoadmap = false`.
     /// - Returns: Released and planned versions, sorted by ``AppVersion/position``.
-    /// - Throws: ``FeedbackClientError/authenticationRequired`` or
-    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   roadmap access is disabled for the app (HTTP 401/403),
+    /// - Throws: ``FeedbackClientError/authenticationRequired`` when anonymous
+    ///   roadmap access is disabled for the app (HTTP 401),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` — deploy-skew
+    ///   defense only (SaaS#1171 removed the disabled-app 403),
     ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse``.
+    ///   with status 404 for an unknown `appKey` or a disabled app — both
+    ///   answer the same `"App not found"` envelope (existence hiding,
+    ///   SaaS#1171) — or ``FeedbackClientError/invalidResponse``.
     public func fetchVersions() async throws -> [AppVersion] {
         let response: ListVersionsResponse = try await get(
             "/api/v1/public/versions/\(configuration.appKey)",

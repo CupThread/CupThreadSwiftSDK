@@ -54,9 +54,15 @@ extension FeedbackClient {
     ///   `userToken` is blank or whitespace-only (rejected locally, before
     ///   any network round trip) or when anonymous access is disabled for the
     ///   app (HTTP 401),
-    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   access is disabled for the app (HTTP 403),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
+    ///   server state answers it on this operation; the generic permission
+    ///   mapping is kept for deploy skew (pre-convention servers answered a
+    ///   non-Turnstile 403 for a disabled app),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   with status 404 when the `appKey` is unknown or the app has public
+    ///   feature requests disabled — the API answers both identically with
+    ///   the `"App not found"` envelope (existence hiding: callers treat 404
+    ///   as "not available here" without distinguishing the two, SaaS#1171) —
     ///   or ``FeedbackClientError/invalidResponse``.
     public func fetchFeatureRequests(
         userToken: String,

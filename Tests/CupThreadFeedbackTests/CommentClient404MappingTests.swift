@@ -52,6 +52,38 @@ struct CommentClient404MappingTests {
         }
     }
 
+    @Test func postCommentMapsUnapprovedRequestUniform404ToCommentsUnavailable() async throws {
+        // SaaS#1171: an unapproved request, which previously answered an
+        // undocumented 403 ("Only approved requests can be commented on"),
+        // is hidden the same as a missing one — both answer the same uniform
+        // 404 envelope, so it must surface as the typed `.commentsUnavailable`
+        // with the server message preserved, never as a permission verdict.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-404-unapproved"]),
+                try encodeJSON(["error": "Feature request not found"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().postComment(
+                featureRequestId: "fr-123",
+                draft: CommentDraft(body: "Test"),
+                userToken: "token-123"
+            )
+            Issue.record("Expected commentsUnavailable")
+        } catch let error as FeedbackClientError {
+            guard case .commentsUnavailable(let message, let requestId) = error else {
+                Issue.record("Expected .commentsUnavailable, got \(error)")
+                return
+            }
+            #expect(message == "Feature request not found")
+            #expect(requestId == "req-404-unapproved")
+            #expect(error.requestId == "req-404-unapproved")
+            #expect(error.responseBody == nil)
+        }
+    }
+
     @Test func postCommentMaps404WithoutRequestId() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (

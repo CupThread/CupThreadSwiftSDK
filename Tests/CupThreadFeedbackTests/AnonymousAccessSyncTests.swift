@@ -45,6 +45,10 @@ struct AnonymousAccessSyncTests {
         }
     }
 
+    // Deploy-skew pin: since the uniform-404 convention (SaaS#1171) no
+    // current server state answers a non-Turnstile 403 on this operation
+    // — a disabled app answers the uniform 404 instead. The generic
+    // permission mapping stays defensive for servers predating it.
     @Test func fetchVersionsMaps403ToForbidden() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
@@ -124,6 +128,10 @@ struct AnonymousAccessSyncTests {
         }
     }
 
+    // Deploy-skew pin: since the uniform-404 convention (SaaS#1171) no
+    // current server state answers a non-Turnstile 403 on this operation
+    // — a disabled app answers the uniform 404 instead. The generic
+    // permission mapping stays defensive for servers predating it.
     @Test func fetchColumnsMaps403ToForbidden() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
