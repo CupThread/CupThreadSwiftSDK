@@ -42,7 +42,9 @@ struct CommentsViewReloadPreservationTests {
         )
         // The full-screen error branch is gated on an empty thread: a failure
         // with comments on screen falls through to the content rows instead.
-        let branchCondition = content[loadingBranch.upperBound..<fullScreenError.lowerBound]
+        // Start after the spinner branch so its own `comments.isEmpty` cannot
+        // satisfy this assertion vacuously.
+        let branchCondition = content[spinner.upperBound..<fullScreenError.lowerBound]
         #expect(
             branchCondition.contains("comments.isEmpty"),
             "LoadErrorView must own the surface only when there is nothing to show (issue #545)"
