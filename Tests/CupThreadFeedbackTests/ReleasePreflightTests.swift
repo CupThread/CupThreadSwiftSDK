@@ -9,6 +9,7 @@ import Testing
 /// tag/release/CDN collision and rerun recognition — is pinned here and runs
 /// as part of the regular `swift test` gate (issue #11).
 @Suite("Release preflight")
+// swiftlint:disable:next type_body_length
 struct ReleasePreflightTests {
     private struct NodeResult {
         let status: Int32
@@ -209,6 +210,115 @@ struct ReleasePreflightTests {
         #expect(
             freshCommands == ["gh release edit v0.1.1 --draft=false"],
             "matching draft notes must be published without a redundant edit; got: \(freshCommands)"
+        )
+    }
+
+    // MARK: - Release-tooling pin (issue #572)
+
+    private struct PinProbeOutcome: Decodable {
+        let name: String
+        let threw: Bool
+        let pin: String?
+        let message: String?
+    }
+
+    /// The exported `wranglerPin` helper is the single reader of the release
+    /// manifest: it must fail closed on a missing or unreadable manifest and
+    /// reject range specifiers, because both would let npx resolve registry
+    /// state at release time (issue #572).
+    @Test func wranglerPinHelperFailsClosedOnMissingManifestsAndRanges() throws {
+        let output = try evaluateJS("""
+        import { pathToFileURL } from 'node:url';
+        import { mkdtempSync, writeFileSync } from 'node:fs';
+        import { tmpdir } from 'node:os';
+        import path from 'node:path';
+        const m = await import(pathToFileURL(process.env.RELEASE_SCRIPT_PATH));
+        const outcomes = [];
+        const attempt = (name, setup) => {
+            const root = mkdtempSync(path.join(tmpdir(), 'wrangler-pin-'));
+            setup(root);
+            try {
+                outcomes.push({ name, threw: false, pin: m.wranglerPin(root), message: null });
+            } catch (error) {
+                outcomes.push({ name, threw: true, pin: null, message: String(error.message) });
+            }
+        };
+        const ranged = JSON.stringify({ devDependencies: { wrangler: '^4.0.0' } });
+        const exact = JSON.stringify({ devDependencies: { wrangler: '4.152.0' } });
+        attempt('missing', () => {});
+        attempt('range', (root) => writeFileSync(path.join(root, 'package.json'), ranged));
+        attempt('missingField', (root) => writeFileSync(path.join(root, 'package.json'), JSON.stringify({ devDependencies: {} })));
+        attempt('exact', (root) => writeFileSync(path.join(root, 'package.json'), exact));
+        console.log(JSON.stringify(outcomes));
+        """)
+        let data = try #require(output.data(using: .utf8), "expected JSON, got: \(output)")
+        let outcomes = try JSONDecoder().decode([PinProbeOutcome].self, from: data)
+        let byName = Dictionary(uniqueKeysWithValues: outcomes.map { ($0.name, $0) })
+        #expect(byName["missing"]?.threw == true, "a missing manifest must fail closed; got: \(String(describing: byName["missing"]))")
+        #expect(byName["missing"]?.message?.contains("issue #572") == true)
+        #expect(byName["range"]?.threw == true, "a range pin must be rejected; got: \(String(describing: byName["range"]))")
+        #expect(byName["range"]?.message?.contains("exact semver") == true)
+        #expect(byName["missingField"]?.threw == true, "an absent wrangler entry must be rejected; got: \(String(describing: byName["missingField"]))")
+        #expect(byName["exact"]?.threw == false, "an exact semver pin must be accepted; got: \(String(describing: byName["exact"]))")
+        #expect(byName["exact"]?.pin == "4.152.0")
+    }
+
+    /// The manifest, the lockfile, and the preflight must agree on one exact
+    /// wrangler version; the lockfile entry proves the install is the pinned
+    /// one (issue #572).
+    @Test func manifestAndLockfilePinTheSameExactWranglerVersion() throws {
+        let root = try Self.repoRoot()
+        let manifestData = try Data(contentsOf: root.appendingPathComponent("package.json"))
+        let manifest = try #require(try JSONSerialization.jsonObject(with: manifestData) as? [String: Any])
+        let devDependencies = try #require(manifest["devDependencies"] as? [String: Any])
+        let pin = try #require(devDependencies["wrangler"] as? String)
+        #expect(
+            pin.range(of: #"^\d+\.\d+\.\d+$"#, options: .regularExpression) != nil,
+            "package.json must pin wrangler to an exact semver (no ranges); got: \(pin)"
+        )
+
+        let lockData = try Data(contentsOf: root.appendingPathComponent("package-lock.json"))
+        let lock = try #require(try JSONSerialization.jsonObject(with: lockData) as? [String: Any])
+        let packages = try #require(lock["packages"] as? [String: Any])
+        let rootPackage = try #require(packages[""] as? [String: Any])
+        let rootDevDependencies = try #require(rootPackage["devDependencies"] as? [String: Any])
+        #expect(
+            rootDevDependencies["wrangler"] as? String == pin,
+            "package-lock.json must pin the same exact wrangler version as package.json"
+        )
+        let wranglerPackage = try #require(packages["node_modules/wrangler"] as? [String: Any])
+        #expect(
+            wranglerPackage["version"] as? String == pin,
+            "package-lock.json must lock exactly the pinned wrangler version"
+        )
+        #expect(
+            wranglerPackage["dev"] as? Bool == true,
+            "wrangler is a release-script devDependency, never a runtime dependency"
+        )
+    }
+
+    /// Source-scan invariant: the script may only execute wrangler through the
+    /// pinned local install (`--no-install`), the preflight must verify the
+    /// resolved version against the manifest pin, and no inline version
+    /// literal may drift from the manifest (issue #572).
+    @Test func releaseScriptInvokesWranglerOnlyThroughThePinnedLocalInstall() throws {
+        let scriptPath = try Self.repoRoot().appendingPathComponent("scripts/release.mjs").path
+        let script = try String(contentsOfFile: scriptPath, encoding: .utf8)
+        #expect(
+            script.contains("requireWranglerPin(planUpload)"),
+            "the preflight must verify the wrangler pin whenever the CDN artifact will be uploaded"
+        )
+        #expect(
+            script.contains(#"["--no-install", "wrangler""#),
+            "every wrangler invocation must go through the pinned local install"
+        )
+        #expect(
+            !script.contains("run(\"npx\", [\"wrangler\""),
+            "an npx invocation without --no-install resolves registry state at release time (issue #572)"
+        )
+        #expect(
+            !script.contains("wrangler@"),
+            "no inline wrangler version literal is allowed — the pin is single-sourced from package.json"
         )
     }
 

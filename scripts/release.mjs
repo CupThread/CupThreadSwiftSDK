@@ -78,6 +78,34 @@ export function syncSDKVersion(version, root = ROOT) {
   return true;
 }
 
+// --- Exported for ReleasePreflightTests: release-tooling pin (issue #572) ---
+
+// Reads the exact wrangler pin from the release-tooling manifest. The pin is
+// single-sourced from package.json — the manifest, the lockfile, and the
+// executed version can never drift the way a version literal copied into this
+// script would. Ranges are rejected because they resolve to registry state at
+// release time, which is exactly the supply-chain exposure issue #572 closes.
+export function wranglerPin(root = ROOT) {
+  const manifestPath = path.join(root, "package.json");
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  } catch (error) {
+    throw new Error(
+      `Could not read the release-tooling pin from ${manifestPath} (${error.message}) — ` +
+      "the release path refuses to execute an unpinned wrangler (issue #572)."
+    );
+  }
+  const pin = manifest?.devDependencies?.wrangler;
+  if (typeof pin !== "string" || !isSemver(pin)) {
+    throw new Error(
+      `package.json must pin an exact semver devDependencies.wrangler (e.g. "4.152.0"); got ${JSON.stringify(pin ?? null)} — ` +
+      "ranges resolve to whatever the registry serves at release time and are forbidden (issue #572)."
+    );
+  }
+  return pin;
+}
+
 // The generated version file is not hand-edited, so "the write changed
 // something" says nothing about whether the release commit carries the bump:
 // a rerun after a failed attempt finds the file already at the target version
@@ -329,6 +357,38 @@ function requireGhAuth() {
   }
 }
 
+// The wrangler toolchain pin (issue #572): the CDN upload runs wrangler with
+// CLOUDFLARE_API_TOKEN in scope at the most privileged moment of the release,
+// so an npx-resolved latest wrangler would be arbitrary registry code on the
+// one machine that can repoint the public CDN artifact. The upload therefore
+// invokes the command with --no-install (fails closed without the pinned
+// install) and this preflight verifies the resolved version against the
+// manifest pin before anything is built.
+function requireWranglerPin(planUpload) {
+  if (!planUpload) return;
+  let pin;
+  try {
+    pin = wranglerPin();
+  } catch (error) {
+    fail(error.message);
+  }
+  const resolved = probe("npx", ["--no-install", "wrangler", "--version"]);
+  if (!resolved.ok) {
+    fail(
+      "The pinned wrangler is not installed — run `npm ci` in the repository root and rerun. " +
+      "The CDN upload executes wrangler with Cloudflare credentials in scope and refuses an unpinned or missing install (issue #572)."
+    );
+  }
+  const version = resolved.stdout.match(/(\d+\.\d+\.\d+)/)?.[1] ?? null;
+  if (version !== pin) {
+    fail(
+      `wrangler version mismatch: package.json pins ${pin} but the resolved tool reports ${version ?? "no version"} — ` +
+      "run `npm ci` in the repository root and rerun (issue #572)."
+    );
+  }
+  console.log(`  wrangler ${version} (pinned ${pin} in package.json)`);
+}
+
 function gitStatusLines() {
   return probe("git", ["status", "--porcelain"]).stdout.split("\n").filter(Boolean);
 }
@@ -441,6 +501,7 @@ function collectPreflightFacts(version, planUpload) {
 function runPreflight(version, planUpload) {
   requireCommands(["git", "gh", "swift", "xcodebuild", "curl", "npx", "libtool", "lipo", "nm", "ditto"]);
   requireGhAuth();
+  requireWranglerPin(planUpload);
   const { facts, collectErrors } = collectPreflightFactsWithErrors(version, planUpload);
   const decision = evaluateReleaseReadiness(facts);
   for (const warning of decision.warnings) console.log(`  ⚠︎ ${warning}`);
@@ -1119,7 +1180,7 @@ async function main() {
     withRecovery(
       "R2 upload failed",
       "the GitHub release is still a draft and nothing is public. Fix credentials or connectivity and rerun — the tag and the draft release are recognized and reused.",
-      () => run("npx", ["wrangler", "r2", "object", "put", `${R2_BUCKET}/sdks/apple/${filename}`,
+      () => run("npx", ["--no-install", "wrangler", "r2", "object", "put", `${R2_BUCKET}/sdks/apple/${filename}`,
         "--file", zipPath, "--remote", "--content-type", "application/zip"])
     );
     verifyCdnChecksum(filename, artifact.sha256);

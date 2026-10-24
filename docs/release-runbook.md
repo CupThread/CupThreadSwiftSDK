@@ -16,6 +16,15 @@ Before running the script:
 4. You are on `main`, in sync with `origin/main`, with a clean tree.
 5. `gh` is authenticated (`gh auth status`); R2 credentials are configured
    for `wrangler` if the CDN artifact will be uploaded.
+6. The release-tooling manifest is installed: run `npm ci` in the
+   repository root if `node_modules/wrangler` is absent. `package.json`
+   pins `wrangler` to an exact version (issue #572) and the preflight
+   refuses to run unless the resolved tool matches that pin — the upload
+   executes `wrangler` with Cloudflare credentials in scope, so an
+   npx-resolved `wrangler@latest` is forbidden. Upgrade the pin by editing
+   `package.json` (exact semver only, no ranges), regenerating
+   `package-lock.json` with `npm install`, and recording the change in the
+   release notes of the next release.
 
 ## Command
 
@@ -34,6 +43,9 @@ real publications.
 1. **Preflight** (publication only; fails fast before any prompt or build):
    - required tools present (`git`, `gh`, `swift`, `xcodebuild`, `curl`,
      `npx`, `libtool`, `lipo`, `nm`, `ditto`) and `gh` authenticated;
+   - when the CDN artifact will be uploaded: the resolved `wrangler` version
+     equals the exact `package.json` pin (issue #572) and is printed for the
+     audit trail;
    - current branch is `main`;
    - working tree is clean (single tolerated exception below);
    - `origin/main` was fetched and is an ancestor of local `HEAD`;
@@ -93,6 +105,7 @@ version is published.
 |---|---|
 | Missing tools | Install the listed tools (`brew install …`, Xcode CLTs). |
 | `gh` not authenticated | `gh auth login`. |
+| Pinned `wrangler` missing or mismatched | Run `npm ci` in the repository root and rerun. The preflight resolves `npx --no-install wrangler --version` and refuses a version that differs from the exact `package.json` pin (issue #572). |
 | Wrong branch | `git switch main`. |
 | Working tree not clean | Commit or stash. If the only dirt is `Sources/CupThreadFeedback/SDKVersion.swift` matching this release's version, the rerun tolerates it — otherwise discard it (`git checkout -- Sources/CupThreadFeedback/SDKVersion.swift`; the script regenerates it). |
 | Behind or diverged from `origin/main` | `git merge --ff-only origin/main` (or rebase and force-with-lease on your own branch, then switch back to `main`). |
@@ -109,7 +122,8 @@ version is published.
   nothing is public. Inspect with `gh release view vX.Y.Z`, fix, and rerun;
   the draft is reused and its assets replaced.
 - **R2 upload fails** — tag + draft release exist, still nothing public.
-  Fix wrangler credentials/connectivity and rerun.
+  Fix wrangler credentials/connectivity and rerun (the preflight also
+  re-verifies the wrangler pin).
 - **CDN checksum verification fails** — the object exists but serves
   different bytes (or 404s). The release is still a draft; overwrite the R2
   object (rerun does this) and re-verify.
