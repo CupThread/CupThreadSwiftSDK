@@ -74,6 +74,10 @@ let client = FeedbackClient(
         // request.canonicalString is the exact UTF-8 bytes to HMAC-SHA256
         // with the SDK signing secret held on your server.
         let signed = try await myBackend.signUserAttributes(request.canonicalString)
+        // signed.timestamp must be the canonical string's last line (the
+        // epoch seconds it was signed over) — the SDK verifies the
+        // equality locally and fails fast with `.invalidSignature`
+        // otherwise (#579).
         return UserAttributesSignature(signature: signed.signature, timestamp: signed.timestamp)
     }
 )
@@ -87,7 +91,7 @@ try await client.updateUserAttributes(
 )
 ```
 
-The provider receives the canonical string the SDK built (its last line is the server-clock-corrected timestamp) and returns the 64-hex-character signature plus that timestamp; the SDK validates the signature grammar locally and sends both verbatim. A `stale_signature` rejection re-consults the provider exactly once with a fresh corrected timestamp; `invalid_signature` is never retried. When the provider returns `nil`, the SDK falls back to the embedded ``FeedbackClientConfiguration/signingSecret`` — and with neither available the report is sent unsigned and rejected by the server.
+The provider receives the canonical string the SDK built (its last line is the server-clock-corrected timestamp) and returns the 64-hex-character signature plus that timestamp; the SDK validates the signature grammar and the timestamp equality locally (a returned timestamp different from the one embedded in the signed canonical string cannot verify server-side, so it is rejected before any request is spent) and sends both verbatim. A `stale_signature` rejection re-consults the provider exactly once with a fresh corrected timestamp; `invalid_signature` is never retried. When the provider returns `nil`, the SDK falls back to the embedded ``FeedbackClientConfiguration/signingSecret`` — and with neither available the report is sent unsigned and rejected by the server.
 
 > Warning: Configuring the embedded `signingSecret` compiles the signing key into your app binary. It is **not tamper-resistant**: anyone who installs the app can extract it and forge verified payment attributes for arbitrary end users. Reserve it for internal, debug, or otherwise trusted builds, and prefer backend-delegated signing in production.
 

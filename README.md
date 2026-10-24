@@ -182,6 +182,10 @@ Feedback submissions (`submit(_:userToken:)`) include `metadata.sdk` (`cupthread
           // request.canonicalString is the exact UTF-8 bytes to HMAC-SHA256
           // with the SDK signing secret held on your server.
           let signed = try await myBackend.signUserAttributes(request.canonicalString)
+          // signed.timestamp must be the canonical string's last line (the
+          // epoch seconds it was signed over) — the SDK verifies the
+          // equality locally and fails fast with `.invalidSignature`
+          // otherwise (#579).
           return UserAttributesSignature(signature: signed.signature, timestamp: signed.timestamp)
       }
   )
@@ -200,7 +204,7 @@ Feedback submissions (`submit(_:userToken:)`) include `metadata.sdk` (`cupthread
   <timestamp: epochSeconds>
   ```
 
-  Return the 64-hex-character signature and the timestamp embedded in the signed string; the SDK validates the grammar locally and sends both verbatim. A `stale_signature` rejection re-consults the provider exactly once with a fresh server-clock-corrected timestamp; `invalid_signature` is never retried.
+  Return the 64-hex-character signature and the timestamp embedded in the signed string (its last line — a different timestamp cannot verify server-side, so the SDK rejects it locally with `.invalidSignature` without spending the request); the SDK validates both locally and sends them verbatim. A `stale_signature` rejection re-consults the provider exactly once with a fresh server-clock-corrected timestamp; `invalid_signature` is never retried.
 
 - **Embedded secret (debug / internal builds only)** — `FeedbackClientConfiguration.signingSecret` compiles the key into the binary. **This is not tamper-resistant**: anyone who installs the app can extract it (strings, class-dump, a memory dump) and forge verified payment attributes for arbitrary users, poisoning revenue-weighted triage. Never ship it in a production app.
 

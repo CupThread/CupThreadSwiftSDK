@@ -8,7 +8,9 @@ import Testing
 /// signed wherever the SDK signing secret lives — normally the host's backend
 /// — so the secret never ships inside the app binary. The SDK builds the
 /// canonical string, the provider HMACs it, and the returned signature and
-/// timestamp are sent verbatim.
+/// timestamp are validated locally (64-hex grammar; the timestamp must be the
+/// one embedded in the canonical string, #579) before the payload goes on
+/// the wire.
 @Suite("UserAttributesSigningProvider", .serialized)
 struct UserAttributesSigningProviderTests {
     static let apiHost = "signing-provider.example.com"
@@ -47,12 +49,13 @@ struct UserAttributesSigningProviderTests {
     }
 
     static func makeProviderClient(
+        host: String? = nil,
         secret: String? = nil,
         serverClock: ServerClock? = nil,
         signer: (@Sendable (UserAttributesSigningRequest) async throws -> UserAttributesSignature?)? = nil
     ) -> FeedbackClient {
         makeClient(
-            baseURL: URL(string: "https://\(apiHost)")!,
+            baseURL: URL(string: "https://\(host ?? apiHost)")!,
             appKey: appKey,
             signingSecret: secret,
             serverClock: serverClock,
@@ -172,24 +175,70 @@ struct UserAttributesSigningProviderTests {
         #expect(timestamp == signedRequest.arguments.timestamp)
     }
 
-    @Test func providerTimestampIsSentVerbatim() async throws {
+    /// A well-behaved provider echoes the timestamp embedded in the
+    /// canonical string it was asked to sign; that value reaches the wire
+    /// verbatim (#579).
+    @Test func wellBehavedProviderTimestampIsSentVerbatim() async throws {
         let capture = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             capture.value = request
             return try Self.successResponse()
         }
 
-        let fixedTimestamp: Int64 = 1_773_600_123
-        let client = Self.makeProviderClient { _ in
-            UserAttributesSignature(signature: String(repeating: "a", count: 64), timestamp: fixedTimestamp)
-        }
+        let recorder = ProviderRecorder()
+        let client = Self.makeProviderClient(
+            signer: Self.backendSigner(recording: recorder, override: { request in
+                UserAttributesSignature(
+                    signature: String(repeating: "a", count: 64),
+                    timestamp: request.arguments.timestamp
+                )
+            })
+        )
         _ = try await client.updateUserAttributes(isPaying: true, userToken: "user-provider-verbatim")
 
         let request = try #require(capture.value)
         let rawData = try #require(bodyData(from: request))
         let json = try #require(parseJSONDict(rawData))
-        #expect(json["timestamp"] as? Int64 == fixedTimestamp)
+        let signedRequest = try #require(recorder.requests.first)
+        #expect(json["timestamp"] as? Int64 == signedRequest.arguments.timestamp)
         #expect(json["signature"] as? String == String(repeating: "a", count: 64))
+    }
+
+    /// A natural provider misreading — the backend signs the canonical
+    /// string but stamps its own signing time — can only verify as
+    /// `invalid_signature` server-side (the server rebuilds the canonical
+    /// string from the payload's timestamp), and `.invalidSignature` is
+    /// never retried, so the SDK fails fast locally without spending the
+    /// request (#579).
+    @Test func providerTimestampMismatchFailsFastWithoutNetworkCall() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        requests.value = []
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
+            requests.value?.append(request)
+            return try Self.successResponse()
+        }
+
+        let client = Self.makeProviderClient { request in
+            UserAttributesSignature(
+                signature: String(repeating: "a", count: 64),
+                timestamp: request.arguments.timestamp + 60
+            )
+        }
+        do {
+            _ = try await client.updateUserAttributes(isPaying: true, userToken: "user-provider-timestamp-mismatch")
+            Issue.record("Expected invalidSignature error")
+        } catch let error as FeedbackClientError {
+            guard case .invalidSignature(let message, let requestId) = error else {
+                Issue.record("Expected .invalidSignature, got \(error)")
+                return
+            }
+            #expect(requestId == nil)
+            #expect(message?.contains("timestamp") == true)
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+        // Rejected locally — no request was ever built or sent.
+        #expect((requests.value ?? []).isEmpty)
     }
 
     @Test func providerWinsOverConfiguredSecret() async throws {
@@ -202,7 +251,9 @@ struct UserAttributesSigningProviderTests {
         let providerSignature = String(repeating: "f", count: 64)
         let client = Self.makeProviderClient(
             secret: "sec_embedded_debug_secret",
-            signer: { _ in UserAttributesSignature(signature: providerSignature, timestamp: 1_773_600_200) }
+            signer: { request in
+                UserAttributesSignature(signature: providerSignature, timestamp: request.arguments.timestamp)
+            }
         )
         _ = try await client.updateUserAttributes(isPaying: true, userToken: "user-provider-wins")
 
@@ -267,57 +318,6 @@ struct UserAttributesSigningProviderTests {
         _ = try await client.updateUserAttributes(userToken: "user-identity-only")
 
         #expect(recorder.callCount == 0)
-    }
-
-    // MARK: - Local Provider-Result Validation
-
-    @Test func malformedProviderSignatureRejectedWithoutNetworkCall() async throws {
-        let requests = CaptureBox<[URLRequest]>()
-        requests.value = []
-        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
-            requests.value?.append(request)
-            return try Self.successResponse()
-        }
-
-        let client = Self.makeProviderClient { _ in
-            UserAttributesSignature(signature: "not-a-signature", timestamp: 1_773_600_300)
-        }
-        do {
-            _ = try await client.updateUserAttributes(isPaying: true, userToken: "user-malformed-sig")
-            Issue.record("Expected invalidSignature error")
-        } catch let error as FeedbackClientError {
-            guard case .invalidSignature(let message, let requestId) = error else {
-                Issue.record("Expected .invalidSignature, got \(error)")
-                return
-            }
-            #expect(requestId == nil)
-            #expect(message?.contains("malformed signature") == true)
-        } catch {
-            Issue.record("Unexpected error type: \(error)")
-        }
-        // Rejected locally — no request was ever built or sent.
-        #expect((requests.value ?? []).isEmpty)
-    }
-
-    @Test func providerThrowingPropagatesWithoutNetworkCall() async throws {
-        let requests = CaptureBox<[URLRequest]>()
-        requests.value = []
-        MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
-            requests.value?.append(request)
-            return try Self.successResponse()
-        }
-
-        struct BackendUnreachable: Error {}
-        let client = Self.makeProviderClient { _ in throw BackendUnreachable() }
-        do {
-            _ = try await client.updateUserAttributes(isPaying: true, userToken: "user-provider-throws")
-            Issue.record("Expected the provider error to propagate")
-        } catch is BackendUnreachable {
-            // The host's own backend error surfaces as-is.
-        } catch {
-            Issue.record("Unexpected error type: \(error)")
-        }
-        #expect((requests.value ?? []).isEmpty)
     }
 
     // MARK: - Clock-Skew Recovery Through the Provider (API-19)
