@@ -18,3 +18,6 @@ docs-site/
 
 # ZCode agent session files
 .zcode/
+
+# Local wrangler state created by `scripts/release.mjs` R2 uploads
+.wrangler/
