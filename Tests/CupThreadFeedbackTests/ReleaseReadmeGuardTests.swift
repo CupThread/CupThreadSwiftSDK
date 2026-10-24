@@ -127,19 +127,22 @@ struct ReleaseReadmeGuardTests {
         // Bound the child: a stalled transport must fail the guard with a
         // clear message instead of blocking the whole `swift test` run (and
         // any release attempt that runs it) forever. Race the blocking read
-        // against a deadline; losing the race terminates git, which unblocks
-        // the reader before the group scope exits.
+        // against a deadline. SIGTERM alone cannot be trusted — a git that
+        // ignores it keeps stdout open and the reader stays blocked, and the
+        // group scope waits for that reader — so the watchdog escalates to
+        // SIGKILL after a grace period, which unblocks the reader before the
+        // scope exits.
         let outcome: Data? = await withTaskGroup(of: Data?.self) { group in
             group.addTask { stdout.fileHandleForReading.readDataToEndOfFile() }
             group.addTask {
                 try? await Task.sleep(for: .seconds(30))
+                process.terminate()
+                try? await Task.sleep(for: .seconds(2))
+                kill(process.processIdentifier, SIGKILL)
                 return nil
             }
             let first = await group.next() ?? nil
             group.cancelAll()
-            if first == nil {
-                process.terminate()
-            }
             return first
         }
         guard let data = outcome else {
