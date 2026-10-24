@@ -66,6 +66,61 @@ public final class UserTokenStore: @unchecked Sendable {
 
     private static let processLock = NSLock()
 
+    /// Process-wide memo of the last ephemeral token served for each backing
+    /// store while that store was unreadable or could not confirm a write
+    /// (issue #567).
+    private static let ephemeralMemo = EphemeralTokenMemo()
+
+    /// Process-wide, thread-safe memo of the last ephemeral token served per
+    /// backing store (issue #567). Without the memo, every read during such a
+    /// window mints a different UUID, so one logical operation that resolves
+    /// the identity more than once — an upload session and the submission
+    /// finalizing it — would present two different end-user identities to the
+    /// server.
+    ///
+    /// Keyed by the backing store's identity (service + account for
+    /// Keychain-backed stores, object identity otherwise), so ``shared`` and
+    /// every scoped store each stay self-consistent for the process lifetime
+    /// without ever sharing an identity across app keys. Entries are dropped
+    /// when a read resolves a stored identity, when a write is confirmed
+    /// durable, and when ``reset()`` confirms an erasure — a durable or
+    /// stored identity must never be shadowed by a stale memo.
+    private final class EphemeralTokenMemo: @unchecked Sendable {
+        private let lock = NSLock()
+        private var tokens: [String: String] = [:]
+
+        /// The memoized token for `key`, minting and recording a fresh one
+        /// when the memo holds none for this backing store yet.
+        func serve(forKey key: String) -> String {
+            lock.lock()
+            defer { lock.unlock() }
+            if let memoized = tokens[key] {
+                return memoized
+            }
+            let fresh = mintToken()
+            tokens[key] = fresh
+            return fresh
+        }
+
+        /// Forgets the ephemeral token for `key`.
+        func drop(forKey key: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            tokens.removeValue(forKey: key)
+        }
+    }
+
+    /// The memo key for a backing store: service + account for Keychain
+    /// storage (stable across store instances, so ad-hoc
+    /// ``init(appKey:)``/``shared`` instances share one run), and object
+    /// identity for any other storage.
+    private static func ephemeralMemoKey(for storage: any TokenStorage) -> String {
+        if let keychain = storage as? KeychainTokenStorage {
+            return "keychain|\(keychain.service)|\(keychain.account)"
+        }
+        return "instance|\(ObjectIdentifier(storage))"
+    }
+
     private let storage: any TokenStorage
     private let legacyUserDefaults: UserDefaults?
     private let legacyKey: String?
@@ -83,6 +138,9 @@ public final class UserTokenStore: @unchecked Sendable {
     /// Only the store that owns the global identity (`.shared`) deletes the
     /// legacy plaintext; scoped stores copy so sibling app keys can inherit.
     private let ownsLegacyPlaintext: Bool
+    /// Key under which this store memoizes its ephemeral fallback token in
+    /// the process-wide ``ephemeralTokens`` table (issue #567).
+    private let ephemeralMemoKey: String
 
     /// Initializes a token store backed by a custom storage and optional migration source.
     /// Internal to allow unit tests to pass storage doubles and test migration.
@@ -101,6 +159,7 @@ public final class UserTokenStore: @unchecked Sendable {
         self.adoptionDefaults = adoptionDefaults
         self.adoptionFlagKey = adoptionFlagKey
         self.ownsLegacyPlaintext = adoptionFlagKey == nil
+        self.ephemeralMemoKey = Self.ephemeralMemoKey(for: storage)
     }
 
     /// Initializes a production token store backed by Keychain, with automatic migration
@@ -147,13 +206,15 @@ public final class UserTokenStore: @unchecked Sendable {
     /// Initializes a token store backed directly by `UserDefaults`.
     /// Internal to allow unit tests to pass isolated `UserDefaults` and keys.
     init(userDefaults: UserDefaults = .standard, key: String = UserTokenStore.defaultKey) {
-        self.storage = UserDefaultsTokenStorage(userDefaults: userDefaults, key: key)
+        let storage = UserDefaultsTokenStorage(userDefaults: userDefaults, key: key)
+        self.storage = storage
         self.legacyUserDefaults = nil
         self.legacyKey = nil
         self.legacyGlobalStore = nil
         self.adoptionDefaults = nil
         self.adoptionFlagKey = nil
         self.ownsLegacyPlaintext = false
+        self.ephemeralMemoKey = Self.ephemeralMemoKey(for: storage)
     }
 
     /// The storage key for one app key's identity (UserDefaults) and the
@@ -189,7 +250,15 @@ public final class UserTokenStore: @unchecked Sendable {
     public func reset() -> Bool {
         Self.processLock.lock()
         defer { Self.processLock.unlock() }
-        return storage.deleteConfirmed()
+        let confirmed = storage.deleteConfirmed()
+        if confirmed {
+            // A confirmed erasure ends the current run: the next read mints
+            // and persists a fresh identity instead of resurrecting the
+            // pre-reset ephemeral one (issue #567). A failed reset keeps the
+            // memo, because the run it belongs to is still unresolved.
+            Self.ephemeralMemo.drop(forKey: ephemeralMemoKey)
+        }
+        return confirmed
     }
 
     /// Returns the existing token, or generates and persists a new UUID on first access.
@@ -197,8 +266,15 @@ public final class UserTokenStore: @unchecked Sendable {
     /// Synchronized across threads and instances via double-checked locking so concurrent
     /// first accesses always resolve and persist the same identity. When the backing
     /// storage cannot confirm a write (e.g. an inaccessible Keychain before first
-    /// unlock), the returned token is ephemeral: nothing is persisted, the adoption
-    /// flag is left untouched, and the next read retries so the identity never rotates.
+    /// unlock), the returned token is ephemeral: nothing is persisted and the adoption
+    /// flag is left untouched. While the store stays unresolved, every read serves the
+    /// same ephemeral token — memoized per backing store for the process lifetime
+    /// (issue #567) — so one logical operation that resolves the identity more than
+    /// once presents a single end-user identity instead of a rotating one. Resolution
+    /// itself is retried on every read and the memo never shadows a durable identity:
+    /// it is dropped as soon as a read resolves a stored token, a write is confirmed,
+    /// or a confirmed ``reset()`` erases the item, after which the next read mints and
+    /// persists a fresh UUID exactly as before.
     ///
     /// The same holds when the backing storage cannot be *read* (SEC-7): an
     /// inaccessible read does not prove the store is empty, so no write is
@@ -209,11 +285,12 @@ public final class UserTokenStore: @unchecked Sendable {
     ///
     /// Likewise, an inaccessible read from the legacy global store (SEC-18)
     /// keeps adoption suspended: no write is attempted, the adoption flag
-    /// remains uncommitted, and an ephemeral UUID is served so the stored
-    /// legacy identity is not permanently forfeited.
+    /// remains uncommitted, and the memoized ephemeral token is served so the
+    /// stored legacy identity is not permanently forfeited.
     public var token: String {
         if let existing = readableStoredToken() {
             removeLegacyPlaintextIfOwned()
+            Self.ephemeralMemo.drop(forKey: ephemeralMemoKey)
             return existing
         }
 
@@ -223,14 +300,16 @@ public final class UserTokenStore: @unchecked Sendable {
         let readAfterLock = storage.loadResult()
         if case .found(let existing) = readAfterLock, !existing.isEmpty {
             removeLegacyPlaintextIfOwned()
+            Self.ephemeralMemo.drop(forKey: ephemeralMemoKey)
             return existing
         }
 
         if case .inaccessible = readAfterLock {
             // The item is present but unreadable (locked Keychain, transient
             // status, undecodable contents). Never write behind its back;
-            // serve an ephemeral token and let the next read retry.
-            return Self.mintToken()
+            // serve the process-stable ephemeral token and let the next read
+            // retry (issue #567).
+            return Self.ephemeralMemo.serve(forKey: ephemeralMemoKey)
         }
 
         switch adoptLegacyIdentityOnce() {
@@ -238,18 +317,23 @@ public final class UserTokenStore: @unchecked Sendable {
             return inherited
         case .inaccessible:
             // The legacy global item is present but unreadable (SEC-18).
-            // Never mint or persist a fresh identity behind its back;
-            // serve an ephemeral token and let the next read retry.
-            return Self.mintToken()
+            // Never mint or persist a fresh identity behind its back; serve
+            // the process-stable ephemeral token and let the next read retry.
+            return Self.ephemeralMemo.serve(forKey: ephemeralMemoKey)
         case .notFound:
             break
         }
 
-        let new = Self.mintToken()
+        // The store verifiably holds no token and no legacy identity is
+        // adoptable, so minting is authorized. Serve the already-memoized
+        // ephemeral token when one exists, so a run whose writes keep
+        // failing still presents one identity while persistence keeps
+        // retrying on every read.
+        let new = Self.ephemeralMemo.serve(forKey: ephemeralMemoKey)
         guard storage.saveConfirmed(new) else {
-            // The write could not be confirmed; serve an ephemeral token and
-            // leave adoption retryable rather than minting an identity that
-            // exists nowhere.
+            // The write could not be confirmed; the token stays memoized as
+            // this store's ephemeral identity and adoption stays retryable
+            // rather than serving an identity that exists nowhere.
             return new
         }
         markAdoptionComplete()
@@ -328,10 +412,14 @@ public final class UserTokenStore: @unchecked Sendable {
         return .notFound
     }
 
-    /// Commits the one-shot adoption flag. Only called once the store
-    /// verifiably holds the identity just persisted; a no-op for `.shared`,
-    /// whose plaintext source self-destructs on adoption.
+    /// Drops the memoized ephemeral token — the store now verifiably holds a
+    /// durable identity that must not be shadowed if the store later becomes
+    /// unreadable — and commits the one-shot adoption flag. Only called once
+    /// the store verifiably holds the identity just persisted; the flag part
+    /// is a no-op for `.shared`, whose plaintext source self-destructs on
+    /// adoption.
     private func markAdoptionComplete() {
+        Self.ephemeralMemo.drop(forKey: ephemeralMemoKey)
         guard let adoptionDefaults, let adoptionFlagKey else { return }
         adoptionDefaults.set(true, forKey: adoptionFlagKey)
     }
