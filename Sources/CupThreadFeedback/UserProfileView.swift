@@ -15,13 +15,44 @@ public struct UserProfileView: View {
         self.userId = userId
     }
 
+    /// Internal initializer for tests: `initialProfile` and
+    /// `initialLoadState` seed the load lifecycle so tests can pin the
+    /// reload-preservation rendering without driving a fetch (issue #545).
+    init(
+        client: FeedbackClient,
+        userId: String,
+        initialProfile: PublicUserProfileResponse?,
+        initialLoadState: SurfaceLoadState = SurfaceLoadState()
+    ) {
+        self.client = client
+        self.userId = userId
+        _profile = State(initialValue: initialProfile)
+        _loadState = State(initialValue: initialLoadState)
+    }
+
+    // MARK: View-level test accessors (reads reflect the seeded @State)
+
+    var isLoading: Bool { loadState.isLoading }
+    var hasLoadedOnce: Bool { loadState.hasLoadedOnce }
+    var loadError: String? { loadState.loadError }
+    /// Transient notice for a failed refresh whose profile stays on screen
+    /// (issue #545). `nil` while the full-screen error owns the surface.
+    var reloadNotice: String? { loadState.reloadNotice }
+
     public var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                if loadState.isLoading {
+                // A reload never collapses the rendered profile to a bare
+                // spinner (#545): the loading branch owns the surface only
+                // before the first successful load, matching the #59/#534
+                // preserve-content contract shared by the other surfaces.
+                if loadState.isLoading && !loadState.hasLoadedOnce {
                     ProgressView()
                         .padding(.top, 32)
-                } else if let loadError = loadState.loadError {
+                } else if let loadError = loadState.loadError, profile == nil {
+                    // Full-screen error only when there is nothing to show;
+                    // a failure with a rendered profile becomes the inline
+                    // notice overlay below instead.
                     LoadErrorView(message: loadError) {
                         await loadProfile()
                     }
@@ -47,6 +78,19 @@ public struct UserProfileView: View {
         #if os(iOS) || os(visionOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        // A failed refresh keeps the rendered profile in place; the failure
+        // surfaces as this transient top banner (issue #534/#545). A
+        // first-load failure has no content to preserve and uses the
+        // full-screen `LoadErrorView` instead.
+        .overlay(alignment: .top) {
+            if let reloadNotice = loadState.reloadNotice {
+                InlineNoticeBanner(message: reloadNotice)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .autoClearNotice($loadState.reloadNotice)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button(CupThreadStrings.tr("cupthread.whatsnew.close_button")) {
@@ -147,8 +191,13 @@ public struct UserProfileView: View {
         }
     }
 
+    /// Internal for view-level tests (`@testable`), mirroring
+    /// `CommentsView.loadComments()`: `@State` writes are not observable on
+    /// a unit-constructed view, so the tests drive the real method against
+    /// a mocked client and pin the `@State` mutations with the source-scan
+    /// pattern.
     @MainActor
-    private func loadProfile() async {
+    func loadProfile() async {
         let generation = loadState.startLoading()
         var wasCancelled = false
         // Cancellation has no empty/error verdict to render (#442).
@@ -162,13 +211,21 @@ public struct UserProfileView: View {
             // profile.
             guard !Task.isCancelled, loadState.isCurrent(generation: generation) else { return }
             profile = fetched
+            loadState.recordSuccess(generation: generation)
         } catch {
             // A cancelled load never reached a verdict — keep whatever
             // profile state was rendered before. A superseded run must not
             // write either; both leave the surface to the surviving load.
             wasCancelled = error.isSdkCancellation || Task.isCancelled
             guard loadState.isCurrent(generation: generation), !wasCancelled else { return }
-            loadState.loadError = FriendlyError.message(for: error)
+            // Issue #545: a failed reload keeps the rendered profile and
+            // degrades to the inline notice; only a failure with nothing to
+            // show fills the surface with the full-screen error (#59/#534).
+            loadState.handleFailure(
+                error: error,
+                generation: generation,
+                hasExistingContent: profile != nil
+            )
         }
     }
 }
