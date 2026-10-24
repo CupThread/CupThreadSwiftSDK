@@ -49,7 +49,18 @@ public struct WhatsNewView: View {
     var isLoading: Bool { state.isLoading }
     var hasLoadedOnce: Bool { state.hasLoadedOnce }
     var loadError: String? { state.loadError }
+    /// Transient notice for a failed refresh whose entries stay on screen
+    /// (issue #534). `nil` while the full-screen error owns the surface.
+    var reloadNotice: String? { state.reloadNotice }
     var loadGeneration: Int { state.loadGeneration }
+
+    /// Bridges the state-owned notice into the shared auto-clear modifier.
+    private var reloadNoticeBinding: Binding<String?> {
+        Binding(
+            get: { state.reloadNotice },
+            set: { state.reloadNotice = $0 }
+        )
+    }
 
     private var isChangelogPermitted: Bool {
         changelogLoadPlan(
@@ -150,6 +161,19 @@ public struct WhatsNewView: View {
         #if os(iOS) || os(visionOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        // A failed refresh keeps the rendered entries and the subscribe footer
+        // in place; the failure surfaces as this transient top banner (issue
+        // #534). A first-load failure has no content to preserve and uses the
+        // full-screen `LoadErrorView` inside the two layouts instead.
+        .overlay(alignment: .top) {
+            if let reloadNotice {
+                InlineNoticeBanner(message: reloadNotice)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .autoClearNotice(reloadNoticeBinding)
         .toolbar {
             if isChangelogPermitted, !isChangelogPermissionBlocked {
                 subscribeToolbarItem
