@@ -3,7 +3,9 @@ import Foundation
 /// Persists a stable anonymous user token across app launches.
 /// Used to track vote state and own pending requests without requiring authentication.
 ///
-/// The token is a plain UUID securely stored in the system Keychain (`kSecClassGenericPassword`).
+/// The token is a plain UUID securely stored in the system Keychain
+/// (`kSecClassGenericPassword` in the data-protection keychain, so the
+/// device-only accessibility guarantee holds on macOS as well — SEC-33).
 /// It never carries personal data and is scoped to this device. On first access, any legacy token
 /// stored in `UserDefaults` is automatically migrated to the Keychain and deleted from defaults,
 /// preventing plaintext credentials from appearing in device backups.

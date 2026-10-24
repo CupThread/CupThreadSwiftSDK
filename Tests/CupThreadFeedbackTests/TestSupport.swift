@@ -222,3 +222,51 @@ func makeScriptedKeychainStorage(item: ScriptedKeychainItem) -> KeychainTokenSto
         }
     )
 }
+
+// MARK: - Data-protection keychain availability (SEC-33)
+
+/// Whether SecItem operations targeting the data-protection keychain succeed
+/// from this process (SEC-33).
+///
+/// On macOS the data-protection keychain is only available to code-signed,
+/// provisioned processes (TN3137): every operation from an unsigned or
+/// unprovisioned caller — including SwiftPM's `swift test` host — fails with
+/// `errSecMissingEntitlement`. iOS, tvOS, and visionOS have no file-based
+/// keychain, so the answer is unconditionally `true` there. Real-Keychain
+/// round-trip tests enable themselves with `.enabled(if:)` on this value so
+/// they run where the keychain is writable and skip (never fail, and never
+/// silently no-op) where it is not.
+enum DataProtectionKeychainProbe {
+    /// Lazily probed once per process; the probe writes and deletes a
+    /// uniquely named item through the same attribute set
+    /// `KeychainTokenStorage` uses.
+    static let isWritable: Bool = probe()
+
+    private static func probe() -> Bool {
+        #if os(macOS)
+        let service = "com.cupthread.test.dpProbe.\(UUID().uuidString)"
+        let addAttributes: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: "dp-probe",
+            kSecValueData as String: Data("probe".utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        let status = SecItemAdd(addAttributes as CFDictionary, nil)
+        guard status == errSecSuccess || status == errSecDuplicateItem else {
+            return false
+        }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: "dp-probe",
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        SecItemDelete(query as CFDictionary)
+        return true
+        #else
+        return true
+        #endif
+    }
+}

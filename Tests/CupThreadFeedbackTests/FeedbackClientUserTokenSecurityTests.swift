@@ -77,6 +77,7 @@ struct FeedbackClientUserTokenSecurityTests {
 
     @Test(
         "resolvedIdentity falls back to tokenStore when provided token contains newlines",
+        .enabled(if: DataProtectionKeychainProbe.isWritable),
         arguments: [
             "malicious\ntoken",
             "malicious\rtoken",
@@ -107,7 +108,10 @@ struct FeedbackClientUserTokenSecurityTests {
         #expect(client.resolvedIdentity(validToken) == validToken)
     }
 
-    @Test("resolvedIdentity falls back to tokenStore when token is nil, empty, or whitespace")
+    @Test(
+        "resolvedIdentity falls back to tokenStore when token is nil, empty, or whitespace",
+        .enabled(if: DataProtectionKeychainProbe.isWritable)
+    )
     func testResolvedIdentityFallsBackOnNilOrEmpty() {
         let configuration = FeedbackClientConfiguration(
             baseURL: URL(string: "https://api.cupthread.com")!,
@@ -123,7 +127,10 @@ struct FeedbackClientUserTokenSecurityTests {
         #expect(client.resolvedIdentity(" \n ") == storedToken)
     }
 
-    @Test("resolvedSubmitUserToken rejects tokens with newlines")
+    @Test(
+        "resolvedSubmitUserToken rejects tokens with newlines",
+        .enabled(if: DataProtectionKeychainProbe.isWritable)
+    )
     func testResolvedSubmitUserTokenRejectsNewlines() {
         let configuration = FeedbackClientConfiguration(
             baseURL: URL(string: "https://api.cupthread.com")!,

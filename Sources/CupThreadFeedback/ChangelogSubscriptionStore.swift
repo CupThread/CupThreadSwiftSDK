@@ -101,9 +101,10 @@ final class InMemorySubscriptionStorage: ChangelogSubscriptionStorage, @unchecke
 ///
 /// Remembers the subscription for this app key — address plus its
 /// double-opt-in phase (`ChangelogSubscriptionRecord`) — in the system
-/// Keychain (`kSecClassGenericPassword`, scoped to device-only
-/// `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and excluded from
-/// unencrypted device backups) under service `"com.cupthread.changelogEmail"`
+/// Keychain (`kSecClassGenericPassword` in the data-protection keychain,
+/// scoped to device-only `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
+/// and excluded from unencrypted device backups) under service
+/// `"com.cupthread.changelogEmail"`
 /// and account `"com.cupthread.changelog.subscribedEmail.<appKey>"`, following
 /// the same per-app-key scoping as `ChangelogSeenStore`. On first access any
 /// legacy value — a bare address or a serialized record in `UserDefaults`, or

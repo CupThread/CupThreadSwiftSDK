@@ -397,7 +397,8 @@ struct ChangelogSubscribeModelTests {
     /// The view persists `.pending` after a successful subscribe (issue #273),
     /// so the next sheet opening starts in the pending manage phase — not in
     /// the confirmed manage view that claims the subscription is active.
-    @Test func subscribeSuccessPersistsPendingRecordSoSheetReopensPending() async throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func subscribeSuccessPersistsPendingRecordSoSheetReopensPending() async throws {
         let suiteName = "test.subscribe_pending_reopen.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }

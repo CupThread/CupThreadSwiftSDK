@@ -13,7 +13,8 @@ import Testing
 @Suite("Keychain Inaccessible Reads (SEC-7)")
 struct KeychainInaccessibleReadTests {
 
-    @Test func loadResultRoundTripsThroughRealKeychain() throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func loadResultRoundTripsThroughRealKeychain() throws {
         let testService = "com.cupthread.test.loadresult.\(UUID().uuidString)"
         let testAccount = "account.\(UUID().uuidString)"
         let storage = KeychainTokenStorage(service: testService, account: testAccount)
