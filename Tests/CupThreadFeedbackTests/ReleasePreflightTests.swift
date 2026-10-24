@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Testing
 
@@ -222,10 +223,17 @@ struct ReleasePreflightTests {
         let message: String?
     }
 
+    private struct InstallProbe: Decodable {
+        let name: String
+        let version: String?
+        let insideRoot: Bool
+        let endsWithBinWrangler: Bool
+    }
+
     /// The exported `wranglerPin` helper is the single reader of the release
     /// manifest: it must fail closed on a missing or unreadable manifest and
-    /// reject range specifiers, because both would let npx resolve registry
-    /// state at release time (issue #572).
+    /// reject range specifiers, because ranges resolve to whatever the
+    /// registry serves when `npm ci` runs (issue #572).
     @Test func wranglerPinHelperFailsClosedOnMissingManifestsAndRanges() throws {
         let output = try evaluateJS("""
         import { pathToFileURL } from 'node:url';
@@ -297,10 +305,67 @@ struct ReleasePreflightTests {
         )
     }
 
+    /// The exported `localWranglerInstall` helper resolves the wrangler
+    /// binary and version as fixed paths under the given root: a missing,
+    /// unreadable, or malformed `node_modules/wrangler/package.json` yields a
+    /// null version (the preflight then fails closed with the `npm ci`
+    /// remedy), and the binary path always names the checkout's own
+    /// `node_modules/.bin/wrangler` (issue #572).
+    @Test func localWranglerInstallResolvesOnlyTheRepositoryLocalTree() throws {
+        let output = try evaluateJS("""
+        import { pathToFileURL } from 'node:url';
+        import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+        import { tmpdir } from 'node:os';
+        import path from 'node:path';
+        const m = await import(pathToFileURL(process.env.RELEASE_SCRIPT_PATH));
+        const outcomes = [];
+        const root = (name, setup) => {
+            const dir = mkdtempSync(path.join(tmpdir(), 'wrangler-install-'));
+            setup(dir);
+            const install = m.localWranglerInstall(dir);
+            outcomes.push({
+                name,
+                version: install.version,
+                insideRoot: install.binary.startsWith(dir + path.sep),
+                endsWithBinWrangler: install.binary.endsWith(path.join('node_modules', '.bin', 'wrangler'))
+            });
+        };
+        root('missing', () => {});
+        root('pinned', (dir) => {
+            mkdirSync(path.join(dir, 'node_modules', 'wrangler'), { recursive: true });
+            const manifest = JSON.stringify({ name: 'wrangler', version: '4.152.0' });
+            writeFileSync(path.join(dir, 'node_modules', 'wrangler', 'package.json'), manifest);
+        });
+        root('malformed', (dir) => {
+            mkdirSync(path.join(dir, 'node_modules', 'wrangler'), { recursive: true });
+            writeFileSync(path.join(dir, 'node_modules', 'wrangler', 'package.json'), 'not json {');
+        });
+        root('noVersion', (dir) => {
+            mkdirSync(path.join(dir, 'node_modules', 'wrangler'), { recursive: true });
+            writeFileSync(path.join(dir, 'node_modules', 'wrangler', 'package.json'), JSON.stringify({ name: 'wrangler' }));
+        });
+        console.log(JSON.stringify(outcomes));
+        """)
+
+        let data = try #require(output.data(using: .utf8), "expected JSON, got: \(output)")
+        let outcomes = try JSONDecoder().decode([InstallProbe].self, from: data)
+        let byName = Dictionary(uniqueKeysWithValues: outcomes.map { ($0.name, $0) })
+        #expect(byName["missing"]?.version == nil, "a missing install manifest must yield a null version; got: \(String(describing: byName["missing"]))")
+        #expect(byName["pinned"]?.version == "4.152.0", "an installed manifest's version must be read verbatim; got: \(String(describing: byName["pinned"]))")
+        #expect(byName["malformed"]?.version == nil, "a malformed install manifest must yield a null version; got: \(String(describing: byName["malformed"]))")
+        #expect(byName["noVersion"]?.version == nil, "an install manifest without a version must yield a null version; got: \(String(describing: byName["noVersion"]))")
+        for outcome in outcomes {
+            #expect(outcome.insideRoot, "\(outcome.name): the binary path must stay inside the given root")
+            #expect(outcome.endsWithBinWrangler, "\(outcome.name): the binary path must be node_modules/.bin/wrangler")
+        }
+    }
+
     /// Source-scan invariant: the script may only execute wrangler through the
-    /// pinned local install (`--no-install`), the preflight must verify the
-    /// resolved version against the manifest pin, and no inline version
-    /// literal may drift from the manifest (issue #572).
+    /// repository-local install (`node_modules/.bin/wrangler`, resolved as a
+    /// literal path under the checkout), the preflight must verify the
+    /// installed version against the manifest pin, and neither a package
+    /// resolver nor an inline version literal may appear anywhere in the
+    /// release path (issue #572).
     @Test func releaseScriptInvokesWranglerOnlyThroughThePinnedLocalInstall() throws {
         let scriptPath = try Self.repoRoot().appendingPathComponent("scripts/release.mjs").path
         let script = try String(contentsOfFile: scriptPath, encoding: .utf8)
@@ -309,12 +374,12 @@ struct ReleasePreflightTests {
             "the preflight must verify the wrangler pin whenever the CDN artifact will be uploaded"
         )
         #expect(
-            script.contains(#"["--no-install", "wrangler""#),
-            "every wrangler invocation must go through the pinned local install"
+            !script.contains("npx"),
+            "the release path must never hand execution to a package resolver — its search order executes the first binary it finds"
         )
         #expect(
-            !script.contains("run(\"npx\", [\"wrangler\""),
-            "an npx invocation without --no-install resolves registry state at release time (issue #572)"
+            script.contains(#""node_modules", ".bin", "wrangler""#),
+            "wrangler must resolve to the literal repository-local binary, never via PATH or ancestor-directory lookups"
         )
         #expect(
             !script.contains("wrangler@"),

@@ -106,6 +106,23 @@ export function wranglerPin(root = ROOT) {
   return pin;
 }
 
+// Resolves the repository-local wrangler install that the release path is
+// allowed to execute: the version is read from node_modules/wrangler/package.json
+// (written by `npm ci` out of the lockfile) and the binary is the literal
+// node_modules/.bin/wrangler inside the checkout. Both are resolved as fixed
+// paths under the repository root — a PATH/ancestor bin search executes
+// whatever binary it finds first, and a matching --version output does not
+// prove where that binary came from (issue #572).
+export function localWranglerInstall(root = ROOT) {
+  let version = null;
+  try {
+    version = JSON.parse(readFileSync(path.join(root, "node_modules", "wrangler", "package.json"), "utf8"))?.version ?? null;
+  } catch {
+    version = null;
+  }
+  return { binary: path.join(root, "node_modules", ".bin", "wrangler"), version };
+}
+
 // The generated version file is not hand-edited, so "the write changed
 // something" says nothing about whether the release commit carries the bump:
 // a rerun after a failed attempt finds the file already at the target version
@@ -359,11 +376,11 @@ function requireGhAuth() {
 
 // The wrangler toolchain pin (issue #572): the CDN upload runs wrangler with
 // CLOUDFLARE_API_TOKEN in scope at the most privileged moment of the release,
-// so an npx-resolved latest wrangler would be arbitrary registry code on the
-// one machine that can repoint the public CDN artifact. The upload therefore
-// invokes the command with --no-install (fails closed without the pinned
-// install) and this preflight verifies the resolved version against the
-// manifest pin before anything is built.
+// so a registry- or PATH-resolved wrangler would be arbitrary code on the one
+// machine that can repoint the public CDN artifact. The upload therefore
+// executes only the repository-local binary and this preflight verifies the
+// installed version against the manifest pin — both read from fixed paths
+// under the checkout — before anything is built.
 function requireWranglerPin(planUpload) {
   if (!planUpload) return;
   let pin;
@@ -372,21 +389,24 @@ function requireWranglerPin(planUpload) {
   } catch (error) {
     fail(error.message);
   }
-  const resolved = probe("npx", ["--no-install", "wrangler", "--version"]);
-  if (!resolved.ok) {
-    fail(
-      "The pinned wrangler is not installed — run `npm ci` in the repository root and rerun. " +
-      "The CDN upload executes wrangler with Cloudflare credentials in scope and refuses an unpinned or missing install (issue #572)."
-    );
+  const npmCiHint =
+    "run `npm ci` in the repository root and rerun. " +
+    "The CDN upload executes wrangler with Cloudflare credentials in scope and refuses an unpinned or missing install (issue #572).";
+  const install = localWranglerInstall();
+  if (install.version === null || !existsSync(install.binary)) {
+    fail(`The pinned wrangler is not installed in node_modules — ${npmCiHint}`);
   }
-  const version = resolved.stdout.match(/(\d+\.\d+\.\d+)/)?.[1] ?? null;
-  if (version !== pin) {
+  if (install.version !== pin) {
     fail(
-      `wrangler version mismatch: package.json pins ${pin} but the resolved tool reports ${version ?? "no version"} — ` +
+      `wrangler version mismatch: package.json pins ${pin} but node_modules/wrangler reports ${install.version} — ` +
       "run `npm ci` in the repository root and rerun (issue #572)."
     );
   }
-  console.log(`  wrangler ${version} (pinned ${pin} in package.json)`);
+  const resolved = probe(install.binary, ["--version"]);
+  if (!resolved.ok) {
+    fail(`The pinned wrangler at node_modules/.bin/wrangler did not run — ${npmCiHint}`);
+  }
+  console.log(`  wrangler ${install.version} (pinned ${pin} in package.json, executed from the repository-local install)`);
 }
 
 function gitStatusLines() {
@@ -499,7 +519,7 @@ function collectPreflightFacts(version, planUpload) {
 }
 
 function runPreflight(version, planUpload) {
-  requireCommands(["git", "gh", "swift", "xcodebuild", "curl", "npx", "libtool", "lipo", "nm", "ditto"]);
+  requireCommands(["git", "gh", "swift", "xcodebuild", "curl", "node", "libtool", "lipo", "nm", "ditto"]);
   requireGhAuth();
   requireWranglerPin(planUpload);
   const { facts, collectErrors } = collectPreflightFactsWithErrors(version, planUpload);
@@ -1180,7 +1200,7 @@ async function main() {
     withRecovery(
       "R2 upload failed",
       "the GitHub release is still a draft and nothing is public. Fix credentials or connectivity and rerun — the tag and the draft release are recognized and reused.",
-      () => run("npx", ["--no-install", "wrangler", "r2", "object", "put", `${R2_BUCKET}/sdks/apple/${filename}`,
+      () => run(localWranglerInstall().binary, ["r2", "object", "put", `${R2_BUCKET}/sdks/apple/${filename}`,
         "--file", zipPath, "--remote", "--content-type", "application/zip"])
     );
     verifyCdnChecksum(filename, artifact.sha256);
