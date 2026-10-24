@@ -101,11 +101,13 @@ struct KeychainInaccessibleReadTests {
         #expect(UUID(uuidString: first) != nil)
 
         // Nothing may be attempted against the unreadable item, and nothing
-        // is persisted: the next read mints another throwaway instead of
-        // re-serving a token that exists nowhere durable.
+        // is persisted: the same throwaway is served for the whole locked
+        // window (memoized per backing store, issue #567) instead of
+        // re-serving a token that exists nowhere durable, and the next read
+        // keeps retrying resolution.
         let second = store.token
         #expect(UUID(uuidString: second) != nil)
-        #expect(second != first)
+        #expect(second == first)
         #expect(adds.isEmpty)
         #expect(updates.isEmpty)
     }

@@ -23,7 +23,11 @@ enum TokenLoadResult: Sendable, Equatable {
 }
 
 /// Persistent storage mechanism for user tokens.
-protocol TokenStorage: Sendable {
+///
+/// Class-bound so instances carry a stable object identity, which
+/// ``UserTokenStore`` uses to memoize its ephemeral fallback token per
+/// backing store (issue #567).
+protocol TokenStorage: AnyObject, Sendable {
     /// Loads the stored token, or returns `nil` when no readable token is
     /// stored.
     ///
