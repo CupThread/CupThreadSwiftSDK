@@ -27,6 +27,16 @@ struct CommentsViewReloadPreservationTests {
             content.range(of: "loadState.isLoading && !loadState.hasLoadedOnce"),
             "the loading branch must require `!hasLoadedOnce` so a reload never collapses rendered comments to a spinner (issue #545)"
         )
+        // A comment appended by `submitComment` before any load succeeded must
+        // also keep the spinner away: `hasLoadedOnce` is still false on that
+        // path, so the branch additionally requires an empty thread.
+        let spinner = try #require(
+            content.range(of: "ProgressView()", range: loadingBranch.upperBound..<content.endIndex)
+        )
+        #expect(
+            content[loadingBranch.upperBound..<spinner.lowerBound].contains("comments.isEmpty"),
+            "the loading branch must render only when there is nothing to preserve (issue #545)"
+        )
         let fullScreenError = try #require(
             content.range(of: "LoadErrorView(message: loadError)", range: loadingBranch.upperBound..<content.endIndex)
         )
@@ -192,6 +202,27 @@ struct CommentsViewReloadPreservationTests {
         #expect(view.isLoading)
         #expect(!view.hasLoadedOnce)
         #expect(viewTreeContains(view.body, ProgressView<EmptyView, EmptyView>.self))
+    }
+
+    /// A comment posted after a failed first load is rendered content even
+    /// though no load has succeeded yet; a pull-to-refresh must not swap it
+    /// for the first-load spinner (CodeRabbit finding on PR #546).
+    @Test @MainActor func locallyPostedCommentBeforeFirstSuccessfulLoadSurvivesARefresh() {
+        let view = CommentsView(
+            client: makeClient(),
+            userToken: "token_545",
+            featureRequestId: "fr_545",
+            featureRequestTitle: "Title",
+            preResolvedAuthentication: true,
+            initialComments: [Self.makeComment(id: "c-new", body: "Just posted")],
+            initialLoadState: SurfaceLoadState(isLoading: true, hasLoadedOnce: false)
+        )
+
+        _ = view.body
+        #expect(view.isLoading)
+        #expect(!view.hasLoadedOnce)
+        #expect(view.renderedComments.map(\.id) == ["c-new"])
+        #expect(!viewTreeContains(view.body, ProgressView<EmptyView, EmptyView>.self))
     }
 
     // MARK: - Failed-refresh lifecycle

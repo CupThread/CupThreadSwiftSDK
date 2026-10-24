@@ -104,8 +104,10 @@ public struct CommentsView: View {
                     // A reload never collapses rendered comments to a bare
                     // spinner (#545): the loading branch owns the surface
                     // only before the first successful load, exactly like
-                    // FeatureRequestsView/RoadmapBoardView/WhatsNewView.
-                    if loadState.isLoading && !loadState.hasLoadedOnce {
+                    // FeatureRequestsView/RoadmapBoardView/WhatsNewView. The
+                    // empty check also covers a comment appended by
+                    // `submitComment` before any load succeeded.
+                    if loadState.isLoading && !loadState.hasLoadedOnce && comments.isEmpty {
                         ProgressView()
                             .padding(.top, 32)
                     } else if let loadError = loadState.loadError, comments.isEmpty {
