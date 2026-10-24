@@ -47,8 +47,11 @@ public struct RoadmapBoardView: View {
     @State private var hasResolvedAuthentication = false
     /// The server answered `401 authentication_required` on a fetch whose
     /// preflight passed (e.g. the token expired between the check and the
-    /// send): the permission placeholder replaces the board.
-    @State private var rejectedByServer = false
+    /// send): the permission placeholder replaces the board. The verdict
+    /// belongs to one load cycle and is cleared when the next one starts
+    /// (BUG-42, issue #523). A reference latch keeps the verdict observable
+    /// from view-level tests, which cannot read `@State` writes (issue #533).
+    @State private var serverRejection = ServerRejectionLatch()
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
     private var activeConfig: PublicAppConfig? {
@@ -72,12 +75,28 @@ public struct RoadmapBoardView: View {
     /// Whether the board must render the permission placeholder: the
     /// preflight denied a locked-down board, or the server's 401 overrode a
     /// permitted one.
-    private var isRoadmapPermissionBlocked: Bool {
+    var isRoadmapPermissionBlocked: Bool {
         isSurfacePermissionBlocked(
             verdictResolved: isRoadmapVerdictResolved,
             permitted: isRoadmapPermitted,
-            rejectedByServer: rejectedByServer
+            rejectedByServer: serverRejection.isRejected
         )
+    }
+
+    /// Whether the placeholder can offer a retry: the client-side preflight
+    /// permits access, so only a stale server rejection is blocking the
+    /// board. A preflight denial cannot be resolved by another request
+    /// (BUG-42, issue #523).
+    var canRetryServerRejection: Bool {
+        serverRejection.isRejected && isRoadmapPermitted
+    }
+
+    /// The placeholder's retry closure, present only when another request can
+    /// change the verdict (see ``canRetryServerRejection``). It enters the
+    /// normal load path, whose start-of-cycle reset clears the rejection.
+    var permissionRetryAction: (@MainActor () async -> Void)? {
+        guard canRetryServerRejection else { return nil }
+        return { await refreshRoadmap() }
     }
 
     /// The query actually sent to the server, trimmed to match the throttle's
@@ -164,7 +183,9 @@ public struct RoadmapBoardView: View {
         initialGroups: [RoadmapGroup]?,
         configOverride: PublicAppConfig? = nil,
         preResolvedAuthentication: Bool? = nil,
-        lastExecutedQueryOverride: String? = nil
+        lastExecutedQueryOverride: String? = nil,
+        rejectedByServer: Bool = false,
+        serverRejection: ServerRejectionLatch? = nil
     ) {
         self.client = client
         self.userToken = userToken
@@ -175,6 +196,9 @@ public struct RoadmapBoardView: View {
             _groups = State(initialValue: initialGroups)
             _loadState = State(initialValue: RoadmapBoardLoadState(isLoading: false, hasLoadedOnce: true))
         }
+        let latch = serverRejection ?? ServerRejectionLatch()
+        if rejectedByServer { latch.rejectList() }
+        _serverRejection = State(initialValue: latch)
         _isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
         _hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
     }
@@ -184,7 +208,8 @@ public struct RoadmapBoardView: View {
             if isRoadmapPermissionBlocked {
                 SdkPermissionDeniedView(
                     titleKey: "cupthread.permission.roadmap_title",
-                    descriptionKey: "cupthread.permission.roadmap_description"
+                    descriptionKey: "cupthread.permission.roadmap_description",
+                    retryAction: permissionRetryAction
                 )
             } else {
             #if os(tvOS)
@@ -500,7 +525,7 @@ extension RoadmapBoardView {
             settlePermissionDeniedState()
             return
         }
-        rejectedByServer = false
+        serverRejection.beginListLoadCycle()
         let generation = loadState.startLoading()
         reloadNotice = nil
         defer { loadState.finishLoading(generation: generation, wasCancelled: Task.isCancelled) }
@@ -544,7 +569,7 @@ extension RoadmapBoardView {
             // token expired (or was revoked) between the check and the
             // send. The signed-out permission placeholder replaces the
             // board instead of the generic error state (issue #297).
-            rejectedByServer = true
+            serverRejection.rejectList()
             return
         }
         if let clientError = error as? FeedbackClientError, case .rateLimited = clientError {
@@ -576,5 +601,25 @@ extension RoadmapBoardView {
     private func resolveAuthenticationAccess() async {
         isAuthenticated = await client.resolveAuthenticatedAccess()
         hasResolvedAuthentication = true
+    }
+}
+
+// MARK: - Test support
+
+extension RoadmapBoardView {
+    /// Drives the private board load from view-level tests (issue #533). A
+    /// view outside a SwiftUI hierarchy cannot persist `@State` writes, so the
+    /// injected latch is the observable verdict.
+    @MainActor
+    func loadForTesting() async {
+        await refreshRoadmap()
+    }
+
+    /// Drives the failure branch from view-level tests. `loadGeneration` never
+    /// advances outside a SwiftUI hierarchy, so its initial value is the
+    /// generation the load path would have recorded.
+    @MainActor
+    func handleLoadFailureForTesting(_ error: Error) async {
+        await handleLoadFailure(error, generation: loadState.loadGeneration)
     }
 }

@@ -37,8 +37,11 @@ public struct WhatsNewView: View {
     @State private var hasResolvedAuthentication = false
     /// The server answered `401 authentication_required` on a fetch whose
     /// preflight passed (e.g. the token expired between the check and the
-    /// send): the permission placeholder replaces the list.
-    @State private var rejectedByServer = false
+    /// send): the permission placeholder replaces the list. The verdict
+    /// belongs to one load cycle and is cleared when the next one starts
+    /// (BUG-42, issue #523). A reference latch keeps the verdict observable
+    /// from view-level tests, which cannot read `@State` writes (issue #533).
+    @State private var serverRejection = ServerRejectionLatch()
     @Environment(\.sdkAppConfig) private var sdkAppConfig
 
     private var activeConfig: PublicAppConfig? {
@@ -79,12 +82,28 @@ public struct WhatsNewView: View {
     /// Whether the surface must render the permission placeholder: the
     /// preflight denied a locked-down console, or the server's 401 overrode a
     /// permitted one.
-    private var isChangelogPermissionBlocked: Bool {
+    var isChangelogPermissionBlocked: Bool {
         isSurfacePermissionBlocked(
             verdictResolved: isChangelogVerdictResolved,
             permitted: isChangelogPermitted,
-            rejectedByServer: rejectedByServer
+            rejectedByServer: serverRejection.isRejected
         )
+    }
+
+    /// Whether the placeholder can offer a retry: the client-side preflight
+    /// permits access, so only a stale server rejection is blocking the
+    /// surface. A preflight denial cannot be resolved by another request
+    /// (BUG-42, issue #523).
+    var canRetryServerRejection: Bool {
+        serverRejection.isRejected && isChangelogPermitted
+    }
+
+    /// The placeholder's retry closure, present only when another request can
+    /// change the verdict (see ``canRetryServerRejection``). It enters the
+    /// normal load path, whose start-of-cycle reset clears the rejection.
+    var permissionRetryAction: (@MainActor () async -> Void)? {
+        guard canRetryServerRejection else { return nil }
+        return { await loadEntries() }
     }
 
     /// Restarts the load lifecycle whenever the config's anonymous-changelog
@@ -127,17 +146,26 @@ public struct WhatsNewView: View {
     ///     view-level tests — `nil` leaves the verdict unsettled so the surface
     ///     resolves in `.task` (the production presentation), while
     ///     `true`/`false` inject a settled verdict without awaiting `.task`.
+    ///   - rejectedByServer: Preloads a latched server rejection for
+    ///     view-level tests.
+    ///   - serverRejection: Injects the latch itself so tests can observe the
+    ///     verdict a view outside a SwiftUI hierarchy cannot persist.
     init(
         client: FeedbackClient,
         userToken: String,
         state: WhatsNewViewState = WhatsNewViewState(),
         configOverride: PublicAppConfig? = nil,
-        preResolvedAuthentication: Bool? = nil
+        preResolvedAuthentication: Bool? = nil,
+        rejectedByServer: Bool = false,
+        serverRejection: ServerRejectionLatch? = nil
     ) {
         self.client = client
         self.userToken = userToken
         self.configOverride = configOverride
         self._state = State(initialValue: state)
+        let latch = serverRejection ?? ServerRejectionLatch()
+        if rejectedByServer { latch.rejectList() }
+        self._serverRejection = State(initialValue: latch)
         self._isAuthenticated = State(initialValue: preResolvedAuthentication ?? false)
         self._hasResolvedAuthentication = State(initialValue: preResolvedAuthentication != nil)
     }
@@ -147,7 +175,8 @@ public struct WhatsNewView: View {
             if isChangelogPermissionBlocked {
                 SdkPermissionDeniedView(
                     titleKey: "cupthread.permission.changelog_title",
-                    descriptionKey: "cupthread.permission.changelog_description"
+                    descriptionKey: "cupthread.permission.changelog_description",
+                    retryAction: permissionRetryAction
                 )
             } else {
                 #if os(tvOS)
@@ -334,7 +363,7 @@ public struct WhatsNewView: View {
             state.handlePermissionDenied(generation: state.loadGeneration)
             return
         }
-        rejectedByServer = false
+        serverRejection.beginListLoadCycle()
         let generationAtStart = state.startLoading()
         var wasCancelled = false
         defer {
@@ -358,7 +387,7 @@ public struct WhatsNewView: View {
                 // the token expired between the check and the send. The
                 // signed-out permission placeholder replaces the list instead
                 // of the generic error state (issue #297).
-                rejectedByServer = true
+                serverRejection.rejectList()
                 return
             }
             state.handleFailure(error: error, generation: generationAtStart)
