@@ -207,6 +207,7 @@
 "cupthread.error.stale_signature" = "결제 정보가 업데이트되지 않았습니다: 보고서의 서명이 만료되었습니다. 기기의 시계를 확인한 후 다시 시도해 주세요.";
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "결제 정보가 업데이트되지 않았습니다: 플랜 이름 \"unset\"과(와) \"null\"은(는) 예약된 이름입니다. 다른 플랜 이름을 선택해 주세요.";
+"cupthread.error.attribute_not_clearable" = "결제 정보가 업데이트되지 않았습니다: 이 속성은 지울 수 없습니다. 플랜과 월간 수익만 초기화할 수 있습니다. 나머지는 변경하지 않거나 실제 값을 보내세요.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "이 피드백 또는 첨부 파일은 이미 제출되었습니다.";

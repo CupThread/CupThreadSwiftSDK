@@ -207,6 +207,7 @@
 "cupthread.error.stale_signature" = "付款資訊未更新：報告的簽名已過期，請檢查裝置時間後再試一次。";
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "付款資訊未更新：方案名稱「unset」與「null」為保留名稱，請改用其他方案名稱。";
+"cupthread.error.attribute_not_clearable" = "付款資訊未更新：此屬性無法清空。只有方案與每月收入可以重設；其餘屬性請保持不變或傳入具體值。";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "此意見反應或附件已被提交。";

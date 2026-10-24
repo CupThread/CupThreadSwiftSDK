@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 /// Errors thrown by ``FeedbackClient`` network calls.
@@ -158,6 +159,17 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// carries the raw server text for diagnostics; it is never shown to end
     /// users.
     case reservedPlanValue(message: String?, requestId: String?)
+    /// A payment-attribute report tried to clear an attribute the live
+    /// `EndUserAttributesInput` schema does not allow to be cleared
+    /// (`isPaying` or `currency` passed `.null` — issue #573) and the SDK
+    /// rejected it locally: before the canonical string was built, before
+    /// any signing material was consulted, and before any network round
+    /// trip. The API accepts an explicit JSON `null` for `plan` and `mrr`
+    /// only, so dispatching the report could only ever end in an HTTP 400
+    /// that also silently dropped every sibling write in the same PUT.
+    /// Pass `.unset` to leave the attribute unchanged, or send a concrete
+    /// value. `attribute` names the rejected field for diagnostics.
+    case attributeNotClearable(attribute: String)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -187,7 +199,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .commentsUnavailable, .emailNotVerified, .invalidParent,
              .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
-             .alreadyFinalized, .imageUploadFailed, .reservedPlanValue, .textTooLong:
+             .alreadyFinalized, .imageUploadFailed, .reservedPlanValue, .textTooLong,
+             .attributeNotClearable:
             return nil
         }
     }
@@ -287,7 +300,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .unexpectedStatus(_, _, let requestId):
             return requestId
         case .invalidResponse, .unreadableUploadResponse, .invalidConfiguration,
-             .authenticationRequired, .textTooLong:
+             .authenticationRequired, .textTooLong, .attributeNotClearable:
             return nil
         }
     }
@@ -324,6 +337,9 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .textTooLong:
             // Rejected client-side, so there is no request id to quote.
             return CupThreadStrings.tr("cupthread.error.text_too_long")
+        case .attributeNotClearable:
+            // Rejected client-side, so there is no request id to quote.
+            return CupThreadStrings.tr("cupthread.error.attribute_not_clearable")
         case .uploaderIdentityRequired(_, let requestId):
             return CupThreadStrings.tr("cupthread.error.uploader_identity_required") + Self.requestIdSuffix(requestId)
         case .uploaderMismatch(_, let requestId):

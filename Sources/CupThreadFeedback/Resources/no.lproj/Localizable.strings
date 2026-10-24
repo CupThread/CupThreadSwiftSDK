@@ -207,6 +207,7 @@
 "cupthread.error.stale_signature" = "Betalingsinformasjonen ble ikke oppdatert: signaturen på rapporten er utløpt. Sjekk enhetens klokke og prøv på nytt.";
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Betalingsinformasjonen ble ikke oppdatert: plannavnene «unset» og «null» er reservert. Velg et annet plannavn.";
+"cupthread.error.attribute_not_clearable" = "Betalingsdetaljene ble ikke oppdatert: dette attributtet kan ikke tømmes. Bare plan og månedlig inntekt kan nullstilles; la de andre stå uendret eller send en verdi.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Denne tilbakemeldingen eller vedlegget er allerede sendt.";
