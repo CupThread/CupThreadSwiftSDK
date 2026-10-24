@@ -263,6 +263,42 @@ struct TurnstileRetryTests {
             #expect(provider.callCount == 2)
         }
     }
+
+    @Test func submitFeatureRequestUniform404DoesNotMintOrRetry() async throws {
+        // SaaS#1176: a disabled app answers the same uniform 404 an unknown
+        // appKey answers. The single retry is keyed on the typed
+        // `.turnstileRequired` error, so a uniform 404 must surface as
+        // `.unexpectedStatus(404)` after exactly one request and exactly one
+        // provider consultation (the initial token) — a denial that no token
+        // can resolve must never mint one.
+        let provider = TokenProvider(["tok-propose-1"])
+        let log = RequestLog()
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            log.append(request)
+            return (
+                makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-propose-404"]),
+                try encodeJSON(["error": "App not found"])
+            )
+        }
+
+        let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
+        do {
+            _ = try await client.submitFeatureRequest(
+                FeatureRequestDraft(title: "Title", description: "Description"),
+                userToken: "user-1"
+            )
+            Issue.record("Expected error to be thrown")
+        } catch let error as FeedbackClientError {
+            guard case .unexpectedStatus(let code, let message, _) = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(code == 404)
+            #expect(message == "App not found")
+            #expect(log.allRequests.count == 1)
+            #expect(provider.callCount == 1)
+        }
+    }
 }
 
 // MARK: - Upload-session provider fallback & retry

@@ -307,6 +307,10 @@ struct AnonymousAccessSyncTests {
     }
 
     @Test func submitFeatureRequestMaps403ToForbidden() async throws {
+        // Deploy-skew pin: since the uniform-404 convention (SaaS#1176) no
+        // current server state answers a non-Turnstile 403 on this operation
+        // — a disabled app answers the uniform 404 instead. The generic
+        // permission mapping stays defensive for servers predating it.
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
                 makeHTTPResponse(status: 403, headers: ["X-Request-Id": "req-propose-403"]),
@@ -329,6 +333,38 @@ struct AnonymousAccessSyncTests {
             #expect(requestId == "req-propose-403")
             #expect(error.requestId == "req-propose-403")
             #expect(error.responseBody == nil)
+        }
+    }
+
+    @Test func submitFeatureRequestMapsDisabledAppUniform404ToUnexpectedStatus() async throws {
+        // SaaS#1176: a disabled app answers the same uniform 404 an unknown
+        // appKey answers ("App not found"). The SDK must not claim a
+        // permission verdict for it — existence hiding means the two causes
+        // are indistinguishable by contract, so the envelope falls through
+        // to the generic unexpected-status error carrying the server message.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 404, headers: ["X-Request-Id": "req-propose-404"]),
+                try encodeJSON(["error": "App not found"])
+            )
+        }
+
+        do {
+            _ = try await Self.makeAPIClient().submitFeatureRequest(
+                FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
+                userToken: "user-fr-propose-1"
+            )
+            Issue.record("Expected unexpectedStatus")
+        } catch let error as FeedbackClientError {
+            guard case .unexpectedStatus(let code, let message, let requestId) = error else {
+                Issue.record("Expected unexpectedStatus, got \(error)")
+                return
+            }
+            #expect(code == 404)
+            #expect(message == "App not found")
+            #expect(requestId == "req-propose-404")
+            #expect(error.requestId == "req-propose-404")
+            #expect(error.responseBody == "App not found")
         }
     }
 
