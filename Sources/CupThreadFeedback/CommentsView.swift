@@ -1,3 +1,7 @@
+// swiftlint:disable file_length
+// One surface per file: the view's @State must stay file-private, so the
+// body is organized by MARK sections rather than split across files to fit
+// the size budget (same policy as WhatsNewView, .swiftlint.yml).
 import SwiftUI
 
 /// Comment thread for a feature request.
@@ -21,8 +25,18 @@ public struct CommentsView: View {
     public let featureRequestTitle: String
 
     @State private var comments: [FeatureRequestComment] = []
-    /// First-load lifecycle and stale-write generation tracking (CONC-4).
+    /// First-load lifecycle, reload preservation, and stale-write generation
+    /// tracking (CONC-4, issue #545).
     @State private var loadState = SurfaceLoadState()
+    /// Ids of comments this surface appended after a successful POST, mapped
+    /// to the load generation in flight at the append (issue #545): a refresh
+    /// resolving behind such a POST carries a page produced before the
+    /// comment existed, and re-appending the tracked rows keeps the
+    /// server-saved comment from vanishing. A row the server echoes is
+    /// retired, as is a row absent from a complete thread read requested
+    /// after the append (moderated, deleted, or otherwise gone); rows on a
+    /// page-capped thread stay tracked because their absence is not proof.
+    @State private var locallyPostedCommentGenerations: [String: Int] = [:]
     @State private var isCommentsUnavailable = false
     /// Whether a request sent right now could carry the signed-in identity's
     /// bearer token. Resolved at the start of every load (BUG-24) —
@@ -51,14 +65,18 @@ public struct CommentsView: View {
     /// injects the resolved access verdict for view-level tests; production
     /// presentations use the public initializer and the view resolves the
     /// verdict on every load. `initialDraft` seeds the composer for tests
-    /// that drive `submitComment()` end to end.
+    /// that drive `submitComment()` end to end. `initialComments` and
+    /// `initialLoadState` seed the load lifecycle so tests can pin the
+    /// reload-preservation rendering without driving a fetch (issue #545).
     init(
         client: FeedbackClient,
         userToken: String,
         featureRequestId: String,
         featureRequestTitle: String,
         preResolvedAuthentication: Bool,
-        initialDraft: CommentDraft? = nil
+        initialDraft: CommentDraft? = nil,
+        initialComments: [FeatureRequestComment] = [],
+        initialLoadState: SurfaceLoadState = SurfaceLoadState()
     ) {
         self.client = client
         self.userToken = userToken
@@ -66,16 +84,37 @@ public struct CommentsView: View {
         self.featureRequestTitle = featureRequestTitle
         _isAuthenticated = State(initialValue: preResolvedAuthentication)
         _draft = State(initialValue: initialDraft ?? CommentDraft())
+        _comments = State(initialValue: initialComments)
+        _loadState = State(initialValue: initialLoadState)
     }
+
+    // MARK: View-level test accessors (reads reflect the seeded @State)
+
+    var renderedComments: [FeatureRequestComment] { comments }
+    var isLoading: Bool { loadState.isLoading }
+    var hasLoadedOnce: Bool { loadState.hasLoadedOnce }
+    var loadError: String? { loadState.loadError }
+    /// Transient notice for a failed refresh whose comments stay on screen
+    /// (issue #545). `nil` while the full-screen error owns the surface.
+    var reloadNotice: String? { loadState.reloadNotice }
 
     public var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    if loadState.isLoading {
+                    // A reload never collapses rendered comments to a bare
+                    // spinner (#545): the loading branch owns the surface
+                    // only before the first successful load, exactly like
+                    // FeatureRequestsView/RoadmapBoardView/WhatsNewView. The
+                    // empty check also covers a comment appended by
+                    // `submitComment` before any load succeeded.
+                    if loadState.isLoading && !loadState.hasLoadedOnce && comments.isEmpty {
                         ProgressView()
                             .padding(.top, 32)
-                    } else if let loadError = loadState.loadError {
+                    } else if let loadError = loadState.loadError, comments.isEmpty {
+                        // Full-screen error only when there is nothing to
+                        // show; a failure with comments on screen becomes the
+                        // inline notice overlay below instead (#59/#534).
                         LoadErrorView(message: loadError) {
                             await loadComments()
                         }
@@ -105,6 +144,19 @@ public struct CommentsView: View {
         #if os(iOS) || os(visionOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        // A failed refresh keeps the rendered comments in place; the failure
+        // surfaces as this transient top banner (issue #534/#545). A
+        // first-load failure has no content to preserve and uses the
+        // full-screen `LoadErrorView` instead.
+        .overlay(alignment: .top) {
+            if let reloadNotice = loadState.reloadNotice {
+                InlineNoticeBanner(message: reloadNotice)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .autoClearNotice($loadState.reloadNotice)
         .composerDismissGuard(
             hasContent: draft.hasContent,
             isSubmitting: isSubmitting,
@@ -279,12 +331,24 @@ public struct CommentsView: View {
         isAuthenticated = await client.resolveAuthenticatedAccess()
         isCommentsUnavailable = false
         do {
-            let fetched = try await client.fetchComments(featureRequestId: featureRequestId)
+            let snapshot = try await client.fetchCommentThread(featureRequestId: featureRequestId)
             // A superseded load (pull-to-refresh racing the initial task,
             // retry taps stacking up) must not clobber the newer run's
             // comments.
             guard !Task.isCancelled, loadState.isCurrent(generation: generation) else { return }
-            comments = fetched
+            // Issue #545: a fetch whose page was produced before a concurrent
+            // POST resolved cannot contain the just-posted comment — merge
+            // the locally appended rows back in instead of dropping them.
+            let reconciliation = Self.reconcilingLocallyPostedComments(
+                snapshot.comments,
+                current: comments,
+                locallyPostedGenerations: locallyPostedCommentGenerations,
+                loadGeneration: generation,
+                isCompleteThread: snapshot.isComplete
+            )
+            comments = reconciliation.merged
+            locallyPostedCommentGenerations = reconciliation.remaining
+            loadState.recordSuccess(generation: generation)
         } catch {
             // A cancelled load never reached a verdict — keep the currently
             // rendered comments. A superseded run must not write either;
@@ -294,7 +358,14 @@ public struct CommentsView: View {
             if let clientError = error as? FeedbackClientError, case .commentsUnavailable = clientError {
                 isCommentsUnavailable = true
             }
-            loadState.loadError = FriendlyError.message(for: error)
+            // Issue #545: a failed reload keeps the rendered comments and
+            // degrades to the inline notice; only a failure with nothing to
+            // show fills the surface with the full-screen error (#59/#534).
+            loadState.handleFailure(
+                error: error,
+                generation: generation,
+                hasExistingContent: !comments.isEmpty
+            )
         }
     }
 
@@ -315,6 +386,12 @@ public struct CommentsView: View {
                 userToken: userToken
             )
             comments.append(newComment)
+            // Issue #545: track the appended row until the server echoes it
+            // in a fetched page, so a refresh resolving behind this POST
+            // cannot silently drop the server-saved comment. The generation
+            // records which fetch was already in flight; a complete read
+            // from a newer generation that omits the row proves it is gone.
+            locallyPostedCommentGenerations[newComment.id] = loadState.loadGeneration
             // BUG-30: the stale full-screen load error outranks the comment
             // list in the body, so a comment appended while it stands would
             // stay masked behind LoadErrorView — retire the verdict on
@@ -464,6 +541,63 @@ extension CommentsView {
         .foregroundStyle(.secondary)
         .padding(.top, 4)
         .accessibilityLabel(Self.replyAccessibilityLabel(targetAuthor: targetAuthor))
+    }
+}
+
+// MARK: - Submit/load coordination
+
+extension CommentsView {
+    /// Reconciles a fetched page with the comments this surface appended
+    /// locally after successful POSTs (issue #545).
+    ///
+    /// A fetch that started before a POST resolved carries a page produced
+    /// before the comment existed server-side, so a plain `comments = fetched`
+    /// overwrite erases a server-saved comment with no error. Locally posted
+    /// rows absent from the fetched page are re-appended in their local
+    /// order unless the read is authoritative: a complete thread read
+    /// requested after the append proves the row was moderated, deleted, or
+    /// otherwise removed. A page-capped read cannot prove absence, and a read
+    /// that started before the append predates the POST, so both keep the row
+    /// tracked. A row the fetched page echoes is retired from tracking so a
+    /// later page omitting it propagates normally.
+    /// - Parameters:
+    ///   - fetched: Rows returned by the settled load.
+    ///   - current: Rows rendered before the load replaced them.
+    ///   - locallyPostedGenerations: Locally appended ids mapped to the load
+    ///     generation in flight at the append.
+    ///   - loadGeneration: Generation of the fetch that produced `fetched`.
+    ///   - isCompleteThread: Whether `fetched` reached the end of the thread.
+    /// - Returns: The merged list and the ids still awaiting a server echo.
+    static func reconcilingLocallyPostedComments(
+        _ fetched: [FeatureRequestComment],
+        current: [FeatureRequestComment],
+        locallyPostedGenerations: [String: Int],
+        loadGeneration: Int,
+        isCompleteThread: Bool
+    ) -> (merged: [FeatureRequestComment], remaining: [String: Int]) {
+        guard !locallyPostedGenerations.isEmpty else {
+            return (fetched, locallyPostedGenerations)
+        }
+        let fetchedIDs = Set(fetched.map(\.id))
+        var remaining = locallyPostedGenerations
+        var locallyPostedRows = [FeatureRequestComment]()
+        for comment in current {
+            guard let appendedAt = locallyPostedGenerations[comment.id] else { continue }
+            if fetchedIDs.contains(comment.id) {
+                // The server echoed the row; a later omission is then a real
+                // moderation/removal and must propagate.
+                remaining.removeValue(forKey: comment.id)
+                continue
+            }
+            if isCompleteThread && loadGeneration > appendedAt {
+                // A complete read from a newer generation does not contain a
+                // row the server saved; it is genuinely gone.
+                remaining.removeValue(forKey: comment.id)
+                continue
+            }
+            locallyPostedRows.append(comment)
+        }
+        return (fetched + locallyPostedRows, remaining)
     }
 }
 

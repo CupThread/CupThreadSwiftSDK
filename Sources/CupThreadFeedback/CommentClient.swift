@@ -21,6 +21,19 @@ private struct CreatedCommentResponse: Decodable, Sendable {
     let comment: FeatureRequestComment
 }
 
+/// One walk of a feature request's visible comment thread.
+///
+/// ``isComplete`` distinguishes a walk that reached the end of the thread
+/// from one the page cap stopped early: an absent locally posted comment is
+/// only authoritative evidence of moderation/deletion when the walk saw the
+/// whole thread.
+struct CommentThreadSnapshot: Equatable, Sendable {
+    /// Visible comments in server order (oldest first).
+    let comments: [FeatureRequestComment]
+    /// Whether the walk observed the end of the thread.
+    let isComplete: Bool
+}
+
 // MARK: - FeedbackClient extension
 
 extension FeedbackClient {
@@ -65,6 +78,23 @@ extension FeedbackClient {
         featureRequestId: String,
         maxPages: Int = Self.defaultMaxPages
     ) async throws -> [FeatureRequestComment] {
+        try await fetchCommentThread(
+            featureRequestId: featureRequestId,
+            maxPages: maxPages
+        ).comments
+    }
+
+    /// Fetches every visible comment on a feature request and reports whether
+    /// the walk reached the end of the thread.
+    ///
+    /// ``CommentsView`` uses this variant to decide whether a locally posted
+    /// comment missing from the fetched page is genuinely gone from the
+    /// server. A capped walk can omit rows that exist beyond the last page,
+    /// so its absences are not evidence of moderation.
+    func fetchCommentThread(
+        featureRequestId: String,
+        maxPages: Int = Self.defaultMaxPages
+    ) async throws -> CommentThreadSnapshot {
         let effectiveMaxPages = max(1, maxPages)
         var collected: [FeatureRequestComment] = []
         var seenIDs = Set<String>()
@@ -85,14 +115,17 @@ extension FeedbackClient {
             // the thread is complete, or on a misbehaving cursor.
             let reachedTotal = page.total > 0 && collected.count >= page.total
             guard page.hasMore, let nextCursor = page.nextCursor, !freshComments.isEmpty, !reachedTotal else {
-                return collected
+                return CommentThreadSnapshot(
+                    comments: collected,
+                    isComplete: !page.hasMore || reachedTotal
+                )
             }
             cursor = nextCursor
         }
         paginationLogger.warning(
             "Comments pagination reached maximum page cap (\(effectiveMaxPages, privacy: .public)) for app '\(self.configuration.appKey, privacy: .public)' on request '\(featureRequestId, privacy: .public)'; returning \(collected.count, privacy: .public) collected comments."
         )
-        return collected
+        return CommentThreadSnapshot(comments: collected, isComplete: false)
     }
 
     /// Fetches one page of comments on a feature request, oldest first.
