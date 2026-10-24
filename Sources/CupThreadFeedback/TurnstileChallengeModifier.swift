@@ -14,6 +14,34 @@ struct PendingTurnstileChallenge: Identifiable {
     let cancel: @MainActor () -> Void
 }
 
+/// Settles a presented challenge exactly once across the sheet's terminal
+/// paths: verified, explicit Cancel, and a dismissal that ran neither (#539).
+///
+/// SwiftUI's `sheet(item:)` nils the binding on an interactive swipe-down
+/// without invoking the sheet's buttons, so the modifier registers the
+/// presented challenge here and lets `onDismiss` run its `cancel` closure.
+/// The button paths resolve the registration first, which turns the
+/// dismissal that follows into a no-op and keeps `cancel` to one invocation.
+struct TurnstileChallengeSettlement {
+    private var outstanding: PendingTurnstileChallenge?
+
+    /// Records the challenge the sheet is currently presenting.
+    mutating func register(_ challenge: PendingTurnstileChallenge) {
+        outstanding = challenge
+    }
+
+    /// Marks the challenge as answered by an explicit sheet action.
+    mutating func resolve() {
+        outstanding = nil
+    }
+
+    /// Returns the challenge that still needs settling, then clears it.
+    mutating func settleOnDismiss() -> PendingTurnstileChallenge? {
+        defer { outstanding = nil }
+        return outstanding
+    }
+}
+
 extension View {
     /// Presents ``TurnstileChallengeSheet`` for a pending rejection.
     ///
@@ -27,24 +55,38 @@ extension View {
 
 private struct TurnstileChallengeSheetModifier: ViewModifier {
     @Binding var pending: PendingTurnstileChallenge?
+    @State private var settlement = TurnstileChallengeSettlement()
 
     func body(content: Content) -> some View {
         #if canImport(WebKit) && !os(tvOS)
-        content.sheet(item: $pending) { challenge in
+        content.sheet(item: $pending, onDismiss: settleOnDismiss) { challenge in
             TurnstileChallengeSheet(
                 challengeURL: challenge.presentation.url,
                 onVerified: { token in
+                    settlement.resolve()
                     pending = nil
                     challenge.resume(token)
                 },
                 onCancel: {
+                    settlement.resolve()
                     pending = nil
                     challenge.cancel()
                 }
             )
+            .onAppear {
+                settlement.register(challenge)
+            }
         }
         #else
         content
         #endif
+    }
+
+    /// The sheet went away without a decision — an interactive swipe-down
+    /// (if the host re-enabled it), a parent teardown, or a programmatic
+    /// dismissal. The pending work must still be settled or the composer is
+    /// left non-submittable with an orphaned spooled photo (#539).
+    private func settleOnDismiss() {
+        settlement.settleOnDismiss()?.cancel()
     }
 }

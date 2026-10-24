@@ -141,9 +141,11 @@ hosted challenge page — `https://app.cupthread.com/turnstile/verify` by
 default, or ``FeedbackClientConfiguration/turnstileChallengeURL`` — in a
 `WKWebView`, captures the minted token from the page's bridge, and resubmits
 automatically. The draft, including attachments, survives a cancelled or
-failed challenge. When no site key is published (or on tvOS, which has no
-WebKit), a gated submission fails after a single attempt with a localized,
-user-safe message instead of the raw server response.
+failed challenge. The challenge sheet blocks interactive dismissal, so a
+swipe-down cannot close it without answering the challenge; use its Cancel
+action to return to the draft. When no site key is published (or on tvOS,
+which has no WebKit), a gated submission fails after a single attempt with a
+localized, user-safe message instead of the raw server response.
 
 Hosts building their own submission UI can do the same explicitly:
 ``FeedbackClient/turnstileChallengePresentation(for:config:theme:locale:)``
