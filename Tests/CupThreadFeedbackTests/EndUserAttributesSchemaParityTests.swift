@@ -33,37 +33,48 @@ struct EndUserAttributesSchemaParityTests {
         let components: Components
     }
 
-    private static func fetchLiveSpec() async throws -> OpenAPISpec {
+    private static func fetchLiveSpecResponse() async throws -> (data: Data, status: Int) {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 30
         let session = URLSession(configuration: config)
         defer { session.finishTasksAndInvalidate() }
-        let (data, _) = try await session.data(from: specURL)
-        return try JSONDecoder().decode(OpenAPISpec.self, from: data)
+        let (data, response) = try await session.data(from: specURL)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }
 
-    /// Fetches the live OpenAPI document, treating transport-level
-    /// unreachability as an inconclusive check instead of a failure (a
-    /// sandbox without network or a temporary api.cupthread.com outage is
-    /// not schema drift): the situation is recorded as a known issue so the
-    /// suite stays completable offline and CI never fails on an outage,
-    /// while the drift tripwire stays armed for every run that can reach
-    /// the API (CI, networked dev). Returns `nil` when the check must be
-    /// skipped; throws when the spec itself violates the client's decoding
-    /// contract (that is drift).
-    private static func fetchLiveSpecRecordingUnreachable() async throws -> OpenAPISpec? {
+    /// Records an inconclusive parity check (no network, or a temporary
+    /// api.cupthread.com outage) as a known issue instead of failing the
+    /// run: neither situation is schema drift, the suite stays completable
+    /// offline, CI never fails on an outage, and the drift tripwire stays
+    /// armed for every run that can reach the API (CI, networked dev).
+    private static func recordInconclusiveParity(_ reason: String) {
+        withKnownIssue {
+            Issue.record("""
+                Live OpenAPI document \(reason) at \(specURL); \
+                EndUserAttributesInput nullability parity was not verified this run
+                """)
+        }
+    }
+
+    /// Fetches and decodes the live OpenAPI document, treating transport
+    /// failures and HTTP 5xx as inconclusive (recorded, not failed).
+    /// Everything else — a 4xx status (the document moved or was removed),
+    /// a non-schema body on a success status, or a schema-shape violation —
+    /// throws, because those are contract drift, not outages.
+    private static func fetchLiveSpecRecordingInconclusive() async throws -> OpenAPISpec? {
+        let payload: (data: Data, status: Int)
         do {
-            return try await fetchLiveSpec()
+            payload = try await Self.fetchLiveSpecResponse()
         } catch let error as URLError where !error.isSdkCancellation {
-            withKnownIssue {
-                Issue.record("""
-                    Live OpenAPI document unreachable at \(specURL) (\(error)); \
-                    EndUserAttributesInput nullability parity was not verified this run
-                    """)
-            }
+            recordInconclusiveParity("unreachable (\(error))")
             return nil
         }
+        guard !(500...599).contains(payload.status) else {
+            recordInconclusiveParity("answered HTTP \(payload.status)")
+            return nil
+        }
+        return try JSONDecoder().decode(OpenAPISpec.self, from: payload.data)
     }
 
     /// Field-by-field: the attributes the SDK allows clearing with `.null`
@@ -72,7 +83,7 @@ struct EndUserAttributesSchemaParityTests {
     /// (`isPaying`, `currency` — `.attributeNotClearable` before any network
     /// activity) are exactly the ones it does not.
     @Test func sdkClearablePolicyMatchesLiveSchemaNullability() async throws {
-        guard let spec = try await Self.fetchLiveSpecRecordingUnreachable() else { return }
+        guard let spec = try await Self.fetchLiveSpecRecordingInconclusive() else { return }
         let input = try #require(
             spec.components.schemas["EndUserAttributesInput"]?.properties,
             "The live OpenAPI document no longer carries EndUserAttributesInput — update this suite"
