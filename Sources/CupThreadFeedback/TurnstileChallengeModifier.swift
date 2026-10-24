@@ -19,9 +19,10 @@ struct PendingTurnstileChallenge: Identifiable {
 ///
 /// SwiftUI's `sheet(item:)` nils the binding on an interactive swipe-down
 /// without invoking the sheet's buttons, so the modifier registers the
-/// presented challenge here and lets `onDismiss` run its `cancel` closure.
-/// The button paths resolve the registration first, which turns the
-/// dismissal that follows into a no-op and keeps `cancel` to one invocation.
+/// presented challenge here and lets the presented content's `onDisappear`
+/// run its `cancel` closure. The button paths resolve the registration first,
+/// which turns the dismissal that follows into a no-op and keeps `cancel` to
+/// one invocation.
 struct TurnstileChallengeSettlement {
     private var outstanding: PendingTurnstileChallenge?
 
@@ -36,12 +37,17 @@ struct TurnstileChallengeSettlement {
     }
 
     /// Marks the challenge as answered by an explicit sheet action.
-    mutating func resolve() {
+    mutating func resolve(_ challenge: PendingTurnstileChallenge) {
+        guard outstanding?.id == challenge.id else { return }
         outstanding = nil
     }
 
-    /// Returns the challenge that still needs settling, then clears it.
-    mutating func settleOnDismiss() -> PendingTurnstileChallenge? {
+    /// The presented content went away. Settles only the challenge whose
+    /// sheet actually disappeared: a retry can publish the next challenge
+    /// before the previous sheet's lifecycle callback runs, and that late
+    /// callback must not cancel the newer attempt.
+    mutating func settleOnDismiss(for id: PendingTurnstileChallenge.ID) -> PendingTurnstileChallenge? {
+        guard outstanding?.id == id else { return nil }
         defer { outstanding = nil }
         return outstanding
     }
@@ -64,16 +70,16 @@ private struct TurnstileChallengeSheetModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         #if canImport(WebKit) && !os(tvOS)
-        content.sheet(item: $pending, onDismiss: settleOnDismiss) { challenge in
+        content.sheet(item: $pending) { challenge in
             TurnstileChallengeSheet(
                 challengeURL: challenge.presentation.url,
                 onVerified: { token in
-                    settlement.resolve()
+                    settlement.resolve(challenge)
                     pending = nil
                     challenge.resume(token)
                 },
                 onCancel: {
-                    settlement.resolve()
+                    settlement.resolve(challenge)
                     pending = nil
                     challenge.cancel()
                 }
@@ -81,17 +87,16 @@ private struct TurnstileChallengeSheetModifier: ViewModifier {
             .onAppear {
                 settlement.register(challenge)
             }
+            // The presented content is the identity-scoped dismissal hook:
+            // `sheet(item:onDismiss:)` has no item parameter, so a late
+            // callback could otherwise cancel a challenge the retry published
+            // in the meantime. Settle only the challenge this sheet owns.
+            .onDisappear {
+                settlement.settleOnDismiss(for: challenge.id)?.cancel()
+            }
         }
         #else
         content
         #endif
-    }
-
-    /// The sheet went away without a decision — an interactive swipe-down
-    /// (if the host re-enabled it), a parent teardown, or a programmatic
-    /// dismissal. The pending work must still be settled or the composer is
-    /// left non-submittable with an orphaned spooled photo (#539).
-    private func settleOnDismiss() {
-        settlement.settleOnDismiss()?.cancel()
     }
 }

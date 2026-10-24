@@ -69,8 +69,9 @@ struct TurnstileChallengeDismissalTests {
         settlement.register(challenge)
 
         // `sheet(item:)` nils the binding on a swipe-down without calling the
-        // sheet's own buttons; `onDismiss` is the only hook that still runs.
-        settlement.settleOnDismiss()?.cancel()
+        // sheet's own buttons; the presented content's disappearance is the
+        // only hook that still runs.
+        settlement.settleOnDismiss(for: challenge.id)?.cancel()
 
         #expect(cancelCount == 1)
         #expect(!FileManager.default.fileExists(atPath: fileURL.path()))
@@ -82,16 +83,26 @@ struct TurnstileChallengeDismissalTests {
     }
 
     @Test @MainActor func dismissalAfterAnExplicitResolutionIsANoOp() {
+        let challenge = Self.makeChallenge()
         var settlement = TurnstileChallengeSettlement()
-        settlement.register(Self.makeChallenge())
+        settlement.register(challenge)
 
-        settlement.settleOnDismiss()?.cancel()
-        #expect(settlement.settleOnDismiss() == nil)
+        settlement.resolve(challenge)
+        #expect(settlement.settleOnDismiss(for: challenge.id) == nil)
     }
 
     @Test @MainActor func dismissalWithoutAPresentationIsANoOp() {
         var settlement = TurnstileChallengeSettlement()
-        #expect(settlement.settleOnDismiss() == nil)
+        #expect(settlement.settleOnDismiss(for: UUID()) == nil)
+    }
+
+    @Test @MainActor func unknownDismissalIdentityLeavesTheChallengeOwned() {
+        let challenge = Self.makeChallenge()
+        var settlement = TurnstileChallengeSettlement()
+        settlement.register(challenge)
+
+        #expect(settlement.settleOnDismiss(for: UUID()) == nil)
+        #expect(settlement.settleOnDismiss(for: challenge.id) != nil)
     }
 
     @Test @MainActor func registrationKeepsTheFirstChallengeWhenASecondProducerArrives() {
@@ -102,12 +113,41 @@ struct TurnstileChallengeDismissalTests {
         var firstCancelCount = 0
         var secondCancelCount = 0
         var settlement = TurnstileChallengeSettlement()
-        settlement.register(Self.makeChallenge(cancel: { firstCancelCount += 1 }))
-        settlement.register(Self.makeChallenge(cancel: { secondCancelCount += 1 }))
+        let first = Self.makeChallenge(cancel: { firstCancelCount += 1 })
+        let second = Self.makeChallenge(cancel: { secondCancelCount += 1 })
+        settlement.register(first)
+        settlement.register(second)
 
-        settlement.settleOnDismiss()?.cancel()
+        settlement.settleOnDismiss(for: first.id)?.cancel()
 
         #expect(firstCancelCount == 1)
+        #expect(secondCancelCount == 0)
+        #expect(settlement.settleOnDismiss(for: second.id) == nil)
+    }
+
+    @Test @MainActor func lateDismissalFromAResolvedChallengeDoesNotCancelTheNextOne() {
+        // After Verified, the retry can publish a new challenge before the
+        // previous sheet's lifecycle callback runs. The late callback must be
+        // ignored rather than cancelling the new attempt and deleting its
+        // freshly spooled file.
+        var firstCancelCount = 0
+        var secondCancelCount = 0
+        var settlement = TurnstileChallengeSettlement()
+        let first = Self.makeChallenge(cancel: { firstCancelCount += 1 })
+        let second = Self.makeChallenge(cancel: { secondCancelCount += 1 })
+
+        settlement.register(first)
+        settlement.resolve(first)
+        settlement.register(second)
+
+        #expect(settlement.settleOnDismiss(for: first.id) == nil)
+        #expect(firstCancelCount == 0)
+        #expect(secondCancelCount == 0)
+
+        // The second challenge is still owned and settles through its own hook.
+        settlement.resolve(second)
+        #expect(settlement.settleOnDismiss(for: second.id) == nil)
+        #expect(firstCancelCount == 0)
         #expect(secondCancelCount == 0)
     }
 
@@ -124,10 +164,10 @@ struct TurnstileChallengeDismissalTests {
         settlement.register(challenge)
 
         // The toolbar Cancel button: resolve, dismiss, then answer.
-        settlement.resolve()
+        settlement.resolve(challenge)
         challenge.cancel()
-        // The `dismiss()` that follows still fires `onDismiss`.
-        #expect(settlement.settleOnDismiss() == nil)
+        // The dismissal that follows still fires the content's hook.
+        #expect(settlement.settleOnDismiss(for: challenge.id) == nil)
 
         #expect(cancelCount == 1)
         #expect(resumeCount == 0)
@@ -143,9 +183,9 @@ struct TurnstileChallengeDismissalTests {
         var settlement = TurnstileChallengeSettlement()
         settlement.register(challenge)
 
-        settlement.resolve()
+        settlement.resolve(challenge)
         challenge.resume("tok-single-use")
-        #expect(settlement.settleOnDismiss() == nil)
+        #expect(settlement.settleOnDismiss(for: challenge.id) == nil)
 
         #expect(resumeCount == 1)
         #expect(cancelCount == 0)
@@ -174,11 +214,17 @@ struct TurnstileChallengeDismissalTests {
         let modifier = try Self.source("TurnstileChallengeModifier.swift")
 
         #expect(
-            modifier.contains("sheet(item: $pending, onDismiss: settleOnDismiss)"),
-            "the sheet must observe dismissal; `sheet(item:)` alone drops the challenge on a swipe (#539)"
+            modifier.contains("settlement.register(challenge)"),
+            "the presented challenge must be registered so a swipe can settle it (#539)"
         )
-        #expect(modifier.contains("settlement.register(challenge)"))
-        #expect(modifier.contains("settlement.settleOnDismiss()?.cancel()"))
+        #expect(
+            modifier.contains("settlement.settleOnDismiss(for: challenge.id)?.cancel()"),
+            "the presented content must settle its own challenge on disappearance (#539)"
+        )
+        #expect(
+            !modifier.contains("onDismiss: settleOnDismiss"),
+            "a sheet-wide dismissal hook cannot tell which challenge disappeared (#539)"
+        )
     }
 
     @Test func sheetRefusesInteractiveDismissal() throws {
