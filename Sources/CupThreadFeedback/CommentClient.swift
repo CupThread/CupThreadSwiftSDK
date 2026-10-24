@@ -211,7 +211,11 @@ extension FeedbackClient {
     /// - Returns: The created comment, as echoed by the server.
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when the
     ///   caller is not signed in (HTTP 401 — this sign-in gate fires before
-    ///   the lookup, so an anonymous caller receives it regardless of the id),
+    ///   the lookup, but only after the local checks below succeed, so an
+    ///   anonymous caller receives it for any request that survives local
+    ///   `featureRequestId` and draft validation; an id failing that
+    ///   validation throws ``FeedbackClientError/invalidResponse`` locally
+    ///   with no network round trip and never reaches the gate),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
     ///   server state answers it on this operation; the generic permission
     ///   mapping is kept for deploy skew (pre-convention servers answered an
