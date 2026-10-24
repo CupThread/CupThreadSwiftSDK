@@ -53,7 +53,7 @@ Add the package dependency in your `Package.swift` by release version or branch:
 ```swift
 dependencies: [
     // By release tag / version:
-    .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", from: "0.1.0"),
+    .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", from: "0.1.1"),
     // Or tracking the latest branch:
     // .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", branch: "main"),
 ]
@@ -74,8 +74,8 @@ Prebuilt **static** XCFrameworks are published to the CupThread CDN with immutab
 targets: [
     .binaryTarget(
         name: "CupThreadFeedback",
-        url: "https://cdn.cupthread.com/sdks/apple/CupThreadFeedback-0.1.0.xcframework.zip",
-        checksum: "ae48499974c5d21d1b33a17831d12f00a52b218654530ae8cfecb796c8d66bcf"
+        url: "https://cdn.cupthread.com/sdks/apple/CupThreadFeedback-0.1.1.xcframework.zip",
+        checksum: "91eb4b6c786762abacf640e99c329ffe5fd7328c8834758c0e7452d9f58fa2be"
     )
 ]
 ```
@@ -164,7 +164,7 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 ### Headers & Version Reporting
 
 Every API request dispatched by `FeedbackClient` carries:
-- `X-SDK-Version`: Semantic version of the CupThread Apple SDK (`FeedbackClient.sdkVersion`, e.g. `0.1.0`).
+- `X-SDK-Version`: Semantic version of the CupThread Apple SDK (`FeedbackClient.sdkVersion`, e.g. `0.1.1`).
 - `X-Request-Id`: Request or session correlation ID.
 
 Feedback submissions (`submit(_:userToken:)`) include `metadata.sdk` (`cupthread-apple/<semver>`) and `metadata.sdkVersion` (`<semver>`), allowing backend analytics and telemetry to segment behavior by SDK release independently of the host app's version.
@@ -244,7 +244,7 @@ scripts/capture-screenshots.sh
 scripts/build-docs.sh docs-site
 
 # Release a new version (archives 7 slices, creates XCFramework zip, tags & creates release)
-node scripts/release.mjs --version 0.1.1
+node scripts/release.mjs --version 0.1.2
 ```
 
 ## License
