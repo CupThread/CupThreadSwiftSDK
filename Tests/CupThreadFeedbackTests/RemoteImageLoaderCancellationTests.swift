@@ -27,6 +27,36 @@ private final class CancellationRequestCounter: @unchecked Sendable {
     }
 }
 
+/// One-shot gate the mock download thread blocks on, so a download stays
+/// in flight until the test releases it. Fixed handler sleeps made the
+/// cancellation tests flaky: under full-suite load a 30 ms caller-side
+/// sleep can overshoot a 200 ms download window, and the cancellation then
+/// lands on an already-completed download (cache warmed, in-flight entry
+/// already cleaned up) instead of a mid-flight one.
+private final class DownloadGate: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var isOpen = false
+
+    /// Blocks the calling (handler) thread until `open()` or the timeout,
+    /// returning whether the gate was opened.
+    func hold(upTo timeout: TimeInterval) -> Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        if !isOpen {
+            condition.wait(until: Date().addingTimeInterval(timeout))
+        }
+        return isOpen
+    }
+
+    /// Releases every waiting handler thread; idempotent.
+    func open() {
+        condition.lock()
+        isOpen = true
+        condition.signal()
+        condition.unlock()
+    }
+}
+
 @Suite(.serialized)
 @MainActor
 struct RemoteImageLoaderCancellationTests {
@@ -52,22 +82,52 @@ struct RemoteImageLoaderCancellationTests {
         )!
     }
 
-    @Test func callerCancellationStillWarmsCacheWhenUnderlyingDownloadSucceeds() async throws {
-        let counter = CancellationRequestCounter()
-        let png = makePNGData()
-        let imageURL = makeImageURL("/caller-cancelled.png")
+    /// Installs a handler whose download stays in flight (blocked on `gate`)
+    /// until the test opens it, so cancellation always lands mid-download no
+    /// matter how far the scheduler delays the test's own execution.
+    private func setGatedHandler(
+        counter: CancellationRequestCounter,
+        gate: DownloadGate,
+        path: String,
+        png: Data
+    ) {
+        let imageURL = makeImageURL(path)
         MockURLProtocol.setHandler(forHost: Self.host) { request in
             counter.record()
-            Thread.sleep(forTimeInterval: 0.15)
+            gate.hold(upTo: 5)
             return (self.makeImageResponse(request.url ?? imageURL), png)
         }
+    }
+
+    /// Waits until the load for `url` has registered its in-flight entry so a
+    /// following `cancel()` deterministically hits a running download.
+    private func waitUntilInFlight(
+        _ loader: RemoteImageLoader,
+        url: URL,
+        timeout: TimeInterval = 2
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if loader.inFlightCount == 1 { return true }
+            try? await Task.sleep(for: .milliseconds(2))
+        }
+        return loader.inFlightCount == 1
+    }
+
+    @Test func callerCancellationStillWarmsCacheWhenUnderlyingDownloadSucceeds() async throws {
+        let counter = CancellationRequestCounter()
+        let gate = DownloadGate()
+        defer { gate.open() }
+        let png = makePNGData()
+        let imageURL = makeImageURL("/caller-cancelled.png")
+        setGatedHandler(counter: counter, gate: gate, path: "/caller-cancelled.png", png: png)
         let loader = RemoteImageLoader(session: makeMockSession())
 
         let callerTask = Task { @MainActor in
             try await loader.image(for: imageURL)
         }
 
-        try await Task.sleep(for: .milliseconds(30))
+        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
         callerTask.cancel()
 
         let result = await callerTask.result
@@ -77,6 +137,7 @@ struct RemoteImageLoaderCancellationTests {
         case .failure(let error):
             #expect(error.isSdkCancellation, "The caller task must surface SDK cancellation")
         }
+        gate.open()
 
         var pollCount = 0
         while loader.cachedImageIfPresent(for: imageURL) == nil && pollCount < 50 {
@@ -94,20 +155,18 @@ struct RemoteImageLoaderCancellationTests {
 
     @Test func concurrentSubscriberReceivesImageEvenIfFirstCallerCancels() async throws {
         let counter = CancellationRequestCounter()
+        let gate = DownloadGate()
+        defer { gate.open() }
         let png = makePNGData()
         let imageURL = makeImageURL("/concurrent-cancellation.png")
-        MockURLProtocol.setHandler(forHost: Self.host) { request in
-            counter.record()
-            Thread.sleep(forTimeInterval: 0.15)
-            return (self.makeImageResponse(request.url ?? imageURL), png)
-        }
+        setGatedHandler(counter: counter, gate: gate, path: "/concurrent-cancellation.png", png: png)
         let loader = RemoteImageLoader(session: makeMockSession())
 
         let firstCaller = Task { @MainActor in
             try await loader.image(for: imageURL)
         }
 
-        try await Task.sleep(for: .milliseconds(30))
+        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
 
         let secondCaller = Task { @MainActor in
             try await loader.image(for: imageURL)
@@ -122,6 +181,7 @@ struct RemoteImageLoaderCancellationTests {
         case .failure(let error):
             #expect(error.isSdkCancellation)
         }
+        gate.open()
 
         let secondImage = try await secondCaller.value
         #expect(RemoteImageLoader.decodedPixelDimensions(of: secondImage).width > 0)
@@ -131,25 +191,24 @@ struct RemoteImageLoaderCancellationTests {
 
     @Test func callerCancellationDoesNotPrematurelyClearInFlightEntry() async throws {
         let counter = CancellationRequestCounter()
+        let gate = DownloadGate()
+        defer { gate.open() }
         let png = makePNGData()
         let imageURL = makeImageURL("/coalesce-after-cancellation.png")
-        MockURLProtocol.setHandler(forHost: Self.host) { request in
-            counter.record()
-            Thread.sleep(forTimeInterval: 0.2)
-            return (self.makeImageResponse(request.url ?? imageURL), png)
-        }
+        setGatedHandler(counter: counter, gate: gate, path: "/coalesce-after-cancellation.png", png: png)
         let loader = RemoteImageLoader(session: makeMockSession())
 
         let caller1 = Task { @MainActor in
             try await loader.image(for: imageURL)
         }
 
-        try await Task.sleep(for: .milliseconds(30))
+        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
         caller1.cancel()
 
         _ = await caller1.result
 
         #expect(loader.inFlightCount == 1, "In-flight task must not be cleared while background download is active")
+        gate.open()
 
         let caller2Image = try await loader.image(for: imageURL)
         #expect(RemoteImageLoader.decodedPixelDimensions(of: caller2Image).width > 0)
@@ -158,24 +217,23 @@ struct RemoteImageLoaderCancellationTests {
 
     @Test func callerCancellationDoesNotPoisonNegativeCache() async throws {
         let counter = CancellationRequestCounter()
+        let gate = DownloadGate()
+        defer { gate.open() }
         let png = makePNGData()
         let imageURL = makeImageURL("/no-negative-cache-poisoning.png")
-        MockURLProtocol.setHandler(forHost: Self.host) { request in
-            counter.record()
-            Thread.sleep(forTimeInterval: 0.1)
-            return (self.makeImageResponse(request.url ?? imageURL), png)
-        }
+        setGatedHandler(counter: counter, gate: gate, path: "/no-negative-cache-poisoning.png", png: png)
         let loader = RemoteImageLoader(session: makeMockSession())
 
         let caller = Task { @MainActor in
             try await loader.image(for: imageURL)
         }
 
-        try await Task.sleep(for: .milliseconds(20))
+        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
         caller.cancel()
         _ = await caller.result
 
         #expect(loader.recentFailureCount == 0, "Caller cancellation must never be recorded in recentFailures")
+        gate.open()
 
         var pollCount = 0
         while loader.cachedImageIfPresent(for: imageURL) == nil && pollCount < 50 {
@@ -227,19 +285,17 @@ struct RemoteImageLoaderCancellationTests {
 
     @Test func cancelledImageLoadErrorDoesNotMapToFailurePhase() async throws {
         let counter = CancellationRequestCounter()
+        let gate = DownloadGate()
+        defer { gate.open() }
         let png = makePNGData()
         let imageURL = makeImageURL("/phase-cancelled.png")
-        MockURLProtocol.setHandler(forHost: Self.host) { request in
-            counter.record()
-            Thread.sleep(forTimeInterval: 0.15)
-            return (self.makeImageResponse(request.url ?? imageURL), png)
-        }
+        setGatedHandler(counter: counter, gate: gate, path: "/phase-cancelled.png", png: png)
         let loader = RemoteImageLoader(session: makeMockSession())
 
         let caller = Task { @MainActor in
             try await loader.image(for: imageURL)
         }
-        try await Task.sleep(for: .milliseconds(30))
+        try #require(await waitUntilInFlight(loader, url: imageURL), "load never became in-flight")
         caller.cancel()
 
         guard case .failure(let error) = await caller.result else {
