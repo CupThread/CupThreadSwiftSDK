@@ -632,26 +632,42 @@ private extension FeatureRequestsView {
         // or the successful `.task(id: filterKey)` rerun) is the path to a
         // matching list.
         guard listState.lastExecutedFilterKey == filterKey else { return }
+        // Capture the request identity before the first await: the pager runs
+        // in an unstructured task, so a filter edit neither cancels it nor
+        // bumps the generation (the debounced replacement only calls
+        // `startLoading()` after its sleep). Re-reading the view's filter at
+        // the fetch would pair the new query with this (old) cursor.
+        let requestFilterKey = filterKey
+        let requestQuery = trimmedSearchText
+        let requestVersionID = selectedVersionID
         let generationAtStart = loadGeneration
         isLoadingNextPage = true
         defer { isLoadingNextPage = false }
         do {
-            if !trimmedSearchText.isEmpty {
+            if !requestQuery.isEmpty {
                 await client.searchThrottle.recordQueryFetch()
             }
+            // The throttle hop is a suspension: revalidate before spending
+            // the cursor request on a filter the user has already left.
+            guard loadGeneration == generationAtStart,
+                  filterKey == requestFilterKey else { return }
             let result = try await client.fetchFeatureRequests(
                 userToken: userToken,
-                versionId: selectedVersionID,
-                query: trimmedSearchText.isEmpty ? nil : trimmedSearchText,
+                versionId: requestVersionID,
+                query: requestQuery.isEmpty ? nil : requestQuery,
                 cursor: cursor
             )
             // A newer replacing load (search/version change, pull-to-refresh)
             // superseded this cursor page — appending it would mix filters.
-            guard loadGeneration == generationAtStart else { return }
+            // The filter key covers the debounce window where the
+            // replacement has not reached `startLoading()` yet.
+            guard loadGeneration == generationAtStart,
+                  filterKey == requestFilterKey else { return }
             pageError = nil
             listState.applyPage(result, replacesExisting: false)
         } catch {
-            guard loadGeneration == generationAtStart, !error.isSdkCancellation else { return }
+            guard loadGeneration == generationAtStart,
+                  filterKey == requestFilterKey, !error.isSdkCancellation else { return }
             if isSdkPermissionRejection(error) {
                 serverRejection.rejectList()
                 return
