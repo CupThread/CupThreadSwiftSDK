@@ -263,8 +263,12 @@ enum DataProtectionKeychainProbe {
             kSecAttrAccount as String: "dp-probe",
             kSecUseDataProtectionKeychain as String: true
         ]
-        SecItemDelete(query as CFDictionary)
-        return true
+        // The round-trip tests gated on this probe also delete, so the
+        // probe is only "writable" when the cleanup delete is confirmed —
+        // otherwise the uniquely named probe item would leak and the
+        // enabled tests would fail on a host that cannot complete the
+        // cycle.
+        return SecItemDelete(query as CFDictionary) == errSecSuccess
         #else
         return true
         #endif
