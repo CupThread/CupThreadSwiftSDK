@@ -21,6 +21,15 @@ final class BoundedBodyTransport: NSObject, URLSessionDataDelegate, @unchecked S
 
     private let lock = NSLock()
     private var pending: [Int: PendingBody] = [:]
+    private var peakBufferedBytes = 0
+
+    /// Largest number of body bytes held at once across this transport's
+    /// transfers; internal so tests can assert the cap bounds the buffer.
+    var peakBufferedByteCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return peakBufferedBytes
+    }
 
     /// Downloads `url`, failing as soon as the delivered body exceeds
     /// `maxBytes` (inclusive: a body exactly at the cap is accepted).
@@ -71,22 +80,28 @@ final class BoundedBodyTransport: NSObject, URLSessionDataDelegate, @unchecked S
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         lock.lock()
-        guard var body = pending[dataTask.taskIdentifier] else {
+        guard let remaining = pending[dataTask.taskIdentifier].map({ $0.cap - $0.data.count }) else {
             lock.unlock()
             return
         }
         // The remaining allowance is non-negative on entry, so an oversized
         // chunk (or a clamped-to-zero injected cap) is rejected without any
         // arithmetic overflow.
-        guard data.count <= body.cap - body.data.count else {
-            pending.removeValue(forKey: dataTask.taskIdentifier)
+        guard data.count <= remaining else {
+            let body = pending.removeValue(forKey: dataTask.taskIdentifier)
             lock.unlock()
             dataTask.cancel()
-            body.continuation?.resume(throwing: URLError(.cannotDecodeContentData))
+            body?.continuation?.resume(throwing: URLError(.cannotDecodeContentData))
             return
         }
-        body.data.append(data)
-        pending[dataTask.taskIdentifier] = body
+        // Mutate through the dictionary entry so the accumulated buffer is
+        // appended in place; appending through a value copy would copy the
+        // whole prefix on every chunk (copy-on-write), doubling both transfer
+        // cost and peak memory near the cap.
+        pending[dataTask.taskIdentifier]?.data.append(data)
+        if let buffered = pending[dataTask.taskIdentifier]?.data.count {
+            peakBufferedBytes = max(peakBufferedBytes, buffered)
+        }
         lock.unlock()
     }
 

@@ -35,6 +35,21 @@ struct RemoteImageLoaderDecodeBoundTests {
         }
     }
 
+    @Test func pdfDocumentIsRejectedBeforeTheThumbnailPath() throws {
+        // ImageIO can thumbnail PDF pages on macOS; the type gate must reject
+        // the document before that pass so it never enters the image cache.
+        let pdf = try Self.makePDFData()
+
+        do {
+            _ = try RemoteImageLoader.decodeBoundedImage(from: pdf, maxPixelEdge: 600)
+            Issue.record("Expected the PDF document to be rejected")
+        } catch let error as URLError {
+            #expect(error.code == .cannotDecodeContentData)
+        } catch {
+            Issue.record("Expected URLError, got \(error)")
+        }
+    }
+
     @Test func fallbackRejectsRecognizedBitmapsPastThePixelCap() throws {
         let png = try Self.makePNGData(width: 3_000, height: 3_000)
         let source = try #require(CGImageSourceCreateWithData(png as CFData, nil))
@@ -94,6 +109,19 @@ struct RemoteImageLoaderDecodeBoundTests {
 
         #expect(loader.cachedImageIfPresent(for: url) == nil)
         #expect(loader.recentFailureCount == 1)
+    }
+
+    private static func makePDFData() throws -> Data {
+        let output = NSMutableData()
+        let consumer = try #require(CGDataConsumer(data: output as CFMutableData))
+        var mediaBox = CGRect(x: 0, y: 0, width: 200, height: 200)
+        let context = try #require(CGContext(consumer: consumer, mediaBox: &mediaBox, nil))
+        context.beginPDFPage(nil)
+        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(mediaBox)
+        context.endPDFPage()
+        context.closePDF()
+        return output as Data
     }
 
     private static func makePNGData(width: Int, height: Int) throws -> Data {

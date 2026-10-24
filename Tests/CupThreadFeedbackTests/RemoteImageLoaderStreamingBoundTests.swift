@@ -151,10 +151,11 @@ struct RemoteImageLoaderStreamingBoundTests {
     }
 
     @Test func oversizedStreamingBodyCancelsTheTransferAtTheCap() async throws {
-        let payload = Data(repeating: 0x41, count: 4 * 1_024 * 1_024)
+        let payload = Data(repeating: 0x41, count: 16 * 1_024 * 1_024)
         StreamingImageURLProtocol.configure(payload: payload, chunkSize: 1_024)
         let url = makeImageURL("/oversized-stream.png")
-        let loader = RemoteImageLoader(session: makeStreamingSession(), maxResponseBytes: 16 * 1_024)
+        let cap = 16 * 1_024
+        let loader = RemoteImageLoader(session: makeStreamingSession(), maxResponseBytes: cap)
 
         do {
             _ = try await loader.image(for: url)
@@ -164,6 +165,13 @@ struct RemoteImageLoaderStreamingBoundTests {
         } catch {
             Issue.record("Expected URLError, got \(error)")
         }
+
+        // The loader's buffer is the memory contract under test: it must never
+        // hold more than the cap, independent of how far the mock raced ahead.
+        #expect(
+            loader.peakBufferedBodyBytes <= cap,
+            "The loader buffered \(loader.peakBufferedBodyBytes) bytes over a \(cap)-byte cap"
+        )
 
         // Cancellation propagates to the protocol through URLSession's
         // queues; give it a bounded window to be observed.
@@ -175,8 +183,8 @@ struct RemoteImageLoaderStreamingBoundTests {
         let delivered = StreamingImageURLProtocol.deliveredBytesSnapshot
         #expect(StreamingImageURLProtocol.stoppedSnapshot, "The loader must cancel the task at the cap")
         #expect(
-            delivered < payload.count / 4,
-            "Only a bounded prefix may be delivered; got \(delivered) of \(payload.count) bytes"
+            delivered < payload.count,
+            "The full body must not be delivered before the transfer is cancelled"
         )
         #expect(loader.cachedImageIfPresent(for: url) == nil, "A rejected body must never be cached")
         #expect(loader.recentFailureCount == 1, "The rejection must replay through the negative cache")
@@ -227,14 +235,15 @@ struct RemoteImageLoaderStreamingBoundTests {
     /// which URLSession has already decompressed — and a compressed response
     /// cannot postpone the check until the whole body arrives.
     @Test func contentEncodingHeaderDoesNotBypassTheStreamingCap() async throws {
-        let payload = Data(repeating: 0x41, count: 2 * 1_024 * 1_024)
+        let payload = Data(repeating: 0x41, count: 8 * 1_024 * 1_024)
         StreamingImageURLProtocol.configure(
             payload: payload,
             chunkSize: 1_024,
             headers: ["Content-Type": "image/png", "Content-Encoding": "gzip"]
         )
         let url = makeImageURL("/compressed-body.png")
-        let loader = RemoteImageLoader(session: makeStreamingSession(), maxResponseBytes: 16 * 1_024)
+        let cap = 16 * 1_024
+        let loader = RemoteImageLoader(session: makeStreamingSession(), maxResponseBytes: cap)
 
         do {
             _ = try await loader.image(for: url)
@@ -245,9 +254,13 @@ struct RemoteImageLoaderStreamingBoundTests {
             Issue.record("Expected URLError, got \(error)")
         }
 
+        #expect(
+            loader.peakBufferedBodyBytes <= cap,
+            "A Content-Encoding header must not let the buffer grow past the cap"
+        )
         try await Task.sleep(for: .milliseconds(100))
         #expect(
-            StreamingImageURLProtocol.deliveredBytesSnapshot < payload.count / 4,
+            StreamingImageURLProtocol.deliveredBytesSnapshot < payload.count,
             "A Content-Encoding header must not delay the cap until the body is buffered"
         )
     }

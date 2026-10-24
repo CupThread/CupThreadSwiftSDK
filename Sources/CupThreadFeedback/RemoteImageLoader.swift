@@ -192,6 +192,10 @@ func image(for url: URL) async throws -> PlatformImage {
     /// background task completion and table cleanup.
     var inFlightCount: Int { inFlight.count }
 
+    /// Largest number of response bytes buffered at once; internal so tests
+    /// can assert the transfer bound, not just the thrown error.
+    var peakBufferedBodyBytes: Int { bodyTransport.peakBufferedByteCount }
+
     /// The cached image for `url`, if any; internal so tests can inspect the
     /// cache without going back through the network path.
     func cachedImageIfPresent(for url: URL) -> PlatformImage? {
@@ -231,7 +235,8 @@ func image(for url: URL) async throws -> PlatformImage {
               let source = CGImageSourceCreateWithData(
                   data as CFData,
                   [kCGImageSourceShouldCache: false] as CFDictionary
-              )
+              ),
+              isBitmapImageSource(source)
         else {
             throw URLError(.cannotDecodeContentData)
         }
@@ -246,6 +251,21 @@ func image(for url: URL) async throws -> PlatformImage {
             throw URLError(.cannotDecodeContentData)
         }
         return image
+    }
+
+    /// Whether ImageIO identifies `source` as a bitmap image container.
+    ///
+    /// The type gate runs before the thumbnail pass: ImageIO can thumbnail
+    /// some non-image documents (PDF on macOS), and an avatar URL must never
+    /// put a document in the image cache just because a thumbnail was
+    /// available.
+    private nonisolated static func isBitmapImageSource(_ source: CGImageSource) -> Bool {
+        #if canImport(UniformTypeIdentifiers)
+        guard let type = CGImageSourceGetType(source) else { return false }
+        return UTType(type as String)?.conforms(to: .image) == true
+        #else
+        return CGImageSourceGetCount(source) > 0
+        #endif
     }
 
     /// The direct-decode fallback used only when ImageIO cannot produce a
