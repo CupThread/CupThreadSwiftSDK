@@ -35,7 +35,9 @@ import WebKit
 /// outcome to the `turnstileBridge` message handler. Tokens are single-use
 /// and valid for 300 seconds, so each gated call opens its own challenge.
 /// Cancelling or failing leaves the caller's draft untouched — the sheet
-/// owns no submission state.
+/// owns no submission state. Interactive dismissal is disabled: a swipe-down
+/// would close the sheet without answering the challenge, so Cancel is the
+/// only exit until the widget reports an outcome (#539).
 ///
 /// The WebKit-backed sheet is unavailable on tvOS, which has no WebKit:
 /// token-gated intake there needs a host-supplied `turnstileTokenProvider`.
@@ -120,6 +122,11 @@ public struct TurnstileChallengeSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         #endif
+        // The caller's gated work (a draft, a spooled photo) is only settled
+        // through Verified or Cancel, so a swipe-down must not leave it
+        // stranded. Presenters that chain `onDismiss` still get the safety
+        // net for host-driven teardown (#539).
+        .interactiveDismissDisabled()
         .task(id: reloadID) {
             // A cold widget mint measured ~8–10 s; give the page and Cloudflare
             // ample time, then fail visibly instead of spinning forever when a

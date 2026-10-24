@@ -458,6 +458,11 @@ public struct FeedbackComposerView: View {
                   theme: activeConfig?.sdk.theme ?? .system
               )
         else { return false }
+        // A submission can still be in flight while a photo upload starts, so
+        // both calls can be gated. The first challenge owns the sheet; let the
+        // submission fall through to its normal error copy rather than replace
+        // the pending challenge and drop the other attempt's cleanup (#539).
+        guard pendingChallenge == nil else { return false }
         pendingChallenge = PendingTurnstileChallenge(
             presentation: presentation,
             resume: { token in
@@ -572,6 +577,15 @@ extension FeedbackComposerView {
         prepared: PreparedPhotoUpload,
         uploadId: UUID
     ) {
+        // The submission path may already own the sheet. Fail this upload
+        // through its normal cleanup instead of replacing the pending
+        // challenge, which would leave this attempt in `.uploading` with an
+        // orphaned spool (#539).
+        guard pendingChallenge == nil else {
+            PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL)
+            recordUploadFailure(error, uploadId: uploadId)
+            return
+        }
         guard let presentation = client.turnstileChallengePresentation(
             for: .feedback(appKey: client.configuration.appKey),
             config: activeConfig,

@@ -153,6 +153,10 @@ struct PhotoUploadAdmissionTests {
         let handOffRemovals = helperBody.components(
             separatedBy: "removeTempUploadFile(at: prepared.fileURL)"
         ).count - 1
-        #expect(handOffRemovals == 2, "challenge resume and cancel must both remove the spooled file")
+        // Three terminal hand-off branches: an unsupported presentation, a
+        // challenge another in-flight request already owns (#539), and the
+        // challenge's cancel closure. A resumed attempt removes the file
+        // through `sendPreparedPhoto`'s own terminal branches.
+        #expect(handOffRemovals == 3, "every challenge hand-off branch must remove the spooled file")
     }
 }
