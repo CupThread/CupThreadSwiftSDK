@@ -13,11 +13,17 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege (issue #576): every job only reads the checkout and builds
+# locally; no step writes to the repository, so nothing beyond `contents:
+# read` is granted regardless of the repository's default workflow setting.
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install SwiftLint
         run: |
           brew untap aws/tap 2>/dev/null || true
@@ -32,7 +38,7 @@ jobs:
   test:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Run Swift Tests
@@ -42,7 +48,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Build iOS slice
@@ -90,15 +96,21 @@ jobs:
           - name: tvOS Simulator
             destination: "generic/platform=tvOS Simulator"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Build ${{ matrix.name }} slice
+        # Same runner-expansion rule as every other `run:` (issue #576): the
+        # matrix is workflow-authored today, but the shell only ever sees these
+        # values through env indirection, so the script stays data-driven.
+        env:
+          SLICE_NAME: ${{ matrix.name }}
+          SLICE_DESTINATION: ${{ matrix.destination }}
         run: |
           xcodebuild archive \
             -scheme CupThreadFeedback \
-            -destination "${{ matrix.destination }}" \
-            -archivePath "/tmp/${{ matrix.name }}.xcarchive" \
+            -destination "$SLICE_DESTINATION" \
+            -archivePath "/tmp/$SLICE_NAME.xcarchive" \
             SKIP_INSTALL=NO \
             BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
             -quiet
@@ -107,7 +119,7 @@ jobs:
     if: github.event_name == 'push'
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Pick an available iPhone simulator
@@ -139,7 +151,7 @@ jobs:
           fi
       - name: Upload UI test result bundle
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ui-test-failure-xcresult
           path: /tmp/cupthread-ui-test.xcresult
@@ -149,7 +161,7 @@ jobs:
     if: github.event_name == 'push'
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Verify release build pipeline
