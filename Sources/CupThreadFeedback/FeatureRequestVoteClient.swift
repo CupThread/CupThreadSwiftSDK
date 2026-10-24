@@ -235,18 +235,25 @@ extension FeedbackClient {
     ///   and any non-fatal warning the server attached.
     /// - Throws: ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
     ///   when the server answers HTTP 404 with the documented JSON error
-    ///   envelope (the request was deleted, is unapproved, or never existed —
-    ///   API-27), or locally with no request sent when `featureRequestId`
-    ///   cannot be a valid id,
+    ///   envelope — since the uniform-404 convention of SaaS#1171 this is the
+    ///   single denial for a request that was deleted, is unapproved, or
+    ///   never existed (API-27), for an app with public feature requests
+    ///   disabled, and for a deactivated app: all answer the same
+    ///   `Feature request not found` body (existence hiding) — or locally
+    ///   with no request sent when `featureRequestId` cannot be a valid id,
     ///   ``FeedbackClientError/authenticationRequired`` when `userToken` is
     ///   blank, whitespace-only, or contains newlines (rejected locally, with
     ///   no request built and no Turnstile token minted), or when anonymous
     ///   voting is disabled for the app (HTTP 401),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when human
-    ///   verification is required or rejected (HTTP 403 `turnstile_verification_failed`),
-    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   voting is disabled for the app (HTTP 403),
+    ///   verification is required or rejected (HTTP 403
+    ///   `turnstile_verification_failed` — since SaaS#1171 the only 403 this
+    ///   operation answers),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
+    ///   server state answers it on this operation; the generic permission
+    ///   mapping is kept for deploy skew (pre-convention servers answered a
+    ///   non-Turnstile 403 for an unapproved request or a disabled app), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func castVote(
@@ -294,16 +301,21 @@ extension FeedbackClient {
     /// - Returns: The new vote state (`voted: false`) and authoritative vote count.
     /// - Throws: ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
     ///   when the server answers HTTP 404 with the documented JSON error
-    ///   envelope (the request was deleted, is unapproved, or never existed —
-    ///   API-27), or locally with no request sent when `featureRequestId`
-    ///   cannot be a valid id,
+    ///   envelope — since the uniform-404 convention of SaaS#1171 this is the
+    ///   single denial for a request that was deleted, is unapproved, or
+    ///   never existed (API-27), for an app with public feature requests
+    ///   disabled, and for a deactivated app: all answer the same
+    ///   `Feature request not found` body (existence hiding) — or locally
+    ///   with no request sent when `featureRequestId` cannot be a valid id,
     ///   ``FeedbackClientError/authenticationRequired`` when `userToken` is
     ///   blank, whitespace-only, or contains newlines (rejected locally, with
     ///   no request built), or when anonymous voting is disabled for the app
     ///   (HTTP 401),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
-    ///   ``FeedbackClientError/forbidden(message:requestId:)`` when anonymous
-    ///   voting is disabled for the app (HTTP 403),
+    ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
+    ///   server state answers it on this operation; the generic permission
+    ///   mapping is kept for deploy skew (pre-convention servers answered a
+    ///   403 for an unapproved request or a disabled app), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func removeVote(
