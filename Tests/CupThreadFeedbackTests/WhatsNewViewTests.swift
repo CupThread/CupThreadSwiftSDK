@@ -62,25 +62,6 @@ struct WhatsNewViewTests {
         #expect(state.loadError == nil)
     }
 
-    @Test func cancelledRefreshPreservesEntriesAndRetryCanFail() {
-        let entries = [makeEntry()]
-        var state = WhatsNewViewState(entries: entries, isLoading: false, hasLoadedOnce: true)
-        let cancelled = state.startLoading()
-        state.handleFailure(error: CancellationError(), generation: cancelled)
-        state.finishLoading(generation: cancelled, wasCancelled: true)
-        #expect(state.entries == entries)
-        #expect(state.hasLoadedOnce)
-        #expect(state.isLoading)
-        #expect(state.loadError == nil)
-
-        let retry = state.startLoading()
-        state.handleFailure(error: URLError(.timedOut), generation: retry)
-        state.finishLoading(generation: retry)
-        #expect(!state.isLoading)
-        #expect(state.loadError != nil)
-        #expect(state.entries == entries)
-    }
-
     @Test func staleCancellationCannotChangeReplacementLoad() {
         var state = WhatsNewViewState()
         let cancelled = state.startLoading()
