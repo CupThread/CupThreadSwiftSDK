@@ -37,7 +37,9 @@ struct AppConfigStoreCancellationTests {
     /// - The handler side parks budget-free: expiring early would complete
     ///   the fetch before the caller is cancelled and void the test's
     ///   premise. Every test signals the gate before it awaits the fetch's
-    ///   result, so the park always ends.
+    ///   result, so the park always ends; a `defer` at each gate's creation
+    ///   site also releases it when a test exits early through any other
+    ///   path, so a failed run never strands the parked handler thread.
     private final class SignalGate: @unchecked Sendable {
         private let condition = NSCondition()
         private var signaled = false
@@ -192,6 +194,7 @@ struct AppConfigStoreCancellationTests {
         let counter = RequestCounter()
         let started = SignalGate()
         let gate = SignalGate()
+        defer { gate.signal() }  // Never strand the parked handler on an early exit.
         try setGatedConfigHandler(
             appKey: appKey, counter: counter, started: started, gate: gate
         )
@@ -225,6 +228,7 @@ struct AppConfigStoreCancellationTests {
         let counter = RequestCounter()
         let started = SignalGate()
         let gate = SignalGate()
+        defer { gate.signal() }  // Never strand the parked handler on an early exit.
         try setGatedConfigHandler(
             appKey: appKey, counter: counter, started: started, gate: gate
         )
@@ -252,6 +256,7 @@ struct AppConfigStoreCancellationTests {
         let counter = RequestCounter()
         let started = SignalGate()
         let gate = SignalGate()
+        defer { gate.signal() }  // Never strand the parked handler on an early exit.
         try setGatedConfigHandler(
             appKey: appKey, counter: counter, started: started, gate: gate, status: 500
         )
