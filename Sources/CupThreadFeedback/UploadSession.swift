@@ -425,59 +425,50 @@ extension FeedbackClient {
     ///
     /// Throws ``FeedbackClientError/invalidResponse`` on off-origin absolute URLs,
     /// protocol-relative URLs (`//`), URLs containing embedded credentials (userinfo),
-    /// or disallowed schemes.
+    /// disallowed schemes, or URLs whose effective port differs from
+    /// `configuration.baseURL`.
     func uploadURL(from uploadUrl: String?) throws -> URL {
-        if let uploadUrl, !uploadUrl.isEmpty {
-            let trimmed = uploadUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                return configuration.baseURL.appending(path: "/api/v1/uploads")
-            }
-            if trimmed.hasPrefix("//") {
-                throw FeedbackClientError.invalidResponse
-            }
-            let candidate: URL
-            if let parsed = URL(string: trimmed), parsed.scheme != nil {
-                candidate = parsed
-            } else if let resolved = URL(string: trimmed, relativeTo: configuration.baseURL)?.absoluteURL {
-                candidate = resolved
-            } else {
-                throw FeedbackClientError.invalidResponse
-            }
-            guard candidate.user == nil, candidate.password == nil,
-                  let scheme = candidate.scheme?.lowercased(),
-                  scheme == "http" || scheme == "https" else {
-                throw FeedbackClientError.invalidResponse
-            }
-            if configuration.baseURL.scheme?.lowercased() == "https", scheme != "https" {
-                throw FeedbackClientError.invalidResponse
-            }
-            guard let candidateHost = candidate.host?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !candidateHost.isEmpty,
-                  let baseHost = configuration.baseURL.host?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !baseHost.isEmpty,
-                  candidateHost.caseInsensitiveCompare(baseHost) == .orderedSame else {
-                throw FeedbackClientError.invalidResponse
-            }
-            let basePort = configuration.baseURL.port ?? (configuration.baseURL.scheme?.lowercased() == "http" ? 80 : 443)
-            let candidatePort = candidate.port ?? (scheme == "http" ? 80 : 443)
-            guard basePort == candidatePort else {
-                throw FeedbackClientError.invalidResponse
-            }
-            return candidate
+        let trimmed = uploadUrl?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed, !trimmed.isEmpty else {
+            return configuration.baseURL.appending(path: "/api/v1/uploads")
         }
-        return configuration.baseURL.appending(path: "/api/v1/uploads")
+        // Upload slots require exact host equality; every other same-origin
+        // leg (scheme, userinfo, effective port) is enforced by the shared
+        // validator below.
+        guard let candidate = sameOriginURL(
+            trimmed,
+            hostPolicy: { candidateHost, baseHost in
+                candidateHost.caseInsensitiveCompare(baseHost) == .orderedSame
+            }
+        ) else {
+            throw FeedbackClientError.invalidResponse
+        }
+        return candidate
     }
 
-    /// Validates an untrusted `downloadUrl` string returned by an upload PUT response:
-    /// - Accepts relative paths resolved against `configuration.baseURL`.
-    /// - Accepts absolute `http`/`https` URLs whose host matches `configuration.baseURL.host`
-    ///   or shares its registrable domain (e.g. CDN subdomains or the apex of the
-    ///   same domain; public-suffix and multi-tenant siblings never match).
-    /// - Returns `nil` for off-origin, protocol-relative, userinfo-containing,
-    ///   or disallowed-scheme URLs.
-    func resolvedDownloadURL(from downloadUrl: String?) -> URL? {
-        guard let downloadUrl else { return nil }
-        let trimmed = downloadUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Shared same-origin validation for untrusted URL strings returned by
+    /// upload responses — slot URLs (`uploadUrl`) and download URLs
+    /// (`downloadUrl`) alike.
+    ///
+    /// Enforces the full three-legged origin definition
+    /// (`SameOriginRedirectLimiter.isSameOrigin`): `http`/`https` scheme with
+    /// the `https`-base downgrade guard, embedded-credential (userinfo)
+    /// rejection, and **effective-port equality** against
+    /// `configuration.baseURL` (defaulting 80/443 by scheme, so an explicit
+    /// `:443` matches an implicit default). Only the host decision is
+    /// delegated to `hostPolicy` — exact equality for upload slots, the
+    /// documented registrable-domain widening
+    /// (``isAllowedDownloadHost(_:baseHost:)``) for download URLs — so a
+    /// policy change to any leg lands on both paths at once (SEC-32).
+    ///
+    /// Returns `nil` for nil, empty, protocol-relative (`//`), unparseable,
+    /// or off-origin input.
+    private func sameOriginURL(
+        _ urlString: String?,
+        hostPolicy: (_ candidateHost: String, _ baseHost: String) -> Bool
+    ) -> URL? {
+        guard let urlString else { return nil }
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.hasPrefix("//") else { return nil }
 
         let candidate: URL
@@ -503,10 +494,29 @@ extension FeedbackClient {
               !baseHost.isEmpty else {
             return nil
         }
-        if isAllowedDownloadHost(candidateHost, baseHost: baseHost) {
-            return candidate
+        let basePort = configuration.baseURL.port ?? (configuration.baseURL.scheme?.lowercased() == "http" ? 80 : 443)
+        let candidatePort = candidate.port ?? (scheme == "http" ? 80 : 443)
+        guard basePort == candidatePort else {
+            return nil
         }
-        return nil
+        guard hostPolicy(candidateHost, baseHost) else {
+            return nil
+        }
+        return candidate
+    }
+
+    /// Validates an untrusted `downloadUrl` string returned by an upload PUT response:
+    /// - Accepts relative paths resolved against `configuration.baseURL`.
+    /// - Accepts absolute `http`/`https` URLs whose host matches `configuration.baseURL.host`
+    ///   or shares its registrable domain (e.g. CDN subdomains or the apex of the
+    ///   same domain; public-suffix and multi-tenant siblings never match).
+    /// - Same-origin includes the effective port: absolute URLs on a port other
+    ///   than `configuration.baseURL`'s (defaulting 80/443 by scheme) are rejected,
+    ///   mirroring the upload-slot validator and the redirect policy (SEC-32).
+    /// - Returns `nil` for off-origin, protocol-relative, userinfo-containing,
+    ///   disallowed-scheme, or non-same-port URLs.
+    func resolvedDownloadURL(from downloadUrl: String?) -> URL? {
+        sameOriginURL(downloadUrl, hostPolicy: isAllowedDownloadHost)
     }
 
     /// Maps upload session lifecycle error envelopes on PUT (API-13):
