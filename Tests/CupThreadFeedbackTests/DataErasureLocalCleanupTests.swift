@@ -65,8 +65,10 @@ struct DataErasureLocalCleanupTests {
             if eraseCount.value == 1 {
                 return (makeHTTPResponse(), try encodeJSON(["erased": true, "endUserId": token]))
             }
-            // The idempotent replay: the profile is already gone.
-            return (makeHTTPResponse(status: 404), try encodeJSON(["erased": false]))
+            // The idempotent replay: the profile is already gone. The
+            // genuine no-match answer carries the documented envelope
+            // (#540) — a bare 404 means infrastructure, not resource state.
+            return (makeHTTPResponse(status: 404), try encodeJSON(["erased": false, "error": "No profile found"]))
         }
 
         let item = ScriptedKeychainItem()
@@ -126,7 +128,7 @@ struct DataErasureLocalCleanupTests {
         #expect(store.token == identity)
 
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (makeHTTPResponse(status: 404), try encodeJSON(["erased": false]))
+            (makeHTTPResponse(status: 404), try encodeJSON(["erased": false, "error": "No profile found"]))
         }
         item.failDeletion = false
         let second = try await client.eraseMyData(
@@ -141,7 +143,7 @@ struct DataErasureLocalCleanupTests {
 
     @Test func eraseReplayKeepsCleanStoresWhenNoPendingCleanup() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (makeHTTPResponse(status: 404), try encodeJSON(["erased": false]))
+            (makeHTTPResponse(status: 404), try encodeJSON(["erased": false, "error": "No profile found"]))
         }
 
         let isolated = makeIsolatedTokenStore()

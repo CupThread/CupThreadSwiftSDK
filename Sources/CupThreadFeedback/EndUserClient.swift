@@ -122,16 +122,22 @@ extension FeedbackClient {
     /// sent, so the device's anonymous row is covered either way. Hosts of
     /// signed-in users should ensure the provider can return a fresh token
     /// at erase time — with a provider configured but no token resolved,
-    /// only the anonymous row is addressed and a server `404` (nothing
-    /// matched this device) surfaces as `erased: false`.
+    /// only the anonymous row is addressed, and the server's documented 404
+    /// envelope (nothing matched this device) surfaces as `erased: false`.
     ///
     /// - Parameter userToken: Anonymous user token sent as `X-User-Token`.
     ///   Blank, whitespace-only, or multi-line values are rejected locally —
     ///   the header plumbing would silently drop them and dispatch the
     ///   erasure without any identity (#417).
-    /// - Returns: Whether a profile was erased. A `404` from the server is
-    ///   normalized to `erased: false` rather than an error, so replaying an
-    ///   erase is idempotent from the caller's perspective.
+    /// - Returns: Whether a profile was erased. The server's documented 404
+    ///   error envelope ("no profile found") is normalized to `erased: false`
+    ///   rather than an error, so replaying an erase is idempotent from the
+    ///   caller's perspective. Any other 404 shape — a bare router fallback
+    ///   (text/plain, empty body, JSON without an `error` string) from a
+    ///   proxy, captive portal, or deploy skew — surfaces as
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   with code `404` instead, so an infrastructure misconfiguration is
+    ///   never misreported as a benign "nothing to erase" (#540).
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when
     ///   `userToken` is blank, whitespace-only, or contains a newline (all
     ///   rejected before any network round trip), or when the
@@ -157,8 +163,18 @@ extension FeedbackClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
-        if httpResponse.statusCode == 404 {
-            // No profile matched the identity — nothing to erase.
+        if httpResponse.statusCode == 404,
+           let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data),
+           envelope.error?.nilIfEmpty != nil {
+            // Only the API's documented resource-404 envelope means "no
+            // profile matched the identity" — the idempotent no-match replay
+            // (BUG-31, #540). A bare router fallback (text/plain "404 Not
+            // Found", empty body, JSON without an `error` string — what
+            // production answers on deploy skew or a wrong `baseURL`) falls
+            // through to `validateResponse` and surfaces as
+            // `.unexpectedStatus`, so an infrastructure misconfiguration is
+            // never misreported as a benign "nothing to erase" and the
+            // erasure can be retried once the misconfiguration is fixed.
             return DataErasureResult(erased: false, endUserId: nil)
         }
         // The route's 401/403 mean the identity is missing or the app
