@@ -1,0 +1,8 @@
+{
+  "name": "cupthread-swift-sdk-release",
+  "private": true,
+  "description": "Release-tooling manifest for the CupThread Apple SDK. The Swift package itself stays zero-dependency (see AGENTS.md); this manifest exists to pin the devDependency that scripts/release.mjs executes with Cloudflare credentials in scope (issue #572). Install with `npm ci` before releasing.",
+  "devDependencies": {
+    "wrangler": "4.152.0"
+  }
+}
