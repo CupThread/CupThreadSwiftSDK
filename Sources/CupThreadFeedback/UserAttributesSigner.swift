@@ -44,8 +44,9 @@ public enum UserAttributesSigner {
         public let plan: Field<String>
         /// Monthly recurring revenue.
         public let mrr: Field<Double>
-        /// Currency code as sent in the request. `.null` is rejected for
-        /// reports before any canonical string is built (issue #573).
+        /// Currency code as sent in the request. `.null` is not a
+        /// representable currency report (the API cannot clear the
+        /// attribute) and renders as the `unset` sentinel (issue #573).
         public let currency: Field<String>
         /// Integer Unix epoch seconds.
         public let timestamp: Int64
@@ -227,7 +228,7 @@ public enum UserAttributesSigner {
             arguments.isPaying.canonicalRepresentation,
             arguments.plan.canonicalRepresentation,
             arguments.mrr.canonicalRepresentation,
-            arguments.currency.canonicalRepresentation,
+            arguments.currency.canonicalCurrencyRepresentation,
             "\(arguments.timestamp)"
         ]
         return lines.joined(separator: "\n")
@@ -271,13 +272,28 @@ extension UserAttributesSigner.Field where T == String {
         case .unset:
             return "unset"
         case .null:
-            // The explicit-null sentinel is only valid for `plan` (the
-            // schema's one nullable string field). The same renderer serves
-            // the `currency` line, where `.null` can only appear through
-            // direct `Arguments` construction — reports carrying
-            // `currency: .null` are rejected before any canonical string is
-            // built (issue #573).
+            // The explicit-null sentinel is only valid for `plan` — the
+            // schema's one nullable string field. The `currency` line uses
+            // ``canonicalCurrencyRepresentation`` instead (issue #573).
             return "null"
+        case .value(let string):
+            // A raw value must never carry the record's "\n" delimiter onto a
+            // line of its own (SEC-3).
+            return UserAttributesSigner.sanitizedLine(string)
+        }
+    }
+
+    /// The canonical grammar has no null slot for `currency`
+    /// (`<currency: valueAsSent|unset>`, issue #573): the server's
+    /// `EndUserAttributesInput` schema cannot reconstruct a cleared
+    /// `currency`, so `.null` renders as the absent sentinel even for
+    /// direct `Arguments` construction —
+    /// ``FeedbackClient/updateUserAttributes`` rejects it before any
+    /// canonical string is built or signed.
+    var canonicalCurrencyRepresentation: String {
+        switch self {
+        case .unset, .null:
+            return "unset"
         case .value(let string):
             // A raw value must never carry the record's "\n" delimiter onto a
             // line of its own (SEC-3).

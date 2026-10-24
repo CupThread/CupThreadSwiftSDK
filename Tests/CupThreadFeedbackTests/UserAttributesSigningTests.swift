@@ -96,9 +96,9 @@ struct UserAttributesSigningTests {
     @Test func canonicalStringWithExplicitNullFieldsMatchesTheDocumentedGrammar() {
         // Issue #573: the canonical grammar carries an explicit-null
         // sentinel only where the server schema is nullable (`plan`, `mrr`).
-        // `isPaying` has no null slot, so `.null` renders as the absent
-        // sentinel; `currency` shares the string renderer with `plan`, and
-        // reports carrying `currency: .null` are rejected before any
+        // `isPaying` and `currency` have no null slot, so `.null` renders as
+        // the absent sentinel even for direct `Arguments` construction;
+        // reports carrying `.null` for either are rejected before any
         // canonical string is built.
         let canonical = UserAttributesSigner.canonicalString(
             for: .init(
@@ -119,11 +119,20 @@ struct UserAttributesSigningTests {
             "unset",
             "null",
             "null",
-            "null",
+            "unset",
             "1773600000"
         ].joined(separator: "\n")
 
         #expect(canonical == expected)
+
+        // Negative assertion: the currency line never carries the forbidden
+        // `null` sentinel, whatever the field states — the grammar
+        // `<currency: valueAsSent|unset>` has no null slot.
+        let currencyLine = canonical
+            .split(separator: "\n")
+            .dropFirst(6)
+            .first
+        #expect(currencyLine == "unset")
     }
 
     @Test func canonicalStringPreservesRawCurrencyAsSent() {
