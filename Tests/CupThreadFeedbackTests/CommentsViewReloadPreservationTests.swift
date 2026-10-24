@@ -82,18 +82,22 @@ struct CommentsViewReloadPreservationTests {
         )
         let tracking = content[append.upperBound..<content.endIndex]
         #expect(
-            tracking.contains("locallyPostedCommentIDs.insert(newComment.id)"),
+            tracking.contains("locallyPostedCommentGenerations[newComment.id] = loadState.loadGeneration"),
             "a successful submit must track the appended row until the server echoes it (issue #545)"
         )
 
         let fetch = try #require(
-            content.range(of: "client.fetchComments(featureRequestId: featureRequestId)"),
+            content.range(of: "client.fetchCommentThread(featureRequestId: featureRequestId)"),
             "the fetch anchor was renamed; update this scan"
         )
         let successPath = content[fetch.upperBound..<content.endIndex]
         #expect(
             successPath.contains("reconcilingLocallyPostedComments("),
             "a successful load must reconcile locally posted comments against the fetched page (issue #545)"
+        )
+        #expect(
+            successPath.contains("isCompleteThread: snapshot.isComplete"),
+            "the reconciler must know whether the walk reached the end of the thread (issue #545)"
         )
         #expect(
             successPath.contains("loadState.recordSuccess(generation: generation)"),
@@ -279,7 +283,7 @@ struct CommentsViewReloadPreservationTests {
     /// A refresh whose page was produced before a POST resolved cannot
     /// contain the just-posted comment: the merge re-appends it and keeps it
     /// tracked until the server echoes it.
-    @Test func refreshPageMissingTheLocallyPostedCommentPreservesIt() {
+    @Test func refreshThatStartedBeforeThePostPreservesTheLocallyPostedComment() {
         let fetched = [Self.makeComment(id: "c-1", body: "Server row")]
         let current = [
             Self.makeComment(id: "c-1", body: "Server row"),
@@ -289,15 +293,60 @@ struct CommentsViewReloadPreservationTests {
         let reconciliation = CommentsView.reconcilingLocallyPostedComments(
             fetched,
             current: current,
-            locallyPostedIDs: ["c-new"]
+            locallyPostedGenerations: ["c-new": 2],
+            loadGeneration: 2,
+            isCompleteThread: true
         )
 
         #expect(reconciliation.merged.map(\.id) == ["c-1", "c-new"])
-        #expect(reconciliation.remainingIDs == ["c-new"])
+        #expect(reconciliation.remaining == ["c-new": 2])
+    }
+
+    /// A complete thread read requested after the append is authoritative:
+    /// the row the server saved is no longer in the thread, so it is retired
+    /// instead of lingering forever (CodeRabbit finding on PR #546).
+    @Test func completeThreadReadFromANewerGenerationRetiresAnUnconfirmedRow() {
+        let fetched = [Self.makeComment(id: "c-1")]
+        let current = [
+            Self.makeComment(id: "c-1"),
+            Self.makeComment(id: "c-moderated", body: "Removed server-side")
+        ]
+
+        let reconciliation = CommentsView.reconcilingLocallyPostedComments(
+            fetched,
+            current: current,
+            locallyPostedGenerations: ["c-moderated": 2],
+            loadGeneration: 3,
+            isCompleteThread: true
+        )
+
+        #expect(reconciliation.merged.map(\.id) == ["c-1"])
+        #expect(reconciliation.remaining.isEmpty)
+    }
+
+    /// A page-capped walk cannot prove absence: the row may sit beyond the
+    /// last page fetched, so it stays visible and tracked.
+    @Test func pageCappedThreadKeepsAnUnconfirmedRowEvenOnANewerGeneration() {
+        let fetched = [Self.makeComment(id: "c-1")]
+        let current = [
+            Self.makeComment(id: "c-1"),
+            Self.makeComment(id: "c-new", body: "Beyond the page cap")
+        ]
+
+        let reconciliation = CommentsView.reconcilingLocallyPostedComments(
+            fetched,
+            current: current,
+            locallyPostedGenerations: ["c-new": 2],
+            loadGeneration: 3,
+            isCompleteThread: false
+        )
+
+        #expect(reconciliation.merged.map(\.id) == ["c-1", "c-new"])
+        #expect(reconciliation.remaining == ["c-new": 2])
     }
 
     /// Once the server echoes the locally posted comment, the fetched page's
-    /// ordering wins and the tracking set retires the id — so a later page
+    /// ordering wins and the tracking retires the id — so a later page
     /// omitting it (moderation, deletion) propagates normally.
     @Test func refreshPageEchoingTheLocallyPostedCommentReconcilesTheTracking() {
         let fetched = [
@@ -312,11 +361,13 @@ struct CommentsViewReloadPreservationTests {
         let reconciliation = CommentsView.reconcilingLocallyPostedComments(
             fetched,
             current: current,
-            locallyPostedIDs: ["c-new"]
+            locallyPostedGenerations: ["c-new": 2],
+            loadGeneration: 3,
+            isCompleteThread: true
         )
 
         #expect(reconciliation.merged.map(\.id) == ["c-1", "c-new"])
-        #expect(reconciliation.remainingIDs.isEmpty)
+        #expect(reconciliation.remaining.isEmpty)
     }
 
     /// Without locally posted rows the refresh is the plain overwrite it has
@@ -328,11 +379,13 @@ struct CommentsViewReloadPreservationTests {
         let reconciliation = CommentsView.reconcilingLocallyPostedComments(
             fetched,
             current: current,
-            locallyPostedIDs: []
+            locallyPostedGenerations: [:],
+            loadGeneration: 3,
+            isCompleteThread: false
         )
 
         #expect(reconciliation.merged.map(\.id) == ["c-1"])
-        #expect(reconciliation.remainingIDs.isEmpty)
+        #expect(reconciliation.remaining.isEmpty)
     }
 
     /// Multiple locally posted rows keep their local append order behind the
@@ -349,11 +402,17 @@ struct CommentsViewReloadPreservationTests {
         let reconciliation = CommentsView.reconcilingLocallyPostedComments(
             fetched,
             current: current,
-            locallyPostedIDs: ["c-second-post", "c-echoed", "c-first-post"]
+            locallyPostedGenerations: [
+                "c-second-post": 2,
+                "c-echoed": 2,
+                "c-first-post": 2
+            ],
+            loadGeneration: 2,
+            isCompleteThread: true
         )
 
         #expect(reconciliation.merged.map(\.id) == ["c-1", "c-echoed", "c-first-post", "c-second-post"])
-        #expect(reconciliation.remainingIDs == ["c-first-post", "c-second-post"])
+        #expect(reconciliation.remaining == ["c-first-post": 2, "c-second-post": 2])
     }
 
     // MARK: - Fixtures

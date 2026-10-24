@@ -28,14 +28,15 @@ public struct CommentsView: View {
     /// First-load lifecycle, reload preservation, and stale-write generation
     /// tracking (CONC-4, issue #545).
     @State private var loadState = SurfaceLoadState()
-    /// Ids of comments this surface appended after a successful POST and the
-    /// server has not yet echoed back in a fetched page (issue #545): a
-    /// refresh resolving behind such a POST carries a page produced before
-    /// the comment existed, and re-appending the tracked rows keeps the
-    /// server-saved comment from vanishing. Rows the server echoes are
-    /// dropped from the set, so later pages omitting them (moderation)
-    /// propagate normally.
-    @State private var locallyPostedCommentIDs: Set<String> = []
+    /// Ids of comments this surface appended after a successful POST, mapped
+    /// to the load generation in flight at the append (issue #545): a refresh
+    /// resolving behind such a POST carries a page produced before the
+    /// comment existed, and re-appending the tracked rows keeps the
+    /// server-saved comment from vanishing. A row the server echoes is
+    /// retired, as is a row absent from a complete thread read requested
+    /// after the append (moderated, deleted, or otherwise gone); rows on a
+    /// page-capped thread stay tracked because their absence is not proof.
+    @State private var locallyPostedCommentGenerations: [String: Int] = [:]
     @State private var isCommentsUnavailable = false
     /// Whether a request sent right now could carry the signed-in identity's
     /// bearer token. Resolved at the start of every load (BUG-24) —
@@ -330,7 +331,7 @@ public struct CommentsView: View {
         isAuthenticated = await client.resolveAuthenticatedAccess()
         isCommentsUnavailable = false
         do {
-            let fetched = try await client.fetchComments(featureRequestId: featureRequestId)
+            let snapshot = try await client.fetchCommentThread(featureRequestId: featureRequestId)
             // A superseded load (pull-to-refresh racing the initial task,
             // retry taps stacking up) must not clobber the newer run's
             // comments.
@@ -339,12 +340,14 @@ public struct CommentsView: View {
             // POST resolved cannot contain the just-posted comment — merge
             // the locally appended rows back in instead of dropping them.
             let reconciliation = Self.reconcilingLocallyPostedComments(
-                fetched,
+                snapshot.comments,
                 current: comments,
-                locallyPostedIDs: locallyPostedCommentIDs
+                locallyPostedGenerations: locallyPostedCommentGenerations,
+                loadGeneration: generation,
+                isCompleteThread: snapshot.isComplete
             )
             comments = reconciliation.merged
-            locallyPostedCommentIDs = reconciliation.remainingIDs
+            locallyPostedCommentGenerations = reconciliation.remaining
             loadState.recordSuccess(generation: generation)
         } catch {
             // A cancelled load never reached a verdict — keep the currently
@@ -385,8 +388,10 @@ public struct CommentsView: View {
             comments.append(newComment)
             // Issue #545: track the appended row until the server echoes it
             // in a fetched page, so a refresh resolving behind this POST
-            // cannot silently drop the server-saved comment.
-            locallyPostedCommentIDs.insert(newComment.id)
+            // cannot silently drop the server-saved comment. The generation
+            // records which fetch was already in flight; a complete read
+            // from a newer generation that omits the row proves it is gone.
+            locallyPostedCommentGenerations[newComment.id] = loadState.loadGeneration
             // BUG-30: the stale full-screen load error outranks the comment
             // list in the body, so a comment appended while it stands would
             // stay masked behind LoadErrorView — retire the verdict on
@@ -549,25 +554,50 @@ extension CommentsView {
     /// before the comment existed server-side, so a plain `comments = fetched`
     /// overwrite erases a server-saved comment with no error. Locally posted
     /// rows absent from the fetched page are re-appended in their local
-    /// order; a row the fetched page echoes is dropped from the tracking set
-    /// so a later page omitting it (moderation, deletion) propagates
-    /// normally.
+    /// order unless the read is authoritative: a complete thread read
+    /// requested after the append proves the row was moderated, deleted, or
+    /// otherwise removed. A page-capped read cannot prove absence, and a read
+    /// that started before the append predates the POST, so both keep the row
+    /// tracked. A row the fetched page echoes is retired from tracking so a
+    /// later page omitting it propagates normally.
+    /// - Parameters:
+    ///   - fetched: Rows returned by the settled load.
+    ///   - current: Rows rendered before the load replaced them.
+    ///   - locallyPostedGenerations: Locally appended ids mapped to the load
+    ///     generation in flight at the append.
+    ///   - loadGeneration: Generation of the fetch that produced `fetched`.
+    ///   - isCompleteThread: Whether `fetched` reached the end of the thread.
     /// - Returns: The merged list and the ids still awaiting a server echo.
     static func reconcilingLocallyPostedComments(
         _ fetched: [FeatureRequestComment],
         current: [FeatureRequestComment],
-        locallyPostedIDs: Set<String>
-    ) -> (merged: [FeatureRequestComment], remainingIDs: Set<String>) {
-        guard !locallyPostedIDs.isEmpty else { return (fetched, locallyPostedIDs) }
-        let fetchedIDs = Set(fetched.map(\.id))
-        var remainingIDs = Set<String>()
-        var locallyPostedRows = [FeatureRequestComment]()
-        for comment in current where locallyPostedIDs.contains(comment.id) {
-            guard !fetchedIDs.contains(comment.id) else { continue }
-            locallyPostedRows.append(comment)
-            remainingIDs.insert(comment.id)
+        locallyPostedGenerations: [String: Int],
+        loadGeneration: Int,
+        isCompleteThread: Bool
+    ) -> (merged: [FeatureRequestComment], remaining: [String: Int]) {
+        guard !locallyPostedGenerations.isEmpty else {
+            return (fetched, locallyPostedGenerations)
         }
-        return (fetched + locallyPostedRows, remainingIDs)
+        let fetchedIDs = Set(fetched.map(\.id))
+        var remaining = locallyPostedGenerations
+        var locallyPostedRows = [FeatureRequestComment]()
+        for comment in current {
+            guard let appendedAt = locallyPostedGenerations[comment.id] else { continue }
+            if fetchedIDs.contains(comment.id) {
+                // The server echoed the row; a later omission is then a real
+                // moderation/removal and must propagate.
+                remaining.removeValue(forKey: comment.id)
+                continue
+            }
+            if isCompleteThread && loadGeneration > appendedAt {
+                // A complete read from a newer generation does not contain a
+                // row the server saved; it is genuinely gone.
+                remaining.removeValue(forKey: comment.id)
+                continue
+            }
+            locallyPostedRows.append(comment)
+        }
+        return (fetched + locallyPostedRows, remaining)
     }
 }
 
