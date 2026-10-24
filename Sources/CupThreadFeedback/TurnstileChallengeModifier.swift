@@ -26,7 +26,12 @@ struct TurnstileChallengeSettlement {
     private var outstanding: PendingTurnstileChallenge?
 
     /// Records the challenge the sheet is currently presenting.
+    ///
+    /// Registration never replaces an active challenge: the creator must
+    /// refuse to present a second challenge while one is pending, or the
+    /// first challenge's `cancel` closure would be dropped unrun.
     mutating func register(_ challenge: PendingTurnstileChallenge) {
+        guard outstanding == nil else { return }
         outstanding = challenge
     }
 

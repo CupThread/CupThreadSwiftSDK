@@ -94,6 +94,23 @@ struct TurnstileChallengeDismissalTests {
         #expect(settlement.settleOnDismiss() == nil)
     }
 
+    @Test @MainActor func registrationKeepsTheFirstChallengeWhenASecondProducerArrives() {
+        // A submission can still be in flight while a photo upload starts.
+        // Replacing the registered challenge would drop the first attempt's
+        // cleanup, so registration keeps the owner and the producers refuse
+        // to present a second challenge (#539).
+        var firstCancelCount = 0
+        var secondCancelCount = 0
+        var settlement = TurnstileChallengeSettlement()
+        settlement.register(Self.makeChallenge(cancel: { firstCancelCount += 1 }))
+        settlement.register(Self.makeChallenge(cancel: { secondCancelCount += 1 }))
+
+        settlement.settleOnDismiss()?.cancel()
+
+        #expect(firstCancelCount == 1)
+        #expect(secondCancelCount == 0)
+    }
+
     // MARK: Explicit paths run cancel/resume exactly once
 
     @Test @MainActor func explicitCancelResolvesBeforeTheDismissalHook() {
@@ -173,17 +190,31 @@ struct TurnstileChallengeDismissalTests {
         )
     }
 
-    @Test func uploadChallengeCancelRemovesTheSpoolAndRecordsTheFailure() throws {
+    @Test func composerRefusesASecondChallengeWhileOneIsPending() throws {
         let composer = try Self.source("FeedbackComposerView.swift")
-        let helper = try #require(composer.range(of: "private func presentUploadChallenge"))
-        let nextHelper = try #require(
-            composer.range(of: "private func recordUploadFailure", range: helper.upperBound..<composer.endIndex)
+        let submissionHelper = try #require(composer.range(of: "private func presentChallengeIfNeeded"))
+        let uploadHelper = try #require(
+            composer.range(of: "private func presentUploadChallenge", range: submissionHelper.upperBound..<composer.endIndex)
         )
-        let body = composer[helper.upperBound..<nextHelper.lowerBound]
+        let submissionBody = composer[submissionHelper.upperBound..<uploadHelper.lowerBound]
 
-        #expect(body.contains(
+        #expect(
+            submissionBody.contains("guard pendingChallenge == nil else { return false }"),
+            "a gated submission must not replace an upload's pending challenge (#539)"
+        )
+
+        let recordHelper = try #require(
+            composer.range(of: "private func recordUploadFailure", range: uploadHelper.upperBound..<composer.endIndex)
+        )
+        let uploadBody = composer[uploadHelper.upperBound..<recordHelper.lowerBound]
+
+        #expect(
+            uploadBody.contains("guard pendingChallenge == nil else {"),
+            "a gated upload must not replace a submission's pending challenge (#539)"
+        )
+        #expect(uploadBody.contains(
             "PhotoAttachmentHelper.removeTempUploadFile(at: prepared.fileURL)"
         ))
-        #expect(body.contains("recordUploadFailure(error, uploadId: uploadId)"))
+        #expect(uploadBody.contains("recordUploadFailure(error, uploadId: uploadId)"))
     }
 }
