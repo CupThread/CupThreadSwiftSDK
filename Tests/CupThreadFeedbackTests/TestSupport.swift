@@ -122,6 +122,19 @@ func encodeJSON(_ dict: [String: Any]) throws -> Data {
     try JSONSerialization.data(withJSONObject: dict)
 }
 
+/// Whether a SwiftUI view value's reflected tree contains `target`.
+///
+/// View-level tests inspect a rendered body without a hosting hierarchy;
+/// `Mirror` walks the nested view values the layout branches produce.
+func viewTreeContains(_ node: Any, _ target: Any.Type) -> Bool {
+    if type(of: node) == target { return true }
+    for child in Mirror(reflecting: node).children
+    where viewTreeContains(child.value, target) {
+        return true
+    }
+    return false
+}
+
 /// Read httpBody from an intercepted request (handles both body and stream).
 func bodyData(from request: URLRequest) -> Data? {
     if let body = request.httpBody { return body }
