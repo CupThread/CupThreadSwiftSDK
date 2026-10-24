@@ -444,28 +444,49 @@ private func makeDefaultEntry() -> [String: Any] {
 private struct TimeoutError: Error {}
 
 /// Hang-guard for tests whose operation cannot complete without the code
-/// under test: races the operation against a fixed budget and throws
-/// `TimeoutError()` when the budget wins. The budget bounds a genuine hang,
-/// never latency — keep it far above runner jitter so scheduling delays can
-/// never reach it (issue #562).
+/// under test: throws `TimeoutError()` when the budget elapses. The
+/// operation runs as an unstructured task so a genuine hang can be
+/// *abandoned* — a task group cannot return while a child stays parked in a
+/// continuation that ignores cancellation, which only delayed the report
+/// until the hung child unblocked (issue #562 review). The budget bounds a
+/// genuine hang, never latency — keep it far above runner jitter.
+///
+/// The completion flag distinguishes "finished" (normally or by throwing)
+/// from "parked forever": `Task` exposes `isCancelled` but no
+/// completed-state property to poll.
+private final class OperationCompletionFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var finished = false
+    func markFinished() {
+        lock.lock()
+        finished = true
+        lock.unlock()
+    }
+    var isFinished: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return finished
+    }
+}
+
 private func withTimeout<T: Sendable>(
     seconds: Double,
     operation: @escaping @Sendable () async throws -> T
 ) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
-        group.addTask {
-            try await operation()
-        }
-        group.addTask {
-            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            throw TimeoutError()
-        }
-        guard let result = try await group.next() else {
-            throw TimeoutError()
-        }
-        group.cancelAll()
-        return result
+    let completion = OperationCompletionFlag()
+    let operationTask = Task {
+        defer { completion.markFinished() }
+        return try await operation()
     }
+    defer { operationTask.cancel() }
+    let deadline = ContinuousClock.now + .seconds(seconds)
+    while !completion.isFinished {
+        guard ContinuousClock.now < deadline else {
+            throw TimeoutError()
+        }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    return try await operationTask.value
 }
 
 private func queryItems(of request: URLRequest) -> [String: String] {
