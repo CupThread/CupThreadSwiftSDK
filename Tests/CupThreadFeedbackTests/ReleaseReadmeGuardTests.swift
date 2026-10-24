@@ -136,8 +136,13 @@ struct ReleaseReadmeGuardTests {
             group.addTask { stdout.fileHandleForReading.readDataToEndOfFile() }
             group.addTask {
                 try? await Task.sleep(for: .seconds(30))
+                // The read winning cancels this watchdog; a cancelled sleep
+                // resumes immediately, so bail before signalling or the
+                // guard would kill a query that merely exited slowly.
+                guard !Task.isCancelled else { return nil }
                 process.terminate()
                 try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return nil }
                 kill(process.processIdentifier, SIGKILL)
                 return nil
             }
