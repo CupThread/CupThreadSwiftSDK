@@ -119,8 +119,22 @@ final class UserDefaultsTokenStorage: TokenStorage, @unchecked Sendable {
 
 /// Token storage backed by the Apple Keychain (`kSecClassGenericPassword`).
 ///
-/// Scoped to this device (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`) and isolated from
-/// unencrypted device backups.
+/// Every SecItem operation targets the data-protection keychain
+/// (`kSecUseDataProtectionKeychain`), so the item is scoped to this device
+/// (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`) and isolated from
+/// unencrypted device backups on every supported platform. On iOS, tvOS, and
+/// visionOS the key is ignored — the data-protection keychain is the only
+/// implementation — but on macOS the SecItem API otherwise defaults to the
+/// legacy file-based login keychain, whose shim neither upholds
+/// `kSecAttrAccessible` semantics nor reliably accepts them (TN3137).
+///
+/// On macOS the data-protection keychain is available only to code-signed,
+/// provisioned processes (TN3137). Signed hosts get the documented behavior;
+/// unprovisioned processes (command-line tools, unsigned `swift test` hosts)
+/// get honest outcomes — reads report the item as absent or inaccessible,
+/// writes report failure — and ``UserTokenStore`` serves its documented
+/// ephemeral identity. Items are never silently diverted to the file-based
+/// keychain, which could not uphold the device-only guarantee (SEC-33).
 final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
     /// The default Keychain service identifier used by the SDK.
     static let defaultService = "com.cupthread.userToken"
@@ -197,7 +211,8 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         var result: AnyObject?
@@ -228,10 +243,15 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
     func saveConfirmed(_ token: String) -> Bool {
         guard let data = token.data(using: .utf8) else { return false }
 
+        // The data-protection selector lives in the shared query, not the
+        // update attributes: `SecItemUpdate` searches with the query, so on
+        // macOS it must name the data-protection keychain to find (and
+        // overwrite) the item `SecItemAdd` created there.
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         var addAttributes = baseQuery
@@ -265,7 +285,8 @@ final class KeychainTokenStorage: TokenStorage, @unchecked Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
         ]
         let status = deleteItem(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound

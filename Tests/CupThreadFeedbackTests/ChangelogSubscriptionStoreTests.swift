@@ -3,6 +3,10 @@ import Security
 import Testing
 @testable import CupThreadFeedback
 
+/// File-local alias for the SEC-33 gate: the two real-Keychain tests here
+/// enable themselves only where the data-protection keychain is writable.
+private let keychainWritable = DataProtectionKeychainProbe.isWritable
+
 @Suite("ChangelogSubscriptionStore")
 struct ChangelogSubscriptionStoreTests {
     private struct IsolatedContext {
@@ -183,7 +187,7 @@ struct ChangelogSubscriptionStoreTests {
         #expect(context.defaults.string(forKey: storageKey) == nil)
     }
 
-    @Test func migrationWithKeychainStorageAdoptsLegacyEmailAndPurgesFromUserDefaults() throws {
+    @Test(.enabled(if: keychainWritable)) func migrationWithKeychainStorageAdoptsLegacyEmailAndPurgesFromUserDefaults() throws {
         let context = makeIsolatedDefaults()
         defer { context.cleanup() }
 
@@ -217,7 +221,7 @@ struct ChangelogSubscriptionStoreTests {
         #expect(context.defaults.string(forKey: storageKey) == nil)
     }
 
-    @Test func roundTripAndClearPurgesBothKeychainAndUserDefaults() throws {
+    @Test(.enabled(if: keychainWritable)) func roundTripAndClearPurgesBothKeychainAndUserDefaults() throws {
         let context = makeIsolatedDefaults()
         defer { context.cleanup() }
 

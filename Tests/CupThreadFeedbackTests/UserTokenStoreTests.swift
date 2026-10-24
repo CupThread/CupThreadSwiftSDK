@@ -136,7 +136,8 @@ struct UserTokenStoreTests {
         #expect(context.defaults.string(forKey: testKey) == token)
     }
 
-    @Test func sharedStoreReturnsValidUUIDAndPersistsInKeychain() throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func sharedStoreReturnsValidUUIDAndPersistsInKeychain() throws {
         let token = UserTokenStore.shared.token
         #expect(!token.isEmpty)
         #expect(UUID(uuidString: token) != nil)
@@ -182,7 +183,8 @@ struct UserTokenStoreTests {
         #expect(store.token == legacyToken)
     }
 
-    @Test func keychainStorageSavesLoadsAndDeletes() throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func keychainStorageSavesLoadsAndDeletes() throws {
         let testService = "com.cupthread.test.\(UUID().uuidString)"
         let testAccount = "account.\(UUID().uuidString)"
         let storage = KeychainTokenStorage(service: testService, account: testAccount)
@@ -203,7 +205,8 @@ struct UserTokenStoreTests {
         #expect(storage.load() == nil)
     }
 
-    @Test func saveConfirmedPersistsAndReportsSuccess() throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func saveConfirmedPersistsAndReportsSuccess() throws {
         let testService = "com.cupthread.test.saveconfirmed.\(UUID().uuidString)"
         let testAccount = "account.\(UUID().uuidString)"
         let storage = KeychainTokenStorage(service: testService, account: testAccount)
@@ -304,7 +307,8 @@ struct UserTokenStoreTests {
         #expect(context.defaults.bool(forKey: flagKey) == false)
     }
 
-    @Test func migrationWithRealKeychainTransfersLegacyToken() throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func migrationWithRealKeychainTransfersLegacyToken() throws {
         let context = makeIsolatedDefaults()
         defer { context.cleanup() }
 
@@ -329,7 +333,8 @@ struct UserTokenStoreTests {
         #expect(context.defaults.string(forKey: testKey) == nil)
     }
 
-    @Test func freshMintOnCleanStorePersistsAndReusesToken() throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func freshMintOnCleanStorePersistsAndReusesToken() throws {
         let testService = "com.cupthread.test.fresh.\(UUID().uuidString)"
         let testAccount = "account.\(UUID().uuidString)"
         let keychainStorage = KeychainTokenStorage(service: testService, account: testAccount)
@@ -350,7 +355,8 @@ struct UserTokenStoreTests {
         #expect(keychainStorage.load() == minted)
     }
 
-    @Test func concurrentFirstAccessOnKeychainResolvesIdenticalToken() async throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func concurrentFirstAccessOnKeychainResolvesIdenticalToken() async throws {
         let testService = "com.cupthread.test.concurrency.\(UUID().uuidString)"
         let testAccount = "account.\(UUID().uuidString)"
         let keychainStorage = KeychainTokenStorage(service: testService, account: testAccount)

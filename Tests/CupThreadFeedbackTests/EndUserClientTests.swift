@@ -105,7 +105,11 @@ struct EndUserClientTests {
         }
     }
 
-    @Test func eraseWithStoreResetsIdentityAfterSuccessfulErasure() async throws {
+    // Hermetic on every host (no Keychain, no `.standard`): the seam keeps
+    // the real erasure flow while injecting `nil` subscription/cleanup, so
+    // the identity-reset assertions never depend on keychain writability.
+    @Test
+    func eraseWithStoreResetsIdentityAfterSuccessfulErasure() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             let token = request.value(forHTTPHeaderField: "X-User-Token")
             return (makeHTTPResponse(), try encodeJSON(["erased": true, "endUserId": token]))
@@ -116,7 +120,7 @@ struct EndUserClientTests {
         let identity = isolated.store.token
 
         let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, tokenStore: isolated.store)
-        let result = try await client.eraseMyData(store: isolated.store)
+        let result = try await client.eraseMyData(store: isolated.store, subscriptionStore: nil)
 
         #expect(result.erased == true)
         // The server rotated the token; the store must drop it.
@@ -125,7 +129,8 @@ struct EndUserClientTests {
         #expect(isolated.defaults.string(forKey: isolated.tokenKey) == fresh)
     }
 
-    @Test func eraseWithStoreKeepsIdentityWhenNothingWasErased() async throws {
+    @Test
+    func eraseWithStoreKeepsIdentityWhenNothingWasErased() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (makeHTTPResponse(status: 404), try encodeJSON(["erased": false, "error": "No profile found"]))
         }
@@ -135,7 +140,7 @@ struct EndUserClientTests {
         let identity = isolated.store.token
 
         let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!, tokenStore: isolated.store)
-        let result = try await client.eraseMyData(store: isolated.store)
+        let result = try await client.eraseMyData(store: isolated.store, subscriptionStore: nil)
 
         #expect(result.erased == false)
         #expect(isolated.store.token == identity)
@@ -182,7 +187,8 @@ struct EndUserClientTests {
         #expect(subscription.store.subscribedEmail() == "user@example.com")
     }
 
-    @Test func eraseWithStoreClearsDefaultSubscriptionStoreForClientAppKey() async throws {
+    @Test(.enabled(if: DataProtectionKeychainProbe.isWritable))
+    func eraseWithStoreClearsDefaultSubscriptionStoreForClientAppKey() async throws {
         MockURLProtocol.setHandler(forHost: Self.apiHost) { request in
             let token = request.value(forHTTPHeaderField: "X-User-Token")
             return (makeHTTPResponse(), try encodeJSON(["erased": true, "endUserId": token]))
