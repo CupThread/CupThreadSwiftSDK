@@ -48,7 +48,7 @@ extension FeedbackClientConfiguration {
         if let language = locale.turnstileLanguageTag {
             queryItems.append(URLQueryItem(name: "locale", value: language))
         }
-        components.queryItems = queryItems
+        components.setQueryItemsEncodingPlus(queryItems)
         return components.url
     }
 

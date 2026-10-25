@@ -58,7 +58,7 @@ extension FeedbackClient {
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
             throw FeedbackClientError.invalidResponse
         }
-        components.queryItems = [URLQueryItem(name: "token", value: trimmedToken)]
+        components.setQueryItemsEncodingPlus([URLQueryItem(name: "token", value: trimmedToken)])
         guard let url = components.url else {
             throw FeedbackClientError.invalidResponse
         }

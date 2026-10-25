@@ -231,6 +231,31 @@ extension Array where Element == String {
     }
 }
 
+// MARK: - Shared query building
+
+extension URLComponents {
+    /// Assigns `queryItems` and then percent-encodes the one character
+    /// `URLComponents` leaves ambiguous: a literal `+` (#601). Foundation
+    /// encodes query values per RFC 3986 — a space becomes `%20` and `+` is
+    /// a legal, literal query character, so `queryItems` emits `+` raw. The
+    /// API server reads query parameters with form-decoding semantics
+    /// (Hono's `c.req.query`, like `URLSearchParams`), which rewrites every
+    /// `+` to a space *before* percent-decoding, silently corrupting values:
+    /// a search for `"C++"` reaches the server as `"C"`. `%2B` means a
+    /// literal plus under both conventions, and `URLComponents` never emits
+    /// `+` as the encoding of anything (an already-encoded `%2B` survives
+    /// untouched), so every `+` remaining after the assignment is a literal
+    /// from a supplied value and can be rewritten unconditionally.
+    ///
+    /// Route every `queryItems` assignment through this helper — values that
+    /// cannot contain `+` today (base64url cursors and tokens) are safe only
+    /// by the server's alphabet, not by encoding design.
+    mutating func setQueryItemsEncodingPlus(_ items: [URLQueryItem]) {
+        queryItems = items
+        percentEncodedQuery = percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+    }
+}
+
 // MARK: - Feedback submission plumbing
 
 /// Wire payload of `POST /api/v1/feedback`. `turnstileToken` is only present
