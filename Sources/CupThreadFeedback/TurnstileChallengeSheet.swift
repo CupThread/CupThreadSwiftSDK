@@ -177,6 +177,8 @@ private typealias TurnstileNativeViewRepresentable = UIViewRepresentable
 /// Loads the hosted challenge page and forwards its `turnstileBridge`
 /// messages. Main-frame navigation is pinned to the page's origin; the
 /// widget's own iframe on `challenges.cloudflare.com` stays free to load.
+/// Inbound bridge messages are accepted only from the page's main frame on
+/// the page's origin (`TurnstileBridgePolicy`); anything else is dropped.
 private struct TurnstileWebView: TurnstileNativeViewRepresentable {
     let url: URL
     let reloadID: UUID
@@ -267,7 +269,17 @@ private struct TurnstileWebView: TurnstileNativeViewRepresentable {
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
+            // The content controller delivers messages from every frame;
+            // only the challenge page's main frame may post into the bridge
+            // (#566, see `TurnstileBridgePolicy`).
             guard message.name == Self.bridgeName,
+                  TurnstileBridgePolicy.acceptsBridgeMessage(
+                      isMainFrame: message.frameInfo.isMainFrame,
+                      originProtocol: message.frameInfo.securityOrigin.protocol,
+                      originHost: message.frameInfo.securityOrigin.host,
+                      originPort: message.frameInfo.securityOrigin.port,
+                      challengeURL: challengeURL
+                  ),
                   let parsed = TurnstileBridgeMessage.parse(message.body) else {
                 return
             }
