@@ -147,7 +147,8 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `fetchFeatureRequests(userToken:limit:offset:versionId:query:)` | `GET /api/v1/feature-requests` |
 | `fetchFeatureRequest(id:userToken:)` / `getFeatureRequest(id:userToken:)` | `GET /api/v1/feature-requests/{id}` |
 | `submitFeatureRequest(_:userToken:)` | `POST /api/v1/feature-requests` |
-| `toggleVote(featureRequestId:userToken:)` | `POST /api/v1/feature-requests/{id}/vote` |
+| `castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)` | `POST /api/v1/feature-requests/{id}/vote` (insert-only; repeating a cast is an idempotent no-op) |
+| `removeVote(featureRequestId:userToken:)` | `DELETE /api/v1/feature-requests/{id}/vote` (idempotent; un-voting is never a side effect of casting again) |
 | `fetchComments(featureRequestId:)` | `GET /api/v1/feature-requests/{id}/comments` (walks keyset pages; `total` is the visible thread size) |
 | `fetchComments(featureRequestId:limit:cursor:)` | `GET /api/v1/feature-requests/{id}/comments` (`limit` 1–200, opaque `cursor`) |
 | `postComment(featureRequestId:draft:userToken:)` | `POST /api/v1/feature-requests/{id}/comments` |
@@ -160,6 +161,8 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `updateUserAttributes(isPaying:plan:mrr:currency:userToken:)` | `PUT /api/v1/public/apps/{appKey}/user` |
 | `eraseMyData(store:)` / `eraseMyData(userToken:)` | `POST /api/v1/me/erase` (sends `X-User-Token`; for signed-in users, the authentication provider's token is attached as `Authorization: Bearer …` so erasure covers every profile linked to that identity, not just this device's anonymous row) |
 | `linkEndUser(sessionToken:userToken:)` | `POST /api/v1/me/link` |
+
+The vote endpoint is insert-only: cast a vote with `castVote`, remove it with `removeVote`. `toggleVote(featureRequestId:userToken:)` remains only as a deprecated compatibility shim that forwards to `castVote` and will be removed in a future release.
 
 ### Headers & Version Reporting
 
