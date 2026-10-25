@@ -98,7 +98,14 @@ func sanitizeMarkdownAttributedString(_ attributedString: AttributedString) -> A
 /// Multi-tenant hosting suffixes that never imply a shared operator (curated,
 /// zero-dependency subset of the Public Suffix List). Hosts that only share one
 /// of these suffixes are different sites, so ``isAllowedDownloadHost(_:baseHost:)``
-/// requires matching full registrable domains instead.
+/// requires matching full registrable domains instead. Matching walks the
+/// longest listed suffix (``publicSuffixLabelCount(of:)``), so the multi-label
+/// service suffixes below shadow the two-label entry they sit on and sibling
+/// tenants of a hosted service (two S3 buckets, for example) never collapse
+/// into one registrable domain. Hosting suffixes missing from this curated set
+/// (e.g. `amplifyapp.com`) still collapse onto their apex — a recorded
+/// limitation of the zero-dependency approximation, not an endorsement
+/// (issue #594).
 private let multiTenantHostSuffixes: Set<String> = [
     "amazonaws.com", "appspot.com", "azurewebsites.net", "azurestaticapps.net",
     "cloudfront.net", "firebaseapp.com", "fly.dev", "gitlab-pages.com", "gitlab.io",
@@ -125,9 +132,64 @@ private func isIPLiteral(_ host: String) -> Bool {
     return !labels.isEmpty && labels.allSatisfy { Int($0) != nil }
 }
 
+/// Returns the label count of the longest curated public suffix that `labels`
+/// ends with, or `nil` when no curated entry matches. Multi-label service
+/// suffixes are matched before the two-label entries so the deepest listed
+/// suffix wins (issue #594).
+private func publicSuffixLabelCount(of labels: [Substring]) -> Int? {
+    let count = labels.count
+    guard count >= 2 else {
+        return nil
+    }
+    if let serviceCount = servicePublicSuffixLabelCount(of: labels) {
+        return serviceCount
+    }
+    let lastTwo = labels.suffix(2).joined(separator: ".")
+    if multiTenantHostSuffixes.contains(lastTwo)
+        || registrySecondLevelLabels.contains(String(labels[count - 2])) {
+        return 2
+    }
+    return nil
+}
+
+/// Label count for the object-storage services whose Public Suffix List entries
+/// make every bucket its own site: `r2.cloudflarestorage.com` and the S3 family
+/// `s3(-…)?(.dualstack)?.<region>.amazonaws.com`. The region label is
+/// arbitrary, so these are matched structurally instead of enumerated
+/// (issue #594).
+private func servicePublicSuffixLabelCount(of labels: [Substring]) -> Int? {
+    let count = labels.count
+    guard count >= 3 else {
+        return nil
+    }
+    let lastTwo = labels.suffix(2).joined(separator: ".")
+    if lastTwo == "cloudflarestorage.com", labels[count - 3] == "r2" {
+        return 3
+    }
+    guard lastTwo == "amazonaws.com" else {
+        return nil
+    }
+    func isS3ServiceLabel(_ label: Substring) -> Bool {
+        label == "s3" || label.hasPrefix("s3-")
+    }
+    if isS3ServiceLabel(labels[count - 3]) {
+        return 3 // `s3.amazonaws.com`
+    }
+    if count >= 4, isS3ServiceLabel(labels[count - 4]) {
+        return 4 // `s3.<region>.amazonaws.com`
+    }
+    if count >= 5, isS3ServiceLabel(labels[count - 5]), labels[count - 4] == "dualstack" {
+        return 5 // `s3.dualstack.<region>.amazonaws.com`
+    }
+    return nil
+}
+
 /// Returns the registrable domain (public suffix plus one label) of `host`, or
 /// `nil` when `host` is itself a bare public suffix and cannot establish
-/// same-site trust.
+/// same-site trust. Hosts under a multi-label object-storage service suffix are
+/// their own registrable domain: the tenant is the bucket and bucket names may
+/// contain dots (`a.b.s3.us-east-1.amazonaws.com`), so no two distinct hosts
+/// below a service suffix ever share one.
 private func registrableDomain(of host: String) -> String? {
     guard !isIPLiteral(host) else {
         return nil
@@ -136,15 +198,21 @@ private func registrableDomain(of host: String) -> String? {
     guard labels.count >= 2 else {
         return nil // A single label is a bare TLD (or an intranet host), never registrable.
     }
-    let lastTwo = labels.suffix(2).joined(separator: ".")
-    let endsWithPublicSuffix = multiTenantHostSuffixes.contains(lastTwo)
-        || registrySecondLevelLabels.contains(String(labels[labels.count - 2]))
-    guard endsWithPublicSuffix else {
-        return lastTwo
+    guard let publicSuffixCount = publicSuffixLabelCount(of: labels) else {
+        return labels.suffix(2).joined(separator: ".")
     }
-    // Under a public suffix the registrable domain needs one more label;
-    // the bare suffix itself (`co.uk`, `github.io`) has none.
-    return labels.count >= 3 ? labels.suffix(3).joined(separator: ".") : nil
+    // Under a public suffix the registrable domain needs one more label; the
+    // bare suffix itself (`co.uk`, `s3.us-east-1.amazonaws.com`) has none.
+    guard labels.count > publicSuffixCount else {
+        return nil
+    }
+    if servicePublicSuffixLabelCount(of: labels) != nil {
+        // Below a hosted object-storage suffix the tenant is the bucket, and
+        // bucket names may themselves contain dots (`a.b.s3.…`), so the whole
+        // host is the tenant identity — no subdomain trust under a service.
+        return labels.joined(separator: ".")
+    }
+    return labels.suffix(publicSuffixCount + 1).joined(separator: ".")
 }
 
 /// Validates whether a candidate host is allowed for download URLs relative to a
