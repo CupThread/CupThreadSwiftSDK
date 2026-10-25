@@ -376,6 +376,10 @@ public struct CommentsView: View {
     /// the source-scan pattern.
     @MainActor
     func submitComment() async {
+        // Re-entrancy guard (issue #581, mirroring `FeedbackComposerView`):
+        // `.disabled(...)` only repaints after the runloop turn, so a
+        // double-tap delivered together would post the comment twice.
+        guard !isSubmitting else { return }
         isSubmitting = true
         defer { isSubmitting = false }
         submitError = nil
