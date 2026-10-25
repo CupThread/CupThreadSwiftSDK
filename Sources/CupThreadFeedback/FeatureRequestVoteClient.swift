@@ -66,6 +66,11 @@ extension FeedbackClient {
         let normalizedShipNotifyEmail = shipNotifyEmail?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
+        // An opt-in address the server can only reject with `400 Validation
+        // failed` must not burn a single-use Turnstile challenge first —
+        // reject it locally under the same plausibility gate the changelog
+        // subscribe path applies (#419, #606).
+        try validateIntakeEmail(normalizedShipNotifyEmail, field: "shipNotifyEmail")
         let normalizedTurnstileToken = turnstileToken?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
@@ -226,7 +231,11 @@ extension FeedbackClient {
     ///     the `X-User-Token` header.
     ///   - shipNotifyEmail: Optional email address (max 254 characters) to
     ///     enroll in ship notifications for this request; `nil` keeps the
-    ///     payload unchanged and sends no opt-in.
+    ///     payload unchanged and sends no opt-in. A present address must be
+    ///     plausibly shaped — an implausible or over-long value throws
+    ///     ``FeedbackClientError/invalidEmailAddress(field:requestId:)``
+    ///     locally, before any request is sent or Turnstile token minted
+    ///     (#606).
     ///   - turnstileToken: Optional Cloudflare Turnstile token for human
     ///     verification when voting anonymously or opting in to ship
     ///     notifications. When omitted and a `turnstileTokenProvider` is
@@ -245,6 +254,12 @@ extension FeedbackClient {
     ///   blank, whitespace-only, or contains newlines (rejected locally, with
     ///   no request built and no Turnstile token minted), or when anonymous
     ///   voting is disabled for the app (HTTP 401),
+    ///   ``FeedbackClientError/invalidEmailAddress(field:requestId:)`` when
+    ///   `shipNotifyEmail` is present but implausibly shaped or over 254 code
+    ///   points (rejected locally, with no request built and no Turnstile
+    ///   token minted — #606), or when the server answers the residual
+    ///   field-error `400` for an edge-case address the local shape check
+    ///   deliberately accepts (#606),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when human
     ///   verification is required or rejected (HTTP 403

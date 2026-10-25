@@ -207,4 +207,22 @@ extension FeedbackClient {
             throw FeedbackClientError.textTooLong
         }
     }
+
+    /// Rejects an intake call whose optional email address is present but can
+    /// never be accepted, before a Turnstile token is consumed or any request
+    /// is built (#606) — the same local gate `subscribeToChangelog` applies
+    /// (#419). `nil` (a blank `reporterEmail` normalizes to `nil` before this
+    /// runs) keeps the field-omitted semantics; a present address must be
+    /// plausibly shaped (``EmailShape/isPlausible(_:)``, strictly looser than
+    /// the server's validation, so nothing the server would accept is
+    /// rejected here) and within ``IntakeTextLimits/maxEmailLength`` code
+    /// points. Anything else can only earn `400 Validation failed` — and on
+    /// the vote path it would burn a single-use Turnstile challenge first.
+    func validateIntakeEmail(_ email: String?, field: String) throws {
+        guard let email else { return }
+        guard EmailShape.isPlausible(email),
+              IntakeTextLimits.measuredLength(email) <= IntakeTextLimits.maxEmailLength else {
+            throw FeedbackClientError.invalidEmailAddress(field: field, requestId: nil)
+        }
+    }
 }

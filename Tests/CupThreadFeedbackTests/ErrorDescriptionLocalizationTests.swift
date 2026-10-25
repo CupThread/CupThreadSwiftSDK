@@ -48,6 +48,7 @@ struct ErrorDescriptionLocalizationTests {
         "cupthread.error.email_not_verified",
         "cupthread.error.reserved_plan_value",
         "cupthread.error.attribute_not_clearable",
+        "cupthread.error.email_invalid",
         "cupthread.attachment.oversized",
         "cupthread.attachment.unprocessable",
         "cupthread.attachment.unsupported_type"
@@ -72,70 +73,42 @@ struct ErrorDescriptionLocalizationTests {
         "The selected photo could not be processed for upload."
     ]
 
+    /// Asserts one typed error's `errorDescription` equals the catalog copy
+    /// for `key` (issue #266 convention).
+    private func assertResolvesThroughCatalog(
+        _ error: FeedbackClientError,
+        _ key: String,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        #expect(error.errorDescription == CupThreadStrings.tr(key), sourceLocation: sourceLocation)
+    }
+
     /// Every typed `FeedbackClientError` description resolves through the
     /// catalog for the current process locale (issue #266). Compared against
     /// `CupThreadStrings.tr` output, so the assertion holds under any dev/CI
     /// locale.
     @Test func feedbackClientErrorDescriptionsResolveThroughCatalog() {
-        #expect(
-            FeedbackClientError.invalidResponse.errorDescription
-                == CupThreadStrings.tr("cupthread.error.invalid_response")
+        assertResolvesThroughCatalog(.invalidResponse, "cupthread.error.invalid_response")
+        assertResolvesThroughCatalog(.unreadableUploadResponse, "cupthread.error.unreadable_upload_response")
+        assertResolvesThroughCatalog(.authenticationRequired, "cupthread.error.auth_required")
+        assertResolvesThroughCatalog(.scanRejected(message: "raw detail"), "cupthread.error.scan_rejected")
+        assertResolvesThroughCatalog(.unsupportedMediaType(message: nil, requestId: nil), "cupthread.error.unsupported_media")
+        assertResolvesThroughCatalog(.payloadTooLarge(message: nil, requestId: nil), "cupthread.error.payload_too_large")
+        assertResolvesThroughCatalog(
+            .uploaderIdentityRequired(message: nil, requestId: nil),
+            "cupthread.error.uploader_identity_required"
         )
-        #expect(
-            FeedbackClientError.unreadableUploadResponse.errorDescription
-                == CupThreadStrings.tr("cupthread.error.unreadable_upload_response")
-        )
-        #expect(
-            FeedbackClientError.authenticationRequired.errorDescription
-                == CupThreadStrings.tr("cupthread.error.auth_required")
-        )
-        #expect(
-            FeedbackClientError.scanRejected(message: "raw detail").errorDescription
-                == CupThreadStrings.tr("cupthread.error.scan_rejected")
-        )
-        #expect(
-            FeedbackClientError.unsupportedMediaType(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.unsupported_media")
-        )
-        #expect(
-            FeedbackClientError.payloadTooLarge(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.payload_too_large")
-        )
-        #expect(
-            FeedbackClientError.uploaderIdentityRequired(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.uploader_identity_required")
-        )
-        #expect(
-            FeedbackClientError.uploaderMismatch(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.uploader_mismatch")
-        )
-        #expect(
-            FeedbackClientError.submissionQuotaExceeded(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.quota_exceeded")
-        )
-        #expect(
-            FeedbackClientError.subscriptionInactive(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.subscription_inactive")
-        )
-        #expect(
-            FeedbackClientError.userProfileNotFound(message: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.profile_not_found")
-        )
-        #expect(
-            FeedbackClientError.commentsUnavailable(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.comments_unavailable")
-        )
-        #expect(
-            FeedbackClientError.emailNotVerified(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.email_not_verified")
-        )
-        #expect(
-            FeedbackClientError.reservedPlanValue(message: nil, requestId: nil).errorDescription
-                == CupThreadStrings.tr("cupthread.error.reserved_plan_value")
-        )
-        #expect(
-            FeedbackClientError.attributeNotClearable(attribute: "isPaying").errorDescription
-                == CupThreadStrings.tr("cupthread.error.attribute_not_clearable")
+        assertResolvesThroughCatalog(.uploaderMismatch(message: nil, requestId: nil), "cupthread.error.uploader_mismatch")
+        assertResolvesThroughCatalog(.submissionQuotaExceeded(message: nil, requestId: nil), "cupthread.error.quota_exceeded")
+        assertResolvesThroughCatalog(.subscriptionInactive(message: nil, requestId: nil), "cupthread.error.subscription_inactive")
+        assertResolvesThroughCatalog(.userProfileNotFound(message: nil), "cupthread.error.profile_not_found")
+        assertResolvesThroughCatalog(.commentsUnavailable(message: nil, requestId: nil), "cupthread.error.comments_unavailable")
+        assertResolvesThroughCatalog(.emailNotVerified(message: nil, requestId: nil), "cupthread.error.email_not_verified")
+        assertResolvesThroughCatalog(.reservedPlanValue(message: nil, requestId: nil), "cupthread.error.reserved_plan_value")
+        assertResolvesThroughCatalog(.attributeNotClearable(attribute: "isPaying"), "cupthread.error.attribute_not_clearable")
+        assertResolvesThroughCatalog(
+            .invalidEmailAddress(field: "reporterEmail"),
+            "cupthread.error.email_invalid"
         )
     }
 
