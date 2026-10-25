@@ -14,7 +14,9 @@ import Foundation
 ///
 /// The last line of ``canonicalString`` is the signature timestamp; the HMAC
 /// must cover it as-is, and the returned ``UserAttributesSignature/timestamp``
-/// must be that same value — the SDK sends it verbatim in the payload's
+/// must be that same value — the SDK verifies the equality locally and fails
+/// fast with ``FeedbackClientError/invalidSignature(message:requestId:)``
+/// otherwise. The verified timestamp is sent verbatim in the payload's
 /// `timestamp` field, and the server verifies the signature against a
 /// canonical string it rebuilds from the received payload.
 public struct UserAttributesSigningRequest: Sendable {
@@ -44,7 +46,11 @@ public struct UserAttributesSignature: Sendable {
     /// any request is built.
     public let signature: String
     /// The epoch seconds embedded in the signed canonical string (its last
-    /// line). Sent verbatim as the payload's `timestamp` field.
+    /// line). Sent verbatim as the payload's `timestamp` field; a value
+    /// different from the timestamp embedded in the canonical string the
+    /// provider was asked to sign is rejected locally with
+    /// ``FeedbackClientError/invalidSignature(message:requestId:)`` before
+    /// any request is built (issue #579).
     public let timestamp: Int64
 
     /// Creates a signature for a canonical string.

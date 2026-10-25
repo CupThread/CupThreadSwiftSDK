@@ -479,9 +479,14 @@ extension FeedbackClient {
     /// server rejects). The SDK builds the canonical string with its own
     /// server-clock-corrected timestamp (embedded in `arguments`) and sends
     /// the provider's returned timestamp verbatim; a provider result outside
-    /// the signature grammar is rejected locally before any request is
-    /// built. The `signed` flag tells the stale-signature retry whether this
-    /// attempt carried a signature worth refreshing.
+    /// the signature grammar — or one whose timestamp differs from the one
+    /// embedded in the canonical string it was asked to sign — is rejected
+    /// locally with `.invalidSignature` before any request is built (issue
+    /// #579: the server rebuilds the canonical string from the received
+    /// payload, so a mismatched timestamp can only verify as
+    /// `invalid_signature`, which is never retried). The `signed` flag tells
+    /// the stale-signature retry whether this attempt carried a signature
+    /// worth refreshing.
     private func resolveUserAttributesAttemptPayload(
         arguments: UserAttributesSigner.Arguments,
         signingSecretInUse: String?
@@ -510,6 +515,17 @@ extension FeedbackClient {
                 guard UserAttributesSignatureGrammar.isValid(resolved.signature) else {
                     throw FeedbackClientError.invalidSignature(
                         message: "Signing provider returned a malformed signature (expected 64 hexadecimal characters)",
+                        requestId: nil
+                    )
+                }
+                // The server rebuilds the canonical string from the received
+                // payload's `timestamp`, so any value other than the one
+                // embedded in the signed canonical string can only verify as
+                // `invalid_signature` — never retried. Fail fast locally,
+                // mirroring the grammar guard above (issue #579).
+                guard resolved.timestamp == arguments.timestamp else {
+                    throw FeedbackClientError.invalidSignature(
+                        message: "Signing provider returned a timestamp that does not match the canonical string it was asked to sign (expected \(arguments.timestamp), got \(resolved.timestamp))",
                         requestId: nil
                     )
                 }

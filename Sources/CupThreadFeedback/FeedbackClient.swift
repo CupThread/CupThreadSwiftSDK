@@ -226,10 +226,12 @@ public struct FeedbackClient: Sendable {
     /// binary. Called once per signed attempt (including the automatic single
     /// retry after `401 stale_signature`) with the ``UserAttributesSigningRequest``
     /// naming the exact canonical string to HMAC; the returned
-    /// ``UserAttributesSignature`` is sent verbatim. Return `nil` to fall back
-    /// to the configured `signingSecret` (and then an unsigned report);
-    /// thrown errors propagate to the caller. When `nil` (the default),
-    /// signing falls back to the embedded `signingSecret` configuration.
+    /// ``UserAttributesSignature`` is validated locally (signature grammar
+    /// and timestamp equality, issue #579) and then sent verbatim. Return
+    /// `nil` to fall back to the configured `signingSecret` (and then an
+    /// unsigned report); thrown errors propagate to the caller. When `nil`
+    /// (the default), signing falls back to the embedded `signingSecret`
+    /// configuration.
     let userAttributesSigner: (@Sendable (UserAttributesSigningRequest) async throws -> UserAttributesSignature?)?
 
     /// The process-wide session used by clients that do not inject one: built
