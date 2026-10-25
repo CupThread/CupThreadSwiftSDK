@@ -31,6 +31,49 @@ public struct FeedbackUploadFileSpec: Encodable, Equatable, Sendable {
     }
 }
 
+/// The grammar the upload-session bearer token must satisfy before it may
+/// reach the `Authorization` header of a slot PUT (issue #593).
+///
+/// `sessionToken` is server-controlled: it arrives in the
+/// `POST /api/v1/uploads/sessions` response body and is replayed by the
+/// client into a new request header. That is the same trust class as the
+/// response-echoed `X-Request-Id` (SEC-12), and it is the last header
+/// interpolation sink that had no validation — caller-supplied tokens were
+/// already hardened by `validatedUserToken` (SEC-25/SEC-26/SEC-30, #433,
+/// #435, #497). The grammar rejects anything that could smuggle header lines
+/// (control characters, which subsume CR/LF/TAB/NUL), anything blank, and
+/// anything oversized, so a corrupted or hostile response fails closed as a
+/// typed ``FeedbackClientError/invalidResponse`` instead of being emitted
+/// verbatim onto the wire.
+enum UploadSessionTokenGrammar {
+    /// The maximum bearer-token length, in characters. Generous for an
+    /// opaque bearer (1 KiB) while bounding any single header line.
+    static let maxCharacterCount = 1024
+
+    /// Whether `value` can be presented as the slot PUT's bearer token.
+    /// Expects an untrimmed value; surrounding whitespace is part of the
+    /// check so a padded-but-otherwise-valid token is accepted trimmed
+    /// (same semantics as `validatedUserToken`).
+    static func isValid(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              !trimmed.contains(where: \.isNewline),
+              trimmed.count <= maxCharacterCount else {
+            return false
+        }
+        // Control characters (C0/C1) cover every header-injection vector —
+        // CR, LF, TAB, NUL, and the rest — while leaving exotic but legal
+        // opaque-token characters alone.
+        return !trimmed.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
+    }
+
+    /// The trimmed token when ``isValid(_:)`` holds, otherwise `nil`.
+    static func validated(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return isValid(value) ? trimmed : nil
+    }
+}
+
 /// Client-side bounds for upload-session creation (API-28).
 ///
 /// `POST /api/v1/uploads/sessions` accepts 1–8 `files` per session and can
@@ -66,6 +109,59 @@ public struct FeedbackUploadSession: Decodable, Equatable, Sendable {
         public let maxFileSizeBytes: Int?
         /// Maximum number of files in this session, when given.
         public let maxFiles: Int?
+
+        private enum CodingKeys: String, CodingKey {
+            case sessionId
+            case sessionToken
+            case expiresAt
+            case maxFileSizeBytes
+            case maxFiles
+        }
+
+        /// Decodes the session info, refusing any `sessionToken` outside
+        /// ``UploadSessionTokenGrammar`` (#593). Enforcement lives at the
+        /// decode boundary — the only place a session enters the process —
+        /// so an invalid token can never propagate to a second consumer,
+        /// and `decodeSuccess` surfaces the failure as the typed
+        /// ``FeedbackClientError/invalidResponse`` before any upload PUT is
+        /// built.
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            sessionId = try container.decode(String.self, forKey: .sessionId)
+            let rawSessionToken = try container.decode(String.self, forKey: .sessionToken)
+            guard let sessionToken = UploadSessionTokenGrammar.validated(rawSessionToken) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .sessionToken,
+                    in: container,
+                    debugDescription: """
+                    sessionToken is blank, newline- or control-character-bearing, \
+                    or longer than \(UploadSessionTokenGrammar.maxCharacterCount) characters (#593)
+                    """
+                )
+            }
+            self.sessionToken = sessionToken
+            expiresAt = try container.decodeIfPresent(String.self, forKey: .expiresAt)
+            maxFileSizeBytes = try container.decodeIfPresent(Int.self, forKey: .maxFileSizeBytes)
+            maxFiles = try container.decodeIfPresent(Int.self, forKey: .maxFiles)
+        }
+
+        /// Memberwise initializer preserved for in-module construction
+        /// (tests, synthetic sessions for limit math). The network trust
+        /// boundary is ``init(from:)``, which is the only initializer a
+        /// decoded — server-controlled — session can pass through.
+        init(
+            sessionId: String,
+            sessionToken: String,
+            expiresAt: String?,
+            maxFileSizeBytes: Int?,
+            maxFiles: Int?
+        ) {
+            self.sessionId = sessionId
+            self.sessionToken = sessionToken
+            self.expiresAt = expiresAt
+            self.maxFileSizeBytes = maxFileSizeBytes
+            self.maxFiles = maxFiles
+        }
     }
 
     /// One pre-allocated file slot.
