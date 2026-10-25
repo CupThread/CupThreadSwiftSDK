@@ -380,6 +380,9 @@ extension FeedbackClient {
     ) throws -> URLRequest {
         var request = URLRequest(url: try uploadURL(from: slot.uploadUrl))
         request.httpMethod = "PUT"
+        // Cookie isolation (#585): the upload PUT authenticates with the
+        // bearer token alone; ambient host cookies must never ride along.
+        request.httpShouldHandleCookies = false
         request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.setValue(nextRequestID(), forHTTPHeaderField: "X-Request-Id")
