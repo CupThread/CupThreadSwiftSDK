@@ -444,13 +444,14 @@ public struct FeedbackClient: Sendable {
     ///   shorter than ``IntakeTextLimits/minDescriptionLength`` also throws
     ///   ``FeedbackClientError/invalidResponse`` locally (BUG-32), before the
     ///   Turnstile token provider is consulted or any request is sent.
-    ///   A draft whose `reporterEmail` is present but implausibly shaped or
-    ///   over ``IntakeTextLimits/maxEmailLength`` code points also throws
-    ///   ``FeedbackClientError/invalidEmailAddress(field:requestId:)`` locally
-    ///   (#606), before the Turnstile token provider is consulted or any
-    ///   request is sent — the same plausibility gate the changelog subscribe
-    ///   path applies (#419); the server can only answer such an address with
-    ///   `400 Validation failed`.
+    ///   A draft whose `reporterEmail` is present but implausibly shaped also
+    ///   throws ``FeedbackClientError/invalidEmailAddress(field:requestId:)``
+    ///   locally (#606), before the Turnstile token provider is consulted or
+    ///   any request is sent — the same plausibility gate the changelog
+    ///   subscribe path applies (#419); the server can only answer such an
+    ///   address with `400 Validation failed`. (An address merely over
+    ///   ``IntakeTextLimits/maxEmailLength`` code points is answered by the
+    ///   caps gate above, with ``FeedbackClientError/textTooLong``.)
     public func submit(
         _ draft: FeedbackDraft,
         userToken: String? = nil,

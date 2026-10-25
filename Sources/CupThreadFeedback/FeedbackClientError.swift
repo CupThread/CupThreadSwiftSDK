@@ -527,7 +527,7 @@ public extension FeedbackClientError {
     }
 
     /// Convenience constructor for ``reservedPlanValue(message:requestId:)`` with no request id.
-    static func reservedPlanValue(message: String?) -> FeedbackClientError {
+    static func reservedPlanValue(message: String? = nil) -> FeedbackClientError {
         .reservedPlanValue(message: message, requestId: nil)
     }
 
