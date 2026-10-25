@@ -31,8 +31,9 @@ import Foundation
 /// endpoints alike (#571) — installs this limiter as a **per-task delegate**,
 /// so the refusal guarantee holds on any session without the host having to
 /// opt in. Hosts issuing their *own* requests against the same API origin can
-/// either reuse ``FeedbackClient/defaultSession`` (the limiter installed at
-/// the session level) or pass this limiter per task the same way.
+/// reuse ``FeedbackClient/defaultSession`` (the limiter installed at the
+/// session level) or install an equivalent redirect policy of their own; this
+/// limiter type is internal to the SDK.
 final class SameOriginRedirectLimiter: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     /// The redirect policy for one redirect decision: `true` when
     /// `redirectURL` stays within `originalURL`'s origin, neither URL contains
