@@ -28,6 +28,21 @@ struct DownloadHostMultiLabelSuffixTests {
         ) == false)
     }
 
+    @Test("Dotted bucket names are distinct tenants even at the same depth")
+    func dottedBucketNamesRefused() {
+        // S3 bucket names may contain periods, so two hosts of the same label
+        // count under a service suffix can still be different buckets; the
+        // whole host is the tenant identity.
+        #expect(isAllowedDownloadHost(
+            "a.b.s3.us-east-1.amazonaws.com",
+            baseHost: "c.b.s3.us-east-1.amazonaws.com"
+        ) == false)
+        #expect(isAllowedDownloadHost(
+            "www.mybucket.s3.amazonaws.com",
+            baseHost: "mybucket.s3.amazonaws.com"
+        ) == false)
+    }
+
     @Test("Dualstack and FIPS S3 endpoints keep tenants separate")
     func dualstackAndFIPSS3Refused() {
         #expect(isAllowedDownloadHost(

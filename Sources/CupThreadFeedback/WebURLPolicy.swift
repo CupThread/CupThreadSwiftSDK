@@ -186,7 +186,10 @@ private func servicePublicSuffixLabelCount(of labels: [Substring]) -> Int? {
 
 /// Returns the registrable domain (public suffix plus one label) of `host`, or
 /// `nil` when `host` is itself a bare public suffix and cannot establish
-/// same-site trust.
+/// same-site trust. Hosts under a multi-label object-storage service suffix are
+/// their own registrable domain: the tenant is the bucket and bucket names may
+/// contain dots (`a.b.s3.us-east-1.amazonaws.com`), so no two distinct hosts
+/// below a service suffix ever share one.
 private func registrableDomain(of host: String) -> String? {
     guard !isIPLiteral(host) else {
         return nil
@@ -202,6 +205,12 @@ private func registrableDomain(of host: String) -> String? {
     // bare suffix itself (`co.uk`, `s3.us-east-1.amazonaws.com`) has none.
     guard labels.count > publicSuffixCount else {
         return nil
+    }
+    if servicePublicSuffixLabelCount(of: labels) != nil {
+        // Below a hosted object-storage suffix the tenant is the bucket, and
+        // bucket names may themselves contain dots (`a.b.s3.…`), so the whole
+        // host is the tenant identity — no subdomain trust under a service.
+        return labels.joined(separator: ".")
     }
     return labels.suffix(publicSuffixCount + 1).joined(separator: ".")
 }
