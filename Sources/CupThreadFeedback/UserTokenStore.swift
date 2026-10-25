@@ -243,6 +243,12 @@ public final class UserTokenStore: @unchecked Sendable {
     /// automatically after a successful erasure, because the server stops
     /// accepting the old token immediately.
     ///
+    /// On ``UserTokenStore/shared``, a confirmed reset also discards any
+    /// legacy `UserDefaults` plaintext that has not been migrated yet, so
+    /// the removed identity cannot be re-adopted by the next ``token`` read.
+    /// An unconfirmed reset leaves both the stored item and the plaintext
+    /// untouched.
+    ///
     /// - Returns: `true` if the backing store successfully deleted the token
     ///   or confirmed no token was present; `false` if the deletion failed
     ///   (e.g. locked Keychain).
@@ -252,10 +258,14 @@ public final class UserTokenStore: @unchecked Sendable {
         defer { Self.processLock.unlock() }
         let confirmed = storage.deleteConfirmed()
         if confirmed {
-            // A confirmed erasure ends the current run: the next read mints
+            // A confirmed erasure also forfeits the legacy plaintext this
+            // store owns: left behind, the next read would re-adopt the very
+            // identity the reset just removed and persist it again (issue
+            // #584). It likewise ends the current run, so the next read mints
             // and persists a fresh identity instead of resurrecting the
-            // pre-reset ephemeral one (issue #567). A failed reset keeps the
-            // memo, because the run it belongs to is still unresolved.
+            // pre-reset ephemeral one (issue #567). A failed reset keeps
+            // both, because the run they belong to is still unresolved.
+            removeLegacyPlaintextIfOwned()
             Self.ephemeralMemo.drop(forKey: ephemeralMemoKey)
         }
         return confirmed
