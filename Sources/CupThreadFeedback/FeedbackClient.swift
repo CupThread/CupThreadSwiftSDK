@@ -166,13 +166,11 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 /// Same-origin redirects (e.g. relative `Location` paths on the API host) are
 /// followed normally.
 ///
-/// The attachment uploads (``uploadAttachment(data:contentType:session:slot:filename:)``
-/// and ``uploadAttachment(fileURL:contentType:session:slot:filename:)``)
-/// additionally install that limiter as a *per-task delegate*, so uploads
-/// refuse cross-origin redirects no matter which session the client runs in —
-/// including a session injected here that carries no redirect policy of its
-/// own (#561). Every other request on an injected session relies on that
-/// session's own redirect policy.
+/// Every request the SDK dispatches — the attachment uploads and all JSON
+/// endpoints alike — additionally installs that limiter as a *per-task
+/// delegate*, so every SDK call refuses cross-origin redirects no matter
+/// which session the client runs in — including a session injected here that
+/// carries no redirect policy of its own (#561, #571).
 public struct FeedbackClient: Sendable {
     /// The default maximum number of cursor pages to fetch during complete-data
     /// walks before gracefully stopping (100).
@@ -271,10 +269,9 @@ public struct FeedbackClient: Sendable {
     ///     custom `URLProtocol` (tests) or custom timeouts; when omitted,
     ///     requests run in a process-wide shared session that refuses
     ///     cross-origin redirects (see “Redirect policy” on ``FeedbackClient``).
-    ///     Injected sessions are not modified — the attachment uploads enforce
-    ///     the redirect policy per-task regardless (#561), while every other
-    ///     request relies on the session's own policy, so install a redirect
-    ///     policy on the session itself if it can face untrusted redirects.
+    ///     Injected sessions are not modified — every SDK request enforces the
+    ///     same redirect policy per-task regardless (#561, #571), so no
+    ///     session-level redirect configuration is required.
     ///   - turnstileTokenProvider: Async closure resolving a Cloudflare
     ///     Turnstile token for gated intake calls, `nil` when none is
     ///     available. Called with the ``TurnstileChallenge`` naming the

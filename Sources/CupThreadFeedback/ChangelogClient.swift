@@ -244,7 +244,7 @@ extension FeedbackClient {
         try applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
         await applyBearerToken(to: &request)
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SameOriginRedirectLimiter())
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
@@ -400,7 +400,7 @@ extension FeedbackClient {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         try applyCorrelationHeaders(userToken: nil, requestID: nextRequestID(), to: &request)
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SameOriginRedirectLimiter())
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }

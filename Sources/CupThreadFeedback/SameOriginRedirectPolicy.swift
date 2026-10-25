@@ -27,11 +27,13 @@ import Foundation
 /// is no silent success path.
 ///
 /// Sessions injected through `FeedbackClient.init(session:)` are not modified;
-/// the SDK's upload PUTs (`uploadAttachment`) install this limiter as a
-/// **per-task delegate** on every call, so the upload guarantee holds on any
-/// session (#561). Every other request run on an injected session relies on
-/// the session's own policy — install this delegate (or an equivalent) on
-/// such sessions to opt them into the same guarantee there.
+/// instead every SDK request dispatch — the upload PUTs (#561) and all JSON
+/// endpoints alike (#571) — installs this limiter as a **per-task delegate**,
+/// so the refusal guarantee holds on any session without the host having to
+/// opt in. Hosts issuing their *own* requests against the same API origin can
+/// reuse ``FeedbackClient/defaultSession`` (the limiter installed at the
+/// session level) or install an equivalent redirect policy of their own; this
+/// limiter type is internal to the SDK.
 final class SameOriginRedirectLimiter: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     /// The redirect policy for one redirect decision: `true` when
     /// `redirectURL` stays within `originalURL`'s origin, neither URL contains
