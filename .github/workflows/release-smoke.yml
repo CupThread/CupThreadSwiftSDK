@@ -60,6 +60,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Source package resolves from the published tag
+        # The manifest pins the release under test with `exact:`. A `from:`
+        # range resolves to the newest tag below the next major — never the
+        # requested one — so a manual dispatch for a past release would build
+        # a different version and then fail the sdkVersion check against the
+        # version it never resolved (issue #586). The resolved version is
+        # asserted before the build so a mismatch fails fast, naming both.
         run: |
           mkdir -p /tmp/source-smoke/Sources/SourceSmoke
           cat > /tmp/source-smoke/Package.swift <<EOF
@@ -70,7 +76,7 @@ jobs:
               name: "SourceSmoke",
               platforms: [.macOS(.v14)],
               dependencies: [
-                  .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", from: "$VERSION")
+                  .package(url: "https://github.com/CupThread/CupThreadSwiftSDK.git", exact: "$VERSION")
               ],
               targets: [
                   .executableTarget(
@@ -92,11 +98,18 @@ jobs:
           print("smoke:", client.configuration.appKey, FeedbackClient.sdkVersion)
           EOF
           cd /tmp/source-smoke
+          swift package resolve
+          RESOLVED="$(swift package show-dependencies --format json \
+            | jq -r '.dependencies[] | select(.identity == "cupthreadswiftsdk") | .version')"
+          if [ "$RESOLVED" != "$VERSION" ]; then
+            echo "Requested CupThreadSwiftSDK $VERSION but SwiftPM resolved '${RESOLVED:-nothing}'."
+            exit 1
+          fi
           swift build
           OUTPUT="$(swift run 2>/dev/null)"
           echo "$OUTPUT"
           echo "$OUTPUT" | grep -q "smoke: app_release_smoke $VERSION" || {
-            echo "Source package from tag v$VERSION reports a different sdkVersion."
+            echo "Source package resolved at $RESOLVED reports a different sdkVersion (expected $VERSION): $OUTPUT"
             exit 1
           }
 
