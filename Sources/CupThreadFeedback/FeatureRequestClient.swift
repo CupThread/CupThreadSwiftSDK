@@ -98,7 +98,7 @@ extension FeedbackClient {
         if let cursor = cursor?.nilIfEmpty {
             queryItems.append(URLQueryItem(name: "cursor", value: cursor))
         }
-        components.queryItems = queryItems
+        components.setQueryItemsEncodingPlus(queryItems)
         guard let url = components.url else {
             throw FeedbackClientError.invalidResponse
         }

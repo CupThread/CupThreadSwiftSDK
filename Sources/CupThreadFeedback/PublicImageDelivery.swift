@@ -57,7 +57,7 @@ public func publicImageThumbnailURL(for url: URL, width: PublicImageThumbnailWid
     var queryItems = components.queryItems ?? []
     queryItems.removeAll { $0.name == "width" }
     queryItems.append(URLQueryItem(name: "width", value: String(width.rawValue)))
-    components.queryItems = queryItems
+    components.setQueryItemsEncodingPlus(queryItems)
     return components.url ?? url
 }
 

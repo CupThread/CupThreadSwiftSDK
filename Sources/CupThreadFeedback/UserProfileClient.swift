@@ -70,7 +70,7 @@ extension FeedbackClient {
             url: profileURL,
             resolvingAgainstBaseURL: false
         )
-        components?.queryItems = [URLQueryItem(name: "appKey", value: configuration.appKey)]
+        components?.setQueryItemsEncodingPlus([URLQueryItem(name: "appKey", value: configuration.appKey)])
         if let keyedURL = components?.url {
             profileURL = keyedURL
         }
