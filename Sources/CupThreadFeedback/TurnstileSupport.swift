@@ -86,7 +86,7 @@ extension FeedbackClient {
         makeRequest: (String?, String) async throws -> URLRequest
     ) async throws -> Data {
         let request = try await makeRequest(turnstileToken, nextRequestID())
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SameOriginRedirectLimiter())
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }

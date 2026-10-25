@@ -159,7 +159,7 @@ extension FeedbackClient {
         await applyBearerToken(to: &request)
         request.httpBody = try encoder.encode(MeAppKeyPayload(appKey: configuration.appKey))
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SameOriginRedirectLimiter())
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
@@ -305,7 +305,7 @@ extension FeedbackClient {
         try applyCorrelationHeaders(userToken: identityToken, requestID: nextRequestID(), to: &request)
         request.httpBody = try encoder.encode(MeAppKeyPayload(appKey: configuration.appKey))
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SameOriginRedirectLimiter())
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FeedbackClientError.invalidResponse
         }
