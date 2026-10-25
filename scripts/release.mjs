@@ -284,7 +284,12 @@ export function evaluateReleaseReadiness(facts) {
   }
 
   const release = facts.githubRelease;
-  if (release) {
+  if (facts.githubReleaseProbeError) {
+    // A failed lookup is not "no release": proceeding could create a second
+    // release for a tag whose real release state was merely unreadable
+    // (issue #583).
+    errors.push(`Could not look up the GitHub release ${tag}: ${facts.githubReleaseProbeError} — the draft-vs-published decision needs the real release state; check \`gh auth status\` and connectivity, then rerun.`);
+  } else if (release) {
     if (release.isDraft) {
       if (facts.artifactSha256 && release.bodySha256 && release.bodySha256 !== facts.artifactSha256) {
         regenerateReleaseNotes = true;
@@ -305,16 +310,23 @@ export function evaluateReleaseReadiness(facts) {
     }
   }
 
-  const cdn = facts.cdnObject;
-  if (cdn && cdn.exists) {
-    if (!facts.artifactSha256) {
-      warnings.push(`CDN object ${artifact} already exists; its checksum will be verified against the freshly built artifact before any upload.`);
-    } else if (cdn.sha256 === facts.artifactSha256) {
-      completed.cdnObject = true;
-    } else if (release && !release.isDraft) {
-      errors.push(`CDN object ${artifact} exists with checksum ${cdn.sha256} but this build is ${facts.artifactSha256}, and the GitHub release is already published — refusing to mutate a published artifact.`);
-    } else {
-      warnings.push(`CDN object ${artifact} exists with a different checksum (${cdn.sha256}); the release is unpublished, so publication will overwrite it with the verified build.`);
+  if (facts.cdnProbeError) {
+    // A failed probe is not "the object does not exist": publishing over an
+    // unreadable state can overwrite a published, checksum-pinned artifact
+    // with a non-byte-reproducible rebuild (issue #583).
+    errors.push(`Could not verify whether the CDN object ${artifact} exists: ${facts.cdnProbeError} — refusing to continue on an unverifiable publication state; check connectivity and rerun (a rerun re-probes).`);
+  } else {
+    const cdn = facts.cdnObject;
+    if (cdn && cdn.exists) {
+      if (!facts.artifactSha256) {
+        warnings.push(`CDN object ${artifact} already exists; its checksum will be verified against the freshly built artifact before any upload.`);
+      } else if (cdn.sha256 === facts.artifactSha256) {
+        completed.cdnObject = true;
+      } else if (release && !release.isDraft) {
+        errors.push(`CDN object ${artifact} exists with checksum ${cdn.sha256} but this build is ${facts.artifactSha256}, and the GitHub release is already published — refusing to mutate a published artifact.`);
+      } else {
+        warnings.push(`CDN object ${artifact} exists with a different checksum (${cdn.sha256}); the release is unpublished, so publication will overwrite it with the verified build.`);
+      }
     }
   }
 
@@ -357,7 +369,8 @@ function probe(cmd, args, opts = {}) {
     ok: result.status === 0 && !result.error,
     status: result.status,
     stdout: (result.stdout || "").trim(),
-    stderr: (result.stderr || "").trim()
+    stderr: (result.stderr || "").trim(),
+    error: result.error ? result.error.message : null
   };
 }
 
@@ -440,34 +453,103 @@ function remoteTagCommitSha(tag) {
   return { sha: peeled ? peeled.split("\t")[0] : (plain ? plain.split("\t")[0] : null), error: null };
 }
 
-function githubReleaseInfo(tag) {
-  const out = probe("gh", ["release", "view", tag, "--json", "isDraft,assets,body"]);
-  if (!out.ok) return null; // "release not found" — anything else is caught by requireGhAuth
+// --- Exported for ReleasePreflightTests: remote probe interpretation -------
+//
+// A probe failure must never be reported as a verified "absent": folding a
+// transient network error into "the object does not exist" lets a rerun of a
+// published version overwrite the checksum-pinned CDN artifact while the
+// script exits 0 (issue #583). Both interpreters therefore distinguish
+// verified absence from *could not determine*, and evaluateReleaseReadiness
+// turns the latter into a hard error so publication never proceeds on an
+// unknown remote state.
+
+// Classifies one `curl -sSL -o <file> --write-out '\n%{http_code}'` probe of
+// a CDN object. `outcome` is the probe() result; `sha256` is the checksum of
+// the downloaded body when curl exited 0.
+export function interpretCdnProbeOutcome(outcome) {
+  const { ok, status, stdout, stderr } = outcome;
+  if (!ok) {
+    // Transport failure (DNS, connect, timeout): presence is simply unknown.
+    return {
+      exists: null,
+      sha256: null,
+      error: outcome.error || stderr || `curl exited ${status ?? "without a status"}`
+    };
+  }
+  // -L may follow redirects and --write-out then prints one code per hop;
+  // the last line is the final response's code.
+  const lines = stdout.split("\n").filter(Boolean);
+  const httpCode = Number.parseInt(lines[lines.length - 1], 10);
+  if (httpCode >= 200 && httpCode < 300) {
+    return { exists: true, sha256: outcome.sha256, error: null };
+  }
+  if (httpCode === 404) {
+    return { exists: false, sha256: null, error: null };
+  }
+  return {
+    exists: null,
+    sha256: null,
+    error: Number.isNaN(httpCode)
+      ? "the CDN probe returned no HTTP status code"
+      : `the CDN answered HTTP ${httpCode}`
+  };
+}
+
+// Classifies one `gh release view` probe. Only gh's explicit "release not
+// found" outcome verifies absence; every other failure (a network blip, a
+// token that expired after the preflight's requireGhAuth ran minutes earlier,
+// malformed output) is reported as unknown — the draft-vs-published decision
+// must never run on fabricated state (issue #583).
+export function interpretGhReleaseProbeOutcome(outcome) {
+  const { ok, status, stdout, stderr } = outcome;
+  if (!ok) {
+    if (/release not found/i.test(stderr)) {
+      return { release: null, error: null };
+    }
+    return {
+      release: null,
+      error: outcome.error || stderr || `gh release view exited ${status ?? "without a status"}`
+    };
+  }
   try {
-    const parsed = JSON.parse(out.stdout);
+    const parsed = JSON.parse(stdout);
     const body = typeof parsed.body === "string" ? parsed.body : "";
     const checksumIndex = body.indexOf("checksum ");
     const bodySha256 = checksumIndex >= 0 ? (body.slice(checksumIndex + "checksum ".length).match(/^[0-9a-f]{64}/) || [null])[0] : null;
     return {
-      isDraft: parsed.isDraft === true,
-      assetNames: (parsed.assets || []).map((asset) => asset.name),
-      bodySha256
+      release: {
+        isDraft: parsed.isDraft === true,
+        assetNames: (parsed.assets || []).map((asset) => asset.name),
+        bodySha256
+      },
+      error: null
     };
-  } catch {
-    return null;
+  } catch (parseError) {
+    return { release: null, error: `could not parse gh release view output: ${parseError.message}` };
   }
+}
+
+// Both wrappers accept an injected probe closure so the tests can drive the
+// full outcome → interpretation path without touching the network (they are
+// exported for ReleasePreflightTests/ReleaseProbeInterpretationTests only).
+export function githubReleaseInfo(tag, probeFn = probe) {
+  return interpretGhReleaseProbeOutcome(probeFn("gh", ["release", "view", tag, "--json", "isDraft,assets,body"]));
 }
 
 // Probe the published CDN object (if any). A random query parameter busts
 // CDN caches so the check observes the object itself, not a cached copy.
-function cdnObjectInfo(filename) {
+// curl runs without -f: it then exits 0 even for HTTP errors and the
+// write-out's last line carries the final response's code, so
+// interpretCdnProbeOutcome — not the exit status alone — separates a
+// verified 404 from an unverifiable 5xx/403/transport failure.
+export function cdnObjectInfo(filename, probeFn = probe) {
   const url = `${CDN_BASE}/sdks/apple/${filename}?probe=${process.pid}-${Date.now()}`;
   const dir = mkdtempSync(path.join(tmpdir(), "cupthread-cdn-probe-"));
   try {
     const file = path.join(dir, "object.bin");
-    const out = probe("curl", ["-fsSL", "-o", file, "--max-time", "120", url]);
-    if (!out.ok) return { exists: false };
-    return { exists: true, sha256: sha256(file) };
+    const out = probeFn("curl", ["-sSL", "-o", file, "--max-time", "120", "--write-out", "\n%{http_code}", url]);
+    const sha256OfBody = out.ok && existsSync(file) ? sha256(file) : null;
+    return interpretCdnProbeOutcome({ ...out, sha256: sha256OfBody });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -488,7 +570,9 @@ function collectPreflightFacts(version, planUpload) {
     remoteTagCommitSha: null,
     remoteTagProbeError: null,
     githubRelease: null,
-    cdnObject: null
+    githubReleaseProbeError: null,
+    cdnObject: null,
+    cdnProbeError: null
   };
 
   const versionFile = path.join(ROOT, VERSION_FILE);
@@ -511,9 +595,13 @@ function collectPreflightFacts(version, planUpload) {
   const remote = remoteTagCommitSha(`v${version}`);
   facts.remoteTagCommitSha = remote.sha;
   facts.remoteTagProbeError = remote.error;
-  facts.githubRelease = githubReleaseInfo(`v${version}`);
+  const releaseProbe = githubReleaseInfo(`v${version}`);
+  facts.githubRelease = releaseProbe.release;
+  facts.githubReleaseProbeError = releaseProbe.error;
   if (planUpload) {
-    facts.cdnObject = cdnObjectInfo(artifactFilename(version));
+    const cdnProbe = cdnObjectInfo(artifactFilename(version));
+    facts.cdnObject = cdnProbe;
+    facts.cdnProbeError = cdnProbe.error;
   }
   return facts;
 }
@@ -967,6 +1055,9 @@ print("probe:", client.configuration.appKey, FeedbackPlatform.current)
 function verifyCdnChecksum(filename, expectedSha256) {
   console.log("• verifying the uploaded CDN object's checksum");
   const info = cdnObjectInfo(filename);
+  if (info.exists === null) {
+    fail(`Could not verify the uploaded CDN object ${filename}: ${info.error}. The upload may or may not have landed; the GitHub release is still a draft. Check ${CDN_BASE}/sdks/apple/${filename} yourself, then rerun — the rerun re-probes the published state.`);
+  }
   if (!info.exists) {
     fail(`CDN object ${filename} is not reachable right after upload (propagation or cache issue?). The GitHub release is still a draft; check ${CDN_BASE}/sdks/apple/${filename} and rerun — the rerun recognizes the tag and the draft release.`);
   }
