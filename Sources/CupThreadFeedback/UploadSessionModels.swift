@@ -46,9 +46,12 @@ public struct FeedbackUploadFileSpec: Encodable, Equatable, Sendable {
 /// typed ``FeedbackClientError/invalidResponse`` instead of being emitted
 /// verbatim onto the wire.
 enum UploadSessionTokenGrammar {
-    /// The maximum bearer-token length, in characters. Generous for an
-    /// opaque bearer (1 KiB) while bounding any single header line.
-    static let maxCharacterCount = 1024
+    /// The maximum bearer-token length, in UTF-8 bytes. Generous for an
+    /// opaque bearer (1 KiB) while bounding the size of any single header
+    /// line. Measured in bytes rather than characters: one `Character` can
+    /// carry unbounded combining scalars, so a grapheme count would not bound
+    /// the `Authorization` header's wire size at all.
+    static let maxByteCount = 1024
 
     /// Whether `value` can be presented as the slot PUT's bearer token.
     /// Expects an untrimmed value; surrounding whitespace is part of the
@@ -58,7 +61,7 @@ enum UploadSessionTokenGrammar {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               !trimmed.contains(where: \.isNewline),
-              trimmed.count <= maxCharacterCount else {
+              trimmed.utf8.count <= maxByteCount else {
             return false
         }
         // Control characters (C0/C1) cover every header-injection vector —
@@ -135,7 +138,7 @@ public struct FeedbackUploadSession: Decodable, Equatable, Sendable {
                     in: container,
                     debugDescription: """
                     sessionToken is blank, newline- or control-character-bearing, \
-                    or longer than \(UploadSessionTokenGrammar.maxCharacterCount) characters (#593)
+                    or longer than \(UploadSessionTokenGrammar.maxByteCount) UTF-8 bytes (#593)
                     """
                 )
             }

@@ -67,13 +67,24 @@ struct UploadSessionTokenValidationTests {
     }
 
     @Test func grammarRejectsOversizeTokens() {
-        #expect(UploadSessionTokenGrammar.maxCharacterCount == 1024)
-        let atCap = String(repeating: "a", count: UploadSessionTokenGrammar.maxCharacterCount)
+        #expect(UploadSessionTokenGrammar.maxByteCount == 1024)
+        let atCap = String(repeating: "a", count: UploadSessionTokenGrammar.maxByteCount)
+        #expect(atCap.utf8.count == UploadSessionTokenGrammar.maxByteCount)
         #expect(UploadSessionTokenGrammar.isValid(atCap))
 
-        let overCap = String(repeating: "a", count: UploadSessionTokenGrammar.maxCharacterCount + 1)
+        let overCap = String(repeating: "a", count: UploadSessionTokenGrammar.maxByteCount + 1)
         #expect(!UploadSessionTokenGrammar.isValid(overCap))
         #expect(UploadSessionTokenGrammar.validated(overCap) == nil)
+    }
+
+    @Test func grammarLengthCapCountsUTF8BytesNotGraphemes() {
+        // 1024 Characters — under a grapheme cap — whose UTF-8 encoding is
+        // 3 KiB: the byte cap must bound the header's wire size, not the
+        // cluster count.
+        let diacriticLoaded = String(repeating: "e\u{0301}", count: UploadSessionTokenGrammar.maxByteCount)
+        #expect(diacriticLoaded.count == UploadSessionTokenGrammar.maxByteCount)
+        #expect(diacriticLoaded.utf8.count == 3 * UploadSessionTokenGrammar.maxByteCount)
+        #expect(!UploadSessionTokenGrammar.isValid(diacriticLoaded))
     }
 
     // MARK: Decode-boundary enforcement
@@ -123,7 +134,13 @@ struct UploadSessionTokenValidationTests {
 
     @Test func decodeRejectsOversizeSessionToken() throws {
         try assertDecodeRejects(
-            sessionToken: String(repeating: "a", count: UploadSessionTokenGrammar.maxCharacterCount + 1)
+            sessionToken: String(repeating: "a", count: UploadSessionTokenGrammar.maxByteCount + 1)
+        )
+    }
+
+    @Test func decodeRejectsByteOversizeCombiningMarkSessionToken() throws {
+        try assertDecodeRejects(
+            sessionToken: String(repeating: "e\u{0301}", count: UploadSessionTokenGrammar.maxByteCount)
         )
     }
 
@@ -235,7 +252,7 @@ struct UploadSessionTokenValidationTests {
 
     @Test func uploadFailsClosedOnOversizeSessionToken() async throws {
         try await assertUploadFailsClosed(
-            sessionToken: String(repeating: "a", count: UploadSessionTokenGrammar.maxCharacterCount + 1),
+            sessionToken: String(repeating: "a", count: UploadSessionTokenGrammar.maxByteCount + 1),
             host: "upload-token-oversize.example.com"
         )
     }
