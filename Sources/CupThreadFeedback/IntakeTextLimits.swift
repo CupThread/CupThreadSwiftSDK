@@ -27,21 +27,28 @@ public enum IntakeField: Equatable, Sendable {
 /// ``maxSubmissionPayloadBytes`` at all. Values mirror the server's column
 /// validation where one exists and stay far enough below the byte budget
 /// otherwise.
+///
+/// Every bound is measured in **Unicode code points**, the unit the server's
+/// JSON Schema `minLength`/`maxLength` validators count (#578) — not Swift's
+/// extended grapheme clusters, which can pack many code points into one
+/// user-perceived character (flag sequences, ZWJ emoji, decomposed accents).
+/// Grapheme count never exceeds code-point count, so counting code points
+/// keeps the client gate at least as tight as the server bound.
 public enum IntakeTextLimits: Sendable {
-    /// Feedback and feature-request title floor, in trimmed characters
-    /// (BUG-32): the server rejects shorter titles with `400`, so the
+    /// Feedback and feature-request title floor, in trimmed Unicode code
+    /// points (BUG-32): the server rejects shorter titles with `400`, so the
     /// composers disable submitting below it and the client methods refuse
     /// such drafts locally, before any network work.
     public static let minTitleLength = 3
-    /// Feedback and feature-request description floor, in trimmed characters
-    /// (BUG-32): the server rejects shorter descriptions with `400`, so the
-    /// composers disable submitting below it and the client methods refuse
-    /// such drafts locally, before any network work.
+    /// Feedback and feature-request description floor, in trimmed Unicode
+    /// code points (BUG-32): the server rejects shorter descriptions with
+    /// `400`, so the composers disable submitting below it and the client
+    /// methods refuse such drafts locally, before any network work.
     public static let minDescriptionLength = 5
-    /// Feedback and feature-request title cap, in characters
+    /// Feedback and feature-request title cap, in Unicode code points
     /// (`FeedbackSubmissionInput.title` / `CreateFeatureRequestInput.title`).
     public static let maxTitleLength = 160
-    /// Feedback description cap, in characters
+    /// Feedback description cap, in Unicode code points
     /// (`FeedbackSubmissionInput.description`).
     ///
     /// The two intake endpoints enforce different description bounds: feature
@@ -50,15 +57,17 @@ public enum IntakeTextLimits: Sendable {
     /// is answered with `400 Validation failed`, so the composers gate on the
     /// matching constant.
     public static let maxDescriptionLength = 10_000
-    /// Feature-request description cap, in characters
+    /// Feature-request description cap, in Unicode code points
     /// (`CreateFeatureRequestInput.description`).
     public static let maxFeatureRequestDescriptionLength = 5_000
-    /// Feedback reporter and feature-requester display-name cap, in characters
-    /// (`FeedbackSubmissionInput.reporterName` / `CreateFeatureRequestInput.requesterName`).
+    /// Feedback reporter and feature-requester display-name cap, in Unicode
+    /// code points (`FeedbackSubmissionInput.reporterName` /
+    /// `CreateFeatureRequestInput.requesterName`).
     public static let maxNameLength = 120
-    /// Feedback contact-email cap, in characters.
+    /// Feedback contact-email cap, in Unicode code points.
     public static let maxEmailLength = 254
-    /// Comment body cap, in characters (`CreateFeatureRequestCommentInput.body`).
+    /// Comment body cap, in Unicode code points
+    /// (`CreateFeatureRequestCommentInput.body`).
     public static let maxCommentLength = 2_000
     /// Whole-payload byte budget for intake JSON bodies: half the server's
     /// 256 KB bounded-reader budget, leaving headroom for JSON structure and
@@ -67,11 +76,16 @@ public enum IntakeTextLimits: Sendable {
     /// character count.
     public static let maxSubmissionPayloadBytes = 128 * 1024
 
-    /// The whitespace-trimmed character count the caps and counters measure:
-    /// mirrors the trim applied to the field on the wire, so UI counters and
-    /// submission gates always agree with what is sent.
+    /// The whitespace-trimmed length, in Unicode code points, the caps and
+    /// counters measure (#578): mirrors the trim applied to the field on the
+    /// wire, and counts the same unit the server's `minLength`/`maxLength`
+    /// validation counts — so UI counters and submission gates always agree
+    /// with what the server will accept. Counting Swift `Character`s
+    /// (grapheme clusters) instead let multi-scalar input — flag sequences,
+    /// ZWJ emoji, decomposed accents — slip past a cap whose wire string the
+    /// server could only answer with `400 Validation failed`.
     static func measuredLength(_ text: String) -> Int {
-        text.trimmingCharacters(in: .whitespacesAndNewlines).count
+        text.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count
     }
 
     /// The first feedback-draft field over its cap, or `nil` when every
@@ -162,6 +176,35 @@ extension FeedbackClient {
     func validateIntakeMinimums(in draft: FeatureRequestDraft) throws {
         guard IntakeTextLimits.underLimitField(in: draft) == nil else {
             throw FeedbackClientError.invalidResponse
+        }
+    }
+
+    /// Rejects a draft whose fields exceed the server's per-field intake
+    /// caps (#578) before a Turnstile token is consumed or any request is
+    /// built — the headless counterpart of the composers' `canSubmit` form
+    /// gate, throwing ``FeedbackClientError/textTooLong`` where the server
+    /// could only answer `400 Validation failed`.
+    func validateIntakeCaps(in draft: FeedbackDraft) throws {
+        guard IntakeTextLimits.overLimitField(in: draft) == nil else {
+            throw FeedbackClientError.textTooLong
+        }
+    }
+
+    /// Rejects a feature-request draft whose fields exceed the server's
+    /// per-field intake caps (#578), mirroring ``FeedbackClient/submit(_:userToken:turnstileToken:)``'s
+    /// local cap gate without the UI.
+    func validateIntakeCaps(in draft: FeatureRequestDraft) throws {
+        guard IntakeTextLimits.overLimitField(in: draft) == nil else {
+            throw FeedbackClientError.textTooLong
+        }
+    }
+
+    /// Rejects a comment draft whose body exceeds
+    /// ``IntakeTextLimits/maxCommentLength`` (#578) before any request is
+    /// built.
+    func validateIntakeCaps(in draft: CommentDraft) throws {
+        guard IntakeTextLimits.overLimitField(in: draft) == nil else {
+            throw FeedbackClientError.textTooLong
         }
     }
 }

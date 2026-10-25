@@ -263,8 +263,10 @@ extension FeedbackClient {
     ///   reply target is missing, hidden, or not on this feature request
     ///   (HTTP 400 `invalid_parent`),
     ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds
-    ///   the client-side intake byte budget (BUG-18) — rejected locally with
-    ///   no network round trip; shorten the comment and post again,
+    ///   the client-side intake byte budget (BUG-18) or the trimmed body
+    ///   exceeds ``IntakeTextLimits/maxCommentLength`` (#578) — rejected
+    ///   locally with no network round trip; shorten the comment and post
+    ///   again,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   or ``FeedbackClientError/invalidResponse`` otherwise — the latter is
     ///   also thrown locally, before any request is built, when
@@ -293,6 +295,10 @@ extension FeedbackClient {
         guard !body.isEmpty else {
             throw FeedbackClientError.invalidResponse
         }
+        // A body past the comment cap can only be answered `400 Validation
+        // failed`; fail fast locally (#578) so headless callers do not spend
+        // the signed-in session's bearer token on a doomed round trip.
+        try validateIntakeCaps(in: draft)
         let payload = CommentSubmitPayload(
             body: body,
             parentId: draft.parentId?.nilIfEmpty,
