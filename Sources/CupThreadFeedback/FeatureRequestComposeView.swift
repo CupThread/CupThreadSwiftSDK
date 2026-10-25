@@ -209,10 +209,15 @@ struct FeatureRequestComposeView: View {
     /// submission flow directly.
     @MainActor
     func submit(turnstileToken: String? = nil) async {
-        guard SdkSubmissionDenial.forFeatureRequest(
-            config: activeConfig,
-            supportsAuthentication: isAuthenticated
-        ) == .none else { return }
+        // Re-entrancy guard (issue #581, mirroring `FeedbackComposerView`):
+        // `.disabled(...)` only repaints after the runloop turn, so two taps
+        // delivered together both reach the network and duplicate the
+        // proposal — there is no idempotency key to dedupe them server-side.
+        guard !isSubmitting,
+              SdkSubmissionDenial.forFeatureRequest(
+                  config: activeConfig,
+                  supportsAuthentication: isAuthenticated
+              ) == .none else { return }
         isSubmitting = true
         submitError = nil
         defer { isSubmitting = false }
@@ -249,6 +254,11 @@ struct FeatureRequestComposeView: View {
                   theme: activeConfig?.sdk.theme ?? .system
               )
         else { return false }
+        // The first challenge owns the sheet; a second gated failure must
+        // fall through to its normal error copy rather than replace the
+        // pending challenge and drop the first challenge's `resume` closure
+        // mid-mint (issue #581, mirroring `FeedbackComposerView` #539).
+        guard pendingChallenge == nil else { return false }
         pendingChallenge = PendingTurnstileChallenge(
             presentation: presentation,
             resume: { token in
