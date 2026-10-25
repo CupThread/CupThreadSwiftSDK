@@ -62,12 +62,12 @@ struct ReleaseSmokeWorkflowGuardTests {
     @Test func sourcePackageStepChecksTheResolvedVersionBeforeBuilding() throws {
         let source = try step(named: Self.sourceStep)
         let resolvedCheck = try #require(source.range(of: "swift package show-dependencies"))
+        let mismatchGate = try #require(source.range(of: #"if [ "$RESOLVED" != "$VERSION" ]; then"#))
         let build = try #require(source.range(of: "swift build"))
         #expect(
-            resolvedCheck.lowerBound < build.lowerBound,
-            "the resolved version must be compared with the requested one before the build so a mismatch fails fast"
+            resolvedCheck.lowerBound < mismatchGate.lowerBound && mismatchGate.lowerBound < build.lowerBound,
+            "the resolved version must be read and compared with the requested one before the build so a mismatch fails fast"
         )
-        #expect(source.contains(#"[ "$RESOLVED" != "$VERSION" ]"#))
     }
 
     @Test func binaryTargetStepPinsTheRequestedArtifactAndChecksum() throws {
