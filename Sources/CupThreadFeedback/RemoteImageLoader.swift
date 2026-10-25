@@ -1,3 +1,7 @@
+// swiftlint:disable file_length
+// One loader per file: the bounded-decode and cookie-isolation policies are
+// documented beside the code that enforces them, the same policy the other
+// oversized files follow (.swiftlint.yml).
 import SwiftUI
 import ImageIO
 #if canImport(UniformTypeIdentifiers)
@@ -81,7 +85,12 @@ final class RemoteImageLoader {
     ///     delegate, and that delegate owns the image path's redirect policy:
     ///     URLSession cannot compose delegates, so a limiter installed on the
     ///     injected session does not carry over, and hosts do not need to
-    ///     install one for image fetches.
+    ///     install one for image fetches. The rebuilt session is always
+    ///     cookie-isolated (#585) — automatic `Cookie` headers are disabled
+    ///     and the session gets a private, empty `HTTPCookieStorage`, so
+    ///     image fetches neither attach the host's ambient cookies nor store
+    ///     API `Set-Cookie` responses in the shared jar — regardless of the
+    ///     injected session's own cookie policy.
     ///   - cacheCountLimit: Maximum number of decoded images retained.
     ///   - cacheCostLimit: Byte budget for the decoded bitmaps retained in
     ///     the cache; each entry is charged its decoded bitmap size, so the
@@ -113,8 +122,18 @@ final class RemoteImageLoader {
         // configuration (protocol classes, timeouts, cache policy) so tests
         // and hosts keep intercepting requests, while giving the transport the
         // delegate callbacks it needs to enforce the byte cap mid-transfer.
+        // `session.configuration` is a copy, so the cookie isolation below
+        // never touches the session the host injected. Image fetches run on
+        // the shared session by default, which would otherwise attach ambient
+        // host cookies to image requests and persist API `Set-Cookie`
+        // responses into the host app's shared cookie jar; the SDK reads no
+        // cookies, so the rebuilt session gets its own empty jar and
+        // automatic cookie handling disabled (#585).
+        let configuration = session.configuration
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieStorage = HTTPCookieStorage()
         self.session = URLSession(
-            configuration: session.configuration,
+            configuration: configuration,
             delegate: transport,
             delegateQueue: nil
         )
@@ -200,6 +219,22 @@ func image(for url: URL) async throws -> PlatformImage {
     /// Number of URLs currently remembered as recently failed; internal so
     /// tests can assert the ledger stays bounded.
     var recentFailureCount: Int { recentFailures.count }
+
+    /// Whether the rebuilt session refuses automatic cookie attachment;
+    /// internal so tests can pin the cookie isolation of #585 directly —
+    /// a `URLProtocol`-captured request cannot prove the absence of cookie
+    /// handling, because Foundation's cookie machinery does not fully
+    /// engage behind a custom protocol.
+    var sessionDisablesAutomaticCookies: Bool {
+        !session.configuration.httpShouldSetCookies
+    }
+
+    /// Whether the rebuilt session carries a private cookie jar instead of
+    /// the host app's shared storage; internal so tests can pin the inbound
+    /// half of the #585 isolation the same way.
+    var sessionUsesAPrivateCookieJar: Bool {
+        session.configuration.httpCookieStorage !== HTTPCookieStorage.shared
+    }
 
     /// Number of downloads currently in flight; internal so tests can verify
     /// background task completion and table cleanup.

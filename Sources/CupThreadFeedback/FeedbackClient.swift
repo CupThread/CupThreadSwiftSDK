@@ -1,3 +1,7 @@
+// swiftlint:disable file_length
+// One client per file: the session-level contracts (redirect policy, cookie
+// isolation) are documented beside the code that enforces them, the same
+// policy the other oversized files follow (.swiftlint.yml).
 import Foundation
 
 /// Connection settings for a ``FeedbackClient``.
@@ -171,6 +175,20 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 /// delegate*, so every SDK call refuses cross-origin redirects no matter
 /// which session the client runs in — including a session injected here that
 /// carries no redirect policy of its own (#561, #571).
+///
+/// ## Cookie isolation
+///
+/// The default session is also cookie-isolated (#585): it neither sends nor
+/// stores cookies. Its configuration disables automatic `Cookie` headers and
+/// carries a private, empty `HTTPCookieStorage`, so cookies the host app
+/// holds for the API origin never attach to SDK requests, and API
+/// `Set-Cookie` responses never reach the host app's shared cookie jar —
+/// the SDK reads no cookies, so nothing is lost. The same isolation applies
+/// to the image loader session on SDK surfaces. Requests additionally set
+/// `httpShouldHandleCookies == false` per request, so even a session injected
+/// here with the host's shared jar stays cookie-free on SDK calls; note that
+/// such an injected session still owns whatever cookie policy its
+/// configuration carries for requests the host dispatches through it itself.
 public struct FeedbackClient: Sendable {
     /// The default maximum number of cursor pages to fetch during complete-data
     /// walks before gracefully stopping (100).
@@ -240,9 +258,19 @@ public struct FeedbackClient: Sendable {
     /// delegate — for the process lifetime. Hosts that issue their own
     /// requests against the same API origin can reuse this session to opt
     /// into the same policy.
+    ///
+    /// The session is cookie-isolated (issue #585): its configuration carries
+    /// `httpShouldSetCookies == false` and a private, empty
+    /// `HTTPCookieStorage`, so ambient cookies the host app holds for the API
+    /// origin are never attached to SDK requests and API `Set-Cookie`
+    /// responses never reach the host app's shared cookie jar. The SDK reads
+    /// no cookies, so nothing is lost.
     public static let defaultSession: URLSession = {
-        URLSession(
-            configuration: URLSessionConfiguration.default,
+        let configuration = URLSessionConfiguration.default
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieStorage = HTTPCookieStorage()
+        return URLSession(
+            configuration: configuration,
             delegate: SameOriginRedirectLimiter(),
             delegateQueue: nil
         )

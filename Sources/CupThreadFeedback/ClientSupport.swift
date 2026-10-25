@@ -90,6 +90,13 @@ extension FeedbackClient {
                 "^[A-Za-z0-9_.-]{1,\(AppKeyGrammar.maxLength)}$; no request was sent"
             )
         }
+        // Cookie isolation (#585): the SDK authenticates with explicit
+        // headers only, so ambient cookies the host app holds for the API
+        // origin must never ride along on SDK traffic — not even when the
+        // client runs in an injected session whose configuration keeps the
+        // shared cookie jar. Disabling per-request cookie handling also
+        // stops response `Set-Cookie`s from being stored.
+        request.httpShouldHandleCookies = false
         applyUserToken(userToken, to: &request)
         request.setValue(requestID, forHTTPHeaderField: "X-Request-Id")
         request.setValue(Self.sdkVersion, forHTTPHeaderField: "X-SDK-Version")
