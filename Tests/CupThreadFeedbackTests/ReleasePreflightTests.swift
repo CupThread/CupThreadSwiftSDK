@@ -437,7 +437,9 @@ struct ReleasePreflightTests {
             remoteTagCommitSha: null,
             remoteTagProbeError: null,
             githubRelease: null,
+            githubReleaseProbeError: null,
             cdnObject: null,
+            cdnProbeError: null,
             artifactSha256: null
         }, overrides);
     }
@@ -463,6 +465,13 @@ struct ReleasePreflightTests {
         { name: 'foreignLocalTag', facts: base({ localTagCommitSha: OTHER }) },
         { name: 'foreignRemoteTag', facts: base({ remoteTagCommitSha: OTHER }) },
         { name: 'remoteTagProbeFailure', facts: base({ remoteTagProbeError: 'offline' }) },
+        { name: 'githubReleaseProbeUnknown', facts: base({ githubReleaseProbeError: 'gh: HTTP 502: Bad Gateway' }) },
+        { name: 'cdnProbeUnknownBeforeBuild', facts: base({ cdnProbeError: 'curl: (28) Operation timed out' }) },
+        { name: 'cdnProbeUnknownWithPublishedRelease', facts: base({
+            artifactSha256: ARTIFACT,
+            cdnProbeError: 'curl: (6) Could not resolve host',
+            githubRelease: publishedRelease
+        }) },
         { name: 'localTagAtHeadUnpushed', facts: base({ localTagCommitSha: HEAD }) },
         { name: 'tagFullyPushed', facts: base({ localTagCommitSha: HEAD, remoteTagCommitSha: HEAD }) },
         { name: 'draftReleaseExists', facts: base({ githubRelease: { isDraft: true, assetNames: [], bodySha256: null } }) },
@@ -533,6 +542,12 @@ struct ReleasePreflightTests {
         "foreignLocalTag": Expectation(errorContains: ["exists locally"]),
         "foreignRemoteTag": Expectation(errorContains: ["already exists on origin"]),
         "remoteTagProbeFailure": Expectation(errorContains: ["Could not list remote tags"]),
+        "githubReleaseProbeUnknown": Expectation(errorContains: ["Could not look up the GitHub release v0.1.1"]),
+        "cdnProbeUnknownBeforeBuild": Expectation(errorContains: ["Could not verify whether the CDN object"]),
+        "cdnProbeUnknownWithPublishedRelease": Expectation(
+            errorContains: ["refusing to continue on an unverifiable publication state"],
+            completed: ["githubRelease"]
+        ),
         "localTagAtHeadUnpushed": Expectation(warningContains: ["has not been pushed"]),
         "tagFullyPushed": Expectation(completed: ["tag"]),
         "draftReleaseExists": Expectation(warningContains: ["draft GitHub release"]),

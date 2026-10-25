@@ -101,6 +101,13 @@ different artifact checksum, CDN object differing from a published release's
 build) is a hard error. Mismatches are never silently reconciled once a
 version is published.
 
+A **failed remote probe** (CDN or GitHub release lookup) is a hard error too,
+never a verified "absent": a transient network failure reported as "the
+object does not exist" would let a rerun overwrite a published artifact while
+exiting 0 (issue #583). The probes therefore distinguish a verified 404 /
+`release not found` from every other outcome, and every other outcome stops
+the run with an error. Rerun once connectivity is restored — a rerun re-probes.
+
 ## Preflight failures and remedies
 
 | Error | Remedy |
@@ -114,6 +121,7 @@ version is published.
 | Version not greater than latest tag | Pick a higher semver. |
 | Reserved version (`0.1.0`) | Publish `0.1.1` or later — see below. |
 | Tag exists elsewhere (local/remote) | Delete the local tag (`git tag -d vX.Y.Z`) only if you are sure it is from your own failed attempt; never move a remote tag. Release a new version instead. |
+| `Could not look up the GitHub release vX.Y.Z` / `Could not verify whether the CDN object … exists` | A transient probe failure (network blip, expired token, 5xx) — the run stops instead of guessing the remote state (issue #583). Check `gh auth status` / connectivity and rerun; a rerun re-probes. |
 | `HEAD`'s `SDKVersion.swift` is not the generated file for the release version | The script refuses to tag a mis-versioned source package, and refuses to build from content a tag at `HEAD` does not contain: commit the generated `Sources/CupThreadFeedback/SDKVersion.swift` (or rerun the release, which commits it). If `vX.Y.Z` already points at a commit without the bump, release a new version instead of moving the tag. |
 
 ## Failure recovery per publication stage
