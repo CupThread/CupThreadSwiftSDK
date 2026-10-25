@@ -261,7 +261,11 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidResponse``, or
     ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds
     ///   the client-side intake byte budget (BUG-18) — rejected locally with
-    ///   no network round trip; shorten the title/description and submit again.
+    ///   no network round trip; shorten the title/description and submit
+    ///   again. A draft whose fields exceed the server's per-field intake
+    ///   caps (#578) also throws ``FeedbackClientError/textTooLong`` locally,
+    ///   before the Turnstile token provider is consulted or any request is
+    ///   sent.
     ///   A draft whose trimmed `title` is shorter than
     ///   ``IntakeTextLimits/minTitleLength`` or whose trimmed `description`
     ///   is shorter than ``IntakeTextLimits/minDescriptionLength`` also throws
@@ -290,6 +294,7 @@ extension FeedbackClient {
         // trimmed token is sent identically in both transports.
         let identityToken = try validatedUserToken(userToken)
         try validateIntakeMinimums(in: draft)
+        try validateIntakeCaps(in: draft)
         let data = try await sendWithTurnstileRetry(
             accepted: [200, 201],
             challenge: .featureRequest(appKey: configuration.appKey),

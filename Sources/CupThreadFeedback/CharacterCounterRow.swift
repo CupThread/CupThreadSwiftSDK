@@ -3,7 +3,11 @@ import SwiftUI
 /// One-line character counter for a free-text intake field approaching its
 /// client-side cap (BUG-18). The composers show it once the field reaches
 /// 80% of its cap; past the cap it turns red and the submission gate
-/// disables sending. The cap itself is enforced by the gates — this row
+/// disables sending. The count is measured in Unicode code points (#578) —
+/// the unit the server's `minLength`/`maxLength` validation counts — so the
+/// number shown agrees with the server's verdict on multi-scalar input
+/// (emoji, decomposed accents), where user-perceived characters and code
+/// points diverge. The cap itself is enforced by the gates — this row
 /// explains it and names the field's budget, so an over-limit paste is
 /// actionable instead of failing server-side with file-flavored copy.
 struct CharacterCounterRow: View {
@@ -37,7 +41,9 @@ struct CharacterCounterRow: View {
 extension View {
     /// Renders the intake field's character-count row (BUG-18) for `text`
     /// against `limit`: hidden until the field reaches 80% of its cap, red
-    /// past it. The composers' `Form` sections pass `styledAsFormRow: true`
+    /// past it. The count is the trimmed Unicode code-point length (#578),
+    /// matching what the server validates. The composers' `Form` sections
+    /// pass `styledAsFormRow: true`
     /// for the transparent-row insets; plain surfaces (the comment composer)
     /// leave it `false`.
     @ViewBuilder

@@ -435,7 +435,10 @@ public struct FeedbackClient: Sendable {
     ///   ``FeedbackClientError/invalidResponse`` when the response cannot be interpreted, or
     ///   ``FeedbackClientError/textTooLong`` when the encoded payload exceeds the
     ///   client-side intake byte budget (BUG-18) — rejected locally with no network
-    ///   round trip; shorten the free-text fields and submit again.
+    ///   round trip; shorten the free-text fields and submit again. A draft whose
+    ///   fields exceed the server's per-field intake caps (#578) also throws
+    ///   ``FeedbackClientError/textTooLong`` locally, before the Turnstile token
+    ///   provider is consulted or any request is sent.
     ///   A draft whose trimmed `title` is shorter than
     ///   ``IntakeTextLimits/minTitleLength`` or whose trimmed `description` is
     ///   shorter than ``IntakeTextLimits/minDescriptionLength`` also throws
@@ -451,6 +454,7 @@ public struct FeedbackClient: Sendable {
         // preserves anonymous submission and attachment-store fallback.
         let validatedToken = try validatedUserToken(userToken)
         try validateIntakeMinimums(in: draft)
+        try validateIntakeCaps(in: draft)
         let uploadIds = draft.attachments.compactMap(\.uploadId).nilIfEmpty
         let effectiveUserToken = resolvedSubmitUserToken(validatedToken, hasAttachments: uploadIds != nil)
         let data = try await sendWithTurnstileRetry(

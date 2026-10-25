@@ -17,17 +17,29 @@ import Testing
 ///    offending field for all three draft types, the feedback state
 ///    machine's `canSubmit` gates on it, and the counter visibility
 ///    threshold behaves at the 80% boundary.
+/// 4. Lengths are measured in Unicode code points (#578) — the unit the
+///    server's `minLength`/`maxLength` validation counts — so multi-scalar
+///    input (flag sequences, ZWJ emoji, decomposed accents) is gated on its
+///    true wire length, and the headless intake methods reject over-cap
+///    drafts locally before any Turnstile token or network activity.
 @Suite("IntakeTextBudget", .serialized)
 struct IntakeTextBudgetTests {
     static let host = "intake-budget.example.com"
     static let baseURL = URL(string: "https://\(host)")!
 
     /// Multibyte payload that blows past the 128 KB byte budget while its
-    /// *character* count stays modest — pins byte-based measurement.
+    /// *character* count stays modest — pins byte-based measurement. It also
+    /// exceeds every per-field cap (#578), so the cap gate rejects such a
+    /// draft first (same `textTooLong` error, still with no network); the
+    /// byte budget itself is pinned directly by
+    /// `encodedIntakeBodyStillEnforcesTheByteBudget` below.
     static let multibyteOverBudgetBody = String(repeating: "あ", count: 50_000) // 150 KB UTF-8
-    /// ASCII payload safely under the budget — pins that the preflight does
-    /// not over-trigger on legitimately long text.
-    static let asciiUnderBudgetBody = String(repeating: "x", count: 60_000) // ~60 KB payload
+    /// Multibyte payloads within every per-field cap (#578) yet large on the
+    /// wire — pin that neither gate over-triggers on legitimately long
+    /// multibyte text.
+    static let feedbackUnderCapDescription = String(repeating: "あ", count: 9_000) // 27 KB UTF-8, ≤ 10 000 cp
+    static let featureRequestUnderCapDescription = String(repeating: "あ", count: 4_900) // 14.7 KB, ≤ 5 000 cp
+    static let commentUnderCapBody = String(repeating: "あ", count: 1_950) // 5.9 KB, ≤ 2 000 cp
 
     // MARK: Helpers
 
@@ -76,6 +88,10 @@ struct IntakeTextBudgetTests {
 
     // MARK: Feedback submit (requirement 1)
 
+    /// The oversized fixture exceeds the per-field caps (#578) as well as the
+    /// byte budget, so the cap gate rejects it first — both gates throw
+    /// `textTooLong` locally with no network activity, which is the pinned
+    /// contract here.
     @Test func oversizedFeedbackPayloadRejectsWithoutNetwork() async {
         let recorder = makeRecordingHandler()
         let client = makeClient()
@@ -121,13 +137,33 @@ struct IntakeTextBudgetTests {
         let client = makeClient()
         let draft = FeedbackDraft(
             title: "Long repro",
-            description: Self.asciiUnderBudgetBody,
+            description: Self.feedbackUnderCapDescription,
             platform: .ios
         )
 
         let result = try await client.submit(draft)
         #expect(result.submissionId == "s-1")
         #expect(recorder.requestCount == 1, "A payload under the budget must still reach the server")
+    }
+
+    /// The per-field caps (#578) reject intake drafts before the byte budget
+    /// is consulted, so the budget itself is pinned directly on
+    /// `encodedIntakeBody` with a payload no cap-respecting draft can build.
+    @Test func encodedIntakeBodyStillEnforcesTheByteBudget() throws {
+        let client = makeClient()
+        struct HugePayload: Encodable { let body: String }
+
+        do {
+            _ = try client.encodedIntakeBody(HugePayload(body: Self.multibyteOverBudgetBody))
+            Issue.record("Expected textTooLong, but the oversized payload encoded")
+        } catch FeedbackClientError.textTooLong {
+            // expected
+        } catch {
+            Issue.record("Expected .textTooLong, got \(error)")
+        }
+
+        let withinBudget = try client.encodedIntakeBody(HugePayload(body: Self.feedbackUnderCapDescription))
+        #expect(withinBudget.count <= IntakeTextLimits.maxSubmissionPayloadBytes)
     }
 
     // MARK: Feature-request submit (requirement 1)
@@ -167,7 +203,7 @@ struct IntakeTextBudgetTests {
         let client = makeClient()
         let draft = FeatureRequestDraft(
             title: "Idea",
-            description: Self.asciiUnderBudgetBody,
+            description: Self.featureRequestUnderCapDescription,
             requesterName: "Ada"
         )
 
@@ -211,7 +247,7 @@ struct IntakeTextBudgetTests {
             return (makeHTTPResponse(status: 201), try encodeJSON(["comment": comment]))
         }
         let client = makeClient()
-        let draft = CommentDraft(body: Self.asciiUnderBudgetBody)
+        let draft = CommentDraft(body: Self.commentUnderCapBody)
 
         let comment = try await client.postComment(featureRequestId: "fr-1", draft: draft, userToken: "user-token-1")
         #expect(comment.id == "c-1")
@@ -408,4 +444,5 @@ struct IntakeTextBudgetTests {
         #expect(CharacterCounterRow.isVisible(length: 201, limit: limit), "Over-cap drafts need the counter most")
         #expect(!CharacterCounterRow.isVisible(length: 0, limit: 0), "Degenerate limits stay hidden")
     }
-}
+
+    }
