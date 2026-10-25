@@ -4,54 +4,56 @@ import Testing
 
 @Suite("Search Admission Verdict Tests")
 struct SearchAdmissionVerdictTests {
-    @Test func duplicateQuerySkipDoesNotProduceRateLimitOutcome() async {
+    @Test func duplicateQuerySkipDoesNotProduceRateLimitOutcome() async throws {
         let throttle = SearchRequestThrottle(minimumInterval: .seconds(1.5))
 
         // First query is admitted
-        let firstAdmitted = await throttle.waitForAdmission(key: "query_1")
-        #expect(firstAdmitted)
+        #expect(await throttle.admissionVerdict(key: "query_1") == .admitted)
 
-        // Immediate second query with identical key is skipped as duplicate
-        let secondAdmitted = await throttle.waitForAdmission(key: "query_1")
-        #expect(!secondAdmitted)
-
-        // A duplicate skip must NOT surface a rate-limited outcome to the UI
-        // When checking whether an admission outcome should be presented for duplicate skips:
-        let outcome = SearchAdmissionOutcome.outcomeForDuplicateSkip()
-        #expect(outcome == nil)
+        // Immediate second query with identical key is skipped as duplicate,
+        // and that skip must NOT surface a rate-limited outcome to the UI.
+        let secondVerdict = try #require(await throttle.admissionVerdict(key: "query_1"))
+        #expect(secondVerdict == .duplicateSkipped)
+        #expect(SearchAdmissionOutcome.outcome(for: secondVerdict, hasExistingContent: true) == nil)
+        #expect(SearchAdmissionOutcome.outcome(for: secondVerdict, hasExistingContent: false) == nil)
     }
 
-    @Test func admissionVerdictDistinguishesDuplicateFromRateLimitedAndAdmitted() async {
+    @Test func admissionVerdictDistinguishesDuplicateFromRateLimitedAndAdmitted() async throws {
         let throttle = SearchRequestThrottle(minimumInterval: .seconds(1.5))
 
         // 1. First fetch is admitted
-        let firstVerdict = await throttle.admissionVerdict(key: "query_1")
+        let firstVerdict = try #require(await throttle.admissionVerdict(key: "query_1"))
         #expect(firstVerdict == .admitted)
         #expect(SearchAdmissionOutcome.outcome(for: firstVerdict, hasExistingContent: true) == nil)
         #expect(SearchAdmissionOutcome.outcome(for: firstVerdict, hasExistingContent: false) == nil)
 
         // 2. Immediate duplicate fetch returns duplicateSkipped
-        let secondVerdict = await throttle.admissionVerdict(key: "query_1")
+        let secondVerdict = try #require(await throttle.admissionVerdict(key: "query_1"))
         #expect(secondVerdict == .duplicateSkipped)
         #expect(SearchAdmissionOutcome.outcome(for: secondVerdict, hasExistingContent: true) == nil)
         #expect(SearchAdmissionOutcome.outcome(for: secondVerdict, hasExistingContent: false) == nil)
-        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: false, hasExistingContent: true, isDuplicate: true) == nil)
-        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: false, hasExistingContent: false, isDuplicate: true) == nil)
-        #expect(SearchAdmissionOutcome.outcome(isCancelled: false, hasExistingContent: true, isDuplicate: true) == nil)
-        #expect(SearchAdmissionOutcome.outcome(isCancelled: false, hasExistingContent: false, isDuplicate: true) == nil)
 
         // 3. Post-429 cooldown returns rateLimited and surfaces user notices
         await throttle.enterCooldown()
-        let thirdVerdict = await throttle.admissionVerdict(key: "query_2")
+        let thirdVerdict = try #require(await throttle.admissionVerdict(key: "query_2"))
         #expect(thirdVerdict == .rateLimited)
         let expectedNotice = CupThreadStrings.tr("cupthread.search.rate_limited")
         #expect(SearchAdmissionOutcome.outcome(for: thirdVerdict, hasExistingContent: true) == .inlineNotice(expectedNotice))
         #expect(SearchAdmissionOutcome.outcome(for: thirdVerdict, hasExistingContent: false) == .fullScreenError(expectedNotice))
     }
 
-    @Test func cancellationVerdictProducesNoOutcome() async {
-        #expect(SearchAdmissionOutcome.outcome(for: nil, hasExistingContent: true) == nil)
-        #expect(SearchAdmissionOutcome.outcome(for: nil, hasExistingContent: false) == nil)
+    /// A cancelled wait reaches no verdict at all: the throttle answers `nil`
+    /// rather than a denial, so a surface returns before it ever consults
+    /// ``SearchAdmissionOutcome`` and writes no state.
+    @Test func cancelledWaitYieldsNoVerdict() async {
+        let throttle = SearchRequestThrottle(
+            minimumInterval: .seconds(3600),
+            sleepUntil: { _ in throw CancellationError() }
+        )
+        #expect(await throttle.admissionVerdict(key: "query_1") == .admitted)
+        // A different key inside the spacing interval must wait; that wait is
+        // cancelled, so the result is `nil` — not `.rateLimited`.
+        #expect(await throttle.admissionVerdict(key: "query_2") == nil)
     }
 
     @Test func isDuplicateKeyReflectsLastAdmittedKey() async {

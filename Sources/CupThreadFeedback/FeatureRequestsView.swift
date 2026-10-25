@@ -276,7 +276,10 @@ public struct FeatureRequestsView: View {
             // 30/min per-IP search budget and skips duplicate queries.
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            let verdict = await client.searchThrottle.admissionVerdict(key: filterKey)
+            // A cancelled wait reaches no verdict (superseded keystroke or
+            // dismissed surface): leave the content and every state flag as
+            // they are.
+            guard let verdict = await client.searchThrottle.admissionVerdict(key: filterKey) else { return }
             guard verdict == .admitted else {
                 // Another instance armed the shared duplicate gate for this
                 // key, or this presentation's predecessor was cancelled
@@ -531,7 +534,7 @@ private extension FeatureRequestsView {
     /// recovered; the surface has already rendered the key otherwise and the
     /// skip stays silent (issue #529).
     @MainActor
-    private func recoversFromDuplicateSkip(_ verdict: SearchAdmissionVerdict?) async -> Bool {
+    private func recoversFromDuplicateSkip(_ verdict: SearchAdmissionVerdict) async -> Bool {
         guard verdict == .duplicateSkipped, !hasRenderedCurrentSearchKey else { return false }
         await client.searchThrottle.resetLastAdmittedKey()
         return true

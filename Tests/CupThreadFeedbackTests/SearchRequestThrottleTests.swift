@@ -446,37 +446,27 @@ struct SearchReloadOutcomeTests {
 
 @Suite("SearchAdmissionOutcome")
 struct SearchAdmissionOutcomeTests {
-    @Test func deniedAdmissionWithExistingContentPresentsInlineNotice() {
+    @Test func rateLimitedWithExistingContentPresentsInlineNotice() {
         let expected = CupThreadStrings.tr("cupthread.search.rate_limited")
         #expect(!expected.isEmpty)
-        #expect(SearchAdmissionOutcome.outcome(isCancelled: false, hasExistingContent: true) == .inlineNotice(expected))
-        #expect(
-            SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: false, hasExistingContent: true)
-                == .inlineNotice(expected)
-        )
+        #expect(SearchAdmissionOutcome.outcome(for: .rateLimited, hasExistingContent: true) == .inlineNotice(expected))
     }
 
-    @Test func deniedAdmissionWithoutExistingContentPresentsFullScreenError() {
+    @Test func rateLimitedWithoutExistingContentPresentsFullScreenError() {
         let expected = CupThreadStrings.tr("cupthread.search.rate_limited")
         #expect(!expected.isEmpty)
-        #expect(SearchAdmissionOutcome.outcome(isCancelled: false, hasExistingContent: false) == .fullScreenError(expected))
-        #expect(
-            SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: false, hasExistingContent: false)
-                == .fullScreenError(expected)
-        )
-    }
-
-    @Test func cancellationIsSuppressedRegardlessOfExistingContent() {
-        #expect(SearchAdmissionOutcome.outcome(isCancelled: true, hasExistingContent: true) == nil)
-        #expect(SearchAdmissionOutcome.outcome(isCancelled: true, hasExistingContent: false) == nil)
-        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: true, hasExistingContent: true) == nil)
-        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: false, isCancelled: true, hasExistingContent: false) == nil)
+        #expect(SearchAdmissionOutcome.outcome(for: .rateLimited, hasExistingContent: false) == .fullScreenError(expected))
     }
 
     @Test func admittedFetchProducesNoDenialOutcome() {
-        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: true, isCancelled: false, hasExistingContent: true) == nil)
-        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: true, isCancelled: false, hasExistingContent: false) == nil)
-        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: true, isCancelled: true, hasExistingContent: true) == nil)
-        #expect(SearchAdmissionOutcome.outcome(wasAdmitted: true, isCancelled: true, hasExistingContent: false) == nil)
+        #expect(SearchAdmissionOutcome.outcome(for: .admitted, hasExistingContent: true) == nil)
+        #expect(SearchAdmissionOutcome.outcome(for: .admitted, hasExistingContent: false) == nil)
+    }
+
+    /// A duplicate skip is benign and must never read as a rate-limit denial,
+    /// with or without rendered content.
+    @Test func duplicateSkipProducesNoDenialOutcome() {
+        #expect(SearchAdmissionOutcome.outcome(for: .duplicateSkipped, hasExistingContent: true) == nil)
+        #expect(SearchAdmissionOutcome.outcome(for: .duplicateSkipped, hasExistingContent: false) == nil)
     }
 }
