@@ -668,6 +668,73 @@ struct PhotoMetadataStrippingTests {
         #expect(PhotoAttachmentHelper.stripGIFContainerMetadata(from: Data(malformedGIF)) == .unsafe)
     }
 
+    @Test func strippingSensitiveMetadataClearsVP8XFlagsOnPaddedVP8XContainer() {
+        // Regression: the VP8X flag-clear was keyed on the low byte of the
+        // 32-bit RIFF size, so a VP8X chunk whose declared size is a multiple
+        // of 256 (zero low byte) kept advertising EXIF/XMP after the matching
+        // top-level chunks were stripped.
+        let gpsMarker = "SEC10 GPS padded vp8x"
+        let xmpMarker = "SEC10 <x:xmpmeta>padded</x:xmpmeta>"
+        let fixture = createAnimatedWebPFixtureWithPaddedVP8X(
+            declaredPayloadSize: 256,
+            flags: 0x3E, // ICCP | alpha | EXIF | XMP | animation
+            exifMarker: gpsMarker,
+            xmpMarker: xmpMarker
+        )
+
+        #expect(fixture.data.range(of: Data(gpsMarker.utf8)) != nil)
+        #expect(fixture.data.range(of: Data(xmpMarker.utf8)) != nil)
+
+        let outcome = PhotoAttachmentHelper.stripWebPContainerMetadata(from: fixture.data)
+        guard case .sanitized(let stripped) = outcome else {
+            Issue.record("Expected .sanitized for padded-VP8X container, got \(outcome)")
+            return
+        }
+
+        // Both metadata payloads are gone and exactly those chunks removed...
+        #expect(stripped.range(of: Data(gpsMarker.utf8)) == nil)
+        #expect(stripped.range(of: Data(xmpMarker.utf8)) == nil)
+        #expect(stripped.count == fixture.data.count - fixture.metadataChunkByteCount)
+        // ...while the VP8X flags byte keeps ICCP (0x20), alpha (0x10), and
+        // the animation bit (0x02) but loses EXIF (0x08) and XMP (0x04).
+        let bytes = [UInt8](stripped)
+        #expect(bytes.count > 20)
+        #expect(bytes[20] == 0x32)
+    }
+
+    @Test func strippingSensitiveMetadataClearsVP8XFlagsAcrossDeclaredSizes() {
+        // The flag-clear guard must fire for every payload-bearing VP8X
+        // declared size — including the multiples of 256 whose low size byte
+        // is zero — and must never write into a size-0 VP8X, which carries no
+        // payload byte to patch.
+        for declaredSize in [0, 1, 10, 256, 512] {
+            let gpsMarker = "SEC10 GPS vp8x size \(declaredSize)"
+            let fixture = createAnimatedWebPFixtureWithPaddedVP8X(
+                declaredPayloadSize: declaredSize,
+                flags: 0x0A, // EXIF | animation
+                exifMarker: gpsMarker
+            )
+
+            let outcome = PhotoAttachmentHelper.stripWebPContainerMetadata(from: fixture.data)
+            guard case .sanitized(let stripped) = outcome else {
+                Issue.record("Expected .sanitized for size-\(declaredSize) VP8X container, got \(outcome)")
+                return
+            }
+
+            // The EXIF chunk is removed and everything else copied verbatim.
+            #expect(stripped.range(of: Data(gpsMarker.utf8)) == nil)
+            #expect(stripped.count == fixture.data.count - fixture.metadataChunkByteCount)
+
+            if declaredSize > 0 {
+                // The first VP8X payload byte is the flags byte: EXIF (0x08)
+                // and XMP (0x04) cleared, animation (0x02) untouched.
+                let bytes = [UInt8](stripped)
+                #expect(bytes.count > 20)
+                #expect(bytes[20] == 0x02)
+            }
+        }
+    }
+
     // MARK: - Test Fixture Helpers
 
     private func createTestImage(
@@ -765,6 +832,55 @@ struct PhotoMetadataStrippingTests {
         bytes[6] = UInt8(truncatingIfNeeded: riffSize >> 16)
         bytes[7] = UInt8(truncatingIfNeeded: riffSize >> 24)
         return (Data(bytes), chunk.count)
+    }
+
+    /// The animated WebP fixture rebuilt with a `VP8X` chunk that declares
+    /// `declaredPayloadSize` payload bytes — the canonical 10-byte payload
+    /// truncated or zero-padded, with `flags` OR-ed into its first byte —
+    /// followed by a top-level `EXIF` chunk (and `XMP ` chunk when
+    /// `xmpMarker` is set). The parseable-but-noncanonical shape the chunk
+    /// walker must survive while the sanitizer still clears the VP8X
+    /// metadata-presence flags.
+    private func createAnimatedWebPFixtureWithPaddedVP8X(
+        declaredPayloadSize: Int,
+        flags: UInt8,
+        exifMarker: String,
+        xmpMarker: String? = nil
+    ) -> (data: Data, metadataChunkByteCount: Int) {
+        var bytes = [UInt8](createAnimatedWebPFixture())
+        let canonicalPayload = Array(bytes[20..<30]) // flags byte, reserved bytes, canvas dimensions
+        var payload = Array(canonicalPayload.prefix(declaredPayloadSize))
+        payload.append(contentsOf: [UInt8](repeating: 0x00, count: declaredPayloadSize - payload.count))
+        if !payload.isEmpty { payload[0] = flags }
+
+        func riffChunk(fourCC: String, payloadBytes: [UInt8]) -> [UInt8] {
+            var chunk = Array(fourCC.utf8)
+            let size = UInt32(payloadBytes.count)
+            chunk += [
+                UInt8(truncatingIfNeeded: size),
+                UInt8(truncatingIfNeeded: size >> 8),
+                UInt8(truncatingIfNeeded: size >> 16),
+                UInt8(truncatingIfNeeded: size >> 24)
+            ]
+            chunk += payloadBytes
+            if payloadBytes.count % 2 == 1 { chunk.append(0x00) } // RIFF pad byte
+            return chunk
+        }
+
+        let vp8x = riffChunk(fourCC: "VP8X", payloadBytes: payload)
+        let metadataChunks = [riffChunk(fourCC: "EXIF", payloadBytes: exifTIFFPayloadWithGPSMarker(exifMarker))]
+            + (xmpMarker.map { [riffChunk(fourCC: "XMP ", payloadBytes: Array($0.utf8))] } ?? [])
+
+        bytes.replaceSubrange(12..<30, with: vp8x) // the canonical VP8X chunk
+        let metadata = metadataChunks.flatMap { $0 }
+        bytes.insert(contentsOf: metadata, at: 12 + vp8x.count)
+
+        let riffSize = UInt32(bytes.count - 8)
+        bytes[4] = UInt8(truncatingIfNeeded: riffSize)
+        bytes[5] = UInt8(truncatingIfNeeded: riffSize >> 8)
+        bytes[6] = UInt8(truncatingIfNeeded: riffSize >> 16)
+        bytes[7] = UInt8(truncatingIfNeeded: riffSize >> 24)
+        return (Data(bytes), metadata.count)
     }
 
     /// Minimal little-endian TIFF carrying a GPS IFD, followed by a unique

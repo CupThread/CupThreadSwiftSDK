@@ -115,9 +115,14 @@ extension PhotoAttachmentHelper {
         for range in chunks where !isMetadataChunk(fourCC(at: range.lowerBound, in: bytes)) {
             let outputChunkStart = output.count
             output.append(contentsOf: bytes[range])
-            if fourCC(at: range.lowerBound, in: bytes) == webPVP8XFourCC, bytes[range.lowerBound + 4] >= 1 {
+            if fourCC(at: range.lowerBound, in: bytes) == webPVP8XFourCC,
+               Int(le32(bytes, at: range.lowerBound + 4)) >= 1 {
                 // Clear the EXIF (0x08) and XMP (0x04) presence flags of the
-                // chunks removed above.
+                // chunks removed above. The guard must read the full 32-bit
+                // declared size, not just its low byte: a size that is a
+                // multiple of 256 has a zero low byte while still carrying
+                // the payload byte holding the flags. A size-0 VP8X has no
+                // payload byte at all and must not be patched.
                 output[outputChunkStart + 8] &= ~0x0C
             }
         }
