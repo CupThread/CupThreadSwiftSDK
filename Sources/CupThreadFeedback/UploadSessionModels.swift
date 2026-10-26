@@ -13,8 +13,14 @@ public struct FeedbackUploadFileSpec: Encodable, Equatable, Sendable {
     /// Declared MIME type, e.g. `"image/png"`. The server verifies it against
     /// the uploaded bytes' magic bytes.
     public var contentType: String
-    /// Declared size in bytes. The server enforces the session's per-file
-    /// limit when the bytes are streamed.
+    /// Declared size in bytes. Must be at least
+    /// ``UploadSessionLimits/minFileSizeBytes``: the session endpoint can only
+    /// answer a zero-byte or negative declaration with `400`, so
+    /// ``FeedbackClient/createUploadSession(files:userToken:turnstileToken:)``
+    /// refuses such a specification locally (issue #611). The server's
+    /// per-file *upper* limit is enforced on the streamed bytes and published
+    /// per session (``FeedbackUploadSession/effectiveMaxSizeBytes(for:)``), so
+    /// the floor is the only size bound the client can decide up front.
     public var sizeBytes: Int
 
     /// Creates a file specification for an upload session.
@@ -22,7 +28,8 @@ public struct FeedbackUploadFileSpec: Encodable, Equatable, Sendable {
     ///   - clientFileId: Caller-chosen id echoed back on the matching slot.
     ///   - filename: File name reported to the server.
     ///   - contentType: Declared MIME type.
-    ///   - sizeBytes: Declared size in bytes.
+    ///   - sizeBytes: Declared size in bytes; at least
+    ///     ``UploadSessionLimits/minFileSizeBytes``.
     public init(clientFileId: String, filename: String, contentType: String, sizeBytes: Int) {
         self.clientFileId = clientFileId
         self.filename = filename
@@ -77,20 +84,33 @@ enum UploadSessionTokenGrammar {
     }
 }
 
-/// Client-side bounds for upload-session creation (API-28).
+/// Client-side bounds for upload-session creation (API-28, issue #611).
 ///
-/// `POST /api/v1/uploads/sessions` accepts 1–8 `files` per session and can
-/// only answer anything else with `400`, so
+/// `POST /api/v1/uploads/sessions` accepts 1–8 `files` per session, each
+/// declaring at least one byte, and can only answer anything else with
+/// `400`, so
 /// ``FeedbackClient/createUploadSession(files:userToken:turnstileToken:)``
-/// refuses out-of-bounds arrays locally — before a Turnstile token is
+/// refuses out-of-bounds payloads locally — before a Turnstile token is
 /// consumed or any request is sent — instead of burning a single-use
-/// challenge on a guaranteed-failing round trip.
+/// challenge on a guaranteed-failing round trip. The server validates the
+/// payload as one object, so one bad specification fails the whole array
+/// and a partial session is never created.
 public enum UploadSessionLimits: Sendable {
     /// The file-count range the session endpoint accepts: one specification
     /// per pre-allocated slot, at least one file, at most eight — the same
     /// cap the feedback submission endpoint enforces on referenced
     /// `uploadId`s.
     public static let allowedFileCountRange = 1...8
+
+    /// The smallest declared file size the session endpoint accepts
+    /// (`CreateUploadSessionFileInput.sizeBytes` `minimum: 1`). A
+    /// ``FeedbackUploadFileSpec/sizeBytes`` below this floor is refused
+    /// locally with ``FeedbackClientError/invalidResponse``, the same
+    /// rejection as an out-of-range file count. The per-file *upper* bound
+    /// is a session property the server enforces on the streamed bytes
+    /// (``FeedbackUploadSession/effectiveMaxSizeBytes(for:)``), so this floor
+    /// is the only size bound the client can decide before a session exists.
+    public static let minFileSizeBytes = 1
 }
 
 /// An upload session created via `POST /api/v1/uploads/sessions`.

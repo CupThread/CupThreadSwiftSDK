@@ -15,9 +15,11 @@ extension FeedbackClient {
     /// via the configured `authenticationProvider`.
     ///
     /// - Parameters:
-    ///   - files: One specification per file to pre-allocate (1–8). An empty
-    ///     array or more than ``UploadSessionLimits/allowedFileCountRange``
-    ///     entries is rejected locally — see the throws list.
+    ///   - files: One specification per file to pre-allocate (1–8), each
+    ///     declaring at least ``UploadSessionLimits/minFileSizeBytes``. An
+    ///     empty array, more than ``UploadSessionLimits/allowedFileCountRange``
+    ///     entries, or any zero-byte or negative `sizeBytes` is rejected
+    ///     locally — see the throws list.
     ///   - userToken: Anonymous end-user token sent as `X-User-Token`.
     ///   - turnstileToken: Optional Turnstile token for apps that require one.
     ///     When `nil`, the client's `turnstileTokenProvider` is consulted as a
@@ -45,9 +47,13 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   / ``FeedbackClientError/invalidResponse`` for other failures. A
     ///   `files` array outside ``UploadSessionLimits/allowedFileCountRange``
-    ///   (empty, or more than eight entries) also throws
-    ///   ``FeedbackClientError/invalidResponse`` locally (API-28), before the
-    ///   Turnstile token provider is consulted or any request is sent.
+    ///   (empty, or more than eight entries — API-28) or containing a
+    ///   specification whose `sizeBytes` is below
+    ///   ``UploadSessionLimits/minFileSizeBytes`` (zero or negative — issue
+    ///   #611) also throws ``FeedbackClientError/invalidResponse`` locally,
+    ///   before the Turnstile token provider is consulted or any request is
+    ///   sent; the whole array is refused, so a partial session is never
+    ///   created.
     public func createUploadSession(
         files: [FeedbackUploadFileSpec],
         userToken: String?,
@@ -58,6 +64,7 @@ extension FeedbackClient {
         // preserves the app-key-scoped store fallback.
         let validatedToken = try validatedUserToken(userToken)
         try validateUploadFileCount(files)
+        try validateUploadFileSizes(files)
 
         struct CreateSessionPayload: Encodable, Sendable {
             let appKey: String
@@ -247,7 +254,8 @@ extension FeedbackClient {
     /// feedback submission.
     ///
     /// - Parameters:
-    ///   - data: The raw file bytes.
+    ///   - data: The raw file bytes; at least one byte. Empty data is
+    ///     rejected locally — see the throws list.
     ///   - filename: Name shown in the console, e.g. `"screenshot.png"`.
     ///   - mimeType: The file's MIME type, e.g. `"image/png"`. Only PNG,
     ///     JPEG, WebP, and GIF are accepted by the server.
@@ -258,9 +266,12 @@ extension FeedbackClient {
     ///     `turnstileTokenProvider` is consulted as a fallback.
     /// - Returns: The uploaded attachment, carrying its `uploadId` for
     ///   `FeedbackDraft.attachments`.
-    /// - Throws: ``FeedbackClientError/unsupportedMediaType`` when the type
-    ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
-    ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
+    /// - Throws: ``FeedbackClientError/invalidResponse`` when `data` is empty
+    ///   — the session endpoint requires `sizeBytes ≥ 1` (issue #611), so the
+    ///   call is refused before the Turnstile token provider is consulted or
+    ///   any request is sent; ``FeedbackClientError/unsupportedMediaType`` when
+    ///   the type is not accepted, ``FeedbackClientError/payloadTooLarge`` when
+    ///   it exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
     ///   when no identity could be presented,
     ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
     ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
@@ -309,6 +320,8 @@ extension FeedbackClient {
     ///
     /// - Parameters:
     ///   - fileURL: URL of the file to upload; its bytes are sent unmodified.
+    ///     The file must hold at least one byte — an empty file is rejected
+    ///     locally — see the throws list.
     ///   - filename: Name shown in the console, e.g. `"screenshot.png"`.
     ///   - mimeType: The file's MIME type, e.g. `"image/png"`. Only PNG,
     ///     JPEG, WebP, and GIF are accepted by the server.
@@ -319,7 +332,12 @@ extension FeedbackClient {
     ///     `turnstileTokenProvider` is consulted as a fallback.
     /// - Returns: The uploaded attachment, carrying its `uploadId` for
     ///   `FeedbackDraft.attachments`.
-    /// - Throws: ``FeedbackClientError/unsupportedMediaType`` when the type
+    /// - Throws: ``FeedbackClientError/invalidResponse`` when the file is
+    ///   empty or its on-disk size cannot be read — the session endpoint
+    ///   requires `sizeBytes ≥ 1` (issue #611), so the call is refused before
+    ///   the Turnstile token provider is consulted or any request is sent
+    ///   (a missing file surfaces FileManager's own error);
+    ///   ``FeedbackClientError/unsupportedMediaType`` when the type
     ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
     ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
     ///   when no identity could be presented,
@@ -368,6 +386,21 @@ extension FeedbackClient {
     /// first — mirroring `FeedbackAttachmentStateMachine` without the UI.
     func validateUploadFileCount(_ files: [FeedbackUploadFileSpec]) throws {
         guard UploadSessionLimits.allowedFileCountRange.contains(files.count) else {
+            throw FeedbackClientError.invalidResponse
+        }
+    }
+
+    /// Rejects any specification whose `sizeBytes` is below
+    /// ``UploadSessionLimits/minFileSizeBytes`` (issue #611) before a Turnstile
+    /// token is consumed or any request is built. The live
+    /// `CreateUploadSessionFileInput` schema requires `sizeBytes ≥ 1`, so a
+    /// zero-byte or negative declaration can only be answered with `400`; the
+    /// server validates the payload as one object, so one bad specification
+    /// fails the whole array and a partial session is never created. Same
+    /// local rejection as the sibling count check so both bounds read
+    /// identically to callers.
+    func validateUploadFileSizes(_ files: [FeedbackUploadFileSpec]) throws {
+        guard files.allSatisfy({ $0.sizeBytes >= UploadSessionLimits.minFileSizeBytes }) else {
             throw FeedbackClientError.invalidResponse
         }
     }
@@ -431,9 +464,19 @@ extension FeedbackClient {
         )
     }
 
+    /// The on-disk size of `fileURL`, failing closed: a `.size` attribute that
+    /// is missing or not representable as `Int` throws
+    /// ``FeedbackClientError/invalidResponse`` rather than reading as `0`,
+    /// which would make an unreadable attribute indistinguishable from an
+    /// empty file and — on the session-creation path — build a `sizeBytes: 0`
+    /// specification the server can only reject (issue #611). A missing file
+    /// surfaces FileManager's own error.
     private func fileSize(at fileURL: URL) throws -> Int {
         let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-        return attributes[.size] as? Int ?? 0
+        guard let size = attributes[.size] as? Int else {
+            throw FeedbackClientError.invalidResponse
+        }
+        return size
     }
 
     /// Resolves and validates an upload slot URL against the configured base URL.

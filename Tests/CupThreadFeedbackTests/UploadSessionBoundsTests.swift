@@ -2,11 +2,13 @@ import Foundation
 import Testing
 @testable import CupThreadFeedback
 
-/// Tests for the local 1–8 bounds check on `POST /api/v1/uploads/sessions`
-/// (`createUploadSession`, API-28). The endpoint accepts 1–8 `files` per
-/// session and can only answer anything else with `400`, so the client must
-/// refuse out-of-bounds arrays locally — before a Turnstile token is
-/// consumed and before any request is sent.
+/// Tests for the local payload bounds on `POST /api/v1/uploads/sessions`
+/// (`createUploadSession`): the 1–8 file-count range (API-28) and the
+/// per-file `sizeBytes ≥ 1` floor (issue #611). The endpoint can only answer
+/// anything else with `400`, so the client must refuse out-of-bounds payloads
+/// locally — before a Turnstile token is consumed and before any request is
+/// sent — and must refuse the array as a whole, because the server validates
+/// it as one object and a partial session must never be created.
 ///
 /// The suite uses its own mock host so it cannot stomp (or be stomped by)
 /// suites that share the default `test.example.com` handler.
@@ -69,11 +71,15 @@ struct UploadSessionBoundsTests {
     }
 
     private func spec(_ index: Int) -> FeedbackUploadFileSpec {
+        spec(index, sizeBytes: 10)
+    }
+
+    private func spec(_ index: Int, sizeBytes: Int) -> FeedbackUploadFileSpec {
         FeedbackUploadFileSpec(
             clientFileId: "file-\(index)",
             filename: "f\(index).png",
             contentType: "image/png",
-            sizeBytes: 10
+            sizeBytes: sizeBytes
         )
     }
 
@@ -142,12 +148,15 @@ struct UploadSessionBoundsTests {
         try await assertAccepted(fileCount: 8)
     }
 
-    /// Installs a counting 201 handler echoing one slot per requested file.
-    private func installSessionHandler(counter: RequestCounter) {
+    /// Installs a counting 201 handler echoing one slot per requested file,
+    /// optionally capturing the raw session-creation body for wire checks.
+    private func installSessionHandler(counter: RequestCounter, body: CaptureBox<Data>? = nil) {
         MockURLProtocol.setHandler(forHost: host) { request in
             counter.increment()
-            let body = parseJSONDict(bodyData(from: request) ?? Data())
-            let files = (body?["files"] as? [[String: Any]]) ?? []
+            let rawBody = bodyData(from: request) ?? Data()
+            body?.value = rawBody
+            let parsed = parseJSONDict(rawBody)
+            let files = (parsed?["files"] as? [[String: Any]]) ?? []
             let slots = files.map { file in
                 [
                     "clientFileId": file["clientFileId"] ?? "",
@@ -187,5 +196,95 @@ struct UploadSessionBoundsTests {
         #expect(session.files.count == fileCount)
         #expect(provider.wasConsulted)
         #expect(counter.value == 1)
+    }
+
+    // MARK: Per-file size floor (issue #611): sizeBytes < 1 is refused before any work
+
+    @Test func createUploadSessionRejectsZeroByteSpecLocally() async throws {
+        try await assertRejectedLocally(files: [spec(1, sizeBytes: 0)])
+    }
+
+    @Test func createUploadSessionRejectsNegativeSizeSpecLocally() async throws {
+        try await assertRejectedLocally(files: [spec(1, sizeBytes: -1)])
+    }
+
+    /// The server validates the payload as one object, so one bad
+    /// specification must fail the whole array: a partial session for the
+    /// valid entries must never be created, and no Turnstile token may be
+    /// spent on the attempt.
+    @Test func createUploadSessionRejectsMixedArrayWithOneZeroByteSpecAsAWhole() async throws {
+        try await assertRejectedLocally(files: [spec(1), spec(2, sizeBytes: 0), spec(3)])
+    }
+
+    // MARK: Size-floor boundary stays accepted (no off-by-one)
+
+    @Test func createUploadSessionAcceptsOneByteSpecAndEncodesItVerbatim() async throws {
+        let provider = ProviderBox()
+        let counter = RequestCounter()
+        let body = CaptureBox<Data>()
+        installSessionHandler(counter: counter, body: body)
+
+        let session = try await makeClient(provider: provider).createUploadSession(
+            files: [spec(1, sizeBytes: UploadSessionLimits.minFileSizeBytes)],
+            userToken: "tok"
+        )
+
+        #expect(session.files.count == 1)
+        #expect(provider.wasConsulted)
+        #expect(counter.value == 1)
+        let rawBody = try #require(body.value)
+        let payload = try #require(parseJSONDict(rawBody))
+        let files = try #require(payload["files"] as? [[String: Any]])
+        #expect(files.count == 1)
+        #expect(files.first?["sizeBytes"] as? Int == 1)
+    }
+
+    // MARK: One-shot helpers refuse an empty payload before a session is created
+
+    /// `uploadAttachment(data:filename:mimeType:)` forwards `data.count` as
+    /// the declared size, so empty data would build a `sizeBytes: 0`
+    /// specification. It must be refused before the Turnstile provider is
+    /// consulted and before the session POST is built.
+    @Test func uploadAttachmentDataRejectsEmptyDataBeforeSessionCreation() async throws {
+        let provider = ProviderBox()
+        let counter = RequestCounter()
+        installSessionHandler(counter: counter)
+
+        await #expect(throws: FeedbackClientError.invalidResponse) {
+            try await makeClient(provider: provider).uploadAttachment(
+                data: Data(),
+                filename: "empty.png",
+                mimeType: "image/png",
+                userToken: "tok"
+            )
+        }
+        #expect(!provider.wasConsulted, "Turnstile token must not be consumed for empty attachment data")
+        #expect(counter.value == 0, "No request may be sent for empty attachment data")
+    }
+
+    /// `uploadAttachment(fileURL:filename:mimeType:)` forwards the on-disk
+    /// size as the declared size, so a genuinely empty file would build a
+    /// `sizeBytes: 0` specification. It must be refused before the Turnstile
+    /// provider is consulted and before the session POST is built.
+    @Test func uploadAttachmentFileURLRejectsEmptyFileBeforeSessionCreation() async throws {
+        let fixtureURL = FileManager.default.temporaryDirectory
+            .appending(path: "cupthread-upload-bounds-empty-\(UUID().uuidString).png")
+        try Data().write(to: fixtureURL, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: fixtureURL) }
+
+        let provider = ProviderBox()
+        let counter = RequestCounter()
+        installSessionHandler(counter: counter)
+
+        await #expect(throws: FeedbackClientError.invalidResponse) {
+            try await makeClient(provider: provider).uploadAttachment(
+                fileURL: fixtureURL,
+                filename: "empty.png",
+                mimeType: "image/png",
+                userToken: "tok"
+            )
+        }
+        #expect(!provider.wasConsulted, "Turnstile token must not be consumed for an empty attachment file")
+        #expect(counter.value == 0, "No request may be sent for an empty attachment file")
     }
 }
