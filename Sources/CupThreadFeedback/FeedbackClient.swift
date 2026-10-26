@@ -469,7 +469,7 @@ public struct FeedbackClient: Sendable {
     ///   live contract, so `submit` keeps the blank/newline gate only — but
     ///   note the asymmetry: a non-UUID token feedback accepts here still
     ///   throws ``FeedbackClientError/invalidIdentityToken`` on
-    ///   ``FeedbackClient/submitFeatureRequest(draft:userToken:turnstileToken:)``,
+    ///   ``FeedbackClient/submitFeatureRequest(_:userToken:turnstileToken:)``,
     ///   the vote endpoints, and
     ///   ``FeedbackClient/createUploadSession(files:userToken:turnstileToken:)``
     ///   (issue #617), so pass a UUID string when one token is shared

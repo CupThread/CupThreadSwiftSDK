@@ -285,7 +285,7 @@ extension FeedbackClient {
     ///   endpoint (body `requesterToken` and the `X-User-Token` header), so
     ///   any other value could only be answered with `400 Validation failed`
     ///   after a single-use Turnstile challenge was consumed. Unlike
-    ///   ``FeedbackClient/submit(draft:platform:customFields:userToken:turnstileToken:)``,
+    ///   ``FeedbackClient/submit(_:userToken:turnstileToken:)``,
     ///   whose header is a plain string per the live contract, a token here
     ///   must be a UUID.
     ///

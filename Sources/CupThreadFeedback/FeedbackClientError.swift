@@ -248,17 +248,17 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// The SDK refused a caller-supplied end-user identity token locally,
     /// before any request was built, because the live contract types the
     /// identity as `format: uuid` on every path it was headed for (issue
-    /// #617): ``FeedbackClient/submitFeatureRequest(draft:userToken:turnstileToken:)``,
+    /// #617): ``FeedbackClient/submitFeatureRequest(_:userToken:turnstileToken:)``,
     /// ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``,
     /// ``FeedbackClient/removeVote(featureRequestId:userToken:)``, and
     /// ``FeedbackClient/createUploadSession(files:userToken:turnstileToken:)``
-    /// (including the ``FeedbackClient/uploadAttachment(data:contentType:session:filename:)``
+    /// (including the ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:turnstileToken:)``
     /// one-shots). Any other value — an internal user id, an email, a hashed
     /// id — could only be answered by the server with `400 Validation
     /// failed`, *after* a single-use Turnstile challenge had been consumed.
     /// Nothing was sent here: no Turnstile token was consumed and no request
     /// id exists. Pass a UUID string (``UserTokenStore`` mints one), and
-    /// note that ``FeedbackClient/submit(draft:platform:customFields:userToken:turnstileToken:)``
+    /// note that ``FeedbackClient/submit(_:userToken:turnstileToken:)``
     /// keeps the plain-string #493 gate — a token feedback accepts can still
     /// fail votes, proposals, and uploads unless it is a UUID.
     case invalidIdentityToken
