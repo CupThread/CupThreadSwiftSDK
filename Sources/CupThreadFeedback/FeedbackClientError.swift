@@ -160,16 +160,21 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// users.
     case reservedPlanValue(message: String?, requestId: String?)
     /// An email-bearing intake call carried an address that cannot succeed:
-    /// either the SDK rejected it locally as implausibly shaped or over the
-    /// 254-code-point cap before any request was sent (issue #606 — the same
-    /// gate `subscribeToChangelog` applies, #419), or the server answered the
-    /// residual `400 Validation failed` whose field errors name the email
-    /// field the local gate deliberately leaves to the server (edge-case-but-
-    /// real shapes `EmailShape` accepts and the server's Zod schema rejects).
-    /// Correct the address and retry. `field` names the offending wire field
+    /// either the SDK rejected it locally as implausibly shaped before any
+    /// request was sent (issue #606 — the same gate `subscribeToChangelog`
+    /// applies, #419), or the server answered the residual `400 Validation
+    /// failed` whose field errors name the email field the local gate
+    /// deliberately leaves to the server (edge-case-but-real shapes
+    /// `EmailShape` accepts and the server's Zod schema rejects). Over the
+    /// 254-code-point cap only ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``
+    /// rejects the address locally with this error; `submit` answers an
+    /// over-cap `reporterEmail` with ``FeedbackClientError/textTooLong``
+    /// instead, because its caps gate runs first. Correct the address and
+    /// retry. `field` names the offending wire field
     /// (`reporterEmail` on feedback submissions, `shipNotifyEmail` on votes)
-    /// for diagnostics; `requestId` is the response's `X-Request-Id` when the
-    /// rejection came from the server, `nil` when it was decided locally.
+    /// for diagnostics; `requestId` is the response's
+    /// `X-Request-Id` when the rejection came from the server, `nil` when it
+    /// was decided locally.
     case invalidEmailAddress(field: String, requestId: String?)
     /// A payment-attribute report tried to clear an attribute the live
     /// `EndUserAttributesInput` schema does not allow to be cleared

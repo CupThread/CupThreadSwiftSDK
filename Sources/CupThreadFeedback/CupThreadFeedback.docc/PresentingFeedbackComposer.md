@@ -100,6 +100,34 @@ let attachment = try await client.uploadAttachment(
 )
 ```
 
+### Email validation contract
+
+Both email-bearing intake calls — ``FeedbackClient/submit(_:userToken:turnstileToken:)``
+(``FeedbackDraft/reporterEmail``) and
+``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``
+(``shipNotifyEmail``) — validate the address locally before any network work,
+so a malformed address never consumes a Turnstile token or a round trip:
+
+- A **blank or whitespace-only** address keeps its field-omitted semantics;
+  nothing is sent.
+- A **present but implausibly shaped** address (`user@@example.com`,
+  `foo@`, `user@localhost`, …) throws
+  ``FeedbackClientError/invalidEmailAddress(field:requestId:)`` locally — the
+  same plausibility gate the changelog subscribe path applies. The check is
+  deliberately looser than the server's, so nothing the server would accept
+  is rejected here; an edge-case address that still earns the server's `400`
+  field error maps to the same typed error, with the response's request id.
+- A **present but over-long** address is a length problem, not a shape
+  problem: `submit` answers an over-cap `reporterEmail` with
+  ``FeedbackClientError/textTooLong`` from the intake caps gate, while
+  `castVote` rejects an over-254-code-point `shipNotifyEmail` with
+  ``FeedbackClientError/invalidEmailAddress(field:requestId:)``.
+
+The composer's orange contact-field hint stays non-blocking by design; when
+a submission does fail on the email, the composer renders the typed error's
+localized copy ("Please enter a valid email address.") instead of a generic
+failure message.
+
 ## Human verification (Turnstile)
 
 The CupThread API gates feedback and feature-request submissions behind
