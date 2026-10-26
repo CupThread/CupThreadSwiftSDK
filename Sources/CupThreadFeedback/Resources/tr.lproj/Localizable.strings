@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "Ödeme ayrıntıları güncellenmedi: bu öznitelik temizlenemez. Yalnızca plan ve aylık gelir sıfırlanabilir; diğerlerini değiştirmeden bırakın veya bir değer gönderin.";
 "cupthread.error.attribute_invalid" = "Ödeme ayrıntıları güncellenmedi: bir öznitelik değeri izin verilen aralığın dışında. 1–64 karakterlik bir plan adı, 0 ile 1.000.000 arasında aylık gelir ve üç harfli bir para birimi kodu kullanın.";
 "cupthread.error.email_invalid" = "Lütfen geçerli bir e-posta adresi girin.";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "Çok fazla ek var: bir gönderim en fazla 8 dosya içerebilir. Lütfen bazı ekleri kaldırıp tekrar deneyin.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Bu geri bildirim veya ek zaten gönderildi.";

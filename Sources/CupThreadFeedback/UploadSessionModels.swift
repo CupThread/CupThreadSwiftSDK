@@ -99,7 +99,10 @@ public enum UploadSessionLimits: Sendable {
     /// The file-count range the session endpoint accepts: one specification
     /// per pre-allocated slot, at least one file, at most eight — the same
     /// cap the feedback submission endpoint enforces on referenced
-    /// `uploadId`s.
+    /// `uploadId`s, published for that endpoint as
+    /// ``FeedbackSubmissionLimits/maxAttachmentCount`` (#613). The two
+    /// bounds are separate schema properties with their own parity
+    /// tripwires, so each is declared where its endpoint is defined.
     public static let allowedFileCountRange = 1...8
 
     /// The smallest declared file size the session endpoint accepts

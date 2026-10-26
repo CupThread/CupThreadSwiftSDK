@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "Betalingsdetaljene ble ikke oppdatert: dette attributtet kan ikke tømmes. Bare plan og månedlig inntekt kan nullstilles; la de andre stå uendret eller send en verdi.";
 "cupthread.error.attribute_invalid" = "Betalingsdetaljene ble ikke oppdatert: en attributtverdi er utenfor tillatt område. Bruk et plannavn på 1–64 tegn, månedlig inntekt mellom 0 og 1 000 000 og en valutakode på tre bokstaver.";
 "cupthread.error.email_invalid" = "Vennligst oppgi en gyldig e-postadresse.";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "For mange vedlegg: en innsending kan inneholde opptil 8 filer. Fjern noen vedlegg og prøv igjen.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Denne tilbakemeldingen eller vedlegget er allerede sendt.";

@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "Os dados de pagamento não foram atualizados: este atributo não pode ser limpo. Apenas o plano e a receita mensal podem ser redefinidos; deixe os demais inalterados ou envie um valor.";
 "cupthread.error.attribute_invalid" = "Os dados de pagamento não foram atualizados: um valor de atributo está fora do intervalo permitido. Use um nome de plano de 1 a 64 caracteres, receita mensal entre 0 e 1.000.000 e um código de moeda de três letras.";
 "cupthread.error.email_invalid" = "Introduza um endereço de e-mail válido.";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "Demasiados anexos: um envio pode incluir até 8 ficheiros. Remova alguns anexos e tente novamente.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Este feedback ou anexo já foi enviado.";

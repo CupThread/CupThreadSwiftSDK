@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "Les informations de paiement n'ont pas été mises à jour : cet attribut ne peut pas être effacé. Seuls le forfait et le revenu mensuel peuvent être réinitialisés ; laissez les autres inchangés ou envoyez une valeur.";
 "cupthread.error.attribute_invalid" = "Les informations de paiement n'ont pas été mises à jour : une valeur d'attribut est hors plage. Utilisez un nom de forfait de 1 à 64 caractères, un revenu mensuel entre 0 et 1 000 000 et un code de devise à trois lettres.";
 "cupthread.error.email_invalid" = "Veuillez saisir une adresse e-mail valide.";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "Trop de pièces jointes : un envoi peut contenir jusqu'à 8 fichiers. Retirez quelques pièces jointes et réessayez.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Ce retour ou cette pièce jointe a déjà été envoyé.";

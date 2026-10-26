@@ -90,9 +90,25 @@ extension FeedbackClient {
         return nil
     }
 
+    /// Maps the `POST /api/v1/feedback` attachment-reference field errors
+    /// (`uploadIds`, and the legacy `attachments` array) to the
+    /// attachment-count typed error (issue #613). Only that endpoint's input
+    /// schema carries these fields, so the mapping cannot misfire on another
+    /// endpoint's 400. Returns `nil` when neither field is named.
+    private static func attachmentReferenceTypedError(
+        fieldErrors: [String: [String]]?,
+        envelopeMessage: String?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        guard fieldErrors?["uploadIds"] != nil || fieldErrors?["attachments"] != nil else { return nil }
+        return .tooManyAttachments(message: envelopeMessage, requestId: requestId)
+    }
+
     /// Maps status 400 failure envelopes to typed errors (uploader identity/mismatch,
-    /// invalid parent comment, disallowed MIME / executable extension, and the
-    /// reserved-plan-sentinel field error of `PUT /api/v1/public/apps/{appKey}/user`).
+    /// invalid parent comment, disallowed MIME / executable extension, the
+    /// reserved-plan-sentinel and attribute-value field errors of
+    /// `PUT /api/v1/public/apps/{appKey}/user`, and the email and
+    /// attachment-reference field errors of the intake endpoints).
     private static func badRequestTypedError(
         code: String?,
         envelopeMessage: String?,
@@ -121,6 +137,21 @@ extension FeedbackClient {
         }
         if fieldErrors?["shipNotifyEmail"] != nil {
             return .invalidEmailAddress(field: "shipNotifyEmail", requestId: requestId)
+        }
+        // Attachment references the local count gate (#613) leaves to the
+        // server — a cap tightened server-side before the SDK's constant
+        // followed (the parity tripwire catches that in CI, not in shipped
+        // hosts), or an individual `uploadId` outside the item bounds —
+        // answer `400 Validation failed` naming `uploadIds` (or the legacy
+        // `attachments` array). Surface the same typed error the local gate
+        // throws, with the response's request id, instead of generic
+        // unexpected-status copy.
+        if let attachmentReferenceError = attachmentReferenceTypedError(
+            fieldErrors: fieldErrors,
+            envelopeMessage: envelopeMessage,
+            requestId: requestId
+        ) {
+            return attachmentReferenceError
         }
         // Attribute values the local bounds gate (#607) deliberately lets
         // through (e.g. astral-plane plan names the code-point gate accepts

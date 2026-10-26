@@ -168,7 +168,13 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
     public var metadata: [String: String]
     /// References returned by the ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)``
     /// and ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:)`` variants.
-    /// Their `uploadId`s are sent with the submission.
+    /// Their `uploadId`s are sent with the submission — at most
+    /// ``FeedbackSubmissionLimits/maxAttachmentCount`` of them (#613): the
+    /// live schema caps the array at 8, and
+    /// ``FeedbackClient/submit(_:userToken:turnstileToken:)`` refuses a
+    /// longer draft locally with
+    /// ``FeedbackClientError/tooManyAttachments(message:requestId:)`` rather
+    /// than spend a Turnstile challenge on a guaranteed rejection.
     public var attachments: [FeedbackAttachment]
 
     /// Creates a draft. All fields except `platform` default to empty.

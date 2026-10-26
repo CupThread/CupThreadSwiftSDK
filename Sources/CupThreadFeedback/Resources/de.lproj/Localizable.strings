@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "Zahlungsinformationen wurden nicht aktualisiert: Dieses Attribut kann nicht geleert werden. Nur Plan und monatlicher Umsatz können zurückgesetzt werden; lassen Sie die übrigen unverändert oder senden Sie einen Wert.";
 "cupthread.error.attribute_invalid" = "Zahlungsinformationen wurden nicht aktualisiert: Ein Attributwert liegt außerhalb des erlaubten Bereichs. Verwenden Sie einen Plannamen mit 1–64 Zeichen, einen monatlichen Umsatz zwischen 0 und 1.000.000 und einen dreibuchstabigen Währungscode.";
 "cupthread.error.email_invalid" = "Bitte geben Sie eine gültige E-Mail-Adresse ein.";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "Zu viele Anhänge: Eine Einsendung kann bis zu 8 Dateien enthalten. Bitte entferne einige Anhänge und versuche es erneut.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Dieses Feedback oder dieser Anhang wurde bereits übermittelt.";

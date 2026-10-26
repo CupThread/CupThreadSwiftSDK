@@ -50,6 +50,7 @@ struct ErrorDescriptionLocalizationTests {
         "cupthread.error.attribute_not_clearable",
         "cupthread.error.attribute_invalid",
         "cupthread.error.email_invalid",
+        "cupthread.error.too_many_attachments",
         "cupthread.attachment.oversized",
         "cupthread.attachment.unprocessable",
         "cupthread.attachment.unsupported_type"
@@ -114,6 +115,10 @@ struct ErrorDescriptionLocalizationTests {
         assertResolvesThroughCatalog(
             .invalidEmailAddress(field: "reporterEmail"),
             "cupthread.error.email_invalid"
+        )
+        assertResolvesThroughCatalog(
+            .tooManyAttachments(message: nil, requestId: nil),
+            "cupthread.error.too_many_attachments"
         )
     }
 
