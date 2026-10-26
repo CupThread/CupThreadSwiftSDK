@@ -153,9 +153,13 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
     public var reporterEmail: String
     /// Platform reported with the submission.
     public var platform: FeedbackPlatform
-    /// The host app's marketing version, e.g. `"2.1.0"`.
+    /// The host app's marketing version, e.g. `"2.1.0"`. Values longer than
+    /// ``IntakeTextLimits/maxVersionLength`` code points are truncated on
+    /// the wire, not rejected (#618).
     public var appVersion: String
-    /// The host app's build number, e.g. `"142"`.
+    /// The host app's build number, e.g. `"142"`. Values longer than
+    /// ``IntakeTextLimits/maxVersionLength`` code points are truncated on
+    /// the wire, not rejected (#618).
     public var buildNumber: String
     /// Free-form key/value pairs merged into the submission for triage.
     ///

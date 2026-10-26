@@ -2,14 +2,16 @@ import Foundation
 import Testing
 @testable import CupThreadFeedback
 
-/// Schema-parity guard for the attachment references on
-/// `POST /api/v1/feedback` (issue #613): the cap
+/// Schema-parity guard for the bounded `FeedbackSubmissionInput` fields on
+/// `POST /api/v1/feedback`: the cap
 /// ``FeedbackSubmissionLimits/maxAttachmentCount`` enforces locally must
 /// equal the `maxItems` the live OpenAPI document publishes on
 /// `FeedbackSubmissionInput.uploadIds` (and on the legacy `attachments`
-/// array the same typed error covers). When the server's contract drifts,
-/// this suite fails a test instead of a host's production submission. The
-/// sibling bounds are guarded the same way by
+/// array the same typed error covers), and the version-string clamp
+/// ``IntakeTextLimits/maxVersionLength`` must equal the live `maxLength` on
+/// `appVersion`/`buildNumber` (issue #618). When the server's contract
+/// drifts, this suite fails a test instead of a host's production
+/// submission. The sibling bounds are guarded the same way by
 /// ``UploadSessionSchemaParityTests`` and ``EndUserAttributesSchemaParityTests``.
 @Suite("FeedbackSubmissionSchemaParity", .serialized)
 struct FeedbackSubmissionSchemaParityTests {
@@ -19,6 +21,7 @@ struct FeedbackSubmissionSchemaParityTests {
     private struct OpenAPIProperty: Decodable {
         let type: String?
         let maxItems: Int?
+        let maxLength: Int?
     }
 
     private struct OpenAPISchemaObject: Decodable {
@@ -127,5 +130,31 @@ struct FeedbackSubmissionSchemaParityTests {
             maxItems \(attachments.maxItems.map(String.init(describing:)) ?? "none") (issue #613).
             """
         )
+    }
+
+    /// ``IntakeTextLimits/maxVersionLength`` equals the live
+    /// `FeedbackSubmissionInput.appVersion.maxLength` and
+    /// `.buildNumber.maxLength` (issue #618): the clamp cuts the wire value
+    /// at the bound the server actually enforces, so drift here means the
+    /// SDK either still sends a doomed submission (SDK bound too high) or
+    /// truncates harder than the server requires (SDK bound too low).
+    @Test func sdkVersionLengthCapMatchesLiveSchema() async throws {
+        guard let input = try await Self.liveSubmissionInputProperties() else { return }
+        for field in ["appVersion", "buildNumber"] {
+            let property = try #require(
+                input[field],
+                "The live schema no longer carries FeedbackSubmissionInput.\(field)"
+            )
+
+            #expect(property.type == "string")
+            #expect(
+                property.maxLength == IntakeTextLimits.maxVersionLength,
+                """
+                Version-string cap drift: the SDK clamps \(field) to \
+                \(IntakeTextLimits.maxVersionLength) code points but the live schema publishes \
+                maxLength \(property.maxLength.map(String.init(describing:)) ?? "none") (issue #618).
+                """
+            )
+        }
     }
 }

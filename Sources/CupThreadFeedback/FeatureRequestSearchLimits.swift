@@ -37,14 +37,6 @@ public enum FeatureRequestSearchLimits: Sendable {
     static func sanitizedQuery(_ query: String?) -> String? {
         guard let trimmed = query?.nilIfEmpty else { return nil }
         guard trimmed.unicodeScalars.count > maxQueryLength else { return trimmed }
-        var codePoints = 0
-        var endIndex = trimmed.startIndex
-        for character in trimmed {
-            let clusterLength = character.unicodeScalars.count
-            guard codePoints + clusterLength <= maxQueryLength else { break }
-            codePoints += clusterLength
-            endIndex = trimmed.index(after: endIndex)
-        }
-        return String(trimmed[..<endIndex]).nilIfEmpty
+        return IntakeTextLimits.prefixFitting(trimmed, codePointCap: maxQueryLength).nilIfEmpty
     }
 }

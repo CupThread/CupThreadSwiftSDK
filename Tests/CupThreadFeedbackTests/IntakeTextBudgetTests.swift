@@ -386,6 +386,7 @@ struct IntakeTextBudgetTests {
         #expect(IntakeTextLimits.maxFeatureRequestDescriptionLength == 5_000)
         #expect(IntakeTextLimits.maxNameLength == 120)
         #expect(IntakeTextLimits.maxCommentLength == 2_000)
+        #expect(IntakeTextLimits.maxVersionLength == 64)
         #expect(IntakeTextLimits.minTitleLength == 3)
         #expect(IntakeTextLimits.minDescriptionLength == 5)
     }
