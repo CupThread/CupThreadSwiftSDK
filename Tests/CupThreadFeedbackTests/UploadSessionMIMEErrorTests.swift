@@ -29,7 +29,7 @@ struct UploadSessionMIMEErrorTests {
                 contentType: contentType,
                 sizeBytes: 128
             )],
-            userToken: "tok-test"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
     }
 
@@ -169,7 +169,7 @@ struct UploadSessionMIMEErrorTests {
                 data: Data("echo hello".utf8),
                 filename: "script.command",
                 mimeType: "application/x-sh",
-                userToken: "tok-test"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected unsupportedMediaType error")
         } catch let error as FeedbackClientError {
@@ -219,7 +219,7 @@ struct UploadSessionMIMEErrorTests {
                 data: Data([0x00, 0x01, 0x02]),
                 filename: "image.png",
                 mimeType: "image/png",
-                userToken: "tok-test"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected unsupportedMediaType error on PUT 415")
         } catch let error as FeedbackClientError {

@@ -23,7 +23,7 @@ struct UploadSessionPermissionMappingTests {
     private func makeUploadCall() async throws -> FeedbackUploadSession {
         try await makeAPIClient().createUploadSession(
             files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
     }
 

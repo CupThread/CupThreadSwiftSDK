@@ -179,7 +179,7 @@ struct FeedbackClientBearerTokenSecurityTests {
         let client = Self.makeSecurityClient(authenticationProvider: { malicious })
         _ = try await client.createUploadSession(
             files: [FeedbackUploadFileSpec(clientFileId: "f1", filename: "shot.png", contentType: "image/png", sizeBytes: 1024)],
-            userToken: "tok-123"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let req = try #require(capture.value)

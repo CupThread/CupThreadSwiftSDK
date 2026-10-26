@@ -72,7 +72,7 @@ struct DecodingErrorMappingTests {
         await expectInvalidResponse(status: 201, body: "[]") {
             _ = try await self.makeAPIClient().submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Long enough body"),
-                userToken: "tok-user"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
     }
@@ -84,7 +84,7 @@ struct DecodingErrorMappingTests {
             await expectInvalidResponse(status: 200, body: body) {
                 _ = try await self.makeAPIClient().castVote(
                     featureRequestId: "fr-vote-1",
-                    userToken: "tok-user"
+                    userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
                 )
             }
         }
@@ -95,7 +95,7 @@ struct DecodingErrorMappingTests {
             await expectInvalidResponse(status: 200, body: body) {
                 _ = try await self.makeAPIClient().removeVote(
                     featureRequestId: "fr-vote-1",
-                    userToken: "tok-user"
+                    userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
                 )
             }
         }
@@ -115,7 +115,7 @@ struct DecodingErrorMappingTests {
         await expectInvalidResponse(status: 200, body: "[]") {
             _ = try await self.makeAPIClient().subscribeToChangelog(
                 email: "user@example.com",
-                userToken: "tok-user"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
     }
@@ -186,7 +186,7 @@ struct DecodingErrorMappingTests {
         await expectInvalidResponse(status: 200, body: "[]") {
             _ = try await self.makeAPIClient().linkEndUser(
                 sessionToken: "sess-token",
-                userToken: "tok-user"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
     }

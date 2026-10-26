@@ -49,14 +49,14 @@ struct TurnstileVotingTests {
 
         let result = try await Self.makeAPIClient().castVote(
             featureRequestId: "fr-vote-1",
-            userToken: "tok-user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
         #expect(result.voted == true)
 
         let data = try #require(capture.value)
         let dict = try #require(parseJSONDict(data))
         #expect(dict["appKey"] as? String == "app_testkey123456")
-        #expect(dict["userToken"] as? String == "tok-user-1")
+        #expect(dict["userToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(dict["shipNotifyEmail"] == nil)
         #expect(dict["turnstileToken"] == nil)
         #expect(dict.count == 2)
@@ -72,7 +72,7 @@ struct TurnstileVotingTests {
 
         _ = try await Self.makeAPIClient().castVote(
             featureRequestId: "fr-vote-1",
-            userToken: "tok-user-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "voter@example.com",
             turnstileToken: "cf-turnstile-token-vote-12345"
         )
@@ -80,7 +80,7 @@ struct TurnstileVotingTests {
         let data = try #require(capture.value)
         let dict = try #require(parseJSONDict(data))
         #expect(dict["appKey"] as? String == "app_testkey123456")
-        #expect(dict["userToken"] as? String == "tok-user-1")
+        #expect(dict["userToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(dict["shipNotifyEmail"] as? String == "voter@example.com")
         #expect(dict["turnstileToken"] as? String == "cf-turnstile-token-vote-12345")
         #expect(dict.count == 4)
@@ -96,7 +96,7 @@ struct TurnstileVotingTests {
 
         _ = try await Self.makeAPIClient().castVote(
             featureRequestId: "fr-vote-1",
-            userToken: "tok-user-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             turnstileToken: "   padded-vote-token   \n"
         )
 
@@ -115,7 +115,7 @@ struct TurnstileVotingTests {
 
         _ = try await Self.makeAPIClient().castVote(
             featureRequestId: "fr-vote-1",
-            userToken: "tok-user-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             turnstileToken: "   \t\n  "
         )
 
@@ -144,7 +144,7 @@ struct TurnstileVotingTests {
 
         _ = try await client.castVote(
             featureRequestId: "fr-vote-provider",
-            userToken: "tok-user-provider"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let challenge = try #require(challengeCapture.value)
@@ -177,7 +177,7 @@ struct TurnstileVotingTests {
 
         let result = try await client.castVote(
             featureRequestId: "fr-vote-ship-notify",
-            userToken: "tok-user-ship-notify",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "voter@example.com"
         )
         #expect(result.voted == true)
@@ -229,7 +229,7 @@ struct TurnstileVotingTests {
 
         let result = try await client.castVote(
             featureRequestId: "fr-ship-retry",
-            userToken: "tok-ship-retry",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "voter@example.com",
             turnstileToken: "stale-explicit-token"
         )
@@ -256,7 +256,7 @@ struct TurnstileVotingTests {
         do {
             _ = try await Self.makeAPIClient().castVote(
                 featureRequestId: "fr-vote-anon",
-                userToken: "tok-anon"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected turnstileRequired error to be thrown")
         } catch let error as FeedbackClientError {
@@ -314,7 +314,7 @@ struct TurnstileVotingTests {
 
         let result = try await client.castVote(
             featureRequestId: "fr-retry",
-            userToken: "tok-retry"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
         #expect(result.voted == true)
         #expect(result.voteCount == 20)
@@ -334,7 +334,7 @@ struct TurnstileVotingTests {
 
         _ = try await Self.makeAPIClient().toggleVote(
             featureRequestId: "fr-vote-legacy",
-            userToken: "tok-user-legacy",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "legacy@example.com",
             turnstileToken: "token-via-toggle"
         )
@@ -360,7 +360,7 @@ struct TurnstileVotingTests {
 
         _ = try await client.removeVote(
             featureRequestId: "fr-vote-1",
-            userToken: "tok-user-2"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let data = try #require(capture.value)

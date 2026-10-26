@@ -13,8 +13,8 @@ import Testing
 @Suite("SEC30UserTokenValidation", .serialized)
 struct Sec30UserTokenValidationTests {
     static let apiHost = "sec30-user-token-validation.example.com"
-    static let paddedToken = "  tok-sec30-valid-9a8b7c  "
-    static let trimmedToken = "tok-sec30-valid-9a8b7c"
+    static let paddedToken = "  9a8b7c1d-2e3f-4a5b-8c9d-0e1f2a3b4c5d  "
+    static let trimmedToken = "9a8b7c1d-2e3f-4a5b-8c9d-0e1f2a3b4c5d"
     static let invalidTokens = [
         "",
         "   ",

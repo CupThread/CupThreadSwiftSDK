@@ -123,7 +123,7 @@ struct FreshSurfaceDuplicateSkipGuardTests {
     @Test @MainActor func freshFeatureRequestsViewHasNoRenderedKey() {
         let view = FeatureRequestsView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             initialSearchText: "dark"
         )
         #expect(!view.hasRenderedCurrentSearchKey)
@@ -132,7 +132,7 @@ struct FreshSurfaceDuplicateSkipGuardTests {
     @Test @MainActor func featureRequestsViewHonorsTheSkipForItsRenderedKey() {
         let view = FeatureRequestsView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             listState: FeatureRequestsListState(
                 lastExecutedQuery: "dark",
                 lastExecutedFilterKey: "features|true|dark|"
@@ -146,7 +146,7 @@ struct FreshSurfaceDuplicateSkipGuardTests {
     @Test @MainActor func featureRequestsViewDoesNotHonorADifferentQueryKey() {
         let view = FeatureRequestsView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             listState: FeatureRequestsListState(
                 lastExecutedQuery: "light",
                 lastExecutedFilterKey: "features|true|light|"
@@ -163,7 +163,7 @@ struct FreshSurfaceDuplicateSkipGuardTests {
         // only automatic loader.
         let view = FeatureRequestsView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             listState: FeatureRequestsListState(
                 lastExecutedQuery: "dark",
                 lastExecutedFilterKey: "features|true|dark|"
@@ -177,7 +177,7 @@ struct FreshSurfaceDuplicateSkipGuardTests {
     @Test @MainActor func freshRoadmapBoardHasNoRenderedKey() {
         let board = RoadmapBoardView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             initialSearchText: "dark",
             initialGroups: nil
         )
@@ -187,7 +187,7 @@ struct FreshSurfaceDuplicateSkipGuardTests {
     @Test @MainActor func roadmapBoardHonorsTheSkipForItsRenderedQuery() {
         let board = RoadmapBoardView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             initialSearchText: "dark",
             initialGroups: []
         )
@@ -199,7 +199,7 @@ struct FreshSurfaceDuplicateSkipGuardTests {
         // already holds a query whose admitted fetch was superseded.
         let board = RoadmapBoardView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             initialSearchText: "dark",
             initialGroups: [],
             lastExecutedQueryOverride: ""

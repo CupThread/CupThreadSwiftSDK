@@ -113,7 +113,7 @@ struct IntakeMinimumLengthTests {
         for (draft, field) in invalidDrafts {
             let (client, counter) = Self.makeCountingClient()
             await #expect(throws: FeedbackClientError.invalidInput(field: field)) {
-                _ = try await client.submitFeatureRequest(draft, userToken: "user-123")
+                _ = try await client.submitFeatureRequest(draft, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             }
             #expect(counter.callCount == 0, "An invalid draft must never consume a Turnstile token")
         }
@@ -137,13 +137,13 @@ struct IntakeMinimumLengthTests {
             title: String(repeating: "t", count: IntakeTextLimits.minTitleLength),
             description: String(repeating: "d", count: IntakeTextLimits.minDescriptionLength)
         )
-        let result = try await client.submitFeatureRequest(atMinimum, userToken: "user-123")
+        let result = try await client.submitFeatureRequest(atMinimum, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.featureRequestId == "fr-1")
         #expect(counter.callCount == 1, "A valid draft consumes exactly one Turnstile token")
 
         // Padded-but-valid drafts still dispatch and are trimmed on the wire.
         let padded = FeatureRequestDraft(title: "  abc  ", description: " abcde ")
-        _ = try await client.submitFeatureRequest(padded, userToken: "user-123")
+        _ = try await client.submitFeatureRequest(padded, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(counter.callCount == 2)
 
         let request = try #require(capture.value)

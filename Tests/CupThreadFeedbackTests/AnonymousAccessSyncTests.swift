@@ -287,7 +287,7 @@ struct AnonymousAccessSyncTests {
         do {
             _ = try await Self.makeAPIClient().submitFeatureRequest(
                 FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
-                userToken: "user-fr-propose-1"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected authenticationRequired")
         } catch let error as FeedbackClientError {
@@ -306,7 +306,7 @@ struct AnonymousAccessSyncTests {
         do {
             _ = try await Self.makeAPIClient().submitFeatureRequest(
                 FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
-                userToken: "user-fr-propose-1"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected authenticationRequired")
         } catch let error as FeedbackClientError {
@@ -329,7 +329,7 @@ struct AnonymousAccessSyncTests {
         do {
             _ = try await Self.makeAPIClient().submitFeatureRequest(
                 FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
-                userToken: "user-fr-propose-1"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected forbidden")
         } catch let error as FeedbackClientError {
@@ -360,7 +360,7 @@ struct AnonymousAccessSyncTests {
         do {
             _ = try await Self.makeAPIClient().submitFeatureRequest(
                 FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
-                userToken: "user-fr-propose-1"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected unexpectedStatus")
         } catch let error as FeedbackClientError {

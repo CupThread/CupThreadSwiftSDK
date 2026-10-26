@@ -279,6 +279,15 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidInput(field:)`` locally (BUG-32, #614),
     ///   before the Turnstile token provider is consulted or any request is
     ///   sent.
+    ///   A `userToken` that is not a UUID string also throws
+    ///   ``FeedbackClientError/invalidIdentityToken`` locally (issue #617) —
+    ///   the live contract types the identity as `format: uuid` on this
+    ///   endpoint (body `requesterToken` and the `X-User-Token` header), so
+    ///   any other value could only be answered with `400 Validation failed`
+    ///   after a single-use Turnstile challenge was consumed. Unlike
+    ///   ``FeedbackClient/submit(_:userToken:turnstileToken:)``,
+    ///   whose header is a plain string per the live contract, a token here
+    ///   must be a UUID.
     ///
     /// When the client was created with a `turnstileTokenProvider`, its token
     /// is sent as `turnstileToken`; the provider is consulted with the
@@ -299,8 +308,10 @@ extension FeedbackClient {
         // server treated the empty token as anonymous, the proposal would be
         // recorded with no end-user identity, silently breaking own-request
         // detection and vote linkage. Fail fast locally instead (#493); the
-        // trimmed token is sent identically in both transports.
-        let identityToken = try validatedUserToken(userToken)
+        // trimmed token is sent identically in both transports. A non-UUID
+        // value the server can only answer with `400` fails the same
+        // fail-fast gate (issue #617).
+        let identityToken = try validatedIdentityToken(userToken)
         try validateIntakeMinimums(in: draft)
         try validateIntakeCaps(in: draft)
         let data = try await sendWithTurnstileRetry(

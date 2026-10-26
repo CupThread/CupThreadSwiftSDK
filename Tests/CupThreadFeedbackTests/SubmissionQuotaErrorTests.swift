@@ -20,7 +20,7 @@ struct SubmissionQuotaErrorTests {
         do {
             _ = try await client.submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Description"),
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -44,7 +44,7 @@ struct SubmissionQuotaErrorTests {
         do {
             _ = try await client.submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Description"),
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -70,7 +70,7 @@ struct SubmissionQuotaErrorTests {
         do {
             _ = try await client.submit(
                 FeedbackDraft(title: "Title", description: "Description", platform: .ios),
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -97,7 +97,7 @@ struct SubmissionQuotaErrorTests {
         do {
             _ = try await client.submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Description"),
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -141,7 +141,7 @@ struct SubmissionQuotaErrorTests {
         do {
             _ = try await client.submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Description"),
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {

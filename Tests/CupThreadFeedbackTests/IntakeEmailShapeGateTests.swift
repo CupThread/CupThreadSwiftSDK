@@ -152,7 +152,7 @@ struct IntakeEmailShapeGateTests {
             await #expect(throws: FeedbackClientError.invalidEmailAddress(field: "shipNotifyEmail", requestId: nil)) {
                 _ = try await client.castVote(
                     featureRequestId: "fr-606",
-                    userToken: "user-606",
+                    userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
                     shipNotifyEmail: email
                 )
             }
@@ -174,7 +174,7 @@ struct IntakeEmailShapeGateTests {
         await #expect(throws: FeedbackClientError.invalidEmailAddress(field: "shipNotifyEmail", requestId: nil)) {
             _ = try await client.castVote(
                 featureRequestId: "fr-606",
-                userToken: "user-606",
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
                 shipNotifyEmail: over
             )
         }
@@ -186,7 +186,7 @@ struct IntakeEmailShapeGateTests {
         #expect(IntakeTextLimits.measuredLength(atCap) == 254)
         _ = try await client.castVote(
             featureRequestId: "fr-606",
-            userToken: "user-606",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: atCap
         )
         let sentRequest = try #require(capture.value)
@@ -201,7 +201,7 @@ struct IntakeEmailShapeGateTests {
         defer { MockURLProtocol.setHandler(forHost: Self.apiHost, nil) }
         let (client, counter) = Self.makeCountingClient()
 
-        let result = try await client.castVote(featureRequestId: "fr-606", userToken: "user-606")
+        let result = try await client.castVote(featureRequestId: "fr-606", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.voted == true)
         #expect(counter.callCount == 1)
         let sentRequest = try #require(capture.value)
@@ -253,7 +253,7 @@ struct IntakeEmailShapeGateTests {
         await #expect(throws: FeedbackClientError.invalidEmailAddress(field: "shipNotifyEmail", requestId: "req-def67890")) {
             _ = try await client.castVote(
                 featureRequestId: "fr-606",
-                userToken: "user-606",
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
                 shipNotifyEmail: "user@my_host.com"
             )
         }

@@ -246,6 +246,31 @@ extension FeedbackClient {
         return try validatedUserToken(token)
     }
 
+    /// Validates a required caller-supplied `userToken` for the paths whose
+    /// live contract types the identity as `format: uuid` (issue #617):
+    /// layers ``UserIdentityGrammar`` after ``validatedUserToken(_:)``'s
+    /// blank/newline gate — so `.authenticationRequired` semantics are
+    /// unchanged — and rejects any other value with
+    /// ``FeedbackClientError/invalidIdentityToken`` before a single-use
+    /// Turnstile challenge is consumed or any request is built. The store
+    /// fallback (`resolvedIdentity`) never reaches this gate unvalidated:
+    /// ``UserTokenStore`` only mints UUIDs.
+    func validatedIdentityToken(_ token: String) throws -> String {
+        let trimmed = try validatedUserToken(token)
+        guard UserIdentityGrammar.isValid(trimmed) else {
+            throw FeedbackClientError.invalidIdentityToken
+        }
+        return trimmed
+    }
+
+    /// Validates an optional caller-supplied `userToken` for the uuid-typed
+    /// paths: preserves `nil` (allowing the store-backed fallback), and runs
+    /// the non-optional uuid gate on any present value (issue #617).
+    func validatedIdentityToken(_ token: String?) throws -> String? {
+        guard let token else { return nil }
+        return try validatedIdentityToken(token)
+    }
+
     /// Resolves an anonymous identity for requests that require one.
     /// Falls back to this client's app-key-scoped token store when the caller
     /// did not pass one, or when the supplied token contains newline characters,

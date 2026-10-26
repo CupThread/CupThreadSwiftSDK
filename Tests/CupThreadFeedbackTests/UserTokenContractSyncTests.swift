@@ -29,7 +29,7 @@ struct UserTokenContractSyncTests {
 
         let result = try await Self.makeAPIClient().removeVote(
             featureRequestId: "fr-rem-1",
-            userToken: "tok-rem-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
         #expect(result.voted == false)
 
@@ -40,7 +40,7 @@ struct UserTokenContractSyncTests {
         let dict = try #require(parseJSONDict(data))
         #expect(Set(dict.keys) == ["appKey", "userToken"])
         #expect(dict["appKey"] as? String == "app_testkey123456")
-        #expect(dict["userToken"] as? String == "tok-rem-1")
+        #expect(dict["userToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     @Test func castVoteBodyOmitsOptionalFieldsWhenAbsent() async throws {
@@ -53,7 +53,7 @@ struct UserTokenContractSyncTests {
 
         _ = try await Self.makeAPIClient().castVote(
             featureRequestId: "fr-cast-1",
-            userToken: "tok-cast-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let data = try #require(capture.value)
@@ -71,7 +71,7 @@ struct UserTokenContractSyncTests {
 
         _ = try await Self.makeAPIClient().castVote(
             featureRequestId: "fr-cast-2",
-            userToken: "tok-cast-2",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "voter@example.com",
             turnstileToken: String(repeating: "t", count: 16)
         )
@@ -96,7 +96,7 @@ struct UserTokenContractSyncTests {
 
         _ = try await Self.makeAPIClient().submitFeatureRequest(
             FeatureRequestDraft(title: "Dark mode", description: "Please", requesterName: "Ada"),
-            userToken: "tok-propose-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         // Corrected component: required appKey/title/description, optional
@@ -104,7 +104,7 @@ struct UserTokenContractSyncTests {
         let data = try #require(capture.value)
         let dict = try #require(parseJSONDict(data))
         #expect(Set(dict.keys) == ["appKey", "title", "description", "requesterName", "requesterToken"])
-        #expect(dict["requesterToken"] as? String == "tok-propose-1")
+        #expect(dict["requesterToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(dict["requesterName"] as? String == "Ada")
         #expect(dict["requesterEmail"] == nil)
 
@@ -118,7 +118,7 @@ struct UserTokenContractSyncTests {
         }
         _ = try await Self.makeAPIClient().submitFeatureRequest(
             FeatureRequestDraft(title: "Dark mode", description: "Please"),
-            userToken: "tok-propose-2"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
         let anonymousData = try #require(anonymous.value)
         let anonymousDict = try #require(parseJSONDict(anonymousData))
@@ -138,13 +138,13 @@ struct UserTokenContractSyncTests {
 
         _ = try await Self.makeAPIClient().submitFeatureRequest(
             FeatureRequestDraft(title: "Dark mode", description: "Please"),
-            userToken: "tok-propose-3"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         // The header transport stays attached for servers that only read the
         // header; the body field wins when both are present, and the SDK
         // always sends the same token in both.
-        #expect(try #require(capture.value).value(forHTTPHeaderField: "X-User-Token") == "tok-propose-3")
+        #expect(try #require(capture.value).value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     @Test func voteResultDecodesCorrectedVoteResponseComponent() throws {

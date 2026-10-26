@@ -28,7 +28,7 @@ struct VoteShipNotifyEmailTests {
 
         let result = try await Self.makeAPIClient().toggleVote(
             featureRequestId: "fr-1",
-            userToken: "tok-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
         #expect(result.voted == true)
 
@@ -37,7 +37,7 @@ struct VoteShipNotifyEmailTests {
         #expect(dict["shipNotifyEmail"] == nil)
         // The historical payload shape is otherwise unchanged.
         #expect(dict["appKey"] as? String == "app_testkey123456")
-        #expect(dict["userToken"] as? String == "tok-1")
+        #expect(dict["userToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(dict.count == 2)
     }
 
@@ -51,7 +51,7 @@ struct VoteShipNotifyEmailTests {
 
         _ = try await Self.makeAPIClient().toggleVote(
             featureRequestId: "fr-1",
-            userToken: "tok-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "voter@example.com"
         )
 
@@ -71,7 +71,7 @@ struct VoteShipNotifyEmailTests {
 
         _ = try await Self.makeAPIClient().castVote(
             featureRequestId: "fr-1",
-            userToken: "tok-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "voter@example.com"
         )
 
@@ -91,7 +91,7 @@ struct VoteShipNotifyEmailTests {
 
         _ = try await Self.makeAPIClient().toggleVote(
             featureRequestId: "fr-1",
-            userToken: "tok-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "  voter@example.com \n"
         )
 
@@ -110,7 +110,7 @@ struct VoteShipNotifyEmailTests {
 
         _ = try await Self.makeAPIClient().toggleVote(
             featureRequestId: "fr-1",
-            userToken: "tok-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "   "
         )
 
@@ -138,7 +138,7 @@ struct VoteShipNotifyEmailTests {
 
         let result = try await Self.makeAPIClient().toggleVote(
             featureRequestId: "fr-1",
-            userToken: "tok-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             shipNotifyEmail: "unverified@example.com"
         )
         // The vote itself is recorded; the rejected opt-in comes back as a

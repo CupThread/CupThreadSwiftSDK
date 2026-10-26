@@ -76,7 +76,7 @@ struct PrivateAttachmentShapeTests {
         let bytes = Data("hello!".utf8)
         let client = makeClient(baseURL: baseURL)
         let attachment = try await client.uploadAttachment(
-            data: bytes, filename: "local.png", mimeType: "image/png", userToken: "tok-259"
+            data: bytes, filename: "local.png", mimeType: "image/png", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         // Fields the new response still carries decode from the wire.

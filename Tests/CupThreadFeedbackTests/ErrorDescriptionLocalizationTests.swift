@@ -52,6 +52,7 @@ struct ErrorDescriptionLocalizationTests {
         "cupthread.error.email_invalid",
         "cupthread.error.too_many_attachments",
         "cupthread.error.invalid_input",
+        "cupthread.error.invalid_identity_token",
         "cupthread.attachment.oversized",
         "cupthread.attachment.unprocessable",
         "cupthread.attachment.unsupported_type"
@@ -124,6 +125,10 @@ struct ErrorDescriptionLocalizationTests {
         assertResolvesThroughCatalog(
             .invalidInput(field: "title"),
             "cupthread.error.invalid_input"
+        )
+        assertResolvesThroughCatalog(
+            .invalidIdentityToken,
+            "cupthread.error.invalid_identity_token"
         )
     }
 

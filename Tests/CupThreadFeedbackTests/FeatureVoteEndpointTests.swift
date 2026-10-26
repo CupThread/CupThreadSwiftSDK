@@ -29,7 +29,7 @@ struct FeatureVoteEndpointTests {
 
         let result = try await Self.makeAPIClient().castVote(
             featureRequestId: "fr-cast-1",
-            userToken: "tok-cast"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let url = try #require(captureUrl.value)
@@ -39,7 +39,7 @@ struct FeatureVoteEndpointTests {
         let data = try #require(captureBody.value)
         let dict = try #require(parseJSONDict(data))
         #expect(dict["appKey"] as? String == "app_testkey123456")
-        #expect(dict["userToken"] as? String == "tok-cast")
+        #expect(dict["userToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
 
         #expect(result.voted == true)
         #expect(result.voteCount == 15)
@@ -64,7 +64,7 @@ struct FeatureVoteEndpointTests {
 
         let result = try await Self.makeAPIClient().removeVote(
             featureRequestId: "fr-rem-1",
-            userToken: "tok-rem"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let url = try #require(captureUrl.value)
@@ -74,7 +74,7 @@ struct FeatureVoteEndpointTests {
         let data = try #require(captureBody.value)
         let dict = try #require(parseJSONDict(data))
         #expect(dict["appKey"] as? String == "app_testkey123456")
-        #expect(dict["userToken"] as? String == "tok-rem")
+        #expect(dict["userToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
 
         #expect(result.voted == false)
         #expect(result.voteCount == 14)
@@ -96,7 +96,7 @@ struct FeatureVoteEndpointTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().castVote(featureRequestId: "missing-fr", userToken: "tok-1")
+            _ = try await Self.makeAPIClient().castVote(featureRequestId: "missing-fr", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected featureRequestNotFound")
         } catch let error as FeedbackClientError {
             guard case .featureRequestNotFound(let message, let requestId) = error else {
@@ -117,7 +117,7 @@ struct FeatureVoteEndpointTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().removeVote(featureRequestId: "missing-fr", userToken: "tok-1")
+            _ = try await Self.makeAPIClient().removeVote(featureRequestId: "missing-fr", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected featureRequestNotFound")
         } catch let error as FeedbackClientError {
             guard case .featureRequestNotFound(let message, let requestId) = error else {
@@ -142,7 +142,7 @@ struct FeatureVoteEndpointTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().castVote(featureRequestId: "fr-42", userToken: "tok-1")
+            _ = try await Self.makeAPIClient().castVote(featureRequestId: "fr-42", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected unexpectedStatus")
         } catch let error as FeedbackClientError {
             guard case .unexpectedStatus(let code, let message, _) = error else {
@@ -160,7 +160,7 @@ struct FeatureVoteEndpointTests {
         }
 
         do {
-            _ = try await Self.makeAPIClient().removeVote(featureRequestId: "fr-42", userToken: "tok-1")
+            _ = try await Self.makeAPIClient().removeVote(featureRequestId: "fr-42", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected unexpectedStatus")
         } catch let error as FeedbackClientError {
             guard case .unexpectedStatus(let code, _, _) = error else {

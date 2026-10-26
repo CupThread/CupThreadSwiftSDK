@@ -194,7 +194,7 @@ struct UserTokenTransportTests {
 
     static let host = "token-transport.example.com"
     /// Distinctive value so an echo in a URL can never false-positive.
-    static let token = "tok-sweep-4f7a9c"
+    static let token = "4f7a9c21-8d3e-4b6a-9c5d-7e8f1a2b3c4d"
 
     @Test(
         "Authenticated calls send the user token only in the X-User-Token header",

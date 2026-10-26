@@ -81,7 +81,7 @@ struct FeedbackUploadStreamingTests {
         ))
         let dataClient = makeClient(baseURL: baseURL)
         let dataAttachment = try await dataClient.uploadAttachment(
-            data: bytes, filename: "f.txt", mimeType: "text/plain", userToken: "tok-1"
+            data: bytes, filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         // File-based variant.
@@ -94,7 +94,7 @@ struct FeedbackUploadStreamingTests {
         ))
         let fileClient = makeClient(baseURL: baseURL)
         let fileAttachment = try await fileClient.uploadAttachment(
-            fileURL: fixtureURL, filename: "f.txt", mimeType: "text/plain", userToken: "tok-1"
+            fileURL: fixtureURL, filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let dataPut = try #require(dataRequests.value?[safe: 1])
@@ -126,7 +126,10 @@ struct FeedbackUploadStreamingTests {
 
         let client = makeClient(baseURL: baseURL)
         let attachment = try await client.uploadAttachment(
-            fileURL: fixtureURL, filename: "big.bin", mimeType: "application/octet-stream", userToken: "tok-2"
+            fileURL: fixtureURL,
+            filename: "big.bin",
+            mimeType: "application/octet-stream",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let captured = try #require(requests.value)
@@ -138,7 +141,7 @@ struct FeedbackUploadStreamingTests {
         #expect(files.first?["sizeBytes"] as? Int == bytes.count)
         #expect(files.first?["contentType"] as? String == "application/octet-stream")
         #expect(files.first?["clientFileId"] as? String == "file-1")
-        #expect(captured[0].value(forHTTPHeaderField: "X-User-Token") == "tok-2")
+        #expect(captured[0].value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
 
         #expect(putBody.value == bytes)
 
@@ -161,7 +164,10 @@ struct FeedbackUploadStreamingTests {
         let client = makeClient(baseURL: baseURL)
         do {
             _ = try await client.uploadAttachment(
-                fileURL: fixtureURL, filename: "big.bin", mimeType: "application/octet-stream", userToken: "tok"
+                fileURL: fixtureURL,
+                filename: "big.bin",
+                mimeType: "application/octet-stream",
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected payloadTooLarge to be thrown")
         } catch let error as FeedbackClientError {
@@ -188,7 +194,7 @@ struct FeedbackUploadStreamingTests {
         let client = makeClient(baseURL: baseURL)
         do {
             _ = try await client.uploadAttachment(
-                fileURL: fixtureURL, filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+                fileURL: fixtureURL, filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected unsupportedMediaType to be thrown")
         } catch let error as FeedbackClientError {
@@ -211,7 +217,7 @@ struct FeedbackUploadStreamingTests {
         let client = makeClient(baseURL: baseURL)
         do {
             _ = try await client.uploadAttachment(
-                fileURL: missingURL, filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+                fileURL: missingURL, filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected the missing fixture to throw")
         } catch {
@@ -288,7 +294,10 @@ struct FeedbackUploadStreamingTests {
         let client = makeClient(baseURL: baseURL)
         do {
             _ = try await client.uploadAttachment(
-                fileURL: fixtureURL, filename: "leak.bin", mimeType: "application/octet-stream", userToken: "tok"
+                fileURL: fixtureURL,
+                filename: "leak.bin",
+                mimeType: "application/octet-stream",
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected off-origin slot uploadUrl to throw invalidResponse")
         } catch let error as FeedbackClientError {
@@ -318,7 +327,10 @@ struct FeedbackUploadStreamingTests {
 
         let client = makeClient(baseURL: baseURL)
         let attachment = try await client.uploadAttachment(
-            fileURL: fixtureURL, filename: "stream.bin", mimeType: "application/octet-stream", userToken: "tok"
+            fileURL: fixtureURL,
+            filename: "stream.bin",
+            mimeType: "application/octet-stream",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let captured = try #require(requests.value)
@@ -340,7 +352,7 @@ struct FeedbackUploadStreamingTests {
         let client = makeClient(baseURL: baseURL, authenticationProvider: { "secret_user_jwt" })
         _ = try await client.createUploadSession(
             files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let req = try #require(capture.value)
@@ -357,7 +369,7 @@ struct FeedbackUploadStreamingTests {
         let clientWithNil = makeClient(baseURL: baseURL, authenticationProvider: { nil })
         _ = try await clientWithNil.createUploadSession(
             files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
         let reqNil = try #require(captureNil.value)
         #expect(reqNil.value(forHTTPHeaderField: "Authorization") == nil)
@@ -371,7 +383,7 @@ struct FeedbackUploadStreamingTests {
         let clientWithEmpty = makeClient(baseURL: baseURL, authenticationProvider: { "   " })
         _ = try await clientWithEmpty.createUploadSession(
             files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
         let reqEmpty = try #require(captureEmpty.value)
         #expect(reqEmpty.value(forHTTPHeaderField: "Authorization") == nil)
@@ -391,7 +403,7 @@ extension FeedbackUploadStreamingTests {
         let client = makeClient(baseURL: baseURL)
         _ = try await client.createUploadSession(
             files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let req = try #require(capture.value)
@@ -412,7 +424,7 @@ extension FeedbackUploadStreamingTests {
             fileURL: fixtureURL,
             filename: "sample.txt",
             mimeType: "text/plain",
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let captured = try #require(requests.value)

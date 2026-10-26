@@ -213,6 +213,8 @@
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "Çok fazla ek var: bir gönderim en fazla 8 dosya içerebilir. Lütfen bazı ekleri kaldırıp tekrar deneyin.";
 "cupthread.error.invalid_input" = "Girilen bilgiler kabul edilemiyor. Lütfen kontrol edip tekrar deneyin.";
+/* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
+"cupthread.error.invalid_identity_token" = "Kullanıcı belirteci bir UUID dizesi olmalıdır. Uygulamanın kimlik yapılandırmasını güncelleyip yeniden deneyin.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Bu geri bildirim veya ek zaten gönderildi.";

@@ -44,13 +44,13 @@ struct IntakeAndVotingBearerTests {
             authenticationProvider: { "user-jwt-vote-456" }
         )
 
-        let result = try await client.toggleVote(featureRequestId: "req_1", userToken: "user_vote_1")
+        let result = try await client.toggleVote(featureRequestId: "req_1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.voted == true)
         #expect(result.voteCount == 42)
 
         let request = try #require(capture.value)
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer user-jwt-vote-456")
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_1")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(request.value(forHTTPHeaderField: "X-Request-Id") != nil)
         #expect(request.value(forHTTPHeaderField: "X-SDK-Version") != nil)
     }
@@ -68,10 +68,10 @@ struct IntakeAndVotingBearerTests {
             baseURL: Self.baseURL,
             authenticationProvider: { nil }
         )
-        _ = try await clientNil.toggleVote(featureRequestId: "req_1", userToken: "user_vote_nil")
+        _ = try await clientNil.toggleVote(featureRequestId: "req_1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         let requestNil = try #require(captureNil.value)
         #expect(requestNil.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(requestNil.value(forHTTPHeaderField: "X-User-Token") == "user_vote_nil")
+        #expect(requestNil.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
 
         let captureWhitespace = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.host) { request in
@@ -83,10 +83,10 @@ struct IntakeAndVotingBearerTests {
             baseURL: Self.baseURL,
             authenticationProvider: { "   \n\t  " }
         )
-        _ = try await clientWhitespace.toggleVote(featureRequestId: "req_1", userToken: "user_vote_ws")
+        _ = try await clientWhitespace.toggleVote(featureRequestId: "req_1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         let requestWhitespace = try #require(captureWhitespace.value)
         #expect(requestWhitespace.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(requestWhitespace.value(forHTTPHeaderField: "X-User-Token") == "user_vote_ws")
+        #expect(requestWhitespace.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     @Test func toggleVoteWithoutProviderOmitsAuthorizationHeader() async throws {
@@ -101,10 +101,10 @@ struct IntakeAndVotingBearerTests {
         let client = makeClient(baseURL: Self.baseURL)
         #expect(client.supportsAuthentication == false)
 
-        _ = try await client.toggleVote(featureRequestId: "req_1", userToken: "user_vote_anon")
+        _ = try await client.toggleVote(featureRequestId: "req_1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         let request = try #require(capture.value)
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_anon")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     // MARK: - castVote & removeVote
@@ -123,14 +123,14 @@ struct IntakeAndVotingBearerTests {
             authenticationProvider: { "user-jwt-cast-123" }
         )
 
-        let result = try await client.castVote(featureRequestId: "req_1", userToken: "user_vote_1")
+        let result = try await client.castVote(featureRequestId: "req_1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.voted == true)
         #expect(result.voteCount == 42)
 
         let request = try #require(capture.value)
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer user-jwt-cast-123")
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_1")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(request.value(forHTTPHeaderField: "X-Request-Id") != nil)
         #expect(request.value(forHTTPHeaderField: "X-SDK-Version") != nil)
     }
@@ -149,14 +149,14 @@ struct IntakeAndVotingBearerTests {
             authenticationProvider: { "user-jwt-remove-789" }
         )
 
-        let result = try await client.removeVote(featureRequestId: "req_1", userToken: "user_vote_1")
+        let result = try await client.removeVote(featureRequestId: "req_1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.voted == false)
         #expect(result.voteCount == 41)
 
         let request = try #require(capture.value)
         #expect(request.httpMethod == "DELETE")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer user-jwt-remove-789")
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_1")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(request.value(forHTTPHeaderField: "X-Request-Id") != nil)
         #expect(request.value(forHTTPHeaderField: "X-SDK-Version") != nil)
     }
@@ -173,12 +173,12 @@ struct IntakeAndVotingBearerTests {
         let client = makeClient(baseURL: Self.baseURL)
         #expect(client.supportsAuthentication == false)
 
-        let result = try await client.removeVote(featureRequestId: "req_1", userToken: "user_vote_anon")
+        let result = try await client.removeVote(featureRequestId: "req_1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.voted == false)
         let request = try #require(capture.value)
         #expect(request.httpMethod == "DELETE")
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_vote_anon")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     // MARK: - submitFeatureRequest
@@ -202,13 +202,13 @@ struct IntakeAndVotingBearerTests {
             description: "Please add dark mode.",
             requesterName: "Alice"
         )
-        let result = try await client.submitFeatureRequest(draft, userToken: "user_fr_1")
+        let result = try await client.submitFeatureRequest(draft, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.featureRequestId == "fr_test_123")
         #expect(result.pending == true)
 
         let request = try #require(capture.value)
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer user-jwt-fr-789")
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_fr_1")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(request.value(forHTTPHeaderField: "X-Request-Id") != nil)
         #expect(request.value(forHTTPHeaderField: "X-SDK-Version") != nil)
     }
@@ -227,10 +227,10 @@ struct IntakeAndVotingBearerTests {
             authenticationProvider: { nil }
         )
         let draft = FeatureRequestDraft(title: "Title", description: "Desc ok")
-        _ = try await clientNil.submitFeatureRequest(draft, userToken: "user_fr_nil")
+        _ = try await clientNil.submitFeatureRequest(draft, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         let requestNil = try #require(captureNil.value)
         #expect(requestNil.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(requestNil.value(forHTTPHeaderField: "X-User-Token") == "user_fr_nil")
+        #expect(requestNil.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
 
         let captureWhitespace = CaptureBox<URLRequest>()
         MockURLProtocol.setHandler(forHost: Self.host) { request in
@@ -242,10 +242,10 @@ struct IntakeAndVotingBearerTests {
             baseURL: Self.baseURL,
             authenticationProvider: { "   " }
         )
-        _ = try await clientWhitespace.submitFeatureRequest(draft, userToken: "user_fr_ws")
+        _ = try await clientWhitespace.submitFeatureRequest(draft, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         let requestWhitespace = try #require(captureWhitespace.value)
         #expect(requestWhitespace.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(requestWhitespace.value(forHTTPHeaderField: "X-User-Token") == "user_fr_ws")
+        #expect(requestWhitespace.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     @Test func submitFeatureRequestWithoutProviderOmitsAuthorizationHeader() async throws {
@@ -259,10 +259,10 @@ struct IntakeAndVotingBearerTests {
 
         let client = makeClient(baseURL: Self.baseURL)
         let draft = FeatureRequestDraft(title: "Title", description: "Desc ok")
-        _ = try await client.submitFeatureRequest(draft, userToken: "user_fr_anon")
+        _ = try await client.submitFeatureRequest(draft, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         let request = try #require(capture.value)
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "user_fr_anon")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     // MARK: - submit (feedback)

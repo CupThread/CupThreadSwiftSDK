@@ -220,7 +220,7 @@ struct RedirectPolicyTests {
                 fileURL: fixtureURL,
                 filename: "leak.bin",
                 mimeType: "application/octet-stream",
-                userToken: "tok-sec11"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected the cross-origin redirect to be refused")
         } catch let error as FeedbackClientError {
@@ -371,7 +371,7 @@ struct RedirectPolicyTests {
             fileURL: fixtureURL,
             filename: "f.txt",
             mimeType: "text/plain",
-            userToken: "tok-sec11"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         #expect(attachment.uploadId == "upl-rp-1")
@@ -411,7 +411,7 @@ struct RedirectPolicyTests {
                 fileURL: fixtureURL,
                 filename: "leak.bin",
                 mimeType: "application/octet-stream",
-                userToken: "tok-sec11"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected the multi-hop redirect chain to be refused")
         } catch let error as FeedbackClientError {

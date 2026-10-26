@@ -128,7 +128,7 @@ struct FeatureRequestIDValidationTests {
 
         for invalidID in ["", "   ", " \n\t ", "../admin", "fr-1/vote", "fr 1", "%2e%2e", String(repeating: "a", count: 129)] {
             await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
-                _ = try await Self.makeAPIClient().castVote(featureRequestId: invalidID, userToken: "tok-1")
+                _ = try await Self.makeAPIClient().castVote(featureRequestId: invalidID, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             }
         }
         #expect(capture.value == nil, "An invalid id must be rejected before any request is sent")
@@ -144,7 +144,10 @@ struct FeatureRequestIDValidationTests {
 
         for invalidID in ["", "   ", "..", "fr-1/../../feedback", "id?next=1", String(repeating: "a", count: 129)] {
             await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
-                _ = try await Self.makeAPIClient().removeVote(featureRequestId: invalidID, userToken: "tok-1")
+                _ = try await Self.makeAPIClient().removeVote(
+                    featureRequestId: invalidID,
+                    userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
+                )
             }
         }
         #expect(capture.value == nil, "An invalid id must be rejected before any request is sent")
@@ -173,7 +176,7 @@ struct FeatureRequestIDValidationTests {
         // A single-use challenge must not be spent on an id that can never
         // name a request (API-27).
         await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
-            _ = try await client.castVote(featureRequestId: "../../admin", userToken: "tok-1")
+            _ = try await client.castVote(featureRequestId: "../../admin", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         }
         #expect(consulted.value != true, "The Turnstile provider must not be consulted for an invalid id")
         #expect(capture.value == nil, "No request may be sent for an invalid id")
@@ -187,7 +190,10 @@ struct FeatureRequestIDValidationTests {
             return (makeHTTPResponse(), try encodeJSON(["voted": false, "voteCount": 3]))
         }
 
-        let result = try await Self.makeAPIClient().removeVote(featureRequestId: " fr-trim-3\t", userToken: "tok-1")
+        let result = try await Self.makeAPIClient().removeVote(
+            featureRequestId: " fr-trim-3\t",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
+        )
 
         let request = try #require(capture.value)
         #expect(request.url?.path == "/api/v1/feature-requests/fr-trim-3/vote")
@@ -214,10 +220,10 @@ struct FeatureRequestIDValidationTests {
                 _ = try await client.fetchFeatureRequest(id: invalidID)
             }
             await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
-                _ = try await client.castVote(featureRequestId: invalidID, userToken: "tok-1")
+                _ = try await client.castVote(featureRequestId: invalidID, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             }
             await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
-                _ = try await client.removeVote(featureRequestId: invalidID, userToken: "tok-1")
+                _ = try await client.removeVote(featureRequestId: invalidID, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             }
             await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
                 _ = try await client.fetchComments(featureRequestId: invalidID, limit: 20)

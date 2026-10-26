@@ -75,7 +75,7 @@ struct FeatureRequestComposeDismissalTests {
         let permittedConfig = makeConfig(allowAnonymousFeedback: true)
         let view = FeatureRequestComposeView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             config: permittedConfig
         ) {}
         #expect(view.dismissalAffordance == .guardedCancel)
@@ -92,7 +92,7 @@ struct FeatureRequestComposeDismissalTests {
         let deniedConfig = makeConfig(allowAnonymousFeedback: false)
         let view = FeatureRequestComposeView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             config: deniedConfig
         ) {}
         #expect(view.dismissalAffordance == .undetermined)
@@ -102,7 +102,7 @@ struct FeatureRequestComposeDismissalTests {
 
     @Test @MainActor func composeViewFailsOpenWhenConfigIsNil() {
         let client = makeClient()
-        let view = FeatureRequestComposeView(client: client, userToken: "test_token") {}
+        let view = FeatureRequestComposeView(client: client, userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b") {}
         #expect(view.dismissalAffordance == .guardedCancel)
         _ = view.body
     }
@@ -115,7 +115,7 @@ struct FeatureRequestComposeDismissalTests {
         let deniedConfig = makeConfig(allowAnonymousFeedback: false)
         let view = FeatureRequestComposeView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             config: deniedConfig,
             preResolvedAuthentication: true
         ) {}
@@ -132,7 +132,7 @@ struct FeatureRequestComposeDismissalTests {
         let deniedConfig = makeConfig(allowAnonymousFeedback: false)
         let view = FeatureRequestComposeView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             config: deniedConfig,
             preResolvedAuthentication: false
         ) {}
@@ -167,7 +167,7 @@ struct FeatureRequestComposeDismissalTests {
         var didSubmit = false
         let view = FeatureRequestComposeView(
             client: makeClient(baseURL: URL(string: "https://\(host)")!),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             config: makeConfig(allowAnonymousFeedback: true),
             initialDraft: FeatureRequestDraft(
                 title: "Dark mode support",
@@ -195,7 +195,7 @@ struct FeatureRequestComposeDismissalTests {
         var didSubmit = false
         let view = FeatureRequestComposeView(
             client: makeClient(baseURL: URL(string: "https://\(host)")!),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             config: makeConfig(allowAnonymousFeedback: true),
             initialDraft: FeatureRequestDraft(
                 title: "Dark mode support",

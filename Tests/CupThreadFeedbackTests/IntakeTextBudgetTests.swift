@@ -183,7 +183,7 @@ struct IntakeTextBudgetTests {
         )
 
         do {
-            _ = try await client.submitFeatureRequest(draft, userToken: "user-token-1")
+            _ = try await client.submitFeatureRequest(draft, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected textTooLong, but submitFeatureRequest succeeded")
         } catch FeedbackClientError.textTooLong {
             // expected
@@ -207,7 +207,7 @@ struct IntakeTextBudgetTests {
             requesterName: "Ada"
         )
 
-        let result = try await client.submitFeatureRequest(draft, userToken: "user-token-1")
+        let result = try await client.submitFeatureRequest(draft, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.featureRequestId == "fr-1")
         #expect(recorder.requestCount == 1)
     }

@@ -135,7 +135,7 @@ struct Uniform404WriteSyncTests {
 
         let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         do {
-            _ = try await client.castVote(featureRequestId: "fr-1", userToken: "user-1")
+            _ = try await client.castVote(featureRequestId: "fr-1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             guard case .featureRequestNotFound(let message, _) = error else {

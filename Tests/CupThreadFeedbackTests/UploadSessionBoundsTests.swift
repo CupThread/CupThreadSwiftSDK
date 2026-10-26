@@ -97,7 +97,7 @@ struct UploadSessionBoundsTests {
         do {
             _ = try await makeClient(provider: provider).createUploadSession(
                 files: files,
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             return nil
         } catch let error as FeedbackClientError {
@@ -192,7 +192,7 @@ struct UploadSessionBoundsTests {
 
         let session = try await makeClient(provider: provider).createUploadSession(
             files: (1...fileCount).map(spec),
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         #expect(session.files.count == fileCount)
@@ -231,7 +231,7 @@ struct UploadSessionBoundsTests {
 
         let session = try await makeClient(provider: provider).createUploadSession(
             files: [spec(1, sizeBytes: UploadSessionLimits.minFileSizeBytes)],
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         #expect(session.files.count == 1)
@@ -260,7 +260,7 @@ struct UploadSessionBoundsTests {
                 data: Data(),
                 filename: "empty.png",
                 mimeType: "image/png",
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
         #expect(!provider.wasConsulted, "Turnstile token must not be consumed for empty attachment data")
@@ -286,7 +286,7 @@ struct UploadSessionBoundsTests {
                 fileURL: fixtureURL,
                 filename: "empty.png",
                 mimeType: "image/png",
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
         #expect(!provider.wasConsulted, "Turnstile token must not be consumed for an empty attachment file")
