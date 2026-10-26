@@ -44,8 +44,10 @@ extension FeedbackClient {
         // cast path consults the Turnstile provider first, burning a
         // single-use challenge token on a request that cannot succeed. Fail
         // fast locally (#493); the trimmed token rides in both the body and
-        // the header so the two transports always agree.
-        let identityToken = try validatedUserToken(userToken)
+        // the header so the two transports always agree. A non-UUID value
+        // the server can only answer with `400` fails the same fail-fast
+        // gate (issue #617).
+        let identityToken = try validatedIdentityToken(userToken)
         let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard FeatureRequestIDGrammar.isValid(trimmedID) else {
             // An id that cannot be a single opaque path segment (API-24
@@ -226,9 +228,12 @@ extension FeedbackClient {
     ///     whitespace-only, or newline-bearing values throw
     ///     ``FeedbackClientError/authenticationRequired`` before any network
     ///     round trip — otherwise the header would be silently dropped and
-    ///     the vote would be recorded without a usable identity. A valid
-    ///     token is trimmed once and sent identically in the JSON body and
-    ///     the `X-User-Token` header.
+    ///     the vote would be recorded without a usable identity. A value
+    ///     that is not a UUID string throws
+    ///     ``FeedbackClientError/invalidIdentityToken`` locally (issue
+    ///     #617) — the live contract types the identity as `format: uuid`
+    ///     on this endpoint. A valid token is trimmed once and sent
+    ///     identically in the JSON body and the `X-User-Token` header.
     ///   - shipNotifyEmail: Optional email address (max 254 characters) to
     ///     enroll in ship notifications for this request; `nil` keeps the
     ///     payload unchanged and sends no opt-in. A present address must be
@@ -254,6 +259,9 @@ extension FeedbackClient {
     ///   blank, whitespace-only, or contains newlines (rejected locally, with
     ///   no request built and no Turnstile token minted), or when anonymous
     ///   voting is disabled for the app (HTTP 401),
+    ///   ``FeedbackClientError/invalidIdentityToken`` when `userToken` is
+    ///   not a UUID string (rejected locally, with no request built and no
+    ///   Turnstile token minted — issue #617),
     ///   ``FeedbackClientError/invalidEmailAddress(field:requestId:)`` when
     ///   `shipNotifyEmail` is present but implausibly shaped or over 254 code
     ///   points (rejected locally, with no request built and no Turnstile
@@ -311,8 +319,11 @@ extension FeedbackClient {
     ///   - userToken: A stable UUID string identifying this user. Blank,
     ///     whitespace-only, or newline-bearing values throw
     ///     ``FeedbackClientError/authenticationRequired`` before any network
-    ///     round trip. A valid token is trimmed once and sent identically in
-    ///     the JSON body and the `X-User-Token` header.
+    ///     round trip. A value that is not a UUID string throws
+    ///     ``FeedbackClientError/invalidIdentityToken`` locally (issue
+    ///     #617) — the live contract types the identity as `format: uuid`
+    ///     on this endpoint. A valid token is trimmed once and sent
+    ///     identically in the JSON body and the `X-User-Token` header.
     /// - Returns: The new vote state (`voted: false`) and authoritative vote count.
     /// - Throws: ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
     ///   when the server answers HTTP 404 with the documented JSON error
@@ -326,6 +337,9 @@ extension FeedbackClient {
     ///   blank, whitespace-only, or contains newlines (rejected locally, with
     ///   no request built), or when anonymous voting is disabled for the app
     ///   (HTTP 401),
+    ///   ``FeedbackClientError/invalidIdentityToken`` when `userToken` is
+    ///   not a UUID string (rejected locally, with no request built — issue
+    ///   #617),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
     ///   server state answers it on this operation; the generic permission

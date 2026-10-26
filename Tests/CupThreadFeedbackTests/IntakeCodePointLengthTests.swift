@@ -192,7 +192,7 @@ struct IntakeCodePointLengthTests {
         )
 
         await #expect(throws: FeedbackClientError.textTooLong) {
-            _ = try await client.submitFeatureRequest(draft, userToken: "user-1")
+            _ = try await client.submitFeatureRequest(draft, userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         }
         #expect(capture.value == nil)
         #expect(counter.callCount == 0)

@@ -85,7 +85,7 @@ struct SubmittedBannerPresentationTests {
         // set, and the immediately following reload returned an empty list.
         let view = FeatureRequestsView(
             client: makeTestClient(),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             listState: FeatureRequestsListState(),
             loadState: makeResolvedLoadState(),
             showsSubmittedBanner: true
@@ -104,7 +104,7 @@ struct SubmittedBannerPresentationTests {
     @Test @MainActor func submittedBannerComposesAbovePopulatedList() {
         let view = FeatureRequestsView(
             client: makeTestClient(),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             listState: FeatureRequestsListState(items: [makeItem(id: "req-1")]),
             loadState: makeResolvedLoadState(),
             showsSubmittedBanner: true
@@ -119,7 +119,7 @@ struct SubmittedBannerPresentationTests {
     @Test @MainActor func submittedBannerIsAbsentByDefault() {
         let view = FeatureRequestsView(
             client: makeTestClient(),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             listState: FeatureRequestsListState(items: [makeItem(id: "req-1")]),
             loadState: makeResolvedLoadState()
         )

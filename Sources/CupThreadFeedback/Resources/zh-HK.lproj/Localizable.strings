@@ -213,6 +213,8 @@
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "附件太多：一次提交最多只可以包含 8 個檔案，請移除部分附件後再試一次。";
 "cupthread.error.invalid_input" = "所提供的資料無法被接受，請檢查後再試一次。";
+/* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
+"cupthread.error.invalid_identity_token" = "用戶權杖必須是 UUID 字串，請更新應用程式的身分設定後再試一次。";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "此意見反應或附件已被提交。";

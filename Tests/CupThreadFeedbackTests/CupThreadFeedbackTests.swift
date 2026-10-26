@@ -1544,7 +1544,7 @@ struct FeedbackClientUploadTests {
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         let attachment = try await client.uploadAttachment(
-            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok-1"
+            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let captured = try #require(requests.value)
@@ -1553,7 +1553,7 @@ struct FeedbackClientUploadTests {
         let sessionRequest = captured[0]
         #expect(sessionRequest.url?.path == "/api/v1/uploads/sessions")
         #expect(sessionRequest.httpMethod == "POST")
-        #expect(sessionRequest.value(forHTTPHeaderField: "X-User-Token") == "tok-1")
+        #expect(sessionRequest.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         let sessionBodyData = try #require(bodyData(from: sessionRequest))
         let sessionBody = try #require(parseJSONDict(sessionBodyData))
         #expect(sessionBody["appKey"] as? String == appKey)
@@ -1636,7 +1636,7 @@ struct FeedbackClientUploadTests {
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
             _ = try await client.uploadAttachment(
-                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -1656,7 +1656,7 @@ struct FeedbackClientUploadTests {
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
             _ = try await client.uploadAttachment(
-                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch FeedbackClientError.rateLimited {
@@ -1681,7 +1681,7 @@ struct FeedbackClientUploadTests {
         do {
             _ = try await client.createUploadSession(
                 files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
-                userToken: "not-a-uuid"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -1737,7 +1737,7 @@ struct FeedbackClientUploadTests {
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
             _ = try await client.uploadAttachment(
-                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+                data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -1769,7 +1769,7 @@ struct FeedbackClientUploadTests {
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
             _ = try await client.uploadAttachment(
-                data: Data("toolarge".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+                data: Data("toolarge".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch FeedbackClientError.payloadTooLarge {
@@ -1806,7 +1806,7 @@ struct FeedbackClientUploadTests {
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         do {
             _ = try await client.uploadAttachment(
-                data: Data("toolarge".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+                data: Data("toolarge".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch FeedbackClientError.payloadTooLarge {
@@ -1824,7 +1824,7 @@ struct FeedbackClientUploadTests {
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         let session = try await client.createUploadSession(
             files: [FeedbackUploadFileSpec(clientFileId: "file-1", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
         #expect(session.session.sessionId == "sess-1")
         #expect(session.session.sessionToken == "stok-abc")
@@ -1845,7 +1845,7 @@ struct FeedbackClientUploadTests {
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         _ = try await client.uploadAttachment(
-            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let captured = try #require(requests.value)
@@ -1866,7 +1866,7 @@ struct FeedbackClientUploadTests {
 
         let client = makeClient(baseURL: baseURL, appKey: appKey)
         _ = try await client.uploadAttachment(
-            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "tok"
+            data: Data("test".utf8), filename: "f.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let captured = try #require(requests.value)

@@ -245,6 +245,23 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// for diagnostics (`title`, `description`, `body`, `files`,
     /// `files[].sizeBytes`, `fileURL`); correct the named value and retry.
     case invalidInput(field: String)
+    /// The SDK refused a caller-supplied end-user identity token locally,
+    /// before any request was built, because the live contract types the
+    /// identity as `format: uuid` on every path it was headed for (issue
+    /// #617): ``FeedbackClient/submitFeatureRequest(draft:userToken:turnstileToken:)``,
+    /// ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``,
+    /// ``FeedbackClient/removeVote(featureRequestId:userToken:)``, and
+    /// ``FeedbackClient/createUploadSession(files:userToken:turnstileToken:)``
+    /// (including the ``FeedbackClient/uploadAttachment(data:contentType:session:filename:)``
+    /// one-shots). Any other value — an internal user id, an email, a hashed
+    /// id — could only be answered by the server with `400 Validation
+    /// failed`, *after* a single-use Turnstile challenge had been consumed.
+    /// Nothing was sent here: no Turnstile token was consumed and no request
+    /// id exists. Pass a UUID string (``UserTokenStore`` mints one), and
+    /// note that ``FeedbackClient/submit(draft:platform:customFields:userToken:turnstileToken:)``
+    /// keeps the plain-string #493 gate — a token feedback accepts can still
+    /// fail votes, proposals, and uploads unless it is a UUID.
+    case invalidIdentityToken
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -276,7 +293,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
              .alreadyFinalized, .imageUploadFailed, .reservedPlanValue, .textTooLong,
              .attributeNotClearable, .invalidEmailAddress, .invalidAttributeValue, .tooManyAttachments,
-             .invalidInput:
+             .invalidInput, .invalidIdentityToken:
             return nil
         }
     }
@@ -382,7 +399,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .unexpectedStatus(_, _, let requestId):
             return requestId
         case .invalidResponse, .unreadableUploadResponse, .invalidConfiguration,
-             .authenticationRequired, .textTooLong, .attributeNotClearable, .invalidInput:
+             .authenticationRequired, .textTooLong, .attributeNotClearable, .invalidInput,
+             .invalidIdentityToken:
             return nil
         }
     }
@@ -486,6 +504,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             // Rejected client-side, so there is no request id to quote. The
             // offending `field` is host-side diagnostics, not end-user copy.
             return CupThreadStrings.tr("cupthread.error.invalid_input")
+        case .invalidIdentityToken:
+            // Rejected client-side, so there is no request id to quote. The
+            // UUID requirement is host-side configuration, not end-user copy.
+            return CupThreadStrings.tr("cupthread.error.invalid_identity_token")
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).

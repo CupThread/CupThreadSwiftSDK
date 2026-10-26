@@ -84,7 +84,10 @@ struct FeedbackUploadSizeLimitsTests {
         let client = makeClient(baseURL: baseURL)
         do {
             _ = try await client.uploadAttachment(
-                fileURL: fixtureURL, filename: "big.bin", mimeType: "application/octet-stream", userToken: "tok"
+                fileURL: fixtureURL,
+                filename: "big.bin",
+                mimeType: "application/octet-stream",
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected payloadTooLarge to be thrown")
         } catch let error as FeedbackClientError {
@@ -109,7 +112,7 @@ struct FeedbackUploadSizeLimitsTests {
         let client = makeClient(baseURL: baseURL)
         do {
             _ = try await client.uploadAttachment(
-                data: bytes, filename: "data.bin", mimeType: "application/octet-stream", userToken: "tok"
+                data: bytes, filename: "data.bin", mimeType: "application/octet-stream", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected payloadTooLarge to be thrown")
         } catch let error as FeedbackClientError {
@@ -135,7 +138,7 @@ struct FeedbackUploadSizeLimitsTests {
         let clientA = makeClient(baseURL: baseURL)
         do {
             _ = try await clientA.uploadAttachment(
-                data: bytes, filename: "data.bin", mimeType: "application/octet-stream", userToken: "tok"
+                data: bytes, filename: "data.bin", mimeType: "application/octet-stream", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected payloadTooLarge to be thrown")
         } catch let error as FeedbackClientError {
@@ -156,7 +159,7 @@ struct FeedbackUploadSizeLimitsTests {
         let clientB = makeClient(baseURL: baseURL)
         do {
             _ = try await clientB.uploadAttachment(
-                data: bytes, filename: "data.bin", mimeType: "application/octet-stream", userToken: "tok"
+                data: bytes, filename: "data.bin", mimeType: "application/octet-stream", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected payloadTooLarge to be thrown")
         } catch let error as FeedbackClientError {
@@ -179,7 +182,7 @@ struct FeedbackUploadSizeLimitsTests {
 
         let client = makeClient(baseURL: baseURL)
         let attachment = try await client.uploadAttachment(
-            data: bytes, filename: "ok.txt", mimeType: "text/plain", userToken: "tok"
+            data: bytes, filename: "ok.txt", mimeType: "text/plain", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         #expect(attachment.uploadId == "upl-limit-1")

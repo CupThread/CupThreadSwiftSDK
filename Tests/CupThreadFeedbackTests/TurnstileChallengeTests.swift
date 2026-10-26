@@ -150,7 +150,7 @@ struct TurnstileChallengeTests {
         let client = makeClient(provider: provider)
         _ = try await client.submitFeatureRequest(
             FeatureRequestDraft(title: "Title", description: "Description"),
-            userToken: "user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         // A feedback-bound consultation (the pre-binding context-free shape)
@@ -174,7 +174,7 @@ struct TurnstileChallengeTests {
                 contentType: "image/png",
                 sizeBytes: 5
             )],
-            userToken: "user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         // Upload sessions deliberately reuse the feedback action, not a
@@ -198,7 +198,7 @@ struct TurnstileChallengeTests {
             data: Data("hello".utf8),
             filename: "f.png",
             mimeType: "image/png",
-            userToken: "user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         #expect(provider.recordedChallenges == [.feedback(appKey: Self.appKey)])

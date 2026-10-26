@@ -160,7 +160,7 @@ struct FeatureRequestsLoadStateTests {
     @Test @MainActor func featureRequestsViewFirstRenderKeepsSkeletonCondition() {
         let view = FeatureRequestsView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token"
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b"
         )
 
         _ = view.body
@@ -175,7 +175,7 @@ struct FeatureRequestsLoadStateTests {
     @Test @MainActor func featureRequestsViewResolvedEmptyStateRendersAfterVerdictOnly() {
         let view = FeatureRequestsView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             listState: FeatureRequestsListState(),
             loadState: {
                 var state = FeatureRequestsLoadState()
@@ -196,7 +196,7 @@ struct FeatureRequestsLoadStateTests {
         let item = makeFeatureRequestItem(id: "req-1")
         let view = FeatureRequestsView(
             client: makeClient(appKey: "app_test_dummy_key_123456"),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             listState: FeatureRequestsListState(items: [item]),
             loadState: {
                 var state = FeatureRequestsLoadState()

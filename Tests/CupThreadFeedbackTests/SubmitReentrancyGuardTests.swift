@@ -123,7 +123,7 @@ struct SubmitReentrancyGuardTests {
         var didSubmit = false
         let view = FeatureRequestComposeView(
             client: makeClient(baseURL: URL(string: "https://\(host)")!),
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             config: makeConfig(),
             initialDraft: FeatureRequestDraft(title: "Dark mode support", description: "Please add dark mode.")
         ) { didSubmit = true }

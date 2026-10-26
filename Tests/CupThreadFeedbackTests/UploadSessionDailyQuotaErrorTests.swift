@@ -22,7 +22,7 @@ struct UploadSessionDailyQuotaErrorTests {
     private func makeUploadCall(client: FeedbackClient) async throws -> FeedbackUploadSession {
         try await client.createUploadSession(
             files: [FeedbackUploadFileSpec(clientFileId: "f", filename: "f.txt", contentType: "text/plain", sizeBytes: 4)],
-            userToken: "tok"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
     }
 
@@ -108,7 +108,7 @@ struct UploadSessionDailyQuotaErrorTests {
                 data: Data([1, 2, 3]),
                 filename: "shot.png",
                 mimeType: "image/png",
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected dailyStorageQuotaExceeded to be thrown")
         } catch let error as FeedbackClientError {
@@ -142,7 +142,7 @@ struct UploadSessionDailyQuotaErrorTests {
                 fileURL: tempFile,
                 filename: "shot.png",
                 mimeType: "image/png",
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected dailyStorageQuotaExceeded to be thrown")
         } catch let error as FeedbackClientError {

@@ -400,7 +400,7 @@ struct PublicAPITests {
 
         let result = try await Self.makeAPIClient().toggleVote(
             featureRequestId: "fr-42",
-            userToken: "tok-abc"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let url = try #require(captureUrl.value)
@@ -410,7 +410,7 @@ struct PublicAPITests {
         let data = try #require(captureBody.value)
         let dict = try #require(parseJSONDict(data))
         #expect(dict["appKey"] as? String == "app_testkey123456")
-        #expect(dict["userToken"] as? String == "tok-abc")
+        #expect(dict["userToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
 
         #expect(result.voted == true)
         #expect(result.voteCount == 12)
@@ -424,7 +424,7 @@ struct PublicAPITests {
         await #expect(throws: FeedbackClientError.self) {
             _ = try await Self.makeAPIClient().toggleVote(
                 featureRequestId: "fr-42",
-                userToken: "tok-abc"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
     }

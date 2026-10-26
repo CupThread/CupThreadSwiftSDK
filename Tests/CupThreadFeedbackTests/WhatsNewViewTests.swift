@@ -269,7 +269,7 @@ struct WhatsNewViewTests {
         let client = makeTestClient()
         let view = WhatsNewView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             state: WhatsNewViewState(isLoading: true, hasLoadedOnce: false)
         )
 
@@ -283,7 +283,7 @@ struct WhatsNewViewTests {
         let client = makeTestClient()
         let view = WhatsNewView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             state: WhatsNewViewState(entries: [], isLoading: false, hasLoadedOnce: true)
         )
 
@@ -301,7 +301,7 @@ struct WhatsNewViewTests {
         ]
         let view = WhatsNewView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             state: WhatsNewViewState(entries: entries, isLoading: false, hasLoadedOnce: true)
         )
 
@@ -315,7 +315,7 @@ struct WhatsNewViewTests {
         let client = makeTestClient()
         let view = WhatsNewView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             state: WhatsNewViewState(
                 isLoading: false,
                 hasLoadedOnce: false,
@@ -333,7 +333,7 @@ struct WhatsNewViewTests {
         let client = makeTestClient()
         let view = WhatsNewView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             state: WhatsNewViewState(entries: [], isLoading: true, hasLoadedOnce: true)
         )
 
@@ -348,7 +348,7 @@ struct WhatsNewViewTests {
         let entries = [makeEntry(id: "e1", title: "Version 1.0")]
         let view = WhatsNewView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             state: WhatsNewViewState(entries: entries, isLoading: true, hasLoadedOnce: true)
         )
 
@@ -414,7 +414,7 @@ struct WhatsNewViewTests {
 
         let view = WhatsNewView(
             client: client,
-            userToken: "test_token",
+            userToken: "3c5f7a9e-1b2d-4e8f-9a0b-2c3d4e5f6a7b",
             state: WhatsNewViewState()
         )
 

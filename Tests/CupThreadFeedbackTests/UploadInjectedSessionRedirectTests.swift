@@ -301,7 +301,7 @@ struct UploadInjectedSessionRedirectTests {
                 data: Data("attachment-bytes".utf8),
                 filename: "leak.bin",
                 mimeType: "application/octet-stream",
-                userToken: "tok-561"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
 
@@ -326,7 +326,7 @@ struct UploadInjectedSessionRedirectTests {
                 fileURL: fixtureURL,
                 filename: "leak.bin",
                 mimeType: "application/octet-stream",
-                userToken: "tok-561"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
 
@@ -356,7 +356,7 @@ struct UploadInjectedSessionRedirectTests {
             data: Data("ok-bytes".utf8),
             filename: "f.txt",
             mimeType: "text/plain",
-            userToken: "tok-561"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         #expect(attachment.uploadId == "upl-ri-1")
@@ -387,7 +387,7 @@ struct UploadInjectedSessionRedirectTests {
                 data: Data("attachment-bytes".utf8),
                 filename: "leak.bin",
                 mimeType: "application/octet-stream",
-                userToken: "tok-561"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
         }
 

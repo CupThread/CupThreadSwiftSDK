@@ -184,7 +184,7 @@ struct TurnstileRetryTests {
         let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         let result = try await client.submitFeatureRequest(
             FeatureRequestDraft(title: "Title", description: "Description"),
-            userToken: "user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         #expect(result.featureRequestId == "fr-1")
@@ -285,7 +285,7 @@ struct TurnstileRetryTests {
         do {
             _ = try await client.submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Description"),
-                userToken: "user-1"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -320,7 +320,7 @@ extension TurnstileRetryTests {
                 contentType: "image/png",
                 sizeBytes: 5
             )],
-            userToken: "user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let rawBody = try #require(log.allBodies.first)
@@ -344,7 +344,7 @@ extension TurnstileRetryTests {
                 contentType: "image/png",
                 sizeBytes: 5
             )],
-            userToken: "user-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             turnstileToken: "tok-explicit-123456"
         )
 
@@ -373,7 +373,7 @@ extension TurnstileRetryTests {
                 contentType: "image/png",
                 sizeBytes: 5
             )],
-            userToken: "user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         #expect(session.session.sessionId == "sess-1")
@@ -411,7 +411,7 @@ extension TurnstileRetryTests {
                 contentType: "image/png",
                 sizeBytes: 5
             )],
-            userToken: "user-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             turnstileToken: "tok-explicit-stale"
         )
 
@@ -441,7 +441,7 @@ extension TurnstileRetryTests {
                     contentType: "image/png",
                     sizeBytes: 5
                 )],
-                userToken: "user-1",
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
                 turnstileToken: "tok-invalid"
             )
             Issue.record("Expected error to be thrown")
@@ -471,7 +471,7 @@ extension TurnstileRetryTests {
                     contentType: "image/png",
                     sizeBytes: 5
                 )],
-                userToken: "user-1"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {

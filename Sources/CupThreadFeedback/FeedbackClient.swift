@@ -464,6 +464,16 @@ public struct FeedbackClient: Sendable {
     ///   remove attachments and submit again with the remaining receipts.
     ///   The same error carries the response's request id when the server
     ///   answers a residual `400` naming `uploadIds` or `attachments`.
+    ///   Unlike the uuid-typed write paths (proposals, votes, upload
+    ///   sessions), this endpoint's `X-User-Token` is a plain string in the
+    ///   live contract, so `submit` keeps the blank/newline gate only — but
+    ///   note the asymmetry: a non-UUID token feedback accepts here still
+    ///   throws ``FeedbackClientError/invalidIdentityToken`` on
+    ///   ``FeedbackClient/submitFeatureRequest(draft:userToken:turnstileToken:)``,
+    ///   the vote endpoints, and
+    ///   ``FeedbackClient/createUploadSession(files:userToken:turnstileToken:)``
+    ///   (issue #617), so pass a UUID string when one token is shared
+    ///   across all of them.
     public func submit(
         _ draft: FeedbackDraft,
         userToken: String? = nil,

@@ -253,7 +253,7 @@ struct PermissionErrorMappingTests {
             )
         }
         do {
-            _ = try await Self.makeAPIClient().toggleVote(featureRequestId: "fr-1", userToken: "tok")
+            _ = try await Self.makeAPIClient().toggleVote(featureRequestId: "fr-1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected authenticationRequired")
         } catch let error as FeedbackClientError {
             #expect(error == .authenticationRequired)
@@ -268,7 +268,7 @@ struct PermissionErrorMappingTests {
             )
         }
         do {
-            _ = try await Self.makeAPIClient().toggleVote(featureRequestId: "fr-1", userToken: "tok")
+            _ = try await Self.makeAPIClient().toggleVote(featureRequestId: "fr-1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected forbidden")
         } catch let error as FeedbackClientError {
             guard case .forbidden(let message, let requestId) = error else {
@@ -309,7 +309,7 @@ struct PermissionErrorMappingTests {
         do {
             _ = try await Self.makeAPIClient().submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Long enough"),
-                userToken: "tok"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected authenticationRequired")
         } catch let error as FeedbackClientError {
@@ -363,7 +363,7 @@ struct PermissionErrorMappingTests {
         }
         let result = try await loadRoadmapGroups(
             client: Self.makeAPIClient(),
-            userToken: "tok",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             query: nil,
             config: makePermissionConfig(allowAnonymousRoadmap: false)
         )
@@ -395,7 +395,7 @@ struct PermissionErrorMappingTests {
         }
         let result = try await loadRoadmapGroups(
             client: Self.makeAPIClient(),
-            userToken: "tok",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             query: nil,
             config: makePermissionConfig(allowAnonymousRoadmap: true)
         )
@@ -454,7 +454,7 @@ struct PermissionErrorMappingTests {
             )
         }
         do {
-            _ = try await Self.makeAPIClient().toggleVote(featureRequestId: "fr-1", userToken: "tok")
+            _ = try await Self.makeAPIClient().toggleVote(featureRequestId: "fr-1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected authenticationRequired")
         } catch let error as FeedbackClientError {
             #expect(error == .authenticationRequired)

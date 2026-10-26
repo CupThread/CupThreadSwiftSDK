@@ -110,14 +110,14 @@ struct TurnstileExplicitTokenTests {
 
         _ = try await makeClient().submitFeatureRequest(
             FeatureRequestDraft(title: "Title", description: "Description"),
-            userToken: "user-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             turnstileToken: "sheet-token-2"
         )
 
         let body = try #require(log.allBodies.first)
         let json = try #require(parseJSONDict(body))
         #expect(json["turnstileToken"] as? String == "sheet-token-2")
-        #expect(json["requesterToken"] as? String == "user-1")
+        #expect(json["requesterToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     @Test func explicitTokenSkipsTheProviderOnTheFirstAttempt() async throws {
@@ -151,7 +151,7 @@ struct TurnstileExplicitTokenTests {
             data: Data("hello".utf8),
             filename: "screenshot.png",
             mimeType: "image/png",
-            userToken: "user-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
             turnstileToken: "{{SECRET_sheetminted}}"
         )
 

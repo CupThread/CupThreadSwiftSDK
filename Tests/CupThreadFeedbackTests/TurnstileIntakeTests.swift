@@ -155,13 +155,13 @@ struct TurnstileIntakeTests {
         let client = makeClient(turnstileTokenProvider: { _ in await provider.next() })
         _ = try await client.submitFeatureRequest(
             FeatureRequestDraft(title: "Title", description: "Description"),
-            userToken: "user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let rawBody = try #require(log.allBodies.first)
         let json = try #require(parseJSONDict(rawBody))
         #expect(json["turnstileToken"] as? String == "tok-1234567890")
-        #expect(json["requesterToken"] as? String == "user-1")
+        #expect(json["requesterToken"] as? String == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 
     @Test func featureRequestSubmissionOmitsTurnstileKeyWithoutProvider() async throws {
@@ -174,7 +174,7 @@ struct TurnstileIntakeTests {
         let client = makeClient()
         _ = try await client.submitFeatureRequest(
             FeatureRequestDraft(title: "Title", description: "Description"),
-            userToken: "user-1"
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
         )
 
         let rawBody = try #require(log.allBodies.first)
@@ -214,7 +214,7 @@ struct TurnstileIntakeTests {
         do {
             _ = try await client.submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Description"),
-                userToken: "user-1"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
@@ -235,7 +235,7 @@ struct TurnstileIntakeTests {
         do {
             _ = try await client.submitFeatureRequest(
                 FeatureRequestDraft(title: "Title", description: "Description"),
-                userToken: "user-1"
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
             )
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {

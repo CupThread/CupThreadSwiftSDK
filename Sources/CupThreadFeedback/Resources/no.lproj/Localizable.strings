@@ -213,6 +213,8 @@
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "For mange vedlegg: en innsending kan inneholde opptil 8 filer. Fjern noen vedlegg og prøv igjen.";
 "cupthread.error.invalid_input" = "De oppgitte detaljene kan ikke godtas. Kontroller dem og prøv igjen.";
+/* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
+"cupthread.error.invalid_identity_token" = "Brukertokenet må være en UUID-streng. Oppdater appens identitetskonfigurasjon og prøv igjen.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Denne tilbakemeldingen eller vedlegget er allerede sendt.";

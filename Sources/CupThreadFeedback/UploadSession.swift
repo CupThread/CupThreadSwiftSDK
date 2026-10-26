@@ -20,7 +20,11 @@ extension FeedbackClient {
     ///     empty array, more than ``UploadSessionLimits/allowedFileCountRange``
     ///     entries, or any zero-byte or negative `sizeBytes` is rejected
     ///     locally — see the throws list.
-    ///   - userToken: Anonymous end-user token sent as `X-User-Token`.
+    ///   - userToken: Anonymous end-user token sent as `X-User-Token`. The
+    ///     live contract types this identity as `format: uuid`: a non-`nil`
+    ///     value that is not a UUID string throws
+    ///     ``FeedbackClientError/invalidIdentityToken`` locally (issue
+    ///     #617). `nil` keeps the store fallback, which only mints UUIDs.
     ///   - turnstileToken: Optional Turnstile token for apps that require one.
     ///     When `nil`, the client's `turnstileTokenProvider` is consulted as a
     ///     fallback — with the ``TurnstileAction/feedback`` binding — so one
@@ -53,7 +57,9 @@ extension FeedbackClient {
     ///   #611) also throws ``FeedbackClientError/invalidInput(field:)``
     ///   locally, before the Turnstile token provider is consulted or any
     ///   request is sent; the whole array is refused, so a partial session is
-    ///   never created.
+    ///   never created. A non-`nil` `userToken` that is not a UUID string
+    ///   also throws ``FeedbackClientError/invalidIdentityToken`` locally
+    ///   (issue #617), at the same pre-Turnstile point.
     public func createUploadSession(
         files: [FeedbackUploadFileSpec],
         userToken: String?,
@@ -61,8 +67,10 @@ extension FeedbackClient {
     ) async throws -> FeedbackUploadSession {
         // Reject a non-nil blank or newline-bearing caller token before the
         // Turnstile provider is consulted or store fallback runs (#497); `nil`
-        // preserves the app-key-scoped store fallback.
-        let validatedToken = try validatedUserToken(userToken)
+        // preserves the app-key-scoped store fallback. The endpoint types the
+        // identity as `format: uuid`, so a non-UUID value the server can only
+        // answer with `400` fails the same fail-fast gate (issue #617).
+        let validatedToken = try validatedIdentityToken(userToken)
         try validateUploadFileCount(files)
         try validateUploadFileSizes(files)
 
@@ -269,7 +277,10 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/invalidInput(field:)`` when `data` is
     ///   empty — the session endpoint requires `sizeBytes ≥ 1` (issue #611),
     ///   so the call is refused before the Turnstile token provider is
-    ///   consulted or any request is sent; ``FeedbackClientError/unsupportedMediaType`` when
+    ///   consulted or any request is sent;
+    ///   ``FeedbackClientError/invalidIdentityToken`` when `userToken` is
+    ///   given but is not a UUID string (issue #617 — the same pre-Turnstile
+    ///   point); ``FeedbackClientError/unsupportedMediaType`` when
     ///   the type is not accepted, ``FeedbackClientError/payloadTooLarge`` when
     ///   it exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
     ///   when no identity could be presented,
@@ -337,6 +348,9 @@ extension FeedbackClient {
     ///   requires `sizeBytes ≥ 1` (issue #611), so the call is refused before
     ///   the Turnstile token provider is consulted or any request is sent
     ///   (a missing file surfaces FileManager's own error);
+    ///   ``FeedbackClientError/invalidIdentityToken`` when `userToken` is
+    ///   given but is not a UUID string (issue #617 — checked before the
+    ///   file is even stat'd);
     ///   ``FeedbackClientError/unsupportedMediaType`` when the type
     ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
     ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
@@ -358,7 +372,10 @@ extension FeedbackClient {
         userToken: String? = nil,
         turnstileToken: String? = nil
     ) async throws -> FeedbackAttachment {
-        let validatedToken = try validatedUserToken(userToken)
+        // The uuid gate runs before `fileSize(at:)` is consulted, so a
+        // non-UUID identity is reported before any filesystem access
+        // (issue #617); the session-creation call below re-checks.
+        let validatedToken = try validatedIdentityToken(userToken)
         let uploadSession = try await createUploadSession(
             files: [FeedbackUploadFileSpec(
                 clientFileId: "file-1",

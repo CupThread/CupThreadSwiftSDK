@@ -294,7 +294,7 @@ struct FeatureRequestPagingTests {
         }
 
         let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
-        let result = try await client.toggleVote(featureRequestId: "fr-1", userToken: "tok")
+        let result = try await client.toggleVote(featureRequestId: "fr-1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
         #expect(result.voted == true)
         #expect(result.voteCount == 2)
         #expect(result.warning?.isEmailNotVerified == true)
@@ -307,7 +307,7 @@ struct FeatureRequestPagingTests {
 
         let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
         do {
-            _ = try await client.toggleVote(featureRequestId: "fr-1", userToken: "tok")
+            _ = try await client.toggleVote(featureRequestId: "fr-1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
             Issue.record("Expected error to be thrown")
         } catch let error as FeedbackClientError {
             guard case .rateLimited = error else {
@@ -348,10 +348,10 @@ struct FeatureRequestPagingTests {
         }
 
         let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
-        _ = try await client.toggleVote(featureRequestId: "fr-1", userToken: "vote-tok")
+        _ = try await client.toggleVote(featureRequestId: "fr-1", userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
 
         let request = try #require(capture.value)
-        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "vote-tok")
+        #expect(request.value(forHTTPHeaderField: "X-User-Token") == "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f")
     }
 }
 
