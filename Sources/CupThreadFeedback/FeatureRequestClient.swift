@@ -43,7 +43,14 @@ extension FeedbackClient {
     ///   - query: Optional server-side search over title and description
     ///     (rate-limited per IP and briefly cached by the backend).
     ///     Blank or whitespace-only values are dropped; surrounding
-    ///     whitespace is trimmed.
+    ///     whitespace is trimmed. Terms longer than
+    ///     ``FeatureRequestSearchLimits/maxQueryLength`` code points are
+    ///     truncated to that bound (#610, whole grapheme clusters kept and
+    ///     counted per the #578 convention) — the live contract's
+    ///     `maxLength: 120` would otherwise answer every such request with a
+    ///     rejection after an admission slot was already spent, so the term
+    ///     the SDK actually sends is capped here the same way `limit` and
+    ///     `offset` are clamped above.
     ///   - cursor: Opaque keyset cursor from a previous page's
     ///     ``ListFeatureRequestsResult/nextCursor`` — the cheaper way to page
     ///     deeply; takes the place of large `offset` values.
@@ -92,7 +99,7 @@ extension FeedbackClient {
         if let versionId = versionId?.nilIfEmpty {
             queryItems.append(URLQueryItem(name: "versionId", value: versionId))
         }
-        if let query = query?.nilIfEmpty {
+        if let query = FeatureRequestSearchLimits.sanitizedQuery(query) {
             queryItems.append(URLQueryItem(name: "q", value: query))
         }
         if let cursor = cursor?.nilIfEmpty {

@@ -11,8 +11,8 @@ struct RoadmapBoardLoadTaskKeyTests {
         // restart even though the query is unchanged. Keyed on the search
         // text alone (the main behavior), the id never changed here.
         #expect(
-            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, trimmedSearchText: "dark mode")
-                != makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "dark mode")
+            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, query: "dark mode")
+                != makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, query: "dark mode")
         )
     }
 
@@ -20,20 +20,20 @@ struct RoadmapBoardLoadTaskKeyTests {
         // The pre-existing debounce behavior: every query change restarts the
         // task while the config switch stays put.
         #expect(
-            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "dark")
-                != makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "dark mode")
+            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, query: "dark")
+                != makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, query: "dark mode")
         )
     }
 
     @Test func unchangedSwitchAndQueryProduceTheSameKey() {
         // A switch-stable config refresh must not restart the in-flight load.
         #expect(
-            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "")
-                == makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, trimmedSearchText: "")
+            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, query: "")
+                == makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: true, query: "")
         )
         #expect(
-            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, trimmedSearchText: "")
-                == makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, trimmedSearchText: "")
+            makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, query: "")
+                == makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: false, query: "")
         )
     }
 }

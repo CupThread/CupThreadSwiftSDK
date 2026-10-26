@@ -99,10 +99,15 @@ public struct RoadmapBoardView: View {
         return { await refreshRoadmap() }
     }
 
-    /// The query actually sent to the server, trimmed to match the throttle's
-    /// duplicate detection.
-    private var trimmedSearchText: String {
-        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// The query actually sent to the server: trimmed to match the throttle's
+    /// duplicate detection and capped to
+    /// ``FeatureRequestSearchLimits/maxQueryLength`` (#610), so the throttle
+    /// key, the wire term on every cursor page, and `lastExecutedQuery` always
+    /// describe the same request — an over-long paste or deep-link term is
+    /// searched as the prefix the live contract accepts instead of spending
+    /// an admission slot on a guaranteed rejection.
+    private var sentSearchText: String {
+        FeatureRequestSearchLimits.sanitizedQuery(searchText) ?? ""
     }
 
     /// The throttle key for a query. The `roadmap|` prefix keeps board
@@ -113,7 +118,7 @@ public struct RoadmapBoardView: View {
 
     /// The throttle key for the query currently in the search field.
     private var searchThrottleKey: String {
-        searchThrottleKey(for: trimmedSearchText)
+        searchThrottleKey(for: sentSearchText)
     }
 
     /// Whether this instance already rendered the results for its current
@@ -141,7 +146,7 @@ public struct RoadmapBoardView: View {
     var loadTaskKey: String {
         makeRoadmapLoadTaskKey(
             allowsAnonymousRoadmap: activeConfig?.allowsAnonymousRoadmap ?? true,
-            trimmedSearchText: trimmedSearchText
+            query: sentSearchText
         )
     }
 
@@ -245,7 +250,7 @@ public struct RoadmapBoardView: View {
                 settlePermissionDeniedState()
                 return
             }
-            guard !trimmedSearchText.isEmpty else {
+            guard !sentSearchText.isEmpty else {
                 // Plain listing: unrate-limited, so no debounce/throttle.
                 hasEmittedAdmissionNotice = false
                 await client.searchThrottle.resetLastAdmittedKey()
@@ -534,7 +539,7 @@ extension RoadmapBoardView {
         defer { loadState.finishLoading(generation: generation, wasCancelled: Task.isCancelled) }
         do {
             // Page through with collectAllRequests so columns load complete data.
-            let queryText = trimmedSearchText
+            let queryText = sentSearchText
             let query = queryText.isEmpty ? nil : queryText
             if let loaded = try await loadRoadmapGroups(
                 client: client,

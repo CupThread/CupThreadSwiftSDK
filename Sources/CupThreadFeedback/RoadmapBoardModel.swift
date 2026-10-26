@@ -142,8 +142,9 @@ struct RoadmapBoardLoadState: Equatable, Sendable {
 }
 
 /// The `.task` identity for the roadmap board's load lifecycle (issues #274,
-/// #365): the config's `allowsAnonymousRoadmap` switch plus the trimmed
-/// search text. Keying on the search text alone never re-ran the task when
+/// #365): the config's `allowsAnonymousRoadmap` switch plus the search term
+/// actually sent (trimmed and capped per ``FeatureRequestSearchLimits``, #610).
+/// Keying on the search text alone never re-ran the task when
 /// the config flipped the switch, stranding the board on its first-load
 /// skeleton; keying on the *resolved permission verdict* made the task cancel
 /// and restart itself, because the task's first act — resolving
@@ -152,8 +153,8 @@ struct RoadmapBoardLoadState: Equatable, Sendable {
 /// locked-down board resolves authentication inside one stable-key run; a
 /// switch-stable config refresh produces the same key and therefore no
 /// restart.
-func makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: Bool, trimmedSearchText: String) -> String {
-    "\(allowsAnonymousRoadmap)|\(trimmedSearchText)"
+func makeRoadmapLoadTaskKey(allowsAnonymousRoadmap: Bool, query: String) -> String {
+    "\(allowsAnonymousRoadmap)|\(query)"
 }
 
 // MARK: - Board display state
