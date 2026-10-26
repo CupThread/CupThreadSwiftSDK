@@ -159,6 +159,23 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// carries the raw server text for diagnostics; it is never shown to end
     /// users.
     case reservedPlanValue(message: String?, requestId: String?)
+    /// An email-bearing intake call carried an address that cannot succeed:
+    /// either the SDK rejected it locally as implausibly shaped before any
+    /// request was sent (issue #606 — the same gate `subscribeToChangelog`
+    /// applies, #419), or the server answered the residual `400 Validation
+    /// failed` whose field errors name the email field the local gate
+    /// deliberately leaves to the server (edge-case-but-real shapes
+    /// `EmailShape` accepts and the server's Zod schema rejects). Over the
+    /// 254-code-point cap only ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``
+    /// rejects the address locally with this error; `submit` answers an
+    /// over-cap `reporterEmail` with ``FeedbackClientError/textTooLong``
+    /// instead, because its caps gate runs first. Correct the address and
+    /// retry. `field` names the offending wire field
+    /// (`reporterEmail` on feedback submissions, `shipNotifyEmail` on votes)
+    /// for diagnostics; `requestId` is the response's
+    /// `X-Request-Id` when the rejection came from the server, `nil` when it
+    /// was decided locally.
+    case invalidEmailAddress(field: String, requestId: String?)
     /// A payment-attribute report tried to clear an attribute the live
     /// `EndUserAttributesInput` schema does not allow to be cleared
     /// (`isPaying` or `currency` passed `.null` — issue #573) and the SDK
@@ -200,7 +217,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
              .alreadyFinalized, .imageUploadFailed, .reservedPlanValue, .textTooLong,
-             .attributeNotClearable:
+             .attributeNotClearable, .invalidEmailAddress:
             return nil
         }
     }
@@ -293,6 +310,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             return requestId
         case .reservedPlanValue(_, let requestId):
             return requestId
+        case .invalidEmailAddress(_, let requestId):
+            return requestId
         case .featureRequestNotFound(_, let requestId):
             return requestId
         case .userProfileNotFound(_, let requestId):
@@ -384,6 +403,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             // Raw server body stays off the user-facing copy (#30); callers
             // can read the associated `message` programmatically.
             return CupThreadStrings.tr("cupthread.error.reserved_plan_value") + Self.requestIdSuffix(requestId)
+        case .invalidEmailAddress(_, let requestId):
+            // The local rejection has no request id to quote; the server's
+            // residual field-error 400 quotes the response's id.
+            return CupThreadStrings.tr("cupthread.error.email_invalid") + Self.requestIdSuffix(requestId)
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
@@ -511,5 +534,11 @@ public extension FeedbackClientError {
     /// Convenience constructor for ``reservedPlanValue(message:requestId:)`` with no request id.
     static func reservedPlanValue(message: String? = nil) -> FeedbackClientError {
         .reservedPlanValue(message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``invalidEmailAddress(field:requestId:)``
+    /// rejected locally, before any request was sent.
+    static func invalidEmailAddress(field: String) -> FeedbackClientError {
+        .invalidEmailAddress(field: field, requestId: nil)
     }
 }

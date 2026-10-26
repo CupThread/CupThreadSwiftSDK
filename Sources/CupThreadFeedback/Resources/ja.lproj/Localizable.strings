@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "支払い情報は更新されませんでした：プラン名「unset」と「null」は予約されているため使用できません。別のプラン名を選択してください。";
 "cupthread.error.attribute_not_clearable" = "支払い情報は更新されませんでした：この属性はクリアできません。リセットできるのはプランと月額収入のみです。その他は変更せずにおくか、具体的な値を送信してください。";
+"cupthread.error.email_invalid" = "有効なメールアドレスを入力してください。";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "このフィードバックまたは添付ファイルは既に送信されています。";

@@ -93,6 +93,19 @@ extension FeedbackClient {
         if fieldErrors?["plan"]?.contains("plan_reserved_sentinel") == true {
             return .reservedPlanValue(message: envelopeMessage, requestId: requestId)
         }
+        // Email fields the local shape gate (#606) deliberately lets through:
+        // edge-case-but-real addresses `EmailShape` accepts and the server's
+        // Zod schema rejects answer `400 Validation failed` naming the field —
+        // surface the same typed error the local gate throws (with the
+        // response's request id) instead of generic unexpected-status copy.
+        // Only the feedback and vote endpoints carry these fields, so the
+        // mapping cannot misfire on any other endpoint's 400.
+        if fieldErrors?["reporterEmail"] != nil {
+            return .invalidEmailAddress(field: "reporterEmail", requestId: requestId)
+        }
+        if fieldErrors?["shipNotifyEmail"] != nil {
+            return .invalidEmailAddress(field: "shipNotifyEmail", requestId: requestId)
+        }
         switch code {
         case "uploader_identity_required":
             return .uploaderIdentityRequired(message: envelopeMessage, requestId: requestId)

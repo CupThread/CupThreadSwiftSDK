@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Payment details weren't updated: the plan names \"unset\" and \"null\" are reserved. Choose a different plan name.";
 "cupthread.error.attribute_not_clearable" = "Payment details weren't updated: this attribute can't be cleared. Only the plan and monthly revenue can be reset; leave the others unchanged or send a value.";
+"cupthread.error.email_invalid" = "Please enter a valid email address.";
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "This feedback or attachment has already been submitted.";
 

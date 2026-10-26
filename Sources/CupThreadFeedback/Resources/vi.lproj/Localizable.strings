@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Thông tin thanh toán chưa được cập nhật: tên gói «unset» và «null» đã bị đặt trước. Hãy chọn tên gói khác.";
 "cupthread.error.attribute_not_clearable" = "Chi tiết thanh toán chưa được cập nhật: thuộc tính này không thể xóa. Chỉ gói và doanh thu hàng tháng có thể đặt lại; hãy giữ nguyên các thuộc tính khác hoặc gửi một giá trị.";
+"cupthread.error.email_invalid" = "Vui lòng nhập địa chỉ email hợp lệ.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Phản hồi hoặc tệp đính kèm này đã được gửi.";

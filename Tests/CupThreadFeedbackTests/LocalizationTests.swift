@@ -53,7 +53,7 @@ struct LocalizationTests {
     @Test func allTargetLanguagesHaveCompleteKeysMatchingEnglish() throws {
         let enDict = try loadStrings(for: "en")
         let enKeys = Set(enDict.keys)
-        #expect(enKeys.count == 213, "Expected 213 keys in en.lproj, found \(enKeys.count)")
+            #expect(enKeys.count == 214, "Expected 214 keys in en.lproj, found \(enKeys.count)")
 
         for lang in Self.targetLanguages where lang != "en" {
             let dict = try loadStrings(for: lang)
