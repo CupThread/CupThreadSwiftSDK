@@ -239,11 +239,14 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// intake length (BUG-32), a comment body that is empty after trimming,
     /// a `files` array outside ``UploadSessionLimits/allowedFileCountRange``
     /// (API-28), an upload specification whose `sizeBytes` is below
-    /// ``UploadSessionLimits/minFileSizeBytes`` (issue #611), or a file whose
-    /// on-disk size cannot be read. Nothing was sent — no Turnstile token was
-    /// consumed and no request id exists. `field` names the offending input
-    /// for diagnostics (`title`, `description`, `body`, `files`,
-    /// `files[].sizeBytes`, `fileURL`); correct the named value and retry.
+    /// ``UploadSessionLimits/minFileSizeBytes`` (issue #611), a file whose
+    /// on-disk size cannot be read, an implausible changelog-subscribe
+    /// address (issue #620), or a blank changelog or weekly-digest
+    /// unsubscribe token (issue #620). Nothing was sent — no Turnstile token
+    /// was consumed and no request id exists. `field` names the offending
+    /// input for diagnostics (`title`, `description`, `body`, `files`,
+    /// `files[].sizeBytes`, `fileURL`, `email`, `token`); correct the named
+    /// value and retry.
     case invalidInput(field: String)
     /// The SDK refused a caller-supplied end-user identity token locally,
     /// before any request was built, because the live contract types the

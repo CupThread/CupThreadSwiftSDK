@@ -45,14 +45,16 @@ struct EndUserTokenLocalValidationTests {
         }
     }
 
-    private static func expectLocalBadRequest(_ error: Error) {
-        guard case FeedbackClientError.unexpectedStatus(let code, let message, let requestId) = error else {
+    /// A locally rejected unsubscribe token must surface as the typed
+    /// ``invalidInput`` case naming `token` (#620) — not a fabricated
+    /// server-shaped status: no server answered, so there is no status code
+    /// and no request id to quote.
+    private static func expectLocalInvalidToken(_ error: Error) {
+        guard case FeedbackClientError.invalidInput(let field) = error else {
             Issue.record("Unexpected error type: \(error)")
             return
         }
-        #expect(code == 400)
-        #expect(requestId == nil, "a locally rejected request carries no server request id")
-        #expect(!message.isEmpty)
+        #expect(field == "token")
     }
 
     // MARK: - linkEndUser sessionToken validation
@@ -155,7 +157,7 @@ struct EndUserTokenLocalValidationTests {
                 _ = try await Self.makeValidatedClient().unsubscribeFromWeeklyDigest(token: blankToken)
                 Issue.record("Expected blank token \(blankToken.debugDescription) to be rejected")
             } catch {
-                Self.expectLocalBadRequest(error)
+                Self.expectLocalInvalidToken(error)
             }
         }
 

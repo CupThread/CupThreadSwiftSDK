@@ -280,9 +280,9 @@ extension FeedbackClient {
     ///   - turnstileToken: Optional Cloudflare Turnstile token (10-2048 chars)
     ///     for bot challenge verification on anonymous subscriptions.
     /// - Returns: Whether the subscription was recorded (pending confirmation).
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   with code `400` (and `requestId == nil`, marking it local) when
-    ///   `email` fails the plausibility shape check,
+    /// - Throws: ``FeedbackClientError/invalidInput(field:)`` naming `email`
+    ///   when the address fails the plausibility shape check (rejected
+    ///   locally, before any network round trip),
     ///   ``FeedbackClientError/authenticationRequired`` when `userToken` is
     ///   blank, whitespace-only, or contains a newline (all rejected before
     ///   any network round trip), or when anonymous
@@ -311,11 +311,10 @@ extension FeedbackClient {
         // address the server can only reject with 400 on the wire (#419).
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard EmailShape.isPlausible(trimmedEmail) else {
-            throw FeedbackClientError.unexpectedStatus(
-                code: 400,
-                message: "Invalid email address format",
-                requestId: nil
-            )
+            // Local rejection, so the typed input case — not a fabricated
+            // server-shaped status carrying SDK-authored "response body"
+            // text (#620).
+            throw FeedbackClientError.invalidInput(field: "email")
         }
         let normalizedToken = turnstileToken?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -358,9 +357,9 @@ extension FeedbackClient {
     /// - Parameter token: The signed token from the unsubscribe link. Blank
     ///   or whitespace-only values are rejected before any network round trip.
     /// - Returns: Whether the address was removed.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   with code `400` (and `requestId == nil`, marking it local) when
-    ///   `token` is blank or whitespace-only,
+    /// - Throws: ``FeedbackClientError/invalidInput(field:)`` naming `token`
+    ///   when `token` is blank or whitespace-only (rejected locally, before
+    ///   any network round trip),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when
     ///   the token is missing or not valid for this app while the app's
     ///   public surfaces are disabled (HTTP 403; the response does not say
@@ -373,13 +372,10 @@ extension FeedbackClient {
     public func unsubscribeFromChangelog(token: String) async throws -> ChangelogUnsubscribeResult {
         // A blank token has no signature to verify and can only come back
         // rejected, so fail fast instead of dispatching the destructive
-        // POST with `token=` (#419).
+        // POST with `token=` (#419). Local rejection, so the typed input
+        // case, not a fabricated server-shaped status (#620).
         guard let trimmedToken = token.nilIfEmpty else {
-            throw FeedbackClientError.unexpectedStatus(
-                code: 400,
-                message: "Unsubscribe token cannot be empty",
-                requestId: nil
-            )
+            throw FeedbackClientError.invalidInput(field: "token")
         }
         let base = configuration.baseURL.appending(
             path: "/api/v1/public/apps/\(configuration.appKey)/changelog/unsubscribe"

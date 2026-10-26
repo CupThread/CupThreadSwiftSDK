@@ -46,7 +46,7 @@ struct ChangelogInputValidationTests {
                 )
                 Issue.record("Expected blank email \(blankEmail.debugDescription) to be rejected")
             } catch {
-                Self.expectLocalBadRequest(error)
+                Self.expectLocalInvalidInput(error, field: "email")
             }
         }
 
@@ -66,7 +66,7 @@ struct ChangelogInputValidationTests {
                 )
                 Issue.record("Expected email \(badEmail.debugDescription) to be rejected")
             } catch {
-                Self.expectLocalBadRequest(error)
+                Self.expectLocalInvalidInput(error, field: "email")
             }
         }
 
@@ -135,7 +135,7 @@ struct ChangelogInputValidationTests {
                 _ = try await Self.makeValidatedClient().unsubscribeFromChangelog(token: blankToken)
                 Issue.record("Expected blank token \(blankToken.debugDescription) to be rejected")
             } catch {
-                Self.expectLocalBadRequest(error)
+                Self.expectLocalInvalidInput(error, field: "token")
             }
         }
 
@@ -160,15 +160,51 @@ struct ChangelogInputValidationTests {
 
     // MARK: - Helpers
 
-    /// A locally rejected input must surface as the `400`-shaped
-    /// `unexpectedStatus` with `requestId == nil` — no server answered.
-    private static func expectLocalBadRequest(_ error: Error) {
-        guard case FeedbackClientError.unexpectedStatus(let code, let message, let requestId) = error else {
+    /// A locally rejected input must surface as the typed ``invalidInput``
+    /// case naming the offending field (#620) — not a fabricated
+    /// server-shaped status: no server answered, so there is no status code
+    /// and no request id to quote.
+    private static func expectLocalInvalidInput(_ error: Error, field expectedField: String) {
+        guard case FeedbackClientError.invalidInput(let field) = error else {
             Issue.record("Unexpected error type: \(error)")
             return
         }
-        #expect(code == 400)
-        #expect(requestId == nil, "a locally rejected request carries no server request id")
-        #expect(!message.isEmpty)
+        #expect(field == expectedField, "the error must name the offending input \(expectedField.debugDescription), got \(field.debugDescription)")
+    }
+
+    // MARK: - Cross-endpoint convention (#620)
+
+    /// The same implausible address is rejected locally by both entry
+    /// points, each with its own typed case — a deliberate split, pinned so
+    /// it cannot drift silently again: `submit` keeps #606's
+    /// ``FeedbackClientError/invalidEmailAddress(field:requestId:)`` (the
+    /// feedback intake's typed email case, carrying a request id whenever
+    /// one is available), while `subscribeToChangelog` reports the generic
+    /// local ``FeedbackClientError/invalidInput(field:)`` shared with every
+    /// other local input preflight (#614). What must stay identical is the
+    /// locality contract: both rejections happen before any request is
+    /// built — no network round trip, no Turnstile token spent, and no
+    /// server-shaped `.unexpectedStatus` fabricated for caller input.
+    @Test func implausibleEmailIsRejectedLocallyByBothEntryPointsWithPinnedDistinctCases() async {
+        let capture = CaptureBox<URLRequest>()
+        Self.stubSubscribeResponse(capture)
+
+        let draft = FeedbackDraft(
+            title: "Cross-endpoint parity",
+            description: "Implausible email on both paths",
+            reporterEmail: "not-an-email",
+            platform: .ios
+        )
+        await #expect(throws: FeedbackClientError.invalidEmailAddress(field: "reporterEmail", requestId: nil)) {
+            _ = try await Self.makeValidatedClient().submit(draft)
+        }
+        await #expect(throws: FeedbackClientError.invalidInput(field: "email")) {
+            _ = try await Self.makeValidatedClient().subscribeToChangelog(
+                email: "not-an-email",
+                userToken: "tok-1"
+            )
+        }
+
+        #expect(capture.value == nil, "neither entry point may build a request for an implausible email")
     }
 }

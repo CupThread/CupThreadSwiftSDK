@@ -32,10 +32,12 @@ extension FeedbackClient {
     ///   token alone identifies the workspace and recipient, so dispatching
     ///   with `token=` can only come back rejected (#416).
     /// - Returns: Whether the address was removed from the weekly digest.
-    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   (status 400 when the token is blank — rejected locally with no
-    ///   network round trip and no server request id — or missing, invalid,
-    ///   or expired on the server),
+    /// - Throws: ``FeedbackClientError/invalidInput(field:)`` naming `token`
+    ///   when the token is blank or whitespace-only (rejected locally with
+    ///   no network round trip and no server request id),
+    ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   (status 400 when the token is missing, invalid, or expired on the
+    ///   server),
     ///   ``FeedbackClientError/authenticationRequired`` (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` (HTTP 403),
     ///   ``FeedbackClientError/rateLimited`` on HTTP 429, or
@@ -46,13 +48,10 @@ extension FeedbackClient {
         // A blank token has no signature to verify and can only come back
         // rejected, so fail fast instead of dispatching the mutating POST
         // with `token=` (#416) — same contract as the changelog
-        // unsubscribe sibling (#419).
+        // unsubscribe sibling (#419). Local rejection, so the typed input
+        // case, not a fabricated server-shaped status (#620).
         guard let trimmedToken = token.nilIfEmpty else {
-            throw FeedbackClientError.unexpectedStatus(
-                code: 400,
-                message: "Unsubscribe token cannot be empty",
-                requestId: nil
-            )
+            throw FeedbackClientError.invalidInput(field: "token")
         }
         let base = configuration.baseURL.appending(path: "/api/v1/public/digest/unsubscribe")
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
