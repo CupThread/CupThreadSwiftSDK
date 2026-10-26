@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "支付信息未更新：套餐名 “unset” 和 “null” 为保留名称，请改用其他套餐名。";
 "cupthread.error.attribute_not_clearable" = "支付信息未更新：该属性无法清空。只有套餐和月度收入可以重置；其余属性请保持不变或传入具体值。";
+"cupthread.error.attribute_invalid" = "支付信息未更新：属性值超出允许范围。套餐名需为 1–64 个字符，月度收入需在 0 到 1,000,000 之间，货币代码需为三个字母。";
 "cupthread.error.email_invalid" = "请输入有效的电子邮件地址。";
 
 /* Issue #257: duplicate attachment finalization — already submitted */

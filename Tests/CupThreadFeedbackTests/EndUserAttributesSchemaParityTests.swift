@@ -19,6 +19,9 @@ struct EndUserAttributesSchemaParityTests {
     private struct OpenAPIProperty: Decodable {
         let type: String?
         let nullable: Bool?
+        let maxLength: Int?
+        let minimum: Double?
+        let maximum: Double?
     }
 
     private struct OpenAPISchemaObject: Decodable {
@@ -147,5 +150,46 @@ struct EndUserAttributesSchemaParityTests {
         #expect(input["currency"]?.type == "string")
         #expect(input["plan"]?.type == "string")
         #expect(input["mrr"]?.type == "number")
+    }
+
+    /// Field-by-field: the numeric bounds ``UserAttributeLimits`` enforces
+    /// locally (issue #607) equal the bounds the live schema publishes —
+    /// `plan.maxLength`, `mrr.minimum`, `mrr.maximum`. The nullability
+    /// tripwire above catches clearability drift; this one catches bound
+    /// drift, so a server-side change trips a test instead of a host's
+    /// production request.
+    @Test func sdkBoundsMatchLiveSchema() async throws {
+        guard let spec = try await Self.fetchLiveSpecRecordingInconclusive() else { return }
+        let input = try #require(
+            spec.components.schemas["EndUserAttributesInput"]?.properties,
+            "The live OpenAPI document no longer carries EndUserAttributesInput — update this suite"
+        )
+
+        let plan = try #require(input["plan"], "The live schema no longer carries EndUserAttributesInput.plan")
+        #expect(
+            plan.maxLength == UserAttributeLimits.maxPlanLength,
+            """
+            Plan-length drift: the SDK enforces \(UserAttributeLimits.maxPlanLength) code points \
+            but the live schema publishes maxLength \(plan.maxLength ?? -1) (issue #607).
+            """
+        )
+
+        let mrr = try #require(input["mrr"], "The live schema no longer carries EndUserAttributesInput.mrr")
+        #expect(
+            mrr.minimum == UserAttributeLimits.minMRR,
+            """
+            MRR floor drift: the SDK enforces \(UserAttributeLimits.minMRR) \
+            but the live schema publishes minimum \(mrr.minimum.map(String.init(describing:)) ?? "none") \
+            (issue #607).
+            """
+        )
+        #expect(
+            mrr.maximum == UserAttributeLimits.maxMRR,
+            """
+            MRR cap drift: the SDK enforces \(UserAttributeLimits.maxMRR) \
+            but the live schema publishes maximum \(mrr.maximum.map(String.init(describing:)) ?? "none") \
+            (issue #607).
+            """
+        )
     }
 }

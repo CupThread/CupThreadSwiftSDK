@@ -48,6 +48,7 @@ struct ErrorDescriptionLocalizationTests {
         "cupthread.error.email_not_verified",
         "cupthread.error.reserved_plan_value",
         "cupthread.error.attribute_not_clearable",
+        "cupthread.error.attribute_invalid",
         "cupthread.error.email_invalid",
         "cupthread.attachment.oversized",
         "cupthread.attachment.unprocessable",
@@ -106,6 +107,10 @@ struct ErrorDescriptionLocalizationTests {
         assertResolvesThroughCatalog(.emailNotVerified(message: nil, requestId: nil), "cupthread.error.email_not_verified")
         assertResolvesThroughCatalog(.reservedPlanValue(message: nil, requestId: nil), "cupthread.error.reserved_plan_value")
         assertResolvesThroughCatalog(.attributeNotClearable(attribute: "isPaying"), "cupthread.error.attribute_not_clearable")
+        assertResolvesThroughCatalog(
+            .invalidAttributeValue(attribute: "mrr", message: nil, requestId: nil),
+            "cupthread.error.attribute_invalid"
+        )
         assertResolvesThroughCatalog(
             .invalidEmailAddress(field: "reporterEmail"),
             "cupthread.error.email_invalid"

@@ -74,6 +74,22 @@ extension FeedbackClient {
         }
     }
 
+    /// Maps the `PUT /api/v1/public/apps/{appKey}/user` attribute field
+    /// errors (`plan`, `mrr`, `currency`) to the value-bounds typed error
+    /// (issue #607). Only that endpoint carries these fields, so the
+    /// mapping cannot misfire on another endpoint's 400. Returns `nil`
+    /// when none of the three fields is named.
+    private static func attributeValueTypedError(
+        fieldErrors: [String: [String]]?,
+        envelopeMessage: String?,
+        requestId: String?
+    ) -> FeedbackClientError? {
+        for attribute in ["plan", "mrr", "currency"] where fieldErrors?[attribute] != nil {
+            return .invalidAttributeValue(attribute: attribute, message: envelopeMessage, requestId: requestId)
+        }
+        return nil
+    }
+
     /// Maps status 400 failure envelopes to typed errors (uploader identity/mismatch,
     /// invalid parent comment, disallowed MIME / executable extension, and the
     /// reserved-plan-sentinel field error of `PUT /api/v1/public/apps/{appKey}/user`).
@@ -105,6 +121,20 @@ extension FeedbackClient {
         }
         if fieldErrors?["shipNotifyEmail"] != nil {
             return .invalidEmailAddress(field: "shipNotifyEmail", requestId: requestId)
+        }
+        // Attribute values the local bounds gate (#607) deliberately lets
+        // through (e.g. astral-plane plan names the code-point gate accepts
+        // and the server's UTF-16-length validation rejects) surface as the
+        // same typed error the local gate throws — with the response's
+        // request id — instead of generic unexpected-status copy. The
+        // `plan_reserved_sentinel` check above stays first: it is also a
+        // `plan` field error.
+        if let attributeValueError = attributeValueTypedError(
+            fieldErrors: fieldErrors,
+            envelopeMessage: envelopeMessage,
+            requestId: requestId
+        ) {
+            return attributeValueError
         }
         switch code {
         case "uploader_identity_required":

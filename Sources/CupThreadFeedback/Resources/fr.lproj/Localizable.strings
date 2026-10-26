@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Les informations de paiement n’ont pas été mises à jour : les noms de formule « unset » et « null » sont réservés. Choisissez un autre nom de formule.";
 "cupthread.error.attribute_not_clearable" = "Les informations de paiement n'ont pas été mises à jour : cet attribut ne peut pas être effacé. Seuls le forfait et le revenu mensuel peuvent être réinitialisés ; laissez les autres inchangés ou envoyez une valeur.";
+"cupthread.error.attribute_invalid" = "Les informations de paiement n'ont pas été mises à jour : une valeur d'attribut est hors plage. Utilisez un nom de forfait de 1 à 64 caractères, un revenu mensuel entre 0 et 1 000 000 et un code de devise à trois lettres.";
 "cupthread.error.email_invalid" = "Veuillez saisir une adresse e-mail valide.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */

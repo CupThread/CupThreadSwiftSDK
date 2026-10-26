@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Dane płatności nie zostały zaktualizowane: nazwy planów „unset“ i „null“ są zastrzeżone. Wybierz inną nazwę planu.";
 "cupthread.error.attribute_not_clearable" = "Dane płatności nie zostały zaktualizowane: tego atrybutu nie można wyczyścić. Tylko plan i przychód miesięczny można zresetować; pozostaw pozostałe bez zmian lub wyślij wartość.";
+"cupthread.error.attribute_invalid" = "Dane płatności nie zostały zaktualizowane: wartość atrybutu jest poza dozwolonym zakresem. Użyj nazwy planu o długości 1–64 znaków, przychodu miesięcznego od 0 do 1 000 000 i trzyliterowego kodu waluty.";
 "cupthread.error.email_invalid" = "Podaj prawidłowy adres e-mail.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
