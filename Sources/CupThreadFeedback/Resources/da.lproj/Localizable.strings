@@ -212,6 +212,7 @@
 "cupthread.error.email_invalid" = "Indtast venligst en gyldig e-mailadresse.";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "For mange vedhæftede filer: en indsendelse kan højst indeholde 8 filer. Fjern nogle af dem, og prøv igen.";
+"cupthread.error.invalid_input" = "De angivne oplysninger kan ikke accepteres. Kontrollér dem, og prøv igen.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Denne feedback eller vedhæftede fil er allerede indsendt.";

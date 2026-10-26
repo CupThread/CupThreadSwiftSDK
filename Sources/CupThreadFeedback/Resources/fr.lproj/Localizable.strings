@@ -212,6 +212,7 @@
 "cupthread.error.email_invalid" = "Veuillez saisir une adresse e-mail valide.";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "Trop de pièces jointes : un envoi peut contenir jusqu'à 8 fichiers. Retirez quelques pièces jointes et réessayez.";
+"cupthread.error.invalid_input" = "Les informations fournies ne peuvent pas être acceptées. Vérifiez-les et réessayez.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Ce retour ou cette pièce jointe a déjà été envoyé.";

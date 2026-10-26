@@ -11,7 +11,11 @@ import Testing
 // mapped *every* 404 — including bare router fallbacks — to
 // `commentsUnavailable`, misreporting infrastructure misconfiguration as a
 // per-request comments-disabled state. All three are now rejected or
-// disambiguated locally.
+// disambiguated locally. Since issue #614 a grammar-invalid id is reported
+// as `.featureRequestNotFound` — the same convention as
+// `fetchFeatureRequest` and the vote endpoints — and an empty body as
+// `.invalidInput(field: "body")`, because `.invalidResponse` describes a
+// malformed server response and nothing was sent.
 @Suite("CommentClient Local Validation", .serialized)
 struct CommentClientLocalValidationTests {
     static let apiHost = "comment-local-validation.example.com"
@@ -46,7 +50,7 @@ struct CommentClientLocalValidationTests {
         }
 
         for id in Self.invalidIDs {
-            await #expect(throws: FeedbackClientError.invalidResponse) {
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
                 _ = try await Self.makeAPIClient().fetchComments(featureRequestId: id, limit: 20)
             }
         }
@@ -62,7 +66,7 @@ struct CommentClientLocalValidationTests {
         }
 
         for id in Self.invalidIDs {
-            await #expect(throws: FeedbackClientError.invalidResponse) {
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
                 _ = try await Self.makeAPIClient().postComment(
                     featureRequestId: id,
                     draft: CommentDraft(body: "hello"),
@@ -84,7 +88,7 @@ struct CommentClientLocalValidationTests {
         }
 
         for body in ["", "   ", "\n\t  ", " \u{00A0} "] {
-            await #expect(throws: FeedbackClientError.invalidResponse) {
+            await #expect(throws: FeedbackClientError.invalidInput(field: "body")) {
                 _ = try await Self.makeAPIClient().postComment(
                     featureRequestId: "fr-123",
                     draft: CommentDraft(body: body),

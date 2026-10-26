@@ -3,7 +3,13 @@ import Foundation
 
 /// Errors thrown by ``FeedbackClient`` network calls.
 public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
-    /// The server response could not be interpreted as HTTP.
+    /// A response could not be interpreted: a `URLResponse` that is not an
+    /// `HTTPURLResponse`, a request the SDK could not form, or a 2xx success
+    /// body that failed JSON decoding — mapped here so hosts never observe a
+    /// raw `DecodingError`. Reserved for the network boundary: caller-input
+    /// preflights throw their typed cases
+    /// (``FeedbackClientError/invalidInput(field:)`` or a convention-appropriate
+    /// not-found error) and never this one (issue #614).
     case invalidResponse
     /// The upload endpoint returned a success response (200, 201, or 202)
     /// whose body could not be decoded.
@@ -226,6 +232,19 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// response's `X-Request-Id` when the rejection came from the server,
     /// `nil` when it was decided locally.
     case tooManyAttachments(message: String?, requestId: String?)
+    /// The SDK refused a caller-supplied value locally, before any request
+    /// was built, because the server could only answer it with `400
+    /// Validation failed` (issue #614): a feedback or feature-request draft
+    /// whose trimmed `title` or `description` is below the server's minimum
+    /// intake length (BUG-32), a comment body that is empty after trimming,
+    /// a `files` array outside ``UploadSessionLimits/allowedFileCountRange``
+    /// (API-28), an upload specification whose `sizeBytes` is below
+    /// ``UploadSessionLimits/minFileSizeBytes`` (issue #611), or a file whose
+    /// on-disk size cannot be read. Nothing was sent — no Turnstile token was
+    /// consumed and no request id exists. `field` names the offending input
+    /// for diagnostics (`title`, `description`, `body`, `files`,
+    /// `files[].sizeBytes`, `fileURL`); correct the named value and retry.
+    case invalidInput(field: String)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -256,7 +275,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
              .alreadyFinalized, .imageUploadFailed, .reservedPlanValue, .textTooLong,
-             .attributeNotClearable, .invalidEmailAddress, .invalidAttributeValue, .tooManyAttachments:
+             .attributeNotClearable, .invalidEmailAddress, .invalidAttributeValue, .tooManyAttachments,
+             .invalidInput:
             return nil
         }
     }
@@ -362,7 +382,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .unexpectedStatus(_, _, let requestId):
             return requestId
         case .invalidResponse, .unreadableUploadResponse, .invalidConfiguration,
-             .authenticationRequired, .textTooLong, .attributeNotClearable:
+             .authenticationRequired, .textTooLong, .attributeNotClearable, .invalidInput:
             return nil
         }
     }
@@ -462,6 +482,10 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             // text stays off user-facing copy (#30); callers can read the
             // associated `message` programmatically.
             return CupThreadStrings.tr("cupthread.error.too_many_attachments") + Self.requestIdSuffix(requestId)
+        case .invalidInput:
+            // Rejected client-side, so there is no request id to quote. The
+            // offending `field` is host-side diagnostics, not end-user copy.
+            return CupThreadStrings.tr("cupthread.error.invalid_input")
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).

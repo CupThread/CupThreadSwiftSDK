@@ -99,20 +99,20 @@ struct IntakeMinimumLengthTests {
     @Test("submitFeatureRequest rejects whitespace-only and sub-minimum drafts locally with no Turnstile consultation and no network call")
     func submitFeatureRequestRejectsInvalidDraftsLocally() async throws {
         let capture = Self.recordNoRequestBody()
-        let invalidDrafts: [FeatureRequestDraft] = [
-            FeatureRequestDraft(title: "", description: "Valid description"),
-            FeatureRequestDraft(title: "   ", description: "Valid description"),
-            FeatureRequestDraft(title: "\n\t", description: "Valid description"),
-            FeatureRequestDraft(title: " \u{00A0} ", description: "Valid description", requesterName: "Ada"),
-            FeatureRequestDraft(title: "ab", description: "Valid description"),
-            FeatureRequestDraft(title: "Valid title", description: ""),
-            FeatureRequestDraft(title: "Valid title", description: "    "),
-            FeatureRequestDraft(title: "Valid title", description: "abcd")
+        let invalidDrafts: [(draft: FeatureRequestDraft, field: String)] = [
+            (FeatureRequestDraft(title: "", description: "Valid description"), "title"),
+            (FeatureRequestDraft(title: "   ", description: "Valid description"), "title"),
+            (FeatureRequestDraft(title: "\n\t", description: "Valid description"), "title"),
+            (FeatureRequestDraft(title: " \u{00A0} ", description: "Valid description", requesterName: "Ada"), "title"),
+            (FeatureRequestDraft(title: "ab", description: "Valid description"), "title"),
+            (FeatureRequestDraft(title: "Valid title", description: ""), "description"),
+            (FeatureRequestDraft(title: "Valid title", description: "    "), "description"),
+            (FeatureRequestDraft(title: "Valid title", description: "abcd"), "description")
         ]
 
-        for draft in invalidDrafts {
+        for (draft, field) in invalidDrafts {
             let (client, counter) = Self.makeCountingClient()
-            await #expect(throws: FeedbackClientError.invalidResponse) {
+            await #expect(throws: FeedbackClientError.invalidInput(field: field)) {
                 _ = try await client.submitFeatureRequest(draft, userToken: "user-123")
             }
             #expect(counter.callCount == 0, "An invalid draft must never consume a Turnstile token")
@@ -158,20 +158,20 @@ struct IntakeMinimumLengthTests {
     @Test("submit rejects whitespace-only and sub-minimum drafts locally with no Turnstile consultation and no network call")
     func submitRejectsInvalidDraftsLocally() async throws {
         let capture = Self.recordNoRequestBody()
-        let invalidDrafts: [FeedbackDraft] = [
-            FeedbackDraft(title: "", description: "Valid description", platform: .ios),
-            FeedbackDraft(title: "   ", description: "Valid description", platform: .ios),
-            FeedbackDraft(title: "\n\t", description: "Valid description", platform: .ios),
-            FeedbackDraft(title: " \u{00A0} ", description: "Valid description", platform: .ios),
-            FeedbackDraft(title: "ab", description: "Valid description", platform: .ios),
-            FeedbackDraft(title: "Valid title", description: "", platform: .ios),
-            FeedbackDraft(title: "Valid title", description: "    ", platform: .ios),
-            FeedbackDraft(title: "Valid title", description: "abcd", platform: .ios)
+        let invalidDrafts: [(draft: FeedbackDraft, field: String)] = [
+            (FeedbackDraft(title: "", description: "Valid description", platform: .ios), "title"),
+            (FeedbackDraft(title: "   ", description: "Valid description", platform: .ios), "title"),
+            (FeedbackDraft(title: "\n\t", description: "Valid description", platform: .ios), "title"),
+            (FeedbackDraft(title: " \u{00A0} ", description: "Valid description", platform: .ios), "title"),
+            (FeedbackDraft(title: "ab", description: "Valid description", platform: .ios), "title"),
+            (FeedbackDraft(title: "Valid title", description: "", platform: .ios), "description"),
+            (FeedbackDraft(title: "Valid title", description: "    ", platform: .ios), "description"),
+            (FeedbackDraft(title: "Valid title", description: "abcd", platform: .ios), "description")
         ]
 
-        for draft in invalidDrafts {
+        for (draft, field) in invalidDrafts {
             let (client, counter) = Self.makeCountingClient()
-            await #expect(throws: FeedbackClientError.invalidResponse) {
+            await #expect(throws: FeedbackClientError.invalidInput(field: field)) {
                 _ = try await client.submit(draft, userToken: "token-123")
             }
             #expect(counter.callCount == 0, "An invalid draft must never consume a Turnstile token")

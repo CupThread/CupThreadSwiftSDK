@@ -214,4 +214,33 @@ struct DecodingErrorMappingTests {
             }
         }
     }
+
+    // MARK: - The single remaining meaning of `.invalidResponse` (issue #614)
+
+    /// A response that is not an `HTTPURLResponse` at all — the transport
+    /// fault `.invalidResponse` was coined for — still maps there, never to
+    /// a typed local-input case or a not-found error.
+    @Test func nonHTTPResponseMapsToInvalidResponse() async throws {
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            (
+                URLResponse(
+                    url: request.url ?? URL(string: "https://\(Self.host)")!,
+                    mimeType: "application/json",
+                    expectedContentLength: 0,
+                    textEncodingName: nil
+                ),
+                Data()
+            )
+        }
+        defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
+
+        do {
+            _ = try await self.makeAPIClient().fetchFeatureRequests(userToken: "tok-user")
+            Issue.record("Expected .invalidResponse to be thrown")
+        } catch let error as FeedbackClientError {
+            #expect(error == .invalidResponse, "Got \(error)")
+        } catch {
+            Issue.record("Expected FeedbackClientError.invalidResponse, got \(error)")
+        }
+    }
 }

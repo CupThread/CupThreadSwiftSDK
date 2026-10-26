@@ -72,6 +72,11 @@ extension FeedbackClient {
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor),
+    ///   ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
+    ///   when `featureRequestId` cannot be a valid feature-request id (empty,
+    ///   whitespace-padded to nothing, or containing path/query/percent
+    ///   characters — deep-link ids are untrusted input; rejected locally with
+    ///   no request sent, same convention as ``FeedbackClient/fetchFeatureRequest(id:userToken:)``),
     ///   ``FeedbackClientError/invalidResponse``, or `CancellationError`
     ///   when the enclosing task is cancelled.
     public func fetchComments(
@@ -158,11 +163,16 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor, and a 404 that arrives
     ///   *without* the JSON envelope — a router fallback, deploy skew, or a
-    ///   wrong `baseURL`), or
-    ///   ``FeedbackClientError/invalidResponse`` when `featureRequestId`
-    ///   cannot be a valid feature-request id (empty, whitespace-padded to
-    ///   nothing, or containing path/query/percent characters — deep-link ids
-    ///   are untrusted input; rejected locally with no request sent).
+    ///   wrong `baseURL`),
+    ///   ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
+    ///   when `featureRequestId` cannot be a valid feature-request id (empty,
+    ///   whitespace-padded to nothing, or containing path/query/percent
+    ///   characters — deep-link ids are untrusted input; rejected locally
+    ///   with no request sent, same convention as
+    ///   ``FeedbackClient/fetchFeatureRequest(id:userToken:)`` and the vote
+    ///   endpoints), or
+    ///   ``FeedbackClientError/invalidResponse`` for a response that cannot
+    ///   be interpreted as HTTP.
     public func fetchComments(
         featureRequestId: String,
         limit: Int,
@@ -174,8 +184,11 @@ extension FeedbackClient {
         // real request, so reject it locally instead of interpolating path
         // separators, `..`, or query/fragment characters into the URL while
         // `Authorization: Bearer` and `X-User-Token` headers are attached.
+        // Reported as not-found — the same convention as `fetchFeatureRequest`
+        // (API-24) and the vote endpoints (API-27) — because `.invalidResponse`
+        // describes a malformed server response, and nothing was sent (#614).
         guard FeatureRequestIDGrammar.isValid(trimmedID) else {
-            throw FeedbackClientError.invalidResponse
+            throw FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)
         }
         let base = configuration.baseURL.appending(
             path: "/api/v1/feature-requests/\(trimmedID)/comments"
@@ -247,8 +260,9 @@ extension FeedbackClient {
     ///   the lookup, but only after the local checks below succeed, so an
     ///   anonymous caller receives it for any request that survives local
     ///   `featureRequestId` and draft validation; an id failing that
-    ///   validation throws ``FeedbackClientError/invalidResponse`` locally
-    ///   with no network round trip and never reaches the gate),
+    ///   validation throws
+    ///   ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
+    ///   locally with no network round trip and never reaches the gate),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
     ///   server state answers it on this operation; the generic permission
     ///   mapping is kept for deploy skew (pre-convention servers answered an
@@ -267,12 +281,15 @@ extension FeedbackClient {
     ///   exceeds ``IntakeTextLimits/maxCommentLength`` (#578) — rejected
     ///   locally with no network round trip; shorten the comment and post
     ///   again,
+    ///   ``FeedbackClientError/invalidInput(field:)`` when `draft.body` is
+    ///   empty after trimming — rejected locally with no request sent (#614),
+    ///   ``FeedbackClientError/featureRequestNotFound(message:requestId:)``
+    ///   when `featureRequestId` cannot be a valid feature-request id (same
+    ///   local not-found convention as
+    ///   ``FeedbackClient/fetchFeatureRequest(id:userToken:)`` — nothing was
+    ///   sent), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
-    ///   or ``FeedbackClientError/invalidResponse`` otherwise — the latter is
-    ///   also thrown locally, before any request is built, when
-    ///   `featureRequestId` cannot be a valid feature-request id (empty,
-    ///   whitespace-padded to nothing, or containing path/query/percent
-    ///   characters) or `draft.body` is empty after trimming.
+    ///   or ``FeedbackClientError/invalidResponse`` otherwise.
     public func postComment(
         featureRequestId: String,
         draft: CommentDraft,
@@ -284,16 +301,19 @@ extension FeedbackClient {
         let trimmedID = featureRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
         // Same untrusted-input grammar as `fetchComments` (BUG-31): never
         // build a URL path from an id that cannot be a single opaque segment.
+        // Same not-found convention as `fetchFeatureRequest` and the vote
+        // endpoints — a grammar-invalid id never sent anything (#614).
         guard FeatureRequestIDGrammar.isValid(trimmedID) else {
-            throw FeedbackClientError.invalidResponse
+            throw FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)
         }
         // A body that is empty after trimming can only be rejected by the
         // server (`400 Validation failed`); fail fast locally so headless
         // callers do not spend a network round trip — or the signed-in
-        // session's bearer token — on a request that cannot succeed.
+        // session's bearer token — on a request that cannot succeed. The
+        // typed local-input error names the field (#614).
         let body = draft.body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty else {
-            throw FeedbackClientError.invalidResponse
+            throw FeedbackClientError.invalidInput(field: "body")
         }
         // A body past the comment cap can only be answered `400 Validation
         // failed`; fail fast locally (#578) so headless callers do not spend

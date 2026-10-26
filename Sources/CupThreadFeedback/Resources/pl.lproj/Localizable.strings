@@ -212,6 +212,7 @@
 "cupthread.error.email_invalid" = "Podaj prawidłowy adres e-mail.";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "Zbyt wiele załączników: zgłoszenie może zawierać maksymalnie 8 plików. Usuń część załączników i spróbuj ponownie.";
+"cupthread.error.invalid_input" = "Podane dane nie mogą zostać zaakceptowane. Sprawdź je i spróbuj ponownie.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Ta opinia lub załącznik zostały już przesłane.";

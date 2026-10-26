@@ -13,6 +13,21 @@ public enum IntakeField: Equatable, Sendable {
     case email
     /// Comment body.
     case commentBody
+
+    /// The wire field this intake value is validated as on the API, used by
+    /// ``FeedbackClientError/invalidInput(field:)`` for host-side diagnostics
+    /// (issue #614). `name` and `email` render endpoint-agnostically: the
+    /// feedback and feature-request endpoints spell them `reporterName` /
+    /// `requesterName` and `reporterEmail` on the wire.
+    var wireFieldName: String {
+        switch self {
+        case .title: return "title"
+        case .description: return "description"
+        case .name: return "name"
+        case .email: return "email"
+        case .commentBody: return "body"
+        }
+    }
 }
 
 /// Client-side length caps for the SDK's free-text intake fields (BUG-18).
@@ -164,19 +179,22 @@ extension FeedbackClient {
     /// such a submission with `400 Validation failed`, and the headless
     /// programmatic path has no form gate to stop it first — mirroring
     /// ``FeedbackAttachmentStateMachine``/``canSubmit(draft:)`` without the UI.
+    /// Throws ``FeedbackClientError/invalidInput(field:)`` naming the
+    /// violating field (#614) — never ``FeedbackClientError/invalidResponse``,
+    /// which describes a malformed server response.
     func validateIntakeMinimums(in draft: FeedbackDraft) throws {
-        guard IntakeTextLimits.underLimitField(in: draft) == nil else {
-            throw FeedbackClientError.invalidResponse
-        }
+        guard let underLimit = IntakeTextLimits.underLimitField(in: draft) else { return }
+        throw FeedbackClientError.invalidInput(field: underLimit.wireFieldName)
     }
 
     /// Rejects a feature-request draft whose trimmed `title` or
     /// `description` is below the server's minimum intake length (BUG-32),
     /// mirroring ``FeatureRequestComposeView``'s form gate without the UI.
+    /// Throws ``FeedbackClientError/invalidInput(field:)`` naming the
+    /// violating field (#614).
     func validateIntakeMinimums(in draft: FeatureRequestDraft) throws {
-        guard IntakeTextLimits.underLimitField(in: draft) == nil else {
-            throw FeedbackClientError.invalidResponse
-        }
+        guard let underLimit = IntakeTextLimits.underLimitField(in: draft) else { return }
+        throw FeedbackClientError.invalidInput(field: underLimit.wireFieldName)
     }
 
     /// Rejects a draft whose fields exceed the server's per-field intake
