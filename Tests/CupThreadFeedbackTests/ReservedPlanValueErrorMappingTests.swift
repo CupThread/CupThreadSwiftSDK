@@ -101,12 +101,19 @@ extension ReservedPlanValueErrorMappingTests {
         }
     }
 
-    @Test func otherPlanFieldErrorsStayUnexpectedStatus() async throws {
-        // Only the documented `plan_reserved_sentinel` field error maps to the
-        // typed error; every other plan validation issue keeps the diagnostic
-        // unexpectedStatus.
+    @Test func otherPlanFieldErrorsMapToInvalidAttributeValue() async throws {
+        // Issue #607: since the value-bounds gate landed, a `plan` field
+        // error that is not the reserved sentinel (an edge the local
+        // code-point gate deliberately leaves to the server, e.g. astral
+        // plane names it accepts and the server's UTF-16 length rejects)
+        // maps to the same typed error the local gate throws — with the
+        // response's request id. The plan below is locally valid, so the
+        // request reaches the server and the mocked field error isolates
+        // the envelope mapping.
+        let counter = RequestCounter()
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
-            (
+            counter.increment()
+            return (
                 makeHTTPResponse(status: 400, headers: ["X-Request-Id": "req-400-other"]),
                 try encodeJSON([
                     "error": "Validation failed",
@@ -117,7 +124,39 @@ extension ReservedPlanValueErrorMappingTests {
 
         do {
             _ = try await Self.makeSigningClient().updateUserAttributes(
-                plan: .value("way-too-long-plan-name"),
+                plan: .value("pro"),
+                userToken: "token-403"
+            )
+            Issue.record("Expected invalidAttributeValue")
+        } catch let error as FeedbackClientError {
+            guard case .invalidAttributeValue(let attribute, let message, let requestId) = error else {
+                Issue.record("Expected .invalidAttributeValue, got \(error)")
+                return
+            }
+            #expect(attribute == "plan")
+            #expect(message == "Validation failed")
+            #expect(requestId == "req-400-other")
+            #expect(error.responseBody == nil, "raw server text must stay off responseBody")
+            #expect(counter.value == 1, "a validation rejection is a normal error and must never be retried")
+        }
+    }
+
+    @Test func fourHundredWithoutAttributeFieldErrorsStaysUnexpectedStatus() async throws {
+        // Only `PUT /user` carries the attribute fields; a 400 whose field
+        // errors name none of them keeps the generic diagnostic mapping.
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: 400, headers: ["X-Request-Id": "req-400-generic"]),
+                try encodeJSON([
+                    "error": "Validation failed",
+                    "details": ["fieldErrors": ["nickname": ["too_long"]]]
+                ])
+            )
+        }
+
+        do {
+            _ = try await Self.makeSigningClient().updateUserAttributes(
+                plan: .value("pro"),
                 userToken: "token-403"
             )
             Issue.record("Expected unexpectedStatus")
@@ -127,13 +166,14 @@ extension ReservedPlanValueErrorMappingTests {
                 return
             }
             #expect(code == 400)
-            #expect(requestId == "req-400-other")
+            #expect(requestId == "req-400-generic")
         }
     }
 
     @Test func sentinelUnderAnotherFieldDoesNotMapToReservedPlanValue() async throws {
-        // The reservation applies to `plan` only; a sentinel-looking message on
-        // any other field is not a reserved-plan rejection.
+        // The reservation applies to `plan` only; a sentinel-looking message
+        // on any other field is not a reserved-plan rejection — since #607 a
+        // `currency` field error maps to the attribute-value error instead.
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
                 makeHTTPResponse(status: 400),
@@ -149,19 +189,22 @@ extension ReservedPlanValueErrorMappingTests {
                 currency: .value("USD"),
                 userToken: "token-403"
             )
-            Issue.record("Expected unexpectedStatus")
+            Issue.record("Expected invalidAttributeValue")
         } catch let error as FeedbackClientError {
-            guard case .unexpectedStatus(let code, _, _) = error else {
-                Issue.record("Expected unexpectedStatus, got \(error)")
+            guard case .invalidAttributeValue(let attribute, _, _) = error else {
+                Issue.record("Expected .invalidAttributeValue, got \(error)")
                 return
             }
-            #expect(code == 400)
+            #expect(attribute == "currency")
         }
     }
 
     @Test func sentinelMessageMatchIsByteExact() async throws {
         // The reservation is byte-exact on the server (case-sensitive,
-        // whole-string), so the SDK mapping must not widen it.
+        // whole-string), so the SDK mapping must not widen it: an
+        // uppercase lookalike is not a reserved-plan rejection — since #607
+        // it still names the `plan` field, so it maps to the attribute-value
+        // error, never `.reservedPlanValue`.
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (
                 makeHTTPResponse(status: 400),
@@ -177,13 +220,13 @@ extension ReservedPlanValueErrorMappingTests {
                 plan: .value("unset"),
                 userToken: "token-403"
             )
-            Issue.record("Expected unexpectedStatus")
+            Issue.record("Expected invalidAttributeValue")
         } catch let error as FeedbackClientError {
-            guard case .unexpectedStatus(let code, _, _) = error else {
-                Issue.record("Expected unexpectedStatus, got \(error)")
+            guard case .invalidAttributeValue(let attribute, _, _) = error else {
+                Issue.record("Expected .invalidAttributeValue, got \(error)")
                 return
             }
-            #expect(code == 400)
+            #expect(attribute == "plan")
         }
     }
 

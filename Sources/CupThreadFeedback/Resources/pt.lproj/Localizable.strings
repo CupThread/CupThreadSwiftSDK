@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Os dados de pagamento não foram atualizados: os nomes de plano «unset» e «null» são reservados. Escolha outro nome de plano.";
 "cupthread.error.attribute_not_clearable" = "Os dados de pagamento não foram atualizados: este atributo não pode ser limpo. Apenas o plano e a receita mensal podem ser redefinidos; deixe os demais inalterados ou envie um valor.";
+"cupthread.error.attribute_invalid" = "Os dados de pagamento não foram atualizados: um valor de atributo está fora do intervalo permitido. Use um nome de plano de 1 a 64 caracteres, receita mensal entre 0 e 1.000.000 e um código de moeda de três letras.";
 "cupthread.error.email_invalid" = "Introduza um endereço de e-mail válido.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */

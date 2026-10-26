@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Betalingsoplysningerne blev ikke opdateret: plannavnene «unset» og «null» er reserveret. Vælg et andet plannavn.";
 "cupthread.error.attribute_not_clearable" = "Betalingsoplysningerne blev ikke opdateret: denne attribut kan ikke ryddes. Kun plan og månedlig omsætning kan nulstilles; lad de andre stå uændrede, eller send en værdi.";
+"cupthread.error.attribute_invalid" = "Betalingsoplysningerne blev ikke opdateret: en attributværdi er uden for det tilladte område. Brug et plannavn på 1–64 tegn, månedlig omsætning mellem 0 og 1.000.000 og en valutakode på tre bogstaver.";
 "cupthread.error.email_invalid" = "Indtast venligst en gyldig e-mailadresse.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */

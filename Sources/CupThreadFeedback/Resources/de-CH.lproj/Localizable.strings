@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "Die Zahlungsinformationen wurden nicht aktualisiert: Die Plan-Namen „unset“ und „null“ sind reserviert. Wählen Sie einen anderen Plan-Namen.";
 "cupthread.error.attribute_not_clearable" = "Zahlungsinformationen wurden nicht aktualisiert: Dieses Attribut kann nicht geleert werden. Nur Plan und monatlicher Umsatz können zurückgesetzt werden; lassen Sie die übrigen unverändert oder senden Sie einen Wert.";
+"cupthread.error.attribute_invalid" = "Zahlungsinformationen wurden nicht aktualisiert: Ein Attributwert liegt ausserhalb des erlaubten Bereichs. Verwenden Sie einen Plannamen mit 1–64 Zeichen, einen monatlichen Umsatz zwischen 0 und 1.000.000 und einen dreibuchstabigen Währungscode.";
 "cupthread.error.email_invalid" = "Bitte geben Sie eine gültige E-Mail-Adresse ein.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */

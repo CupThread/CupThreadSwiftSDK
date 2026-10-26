@@ -187,6 +187,25 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// Pass `.unset` to leave the attribute unchanged, or send a concrete
     /// value. `attribute` names the rejected field for diagnostics.
     case attributeNotClearable(attribute: String)
+    /// A payment-attribute report carried a `plan`, `mrr`, or `currency`
+    /// **value** the live `EndUserAttributesInput` schema can only reject
+    /// (issue #607): either the SDK rejected it locally before any signing
+    /// material was consulted or any request was sent — a `plan` outside
+    /// ``UserAttributeLimits/maxPlanLength``, an `mrr` outside
+    /// `0...1_000_000`, or a `currency` that is not exactly three ASCII
+    /// letters (see ``UserAttributeLimits``) — or the server answered the
+    /// residual `400 Validation failed` whose field errors name the
+    /// attribute (an edge the local gate deliberately leaves to the
+    /// server). The whole report is validated as one object server-side,
+    /// so dispatching it would silently drop every sibling write in the
+    /// same PUT. Correct the value and resubmit — this is a normal
+    /// validation error and is never retried. `attribute` names the
+    /// rejected wire field (`plan`, `mrr`, or `currency`); `message`
+    /// carries the diagnostic detail (`nil` on a local rejection, the raw
+    /// server text otherwise) and is never shown to end users; `requestId`
+    /// is the response's `X-Request-Id` when the rejection came from the
+    /// server, `nil` when it was decided locally.
+    case invalidAttributeValue(attribute: String, message: String?, requestId: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -217,7 +236,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
              .alreadyFinalized, .imageUploadFailed, .reservedPlanValue, .textTooLong,
-             .attributeNotClearable, .invalidEmailAddress:
+             .attributeNotClearable, .invalidEmailAddress, .invalidAttributeValue:
             return nil
         }
     }
@@ -311,6 +330,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .reservedPlanValue(_, let requestId):
             return requestId
         case .invalidEmailAddress(_, let requestId):
+            return requestId
+        case .invalidAttributeValue(_, _, let requestId):
             return requestId
         case .featureRequestNotFound(_, let requestId):
             return requestId
@@ -407,6 +428,12 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             // The local rejection has no request id to quote; the server's
             // residual field-error 400 quotes the response's id.
             return CupThreadStrings.tr("cupthread.error.email_invalid") + Self.requestIdSuffix(requestId)
+        case .invalidAttributeValue(_, _, let requestId):
+            // The local rejection has no request id to quote; the server's
+            // residual field-error 400 quotes the response's id. Raw server
+            // text stays off user-facing copy (#30); callers can read the
+            // associated `message` programmatically.
+            return CupThreadStrings.tr("cupthread.error.attribute_invalid") + Self.requestIdSuffix(requestId)
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
@@ -540,5 +567,12 @@ public extension FeedbackClientError {
     /// rejected locally, before any request was sent.
     static func invalidEmailAddress(field: String) -> FeedbackClientError {
         .invalidEmailAddress(field: field, requestId: nil)
+    }
+
+    /// Convenience constructor for
+    /// ``invalidAttributeValue(attribute:message:requestId:)`` rejected
+    /// locally, before any request was sent.
+    static func invalidAttributeValue(attribute: String, message: String?) -> FeedbackClientError {
+        .invalidAttributeValue(attribute: attribute, message: message, requestId: nil)
     }
 }

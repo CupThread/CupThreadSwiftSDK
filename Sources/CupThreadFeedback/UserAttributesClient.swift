@@ -210,9 +210,20 @@ extension FeedbackClient {
     /// - Parameters:
     ///   - isPaying: Whether the user is on a paid plan.
     ///   - plan: Host-app plan name (e.g. `"pro"`); never the reserved literals
-    ///     `"unset"` or `"null"`.
-    ///   - mrr: Monthly recurring revenue attributable to this user.
-    ///   - currency: Three-letter ISO 4217 code for `mrr` (an omitted currency preserves the stored value).
+    ///     `"unset"` or `"null"`, and never empty — 1–64 Unicode code points
+    ///     (``UserAttributeLimits``) after CR/LF sanitization, enforced
+    ///     locally before anything is signed. There is no empty-string "no
+    ///     plan": omit the parameter to leave the stored plan unchanged, or
+    ///     pass `plan: .null` on the ``UserAttributesSigner/Field`` overload
+    ///     to clear it.
+    ///   - mrr: Monthly recurring revenue attributable to this user, between
+    ///     `0` and `1_000_000` inclusive (``UserAttributeLimits``); a
+    ///     non-finite value keeps its `0` coercion (SEC-3). Enforced locally
+    ///     before anything is signed.
+    ///   - currency: Three-letter ISO 4217 code for `mrr` — exactly three
+    ///     ASCII letters, sent as given (the server uppercases; the
+    ///     signature covers the raw value). An omitted currency preserves
+    ///     the stored value. Enforced locally before anything is signed.
     ///   - userToken: Anonymous user token sent as `X-User-Token`. Blank,
     ///     whitespace-only, or multi-line values are rejected locally — a
     ///     blank token would leave the signed report without any identity,
@@ -234,9 +245,12 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/paymentAttributesRequireSignature(message:requestId:)``,
     ///   ``FeedbackClientError/sdkSigningSecretNotConfigured(message:requestId:)``,
     ///   ``FeedbackClientError/invalidSignature(message:requestId:)``,
-    ///   ``FeedbackClientError/staleSignature(message:requestId:)``, and the
+    ///   ``FeedbackClientError/staleSignature(message:requestId:)``, the
     ///   reserved-plan validation error
-    ///   ``FeedbackClientError/reservedPlanValue(message:requestId:)``.
+    ///   ``FeedbackClientError/reservedPlanValue(message:requestId:)``, and
+    ///   the value-bounds validation error
+    ///   ``FeedbackClientError/invalidAttributeValue(attribute:message:requestId:)``
+    ///   (issue #607 — rejected before anything is signed or sent).
     public func updateUserAttributes(
         isPaying: Bool? = nil,
         plan: String? = nil,
@@ -286,10 +300,20 @@ extension FeedbackClient {
     ///   - isPaying: Whether the user is on a paid plan (`.value` or
     ///     `.unset`; `.null` throws — the API cannot clear this attribute).
     ///   - plan: Host-app plan name (`.value`, `.null`, or `.unset`); a `.value`
-    ///     is never the reserved literals `"unset"` or `"null"`.
-    ///   - mrr: Monthly recurring revenue (`.value`, `.null`, or `.unset`).
+    ///     is never the reserved literals `"unset"` or `"null"`, and never
+    ///     empty — 1–64 Unicode code points (``UserAttributeLimits``) after
+    ///     CR/LF sanitization, enforced locally before anything is signed.
+    ///     "No plan" is `.unset` (leave unchanged) or `.null` (clear), never
+    ///     `.value("")`.
+    ///   - mrr: Monthly recurring revenue (`.value`, `.null`, or `.unset`),
+    ///     between `0` and `1_000_000` inclusive (``UserAttributeLimits``);
+    ///     a non-finite `.value` keeps its `0` coercion (SEC-3). Enforced
+    ///     locally before anything is signed.
     ///   - currency: Currency code (`.value` or `.unset`; `.null` throws —
-    ///     the API cannot clear this attribute).
+    ///     the API cannot clear this attribute). A `.value` is exactly three
+    ///     ASCII letters, sent as given (the server uppercases; the
+    ///     signature covers the raw value). Enforced locally before
+    ///     anything is signed.
     ///   - userToken: Anonymous user token sent as `X-User-Token`. Blank,
     ///     whitespace-only, or multi-line values are rejected locally (#417).
     ///   - signingSecret: Optional override for the SDK signing secret configured
@@ -309,11 +333,13 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidSignature(message:requestId:)``,
     ///   ``FeedbackClientError/staleSignature(message:requestId:)``, the
     ///   reserved-plan validation error
-    ///   ``FeedbackClientError/reservedPlanValue(message:requestId:)``, and
+    ///   ``FeedbackClientError/reservedPlanValue(message:requestId:)``,
     ///   ``FeedbackClientError/attributeNotClearable(attribute:)`` when
     ///   `isPaying` or `currency` is passed `.null` (only `plan` and `mrr`
     ///   can be cleared — issue #573; rejected before anything is signed or
-    ///   sent).
+    ///   sent), and the value-bounds validation error
+    ///   ``FeedbackClientError/invalidAttributeValue(attribute:message:requestId:)``
+    ///   (issue #607 — also rejected before anything is signed or sent).
     public func updateUserAttributes(
         isPaying: UserAttributesSigner.Field<Bool> = .unset,
         plan: UserAttributesSigner.Field<String> = .unset,
@@ -418,8 +444,14 @@ extension FeedbackClient {
         let identityToken = try validatedUserToken(userToken)
         // `.null` is only a valid clear for the attributes the server schema
         // marks nullable (`plan`, `mrr`); reject the rest before any signing
-        // material is consulted (issue #573).
+        // material is consulted (issue #573). Value bounds get the same
+        // treatment (issue #607): a `plan`/`mrr`/`currency` the schema can
+        // only reject is refused before the signer provider is called or the
+        // embedded secret HMACs — the whole PUT is one Zod object
+        // server-side, so a doomed report would also silently drop every
+        // sibling write in it.
         try UserAttributesPayload.validateClearableFields(isPaying: isPaying, currency: currency)
+        try UserAttributeLimits.validateValueBounds(plan: plan, mrr: mrr, currency: currency)
         let signingSecretInUse = (signingSecret ?? configuration.signingSecret)?.nilIfEmpty
 
         // The signing clock is the device clock corrected by the server-time

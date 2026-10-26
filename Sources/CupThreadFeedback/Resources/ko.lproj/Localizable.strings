@@ -208,6 +208,7 @@
 /* Issue #403: the signature sentinels "unset"/"null" are reserved and never valid plan names */
 "cupthread.error.reserved_plan_value" = "결제 정보가 업데이트되지 않았습니다: 플랜 이름 \"unset\"과(와) \"null\"은(는) 예약된 이름입니다. 다른 플랜 이름을 선택해 주세요.";
 "cupthread.error.attribute_not_clearable" = "결제 정보가 업데이트되지 않았습니다: 이 속성은 지울 수 없습니다. 플랜과 월간 수익만 초기화할 수 있습니다. 나머지는 변경하지 않거나 실제 값을 보내세요.";
+"cupthread.error.attribute_invalid" = "결제 정보가 업데이트되지 않았습니다: 속성 값이 허용 범위를 벗어났습니다. 플랜 이름은 1~64자, 월간 수익은 0에서 1,000,000 사이, 통화 코드는 세 글자로 입력해 주세요.";
 "cupthread.error.email_invalid" = "유효한 이메일 주소를 입력해 주세요.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
