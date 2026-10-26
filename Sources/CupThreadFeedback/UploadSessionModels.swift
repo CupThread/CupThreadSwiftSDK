@@ -108,8 +108,9 @@ public enum UploadSessionLimits: Sendable {
     /// The smallest declared file size the session endpoint accepts
     /// (`CreateUploadSessionFileInput.sizeBytes` `minimum: 1`). A
     /// ``FeedbackUploadFileSpec/sizeBytes`` below this floor is refused
-    /// locally with ``FeedbackClientError/invalidResponse``, the same
-    /// rejection as an out-of-range file count. The per-file *upper* bound
+    /// locally with ``FeedbackClientError/invalidInput(field:)`` naming
+    /// `"files[].sizeBytes"` (issue #614), the same rejection shape as an
+    /// out-of-range file count. The per-file *upper* bound
     /// is a session property the server enforces on the streamed bytes
     /// (``FeedbackUploadSession/effectiveMaxSizeBytes(for:)``), so this floor
     /// is the only size bound the client can decide before a session exists.

@@ -3,9 +3,11 @@ import Foundation
 
 /// Errors thrown by ``FeedbackClient`` network calls.
 public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
-    /// The server response could not be interpreted as HTTP — a `URLResponse`
-    /// that is not an `HTTPURLResponse`, or a request the SDK could not form.
-    /// Transport-level only: caller-input preflights throw their typed cases
+    /// A response could not be interpreted: a `URLResponse` that is not an
+    /// `HTTPURLResponse`, a request the SDK could not form, or a 2xx success
+    /// body that failed JSON decoding — mapped here so hosts never observe a
+    /// raw `DecodingError`. Reserved for the network boundary: caller-input
+    /// preflights throw their typed cases
     /// (``FeedbackClientError/invalidInput(field:)`` or a convention-appropriate
     /// not-found error) and never this one (issue #614).
     case invalidResponse
