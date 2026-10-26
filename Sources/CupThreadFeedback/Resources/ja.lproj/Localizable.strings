@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "支払い情報は更新されませんでした：この属性はクリアできません。リセットできるのはプランと月額収入のみです。その他は変更せずにおくか、具体的な値を送信してください。";
 "cupthread.error.attribute_invalid" = "支払い情報は更新されませんでした：属性値が許容範囲外です。プラン名は1〜64文字、月額収入は0〜1,000,000、通貨コードは3文字のアルファベットで指定してください。";
 "cupthread.error.email_invalid" = "有効なメールアドレスを入力してください。";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "添付ファイルが多すぎます。1 回の送信に含められるファイルは最大 8 件です。添付ファイルをいくつか削除してから、もう一度お試しください。";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "このフィードバックまたは添付ファイルは既に送信されています。";

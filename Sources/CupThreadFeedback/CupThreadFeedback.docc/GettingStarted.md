@@ -158,6 +158,8 @@ print(result.submissionId)
 
 Drafts can carry attachments you upload with ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)`` (or ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:)`` for large files, which streams from disk instead of buffering the body in memory) and arbitrary metadata for your own triage tooling. Metadata is sanitized locally per the server's redaction contract (credential-looking keys are redacted, values truncated, oversized payloads shrunk). The reserved keys `sdk`, `sdkVersion`, `platform`, and `submittedAt` are authored by the SDK itself: draft entries with those names are replaced before sending, and all other custom keys are preserved.
 
+One submission may reference at most ``FeedbackSubmissionLimits/maxAttachmentCount`` (8) attachment uploads — the live `FeedbackSubmissionInput` schema's `uploadIds` cap (issue #613). Each one-shot upload helper creates its own session, so nothing upstream sees the aggregate: a host that builds its own attachment UI can legitimately collect nine receipts and hand them to one `submit`. The SDK refuses such a draft locally with ``FeedbackClientError/tooManyAttachments(message:requestId:)`` before the Turnstile provider is consulted or any request is sent, so the already-uploaded files are not stranded behind a `400` that retrying cannot clear; remove attachments and submit again with the remaining receipts. ``FeedbackAttachmentStateMachine/canSubmit(draft:)`` applies the same verdict, and ``FeedbackSubmissionLimits/referencedUploadCount(in:)`` exposes the counted figure so custom pickers can stop at the bound.
+
 ## Explore guides & articles
 
 - <doc:PresentingFeedbackComposer>

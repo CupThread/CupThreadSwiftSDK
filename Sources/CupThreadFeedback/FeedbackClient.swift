@@ -452,6 +452,17 @@ public struct FeedbackClient: Sendable {
     ///   address with `400 Validation failed`. (An address merely over
     ///   ``IntakeTextLimits/maxEmailLength`` code points is answered by the
     ///   caps gate above, with ``FeedbackClientError/textTooLong``.)
+    ///   A draft referencing more than
+    ///   ``FeedbackSubmissionLimits/maxAttachmentCount`` attachment uploads
+    ///   (non-`nil` ``FeedbackAttachment/uploadId``s) throws
+    ///   ``FeedbackClientError/tooManyAttachments(message:requestId:)`` locally
+    ///   (#613), before the Turnstile token provider is consulted or any
+    ///   request is sent — the live `FeedbackSubmissionInput` schema caps
+    ///   `uploadIds` at 8 items and would otherwise reject the submission
+    ///   after the challenge was spent and every file already uploaded;
+    ///   remove attachments and submit again with the remaining receipts.
+    ///   The same error carries the response's request id when the server
+    ///   answers a residual `400` naming `uploadIds` or `attachments`.
     public func submit(
         _ draft: FeedbackDraft,
         userToken: String? = nil,
@@ -466,7 +477,12 @@ public struct FeedbackClient: Sendable {
         // An implausible contact address can only earn `400 Validation failed`
         // — reject it locally before the Turnstile provider is consulted (#606).
         try validateIntakeEmail(draft.reporterEmail.nilIfEmpty, field: "reporterEmail")
-        let uploadIds = draft.attachments.compactMap(\.uploadId).nilIfEmpty
+        // A draft referencing more uploads than the live schema accepts can
+        // only earn `400 Validation failed` — refuse it before the Turnstile
+        // provider is consulted (#613), so the already-uploaded files are not
+        // stranded behind a rejection the user cannot retry past.
+        try validateAttachmentCount(in: draft)
+        let uploadIds = FeedbackSubmissionLimits.referencedUploadIds(in: draft).nilIfEmpty
         let effectiveUserToken = resolvedSubmitUserToken(validatedToken, hasAttachments: uploadIds != nil)
         let data = try await sendWithTurnstileRetry(
             accepted: Self.acceptedSubmitStatuses,

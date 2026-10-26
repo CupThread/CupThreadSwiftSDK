@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "Payment details weren't updated: this attribute can't be cleared. Only the plan and monthly revenue can be reset; leave the others unchanged or send a value.";
 "cupthread.error.attribute_invalid" = "Payment details weren't updated: an attribute value is outside the allowed range. Use a plan name of 1–64 characters, monthly revenue between 0 and 1,000,000, and a three-letter currency code.";
 "cupthread.error.email_invalid" = "Please enter a valid email address.";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "Too many attachments: a submission can include up to 8 files. Remove some attachments and try again.";
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "This feedback or attachment has already been submitted.";
 

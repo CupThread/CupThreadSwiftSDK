@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "付款資訊未更新：此屬性無法清空。只有方案與每月收入可以重設；其餘屬性請保持不變或傳入具體值。";
 "cupthread.error.attribute_invalid" = "付款資訊未更新：屬性值超出允許範圍。方案名稱需為 1–64 個字元，每月收入需在 0 到 1,000,000 之間，貨幣代碼需為三個字母。";
 "cupthread.error.email_invalid" = "請輸入有效的電子郵件地址。";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "附件過多：一次提交最多可包含 8 個檔案，請移除部分附件後再試一次。";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "此意見反應或附件已被提交。";

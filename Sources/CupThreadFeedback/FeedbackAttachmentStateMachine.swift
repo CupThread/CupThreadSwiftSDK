@@ -154,14 +154,19 @@ public struct FeedbackAttachmentStateMachine: Sendable {
     ///
     /// Submission is rejected while an attachment is uploading, when
     /// title/description fall below their ``IntakeTextLimits`` minimums
-    /// (BUG-32), or when any free-text field is over its ``IntakeTextLimits``
-    /// cap (BUG-18).
+    /// (BUG-32), when any free-text field is over its ``IntakeTextLimits``
+    /// cap (BUG-18), or when the draft references more uploads than
+    /// ``FeedbackSubmissionLimits/maxAttachmentCount`` (#613) — the same
+    /// verdicts ``FeedbackClient/submit(_:userToken:turnstileToken:)``
+    /// enforces, so a host driving this state machine with its own picker
+    /// never dispatches a draft the client would refuse.
     /// - Parameter draft: The draft to inspect.
     /// - Returns: `true` if the form is ready to submit.
     public func canSubmit(draft: FeedbackDraft) -> Bool {
         guard !isUploading else { return false }
         guard IntakeTextLimits.underLimitField(in: draft) == nil else { return false }
-        return IntakeTextLimits.overLimitField(in: draft) == nil
+        guard IntakeTextLimits.overLimitField(in: draft) == nil else { return false }
+        return FeedbackSubmissionLimits.referencedUploadCount(in: draft) <= FeedbackSubmissionLimits.maxAttachmentCount
     }
 
     /// Removes an existing attachment from the draft by identifier.

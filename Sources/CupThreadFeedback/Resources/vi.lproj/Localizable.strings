@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "Chi tiết thanh toán chưa được cập nhật: thuộc tính này không thể xóa. Chỉ gói và doanh thu hàng tháng có thể đặt lại; hãy giữ nguyên các thuộc tính khác hoặc gửi một giá trị.";
 "cupthread.error.attribute_invalid" = "Chi tiết thanh toán chưa được cập nhật: giá trị thuộc tính nằm ngoài phạm vi cho phép. Hãy dùng tên gói dài 1–64 ký tự, doanh thu hàng tháng từ 0 đến 1.000.000 và mã tiền tệ ba chữ cái.";
 "cupthread.error.email_invalid" = "Vui lòng nhập địa chỉ email hợp lệ.";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "Quá nhiều tệp đính kèm: mỗi lần gửi chỉ có thể bao gồm tối đa 8 tệp. Vui lòng gỡ bỏ một số tệp đính kèm rồi thử lại.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Phản hồi hoặc tệp đính kèm này đã được gửi.";

@@ -210,6 +210,8 @@
 "cupthread.error.attribute_not_clearable" = "I dati di pagamento non sono stati aggiornati: questo attributo non può essere cancellato. Solo piano e ricavo mensile possono essere azzerati; lasciare gli altri invariati o inviare un valore.";
 "cupthread.error.attribute_invalid" = "I dati di pagamento non sono stati aggiornati: il valore di un attributo è fuori dall'intervallo consentito. Usa un nome piano di 1–64 caratteri, un ricavo mensile tra 0 e 1.000.000 e un codice valuta di tre lettere.";
 "cupthread.error.email_invalid" = "Inserisci un indirizzo e-mail valido.";
+/* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
+"cupthread.error.too_many_attachments" = "Troppi allegati: un invio può includere fino a 8 file. Rimuovi alcuni allegati e riprova.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Questo feedback o allegato è già stato inviato.";

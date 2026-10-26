@@ -206,6 +206,26 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// is the response's `X-Request-Id` when the rejection came from the
     /// server, `nil` when it was decided locally.
     case invalidAttributeValue(attribute: String, message: String?, requestId: String?)
+    /// A feedback submission referenced more attachment uploads than the
+    /// live `FeedbackSubmissionInput` schema accepts (`uploadIds`
+    /// `maxItems: 8` — issue #613): either the SDK rejected the draft
+    /// locally, before the Turnstile token provider was consulted or any
+    /// request was sent, because it forwards more than
+    /// ``FeedbackSubmissionLimits/maxAttachmentCount`` upload ids; or the
+    /// server answered the residual `400 Validation failed` whose field
+    /// errors name `uploadIds` or `attachments` (an edge the local gate
+    /// leaves to the server — a cap tightened server-side before the SDK's
+    /// constant followed, or an individual id outside the item bounds).
+    /// Dispatching an over-cap draft would otherwise burn a single-use
+    /// challenge and strand every already-uploaded file behind a rejection
+    /// that retrying cannot clear. Remove attachments until at most
+    /// ``FeedbackSubmissionLimits/maxAttachmentCount`` remain and submit
+    /// again — the remaining upload receipts stay valid. `message` carries
+    /// the diagnostic detail (`nil` on a local rejection, the raw server
+    /// text otherwise) and is never shown to end users; `requestId` is the
+    /// response's `X-Request-Id` when the rejection came from the server,
+    /// `nil` when it was decided locally.
+    case tooManyAttachments(message: String?, requestId: String?)
     /// The server answered with a status the SDK does not handle. `message`
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
@@ -236,7 +256,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
              .paymentAttributesRequireSignature, .sdkSigningSecretNotConfigured,
              .invalidSignature, .staleSignature, .uploadSessionExpired, .uploadSessionInvalid,
              .alreadyFinalized, .imageUploadFailed, .reservedPlanValue, .textTooLong,
-             .attributeNotClearable, .invalidEmailAddress, .invalidAttributeValue:
+             .attributeNotClearable, .invalidEmailAddress, .invalidAttributeValue, .tooManyAttachments:
             return nil
         }
     }
@@ -332,6 +352,8 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
         case .invalidEmailAddress(_, let requestId):
             return requestId
         case .invalidAttributeValue(_, _, let requestId):
+            return requestId
+        case .tooManyAttachments(_, let requestId):
             return requestId
         case .featureRequestNotFound(_, let requestId):
             return requestId
@@ -434,6 +456,12 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
             // text stays off user-facing copy (#30); callers can read the
             // associated `message` programmatically.
             return CupThreadStrings.tr("cupthread.error.attribute_invalid") + Self.requestIdSuffix(requestId)
+        case .tooManyAttachments(_, let requestId):
+            // The local rejection has no request id to quote; the server's
+            // residual field-error 400 quotes the response's id. Raw server
+            // text stays off user-facing copy (#30); callers can read the
+            // associated `message` programmatically.
+            return CupThreadStrings.tr("cupthread.error.too_many_attachments") + Self.requestIdSuffix(requestId)
         case .unexpectedStatus(let code, _, let requestId):
             // The raw body stays on the case for diagnostics (`responseBody`);
             // only localized status copy is shown to users (#30).
@@ -574,5 +602,11 @@ public extension FeedbackClientError {
     /// locally, before any request was sent.
     static func invalidAttributeValue(attribute: String, message: String?) -> FeedbackClientError {
         .invalidAttributeValue(attribute: attribute, message: message, requestId: nil)
+    }
+
+    /// Convenience constructor for ``tooManyAttachments(message:requestId:)``
+    /// rejected locally, before any request was sent.
+    static func tooManyAttachments() -> FeedbackClientError {
+        .tooManyAttachments(message: nil, requestId: nil)
     }
 }
