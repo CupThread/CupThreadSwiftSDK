@@ -212,6 +212,7 @@
 "cupthread.error.email_invalid" = "Vui lòng nhập địa chỉ email hợp lệ.";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "Quá nhiều tệp đính kèm: mỗi lần gửi chỉ có thể bao gồm tối đa 8 tệp. Vui lòng gỡ bỏ một số tệp đính kèm rồi thử lại.";
+"cupthread.error.invalid_input" = "Thông tin đã cung cấp không được chấp nhận. Vui lòng kiểm tra rồi thử lại.";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "Phản hồi hoặc tệp đính kèm này đã được gửi.";

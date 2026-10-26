@@ -10,7 +10,10 @@ import Security
 /// parallel. Keying handlers by request host (each suite uses its own base URL) keeps
 /// parallel suites from stomping each other's handlers.
 final class MockURLProtocol: URLProtocol, @unchecked Sendable {
-    typealias Handler = (URLRequest) throws -> (HTTPURLResponse, Data)
+    /// The response is `URLResponse` (not `HTTPURLResponse`) so a suite can
+    /// script a non-HTTP reply — the one transport fault `.invalidResponse`
+    /// still answers (issue #614).
+    typealias Handler = (URLRequest) throws -> (URLResponse, Data)
 
     private static let defaultHost = "test.example.com"
     private static let lock = NSLock()

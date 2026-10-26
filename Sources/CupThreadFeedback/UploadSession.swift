@@ -50,10 +50,10 @@ extension FeedbackClient {
     ///   (empty, or more than eight entries — API-28) or containing a
     ///   specification whose `sizeBytes` is below
     ///   ``UploadSessionLimits/minFileSizeBytes`` (zero or negative — issue
-    ///   #611) also throws ``FeedbackClientError/invalidResponse`` locally,
-    ///   before the Turnstile token provider is consulted or any request is
-    ///   sent; the whole array is refused, so a partial session is never
-    ///   created.
+    ///   #611) also throws ``FeedbackClientError/invalidInput(field:)``
+    ///   locally, before the Turnstile token provider is consulted or any
+    ///   request is sent; the whole array is refused, so a partial session is
+    ///   never created.
     public func createUploadSession(
         files: [FeedbackUploadFileSpec],
         userToken: String?,
@@ -266,10 +266,10 @@ extension FeedbackClient {
     ///     `turnstileTokenProvider` is consulted as a fallback.
     /// - Returns: The uploaded attachment, carrying its `uploadId` for
     ///   `FeedbackDraft.attachments`.
-    /// - Throws: ``FeedbackClientError/invalidResponse`` when `data` is empty
-    ///   — the session endpoint requires `sizeBytes ≥ 1` (issue #611), so the
-    ///   call is refused before the Turnstile token provider is consulted or
-    ///   any request is sent; ``FeedbackClientError/unsupportedMediaType`` when
+    /// - Throws: ``FeedbackClientError/invalidInput(field:)`` when `data` is
+    ///   empty — the session endpoint requires `sizeBytes ≥ 1` (issue #611),
+    ///   so the call is refused before the Turnstile token provider is
+    ///   consulted or any request is sent; ``FeedbackClientError/unsupportedMediaType`` when
     ///   the type is not accepted, ``FeedbackClientError/payloadTooLarge`` when
     ///   it exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
     ///   when no identity could be presented,
@@ -332,8 +332,8 @@ extension FeedbackClient {
     ///     `turnstileTokenProvider` is consulted as a fallback.
     /// - Returns: The uploaded attachment, carrying its `uploadId` for
     ///   `FeedbackDraft.attachments`.
-    /// - Throws: ``FeedbackClientError/invalidResponse`` when the file is
-    ///   empty or its on-disk size cannot be read — the session endpoint
+    /// - Throws: ``FeedbackClientError/invalidInput(field:)`` when the file
+    ///   is empty or its on-disk size cannot be read — the session endpoint
     ///   requires `sizeBytes ≥ 1` (issue #611), so the call is refused before
     ///   the Turnstile token provider is consulted or any request is sent
     ///   (a missing file surfaces FileManager's own error);
@@ -384,9 +384,12 @@ extension FeedbackClient {
     /// The server can only answer such a session creation with `400`, and the
     /// headless programmatic path has no attachment-picker gate to stop it
     /// first — mirroring `FeedbackAttachmentStateMachine` without the UI.
+    /// Throws ``FeedbackClientError/invalidInput(field:)`` naming `files`
+    /// (#614) — never ``FeedbackClientError/invalidResponse``, which describes
+    /// a malformed server response.
     func validateUploadFileCount(_ files: [FeedbackUploadFileSpec]) throws {
         guard UploadSessionLimits.allowedFileCountRange.contains(files.count) else {
-            throw FeedbackClientError.invalidResponse
+            throw FeedbackClientError.invalidInput(field: "files")
         }
     }
 
@@ -398,10 +401,10 @@ extension FeedbackClient {
     /// server validates the payload as one object, so one bad specification
     /// fails the whole array and a partial session is never created. Same
     /// local rejection as the sibling count check so both bounds read
-    /// identically to callers.
+    /// identically to callers (issue #614).
     func validateUploadFileSizes(_ files: [FeedbackUploadFileSpec]) throws {
         guard files.allSatisfy({ $0.sizeBytes >= UploadSessionLimits.minFileSizeBytes }) else {
-            throw FeedbackClientError.invalidResponse
+            throw FeedbackClientError.invalidInput(field: "files[].sizeBytes")
         }
     }
 
@@ -466,15 +469,16 @@ extension FeedbackClient {
 
     /// The on-disk size of `fileURL`, failing closed: a `.size` attribute that
     /// is missing or not representable as `Int` throws
-    /// ``FeedbackClientError/invalidResponse`` rather than reading as `0`,
-    /// which would make an unreadable attribute indistinguishable from an
-    /// empty file and — on the session-creation path — build a `sizeBytes: 0`
-    /// specification the server can only reject (issue #611). A missing file
-    /// surfaces FileManager's own error.
+    /// ``FeedbackClientError/invalidInput(field:)`` naming `fileURL` (issue
+    /// #614) rather than reading as `0`, which would make an unreadable
+    /// attribute indistinguishable from an empty file and — on the
+    /// session-creation path — build a `sizeBytes: 0` specification the
+    /// server can only reject (issue #611). A missing file surfaces
+    /// FileManager's own error.
     private func fileSize(at fileURL: URL) throws -> Int {
         let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
         guard let size = attributes[.size] as? Int else {
-            throw FeedbackClientError.invalidResponse
+            throw FeedbackClientError.invalidInput(field: "fileURL")
         }
         return size
     }

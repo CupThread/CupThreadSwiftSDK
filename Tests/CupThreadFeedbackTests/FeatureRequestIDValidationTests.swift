@@ -9,6 +9,9 @@ import Testing
 // `commentsUnavailable`, misleading callers into thinking comments are
 // disabled. All three entry points now trim and reject empty ids locally
 // (matching `fetchFeatureRequest(id:)`) before any request is built.
+// Issue #614: every grammar-invalid id — on all four entry points — reports
+// the same `.featureRequestNotFound(message: nil, requestId: nil)` locally,
+// never `.invalidResponse` (which describes a malformed server response).
 @Suite("FeatureRequestIDValidation", .serialized)
 struct FeatureRequestIDValidationTests {
     static let apiHost = "request-id-validation.example.com"
@@ -28,7 +31,7 @@ struct FeatureRequestIDValidationTests {
         }
 
         for blankID in ["", "   ", " \n\t "] {
-            await #expect(throws: FeedbackClientError.invalidResponse) {
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
                 _ = try await Self.makeAPIClient().fetchComments(featureRequestId: blankID, limit: 20)
             }
         }
@@ -67,7 +70,7 @@ struct FeatureRequestIDValidationTests {
         }
 
         for blankID in ["", "   "] {
-            await #expect(throws: FeedbackClientError.invalidResponse) {
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
                 _ = try await Self.makeAPIClient().postComment(
                     featureRequestId: blankID,
                     draft: CommentDraft(body: "hello"),
@@ -190,5 +193,42 @@ struct FeatureRequestIDValidationTests {
         #expect(request.url?.path == "/api/v1/feature-requests/fr-trim-3/vote")
         #expect(request.httpMethod == "DELETE")
         #expect(result.voteCount == 3)
+    }
+
+    // MARK: - One convention, four entry points (issue #614)
+
+    /// The grammar-invalid-id rejection must be indistinguishable across all
+    /// four id-bearing entry points: the same `.featureRequestNotFound` with
+    /// no server text and no request id, so a host's
+    /// `catch FeedbackClientError.featureRequestNotFound` branch behaves
+    /// identically for a deep-linked id whichever surface loads it.
+    @Test("a grammar-invalid id reports the same not-found error on every entry point")
+    func grammarInvalidIDReportsSameErrorOnEveryEntryPoint() async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (makeHTTPResponse(), Data("SHOULD NOT BE REACHED".utf8))
+        }
+        let client = Self.makeAPIClient()
+
+        for invalidID in ["../test", "fr/1", "a?b", "a%2Fb", String(repeating: "a", count: 129)] {
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
+                _ = try await client.fetchFeatureRequest(id: invalidID)
+            }
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
+                _ = try await client.castVote(featureRequestId: invalidID, userToken: "tok-1")
+            }
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
+                _ = try await client.removeVote(featureRequestId: invalidID, userToken: "tok-1")
+            }
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
+                _ = try await client.fetchComments(featureRequestId: invalidID, limit: 20)
+            }
+            await #expect(throws: FeedbackClientError.featureRequestNotFound(message: nil, requestId: nil)) {
+                _ = try await client.postComment(
+                    featureRequestId: invalidID,
+                    draft: CommentDraft(body: "hello"),
+                    userToken: "tok-1"
+                )
+            }
+        }
     }
 }

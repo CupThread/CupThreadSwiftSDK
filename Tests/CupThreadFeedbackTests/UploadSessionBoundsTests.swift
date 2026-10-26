@@ -108,7 +108,8 @@ struct UploadSessionBoundsTests {
     }
 
     private func assertRejectedLocally(
-        files: [FeedbackUploadFileSpec]
+        files: [FeedbackUploadFileSpec],
+        expectedField: String
     ) async throws {
         let provider = ProviderBox()
         let counter = RequestCounter()
@@ -116,10 +117,11 @@ struct UploadSessionBoundsTests {
             await thrownError(files: files, provider: provider, counter: counter),
             "Expected the out-of-bounds files array to be rejected"
         )
-        guard case .invalidResponse = error else {
+        guard case .invalidInput(let field) = error else {
             Issue.record("Unexpected error: \(error)")
             return
         }
+        #expect(field == expectedField, "The typed input error must name the offending field")
         #expect(!provider.wasConsulted, "Turnstile token must not be consumed for an out-of-bounds files array")
         #expect(counter.value == 0, "No request may be sent for an out-of-bounds files array")
     }
@@ -127,15 +129,15 @@ struct UploadSessionBoundsTests {
     // MARK: Out-of-bounds arrays are refused before any work
 
     @Test func createUploadSessionRejectsEmptyFilesArrayLocally() async throws {
-        try await assertRejectedLocally(files: [])
+        try await assertRejectedLocally(files: [], expectedField: "files")
     }
 
     @Test func createUploadSessionRejectsOversizedFilesArrayLocally() async throws {
-        try await assertRejectedLocally(files: (1...9).map(spec))
+        try await assertRejectedLocally(files: (1...9).map(spec), expectedField: "files")
     }
 
     @Test func createUploadSessionRejectsFarOverBoundsFilesArrayLocally() async throws {
-        try await assertRejectedLocally(files: (1...32).map(spec))
+        try await assertRejectedLocally(files: (1...32).map(spec), expectedField: "files")
     }
 
     // MARK: Boundary counts stay accepted (no off-by-one)
@@ -201,11 +203,11 @@ struct UploadSessionBoundsTests {
     // MARK: Per-file size floor (issue #611): sizeBytes < 1 is refused before any work
 
     @Test func createUploadSessionRejectsZeroByteSpecLocally() async throws {
-        try await assertRejectedLocally(files: [spec(1, sizeBytes: 0)])
+        try await assertRejectedLocally(files: [spec(1, sizeBytes: 0)], expectedField: "files[].sizeBytes")
     }
 
     @Test func createUploadSessionRejectsNegativeSizeSpecLocally() async throws {
-        try await assertRejectedLocally(files: [spec(1, sizeBytes: -1)])
+        try await assertRejectedLocally(files: [spec(1, sizeBytes: -1)], expectedField: "files[].sizeBytes")
     }
 
     /// The server validates the payload as one object, so one bad
@@ -213,7 +215,10 @@ struct UploadSessionBoundsTests {
     /// valid entries must never be created, and no Turnstile token may be
     /// spent on the attempt.
     @Test func createUploadSessionRejectsMixedArrayWithOneZeroByteSpecAsAWhole() async throws {
-        try await assertRejectedLocally(files: [spec(1), spec(2, sizeBytes: 0), spec(3)])
+        try await assertRejectedLocally(
+            files: [spec(1), spec(2, sizeBytes: 0), spec(3)],
+            expectedField: "files[].sizeBytes"
+        )
     }
 
     // MARK: Size-floor boundary stays accepted (no off-by-one)
@@ -250,7 +255,7 @@ struct UploadSessionBoundsTests {
         let counter = RequestCounter()
         installSessionHandler(counter: counter)
 
-        await #expect(throws: FeedbackClientError.invalidResponse) {
+        await #expect(throws: FeedbackClientError.invalidInput(field: "files[].sizeBytes")) {
             try await makeClient(provider: provider).uploadAttachment(
                 data: Data(),
                 filename: "empty.png",
@@ -276,7 +281,7 @@ struct UploadSessionBoundsTests {
         let counter = RequestCounter()
         installSessionHandler(counter: counter)
 
-        await #expect(throws: FeedbackClientError.invalidResponse) {
+        await #expect(throws: FeedbackClientError.invalidInput(field: "files[].sizeBytes")) {
             try await makeClient(provider: provider).uploadAttachment(
                 fileURL: fixtureURL,
                 filename: "empty.png",

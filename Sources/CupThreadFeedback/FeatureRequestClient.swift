@@ -276,8 +276,9 @@ extension FeedbackClient {
     ///   A draft whose trimmed `title` is shorter than
     ///   ``IntakeTextLimits/minTitleLength`` or whose trimmed `description`
     ///   is shorter than ``IntakeTextLimits/minDescriptionLength`` also throws
-    ///   ``FeedbackClientError/invalidResponse`` locally (BUG-32), before the
-    ///   Turnstile token provider is consulted or any request is sent.
+    ///   ``FeedbackClientError/invalidInput(field:)`` locally (BUG-32, #614),
+    ///   before the Turnstile token provider is consulted or any request is
+    ///   sent.
     ///
     /// When the client was created with a `turnstileTokenProvider`, its token
     /// is sent as `turnstileToken`; the provider is consulted with the

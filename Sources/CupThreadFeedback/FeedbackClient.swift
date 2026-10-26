@@ -442,8 +442,9 @@ public struct FeedbackClient: Sendable {
     ///   A draft whose trimmed `title` is shorter than
     ///   ``IntakeTextLimits/minTitleLength`` or whose trimmed `description` is
     ///   shorter than ``IntakeTextLimits/minDescriptionLength`` also throws
-    ///   ``FeedbackClientError/invalidResponse`` locally (BUG-32), before the
-    ///   Turnstile token provider is consulted or any request is sent.
+    ///   ``FeedbackClientError/invalidInput(field:)`` locally (BUG-32, #614),
+    ///   before the Turnstile token provider is consulted or any request is
+    ///   sent.
     ///   A draft whose `reporterEmail` is present but implausibly shaped also
     ///   throws ``FeedbackClientError/invalidEmailAddress(field:requestId:)``
     ///   locally (#606), before the Turnstile token provider is consulted or

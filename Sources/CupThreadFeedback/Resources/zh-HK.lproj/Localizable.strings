@@ -212,6 +212,7 @@
 "cupthread.error.email_invalid" = "請輸入有效的電子郵件地址。";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "附件太多：一次提交最多只可以包含 8 個檔案，請移除部分附件後再試一次。";
+"cupthread.error.invalid_input" = "所提供的資料無法被接受，請檢查後再試一次。";
 
 /* Issue #257: duplicate attachment finalization — already submitted */
 "cupthread.error.already_finalized" = "此意見反應或附件已被提交。";
