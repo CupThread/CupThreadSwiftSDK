@@ -267,7 +267,13 @@ struct FeedbackSubmissionPayload: Codable, Sendable {
     let reporterName: String?
     let reporterEmail: String?
     let platform: FeedbackPlatform
+    /// The trimmed draft version clamped to
+    /// ``IntakeTextLimits/maxVersionLength`` code points (#618), or `nil`
+    /// when blank.
     let appVersion: String?
+    /// The trimmed draft build number clamped to
+    /// ``IntakeTextLimits/maxVersionLength`` code points (#618), or `nil`
+    /// when blank.
     let buildNumber: String?
     let metadata: [String: String]
     let uploadIds: [String]?
@@ -291,8 +297,8 @@ extension FeedbackClient {
             reporterName: draft.reporterName.nilIfEmpty,
             reporterEmail: draft.reporterEmail.nilIfEmpty,
             platform: draft.platform,
-            appVersion: draft.appVersion.nilIfEmpty,
-            buildNumber: draft.buildNumber.nilIfEmpty,
+            appVersion: IntakeTextLimits.wireVersionValue(draft.appVersion),
+            buildNumber: IntakeTextLimits.wireVersionValue(draft.buildNumber),
             metadata: sanitizedMetadata(from: draft),
             uploadIds: uploadIds,
             turnstileToken: turnstileToken

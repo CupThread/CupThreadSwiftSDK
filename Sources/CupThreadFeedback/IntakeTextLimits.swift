@@ -84,6 +84,13 @@ public enum IntakeTextLimits: Sendable {
     /// Comment body cap, in Unicode code points
     /// (`CreateFeatureRequestCommentInput.body`).
     public static let maxCommentLength = 2_000
+    /// Feedback environment-version cap, in Unicode code points, shared by
+    /// `FeedbackSubmissionInput.appVersion` and `.buildNumber` (issue #618).
+    /// These are host-supplied environment fields, not user content, so an
+    /// over-long value is clamped to this bound on the wire instead of
+    /// failing the submission — a truncated version string keeps its
+    /// diagnostic value, and no end user could shorten it anyway.
+    public static let maxVersionLength = 64
     /// Whole-payload byte budget for intake JSON bodies: half the server's
     /// 256 KB bounded-reader budget, leaving headroom for JSON structure and
     /// the SDK's reserved metadata. Measured on the encoded `httpBody`
@@ -101,6 +108,34 @@ public enum IntakeTextLimits: Sendable {
     /// server could only answer with `400 Validation failed`.
     static func measuredLength(_ text: String) -> Int {
         text.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count
+    }
+
+    /// The longest prefix of `text` containing at most `cap` Unicode code
+    /// points, cut on whole grapheme-cluster boundaries: a cluster that
+    /// would straddle the cap is dropped whole, so the result is always a
+    /// prefix made of complete user-perceived characters (#610, #618).
+    static func prefixFitting(_ text: String, codePointCap cap: Int) -> String {
+        var codePoints = 0
+        var endIndex = text.startIndex
+        for character in text {
+            let clusterLength = character.unicodeScalars.count
+            guard codePoints + clusterLength <= cap else { break }
+            codePoints += clusterLength
+            endIndex = text.index(after: endIndex)
+        }
+        return String(text[..<endIndex])
+    }
+
+    /// The wire value for `FeedbackSubmissionInput.appVersion` and
+    /// `.buildNumber` (issue #618): the trimmed value verbatim when it fits
+    /// ``maxVersionLength`` code points, otherwise the whole-cluster-boundary
+    /// prefix that fits (re-trimmed, in case the cut lands on interior
+    /// whitespace), and `nil` when nothing remains — the blank-drop
+    /// semantics the payload builder has always applied.
+    static func wireVersionValue(_ value: String) -> String? {
+        guard let trimmed = value.nilIfEmpty else { return nil }
+        guard trimmed.unicodeScalars.count > maxVersionLength else { return trimmed }
+        return prefixFitting(trimmed, codePointCap: maxVersionLength).nilIfEmpty
     }
 
     /// The first feedback-draft field over its cap, or `nil` when every

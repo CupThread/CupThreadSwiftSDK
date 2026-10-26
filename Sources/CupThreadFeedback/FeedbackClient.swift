@@ -439,6 +439,12 @@ public struct FeedbackClient: Sendable {
     ///   fields exceed the server's per-field intake caps (#578) also throws
     ///   ``FeedbackClientError/textTooLong`` locally, before the Turnstile token
     ///   provider is consulted or any request is sent.
+    ///   The draft's `appVersion` and `buildNumber` are environment fields,
+    ///   not user content: a value longer than
+    ///   ``IntakeTextLimits/maxVersionLength`` code points is truncated to
+    ///   that bound on the wire (#618) instead of throwing — a truncated
+    ///   version string keeps its diagnostic value, and the host-set value
+    ///   is not something the end user could shorten anyway.
     ///   A draft whose trimmed `title` is shorter than
     ///   ``IntakeTextLimits/minTitleLength`` or whose trimmed `description` is
     ///   shorter than ``IntakeTextLimits/minDescriptionLength`` also throws
