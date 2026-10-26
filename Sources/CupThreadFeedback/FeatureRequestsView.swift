@@ -148,10 +148,15 @@ public struct FeatureRequestsView: View {
     /// Whether the post-submit success banner is presented (issue #270).
     var isSubmittedBannerVisible: Bool { showSubmittedBanner }
 
-    /// The query actually sent to the server, trimmed to match the throttle's
-    /// duplicate detection.
-    private var trimmedSearchText: String {
-        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// The query actually sent to the server: trimmed to match the throttle's
+    /// duplicate detection and capped to
+    /// ``FeatureRequestSearchLimits/maxQueryLength`` (#610), so the throttle
+    /// key, the wire term, and the card highlight always describe the same
+    /// request — an over-long paste or deep-link term is searched as the
+    /// prefix the live contract accepts instead of spending an admission
+    /// slot on a guaranteed rejection.
+    private var sentSearchText: String {
+        FeatureRequestSearchLimits.sanitizedQuery(searchText) ?? ""
     }
 
     /// Creates the feature requests list.
@@ -181,7 +186,7 @@ public struct FeatureRequestsView: View {
     /// is the trimmed query plus the version filter — the identity the shared
     /// search throttle uses for duplicate suppression.
     private var filterKey: String {
-        "features|\(activeConfig?.allowsAnonymousRoadmap ?? true)|\(trimmedSearchText)|\(selectedVersionID ?? "")"
+        "features|\(activeConfig?.allowsAnonymousRoadmap ?? true)|\(sentSearchText)|\(selectedVersionID ?? "")"
     }
 
     /// Whether this instance already rendered the results for its current
@@ -262,7 +267,7 @@ public struct FeatureRequestsView: View {
             await loadVersions()
         }
         .task(id: filterKey) {
-            guard !trimmedSearchText.isEmpty else {
+            guard !sentSearchText.isEmpty else {
                 // Plain listing: the backend does not rate-limit it, so no
                 // debounce or throttle admission is needed.
                 hasEmittedAdmissionNotice = false
@@ -563,14 +568,14 @@ private extension FeatureRequestsView {
             // is still in flight (issue #286).
             loadState.finishLoading(generation: generationAtStart, wasCancelled: Task.isCancelled)
         }
-        if recordsThrottle && !trimmedSearchText.isEmpty {
+        if recordsThrottle && !sentSearchText.isEmpty {
             await client.searchThrottle.recordQueryFetch(key: filterKey)
         }
         do {
             let result = try await client.fetchFeatureRequests(
                 userToken: userToken,
                 versionId: selectedVersionID,
-                query: trimmedSearchText.isEmpty ? nil : trimmedSearchText
+                query: sentSearchText.isEmpty ? nil : sentSearchText
             )
             // A newer replacing load (search/version change, pull-to-refresh)
             // superseded this one — applying its page would render the older
@@ -583,7 +588,7 @@ private extension FeatureRequestsView {
             listState.applyPage(
                 result,
                 replacesExisting: true,
-                executedQuery: trimmedSearchText,
+                executedQuery: sentSearchText,
                 executedFilterKey: filterKey
             )
         } catch {
@@ -641,7 +646,7 @@ private extension FeatureRequestsView {
         // `startLoading()` after its sleep). Re-reading the view's filter at
         // the fetch would pair the new query with this (old) cursor.
         let requestFilterKey = filterKey
-        let requestQuery = trimmedSearchText
+        let requestQuery = sentSearchText
         let requestVersionID = selectedVersionID
         let generationAtStart = loadGeneration
         isLoadingNextPage = true

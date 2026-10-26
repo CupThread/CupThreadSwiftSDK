@@ -146,6 +146,96 @@ struct FeatureRequestListInputValidationTests {
         #expect(queryItems(of: request)["q"] == "dark mode")
         #expect(queryItems(of: request)["cursor"] == "MjAyNi0w")
     }
+
+    // MARK: - query (q) cap (#610)
+
+    /// The live contract bounds `q` at `maxLength: 120`; an over-long term is
+    /// a guaranteed rejection that would still spend a search-throttle slot,
+    /// so the wire term is truncated to the cap instead (#610).
+    @Test func fetchFeatureRequestsTruncatesOverLongQueryToLiveContractCap() async throws {
+        let capture = CaptureBox<URLRequest>()
+        Self.stubListResponse(capture)
+
+        let overLong = String(repeating: "a", count: FeatureRequestSearchLimits.maxQueryLength + 1)
+        _ = try await Self.makeValidatedClient().fetchFeatureRequests(userToken: "tok-1", query: overLong)
+
+        let request = try #require(capture.value)
+        #expect(queryItems(of: request)["q"] == String(repeating: "a", count: FeatureRequestSearchLimits.maxQueryLength))
+    }
+
+    @Test func fetchFeatureRequestsKeepsQueryAtTheCapVerbatim() async throws {
+        let capture = CaptureBox<URLRequest>()
+        Self.stubListResponse(capture)
+
+        let atCap = String(repeating: "a", count: FeatureRequestSearchLimits.maxQueryLength)
+        _ = try await Self.makeValidatedClient().fetchFeatureRequests(userToken: "tok-1", query: atCap)
+
+        let request = try #require(capture.value)
+        #expect(queryItems(of: request)["q"] == atCap)
+    }
+
+    /// The cap counts Unicode code points (#578), not grapheme clusters:
+    /// 60 decomposed `e\u{0301}` pairs are exactly 120 code points and go out
+    /// verbatim, while 65 pairs (130 code points) are cut at 60 whole pairs —
+    /// grapheme counting would have sent the full 130-code-point term.
+    @Test func fetchFeatureRequestsMeasuresQueryCapInCodePointsNotGraphemes() async throws {
+        let capture = CaptureBox<URLRequest>()
+        Self.stubListResponse(capture)
+
+        let atCap = String(repeating: "e\u{0301}", count: 60)
+        #expect(atCap.unicodeScalars.count == 120)
+        #expect(atCap.count == 60)
+        _ = try await Self.makeValidatedClient().fetchFeatureRequests(userToken: "tok-1", query: atCap)
+        #expect(queryItems(of: try #require(capture.value))["q"] == atCap)
+
+        let overCap = String(repeating: "e\u{0301}", count: 65)
+        #expect(overCap.unicodeScalars.count == 130)
+        _ = try await Self.makeValidatedClient().fetchFeatureRequests(userToken: "tok-1", query: overCap)
+        let overCapRequest = try #require(capture.value)
+        let clamped = try #require(queryItems(of: overCapRequest)["q"])
+        #expect(clamped == String(repeating: "e\u{0301}", count: 60))
+        #expect(clamped.unicodeScalars.count == 120)
+    }
+
+    /// The cut can land on interior whitespace, and a trailing space would be
+    /// sent verbatim — the clamped term is re-trimmed before it rides the wire.
+    @Test func fetchFeatureRequestsReTrimsWhitespaceTheCapCutCanLeaveBehind() async throws {
+        let capture = CaptureBox<URLRequest>()
+        Self.stubListResponse(capture)
+
+        let padded = String(repeating: "a ", count: 70)
+        #expect(padded.unicodeScalars.count == 140)
+        _ = try await Self.makeValidatedClient().fetchFeatureRequests(userToken: "tok-1", query: padded)
+
+        let request = try #require(capture.value)
+        #expect(queryItems(of: request)["q"] == String(repeating: "a ", count: 59) + "a")
+    }
+
+    /// A single cluster longer than the whole cap (a long combining run) can
+    /// yield an empty prefix; the query is then dropped entirely — the same
+    /// blank-drop semantics a whitespace-only term has always had — instead
+    /// of sending a doomed search.
+    @Test func sanitizedQueryDropsQueryWhoseWholeClusterExceedsTheCap() {
+        let giant = "e" + String(repeating: "\u{0301}", count: 150)
+        #expect(giant.unicodeScalars.count > FeatureRequestSearchLimits.maxQueryLength)
+        #expect(giant.count == 1)
+        #expect(FeatureRequestSearchLimits.sanitizedQuery(giant) == nil)
+    }
+
+    @Test func sanitizedQueryPreservesShortTermsAndBlankDropSemantics() {
+        #expect(FeatureRequestSearchLimits.sanitizedQuery(nil) == nil)
+        #expect(FeatureRequestSearchLimits.sanitizedQuery("   ") == nil)
+        #expect(FeatureRequestSearchLimits.sanitizedQuery("  dark mode  ") == "dark mode")
+        let short = "dark mode"
+        #expect(FeatureRequestSearchLimits.sanitizedQuery(short) == short)
+    }
+
+    @Test func sanitizedQueryTruncatesOnClusterBoundariesToTheCap() {
+        let over = String(repeating: "ab", count: 70)
+        let clamped = FeatureRequestSearchLimits.sanitizedQuery(over)
+        #expect(clamped == String(repeating: "ab", count: 60))
+        #expect(clamped?.unicodeScalars.count == FeatureRequestSearchLimits.maxQueryLength)
+    }
 }
 
 // MARK: - Helpers
