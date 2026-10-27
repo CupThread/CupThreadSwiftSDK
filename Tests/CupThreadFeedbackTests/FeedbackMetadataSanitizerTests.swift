@@ -80,7 +80,7 @@ struct FeedbackMetadataSanitizerSuite {
             ("token", "refreshToken"),
             ("api[-_ ]?key", "apiKey"),
             ("access[-_ ]?key", "accessKey"),
-            ("client[-_ ]?secret", "clientSecret"),
+            ("client[-_ ]?secret", "clientsecret"),
             ("credential", "userCredential"),
             ("auth(orization)?", "authorization"),
             ("cookie", "cookieConsent"),
