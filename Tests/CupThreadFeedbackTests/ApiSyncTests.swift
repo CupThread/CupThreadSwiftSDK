@@ -999,3 +999,83 @@ struct ApiSyncSchemaCorrectionsTests {
         #expect(result.warningCode == "github_delivery_pending")
     }
 }
+
+// MARK: - ErrorResponse.details spec sync (issue #629)
+
+/// Pins the corrected `ErrorResponse` schema from the OpenAPI sync (issue
+/// #629): `details` is the zod `flatten()` output — top-level `formErrors`
+/// for object-level failures plus the flattened `fieldErrors` map — served
+/// only on `400 Validation failed`. The SDK decodes both members; the typed
+/// 400 mapping keeps keying off `fieldErrors` alone, so an object-level
+/// failure that names no mapped field still falls through to
+/// `.unexpectedStatus`.
+@Suite("ApiSyncErrorResponseDetailsSync", .serialized)
+struct ApiSyncErrorResponseDetailsSyncTests {
+    private let host = "apisync-errdetails.example.com"
+    private var baseURL: URL { URL(string: "https://\(host)")! }
+
+    @Test func errorEnvelopeDecodesFullFlattenDetails() throws {
+        // The exact body the corrected spec documents for a
+        // request-validation failure: both flatten members on the wire.
+        let data = try encodeJSON([
+            "error": "Validation failed",
+            "details": [
+                "formErrors": [],
+                "fieldErrors": ["appKey": ["Required"]]
+            ]
+        ])
+        let envelope = try JSONDecoder().decode(APIErrorEnvelope.self, from: data)
+        #expect(envelope.error == "Validation failed")
+        #expect(envelope.details?.formErrors == [])
+        #expect(envelope.details?.fieldErrors?["appKey"] == ["Required"])
+    }
+
+    @Test func errorEnvelopeDecodesObjectLevelFormErrorsOnly() throws {
+        // Cross-field (object-level) zod failures land in `formErrors` with
+        // no `fieldErrors` member at all; the model types both shapes.
+        let data = try encodeJSON([
+            "error": "Validation failed",
+            "details": ["formErrors": ["Either a contact email or a signed-in user is required"]]
+        ])
+        let envelope = try JSONDecoder().decode(APIErrorEnvelope.self, from: data)
+        #expect(envelope.details?.formErrors == ["Either a contact email or a signed-in user is required"])
+        #expect(envelope.details?.fieldErrors == nil)
+    }
+
+    @Test func validationFailureWithOnlyFormErrorsStillFallsThroughToUnexpectedStatus() async throws {
+        // The corrected schema adds `formErrors` to the model, not to the
+        // typed 400 mapping: an object-level failure names no mapped field
+        // and no machine-readable code, so it keeps surfacing as
+        // `.unexpectedStatus` with the envelope message.
+        MockURLProtocol.setHandler(forHost: host) { _ in
+            (
+                makeHTTPResponse(status: 400, headers: ["X-Request-Id": "req-form-1"]),
+                try encodeJSON([
+                    "error": "Validation failed",
+                    "details": ["formErrors": ["Either a contact email or a signed-in user is required"]]
+                ])
+            )
+        }
+
+        do {
+            _ = try await makeClient(baseURL: baseURL).createUploadSession(
+                files: [FeedbackUploadFileSpec(
+                    clientFileId: "f-1",
+                    filename: "note.txt",
+                    contentType: "text/plain",
+                    sizeBytes: 16
+                )],
+                userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f"
+            )
+            Issue.record("Expected unexpectedStatus error")
+        } catch let error as FeedbackClientError {
+            guard case .unexpectedStatus(let code, let message, let requestId) = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(code == 400)
+            #expect(message == "Validation failed")
+            #expect(requestId == "req-form-1")
+        }
+    }
+}
