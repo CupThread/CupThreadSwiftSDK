@@ -133,12 +133,12 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 /// One client serves every SDK surface — feedback, feature requests, roadmap,
 /// and changelog. Create it once with a ``FeedbackClientConfiguration`` and
 /// share it freely; the client is `Sendable` and stateless apart from three
-/// shared helpers: the search throttle (``SearchRequestThrottle``), which the
+/// shared helpers: the search throttle (`SearchRequestThrottle`), which the
 /// search surfaces share so sustained typing stays below the API's per-IP
 /// search rate limit, the short-TTL app-config cache
 /// (``FeedbackClient/cachedAppConfig()``), which all surfaces share so
 /// presenting any number of them costs at most one configuration GET per
-/// TTL window, and the server-clock offset (``ServerClock``), which learns
+/// TTL window, and the server-clock offset (`ServerClock`), which learns
 /// the API's clock from response `Date` headers so signed payment-attribute
 /// reports stay inside the server's signature freshness window on devices
 /// with a skewed clock.
@@ -154,7 +154,7 @@ public struct FeedbackClientConfiguration: Equatable, Sendable {
 ///
 /// The views (``FeedbackComposerView``, ``FeatureRequestsView``,
 /// ``RoadmapBoardView``, ``WhatsNewView``) use the same client, so you can mix
-/// ready-made UI with direct calls like ``submit(_:userToken:)``.
+/// ready-made UI with direct calls like ``submit(_:userToken:turnstileToken:)``.
 ///
 /// ## Redirect policy
 ///
@@ -217,7 +217,7 @@ public struct FeedbackClient: Sendable {
     /// (theme, surface gating, composer, changelog overlay) goes through it.
     let configStore: AppConfigStore
     /// Learned offset between the API's clock and this device's clock
-    /// (``ServerClock``); feeds the signature timestamps of payment-attribute
+    /// (`ServerClock`); feeds the signature timestamps of payment-attribute
     /// reports so a skewed device clock never produces a stale signature.
     let serverClock: ServerClock
     /// Optional provider the SDK consults for a Cloudflare Turnstile token on
@@ -371,8 +371,8 @@ public struct FeedbackClient: Sendable {
     ///
     /// Titles and descriptions are trimmed; empty contact fields, version
     /// strings, and attachment lists are omitted from the payload. Attachments
-    /// contributed by the ``uploadAttachment(data:filename:mimeType:userToken:)``
-    /// and ``uploadAttachment(fileURL:filename:mimeType:userToken:)`` variants
+    /// contributed by the ``uploadAttachment(data:filename:mimeType:userToken:turnstileToken:)``
+    /// and ``uploadAttachment(fileURL:filename:mimeType:userToken:turnstileToken:)`` variants
     /// are sent as `uploadIds` referencing their upload session. The SDK adds
     /// `sdk` (`cupthread-apple/<semver>`), `sdkVersion` (`<semver>`), `platform`,
     /// and `submittedAt` metadata automatically; these reserved keys are
@@ -421,7 +421,7 @@ public struct FeedbackClient: Sendable {
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when the
     ///   server's Turnstile gate rejects the submission and no fresh token could
     ///   be presented (HTTP 403),
-    ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` on HTTP 429,
     ///   ``FeedbackClientError/alreadyFinalized(message:requestId:)`` when an attachment
     ///   referenced in the submission was already finalized into another submission
     ///   (HTTP 409 `already_finalized`); the losing request creates no duplicate submission
@@ -530,7 +530,7 @@ public struct FeedbackClient: Sendable {
     /// signed out, and hosts normally install it unconditionally, so a `true`
     /// value says nothing about the current session. SDK permission preflights
     /// must therefore not gate on this property: they resolve
-    /// ``resolveAuthenticatedAccess()`` instead, so a signed-out user of a
+    /// `resolveAuthenticatedAccess()` instead, so a signed-out user of a
     /// host with an installed provider still sees the deliberate signed-out
     /// state instead of requests that cannot succeed (issue #297). The
     /// property is kept for source compatibility with hosts that only need to

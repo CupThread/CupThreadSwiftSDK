@@ -39,17 +39,36 @@ BASE_PATH="${BASE_PATH%/}"
 BASE_PATH="/${BASE_PATH#/}"
 
 echo "==> Building $SCHEME.doccarchive (base path: $BASE_PATH)"
+# The tripwire below needs the full docbuild log. Note it only sees warnings
+# from an actual docc compile — a fully up-to-date incremental build re-emits
+# nothing, so the gate is authoritative on clean checkouts (CI) and after
+# touching doc comments locally. CI's docs workflow runs on a fresh runner.
+DOCBUILD_LOG="$DERIVED_DATA/docbuild.log"
+mkdir -p "$DERIVED_DATA"
 if [ "$BASE_PATH" = "/" ]; then
     xcodebuild docbuild \
         -scheme "$SCHEME" \
         -destination 'generic/platform=iOS Simulator' \
-        -derivedDataPath "$DERIVED_DATA"
+        -derivedDataPath "$DERIVED_DATA" \
+        > "$DOCBUILD_LOG" 2>&1 || { cat "$DOCBUILD_LOG"; exit 1; }
 else
     xcodebuild docbuild \
         -scheme "$SCHEME" \
         -destination 'generic/platform=iOS Simulator' \
         -derivedDataPath "$DERIVED_DATA" \
-        "OTHER_DOCC_FLAGS=--hosting-base-path $BASE_PATH"
+        "OTHER_DOCC_FLAGS=--hosting-base-path $BASE_PATH" \
+        > "$DOCBUILD_LOG" 2>&1 || { cat "$DOCBUILD_LOG"; exit 1; }
+fi
+cat "$DOCBUILD_LOG"
+
+# Tripwire (issue #623): unresolved or ambiguous DocC symbol links render as
+# dead plain text on the published site, and a flood of such warnings hides
+# new link regressions. Fail the build when the docc phase emits any of the
+# documentation-rot warning classes, keeping the count pinned at zero.
+if grep -E "doesn't exist at '|is ambiguous at '|External name '.*' used to document parameter|Parameter '.*' is missing documentation" "$DOCBUILD_LOG" >/dev/null; then
+    echo "ERROR: DocC emitted documentation-rot warnings (unresolved/ambiguous symbol links or parameter-documentation mismatches). Fix the links listed above; see issue #623." >&2
+    grep -E "doesn't exist at '|is ambiguous at '|External name '.*' used to document parameter|Parameter '.*' is missing documentation" "$DOCBUILD_LOG" >&2
+    exit 1
 fi
 
 echo "==> Transforming archive for static hosting"

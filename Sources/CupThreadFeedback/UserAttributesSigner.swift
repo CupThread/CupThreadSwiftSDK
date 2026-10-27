@@ -12,7 +12,7 @@ public enum UserAttributesSigner {
         case unset
         /// The field is explicitly present with a `null` value in JSON.
         /// Only `plan` and `mrr` accept a null on the wire:
-        /// ``FeedbackClient/updateUserAttributes`` rejects `.null` for
+        /// ``FeedbackClient/updateUserAttributes(isPaying:plan:mrr:currency:userToken:signingSecret:)-(UserAttributesSigner.Field<Bool>,_,_,_,_,_)`` rejects `.null` for
         /// `isPaying` and `currency` with
         /// ``FeedbackClientError/attributeNotClearable(attribute:)``
         /// (issue #573).
@@ -254,7 +254,7 @@ extension UserAttributesSigner.Field where T == Bool {
     /// (`<isPaying: true|false|unset>`, issue #573): the server's
     /// `EndUserAttributesInput` schema cannot reconstruct a cleared
     /// `isPaying`, so `.null` renders as the absent sentinel and
-    /// ``FeedbackClient/updateUserAttributes`` rejects it before any
+    /// ``FeedbackClient/updateUserAttributes(isPaying:plan:mrr:currency:userToken:signingSecret:)-(UserAttributesSigner.Field<Bool>,_,_,_,_,_)`` rejects it before any
     /// canonical string is built or signed.
     var canonicalRepresentation: String {
         switch self {
@@ -288,7 +288,7 @@ extension UserAttributesSigner.Field where T == String {
     /// `EndUserAttributesInput` schema cannot reconstruct a cleared
     /// `currency`, so `.null` renders as the absent sentinel even for
     /// direct `Arguments` construction —
-    /// ``FeedbackClient/updateUserAttributes`` rejects it before any
+    /// ``FeedbackClient/updateUserAttributes(isPaying:plan:mrr:currency:userToken:signingSecret:)-(UserAttributesSigner.Field<Bool>,_,_,_,_,_)`` rejects it before any
     /// canonical string is built or signed.
     var canonicalCurrencyRepresentation: String {
         switch self {

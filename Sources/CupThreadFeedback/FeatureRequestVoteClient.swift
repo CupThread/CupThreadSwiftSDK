@@ -184,7 +184,7 @@ extension FeedbackClient {
     /// header-only fallback is ever needed.
     ///
     /// The vote endpoints are rate limited per client IP (20 requests/minute);
-    /// exceeding the limit throws ``FeedbackClientError/rateLimited``, which
+    /// exceeding the limit throws ``FeedbackClientError/rateLimited(message:requestId:)``, which
     /// the SDK surfaces as a friendly "try again in a minute" message rather
     /// than retrying in a tight loop.
     ///
@@ -268,7 +268,7 @@ extension FeedbackClient {
     ///   token minted — #606), or when the server answers the residual
     ///   field-error `400` for an edge-case address the local shape check
     ///   deliberately accepts (#606),
-    ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` on HTTP 429,
     ///   ``FeedbackClientError/turnstileRequired(message:requestId:)`` when human
     ///   verification is required or rejected (HTTP 403
     ///   `turnstile_verification_failed` — since SaaS#1171 the only 403 this
@@ -309,7 +309,7 @@ extension FeedbackClient {
     /// `DELETE`.
     ///
     /// The vote endpoints are rate limited per client IP (20 requests/minute);
-    /// exceeding the limit throws ``FeedbackClientError/rateLimited``.
+    /// exceeding the limit throws ``FeedbackClientError/rateLimited(message:requestId:)``.
     /// - Parameters:
     ///   - featureRequestId: Id of the request to unvote. Values that cannot
     ///     be a valid feature-request id (empty, whitespace, or containing
@@ -340,7 +340,7 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidIdentityToken`` when `userToken` is
     ///   not a UUID string (rejected locally, with no request built — issue
     ///   #617),
-    ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` on HTTP 429,
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` — no current
     ///   server state answers it on this operation; the generic permission
     ///   mapping is kept for deploy skew (pre-convention servers answered a

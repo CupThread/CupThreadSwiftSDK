@@ -202,7 +202,7 @@ enum SearchReloadOutcome: Equatable {
     ///   - error: The error the reload threw.
     ///   - hasExistingContent: Whether the surface already shows results.
     /// - Returns: `nil` when `error` is task cancellation
-    ///   (``Error/isSdkCancellation``) — the reload was superseded or the
+    ///   (`Error.isSdkCancellation`) — the reload was superseded or the
     ///   surface dismissed, and no failure state may be written.
     static func outcome(for error: Error, hasExistingContent: Bool) -> SearchReloadOutcome? {
         guard !error.isSdkCancellation else { return nil }

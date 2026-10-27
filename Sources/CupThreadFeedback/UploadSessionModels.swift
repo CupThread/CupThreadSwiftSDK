@@ -121,7 +121,7 @@ public enum UploadSessionLimits: Sendable {
 ///
 /// Files are uploaded by streaming bytes to each slot's
 /// `PUT /api/v1/uploads/{uploadId}` with the session's bearer token, and the
-/// returned ``FeedbackUploadSessionFile/uploadId`` values are then attached
+/// returned ``FeedbackUploadSession/File/uploadId`` values are then attached
 /// to a ``FeedbackDraft`` for submission.
 public struct FeedbackUploadSession: Decodable, Equatable, Sendable {
     /// Session metadata.
@@ -146,7 +146,7 @@ public struct FeedbackUploadSession: Decodable, Equatable, Sendable {
         }
 
         /// Decodes the session info, refusing any `sessionToken` outside
-        /// ``UploadSessionTokenGrammar`` (#593). Enforcement lives at the
+        /// `UploadSessionTokenGrammar` (#593). Enforcement lives at the
         /// decode boundary — the only place a session enters the process —
         /// so an invalid token can never propagate to a second consumer,
         /// and `decodeSuccess` surfaces the failure as the typed

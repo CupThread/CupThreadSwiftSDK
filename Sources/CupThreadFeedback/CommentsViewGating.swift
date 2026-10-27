@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Resolved-access gating (BUG-24)
 
 /// The comment surface's interactive affordances gate on the *resolved*
-/// authenticated access (``FeedbackClient/resolveAuthenticatedAccess()``),
+/// authenticated access (`resolveAuthenticatedAccess()`),
 /// re-read on every load — provider presence alone cannot tell a signed-out
 /// user of an unconditionally-installed provider apart, and a composer gated
 /// on presence could only end in a server-rejected submission.

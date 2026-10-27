@@ -238,7 +238,7 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when
     ///   `userToken` is blank, whitespace-only, or contains a newline (all
     ///   rejected before anything is signed or sent),
-    ///   ``FeedbackClientError/rateLimited`` when the retry is also
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the retry is also
     ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,
     ///   ``FeedbackClientError/invalidResponse``, or — for payment-attribute
     ///   reports — the signature failures
@@ -324,7 +324,7 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when
     ///   `userToken` is blank, whitespace-only, or contains a newline (all
     ///   rejected before anything is signed or sent),
-    ///   ``FeedbackClientError/rateLimited`` when the retry is also
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the retry is also
     ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,
     ///   ``FeedbackClientError/invalidResponse``, or — for payment-attribute
     ///   reports — the signature failures
@@ -381,7 +381,7 @@ extension FeedbackClient {
     /// - Throws: ``FeedbackClientError/authenticationRequired`` when
     ///   `userToken` is blank, whitespace-only, or contains a newline (all
     ///   rejected before anything is signed or sent),
-    ///   ``FeedbackClientError/rateLimited`` when the retry is also
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the retry is also
     ///   limited, ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``,
     ///   ``FeedbackClientError/invalidResponse``, or — for payment-attribute
     ///   reports — the signature failures

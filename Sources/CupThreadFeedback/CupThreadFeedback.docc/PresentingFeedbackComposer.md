@@ -105,7 +105,7 @@ let attachment = try await client.uploadAttachment(
 Both email-bearing intake calls — ``FeedbackClient/submit(_:userToken:turnstileToken:)``
 (``FeedbackDraft/reporterEmail``) and
 ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``
-(``shipNotifyEmail``) — validate the address locally before any network work,
+(`shipNotifyEmail`) — validate the address locally before any network work,
 so a malformed address never consumes a Turnstile token or a round trip:
 
 - A **blank or whitespace-only** address keeps its field-omitted semantics;
