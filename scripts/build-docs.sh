@@ -39,11 +39,14 @@ BASE_PATH="${BASE_PATH%/}"
 BASE_PATH="/${BASE_PATH#/}"
 
 echo "==> Building $SCHEME.doccarchive (base path: $BASE_PATH)"
-# The tripwire below needs the full docbuild log. Note it only sees warnings
-# from an actual docc compile — a fully up-to-date incremental build re-emits
-# nothing, so the gate is authoritative on clean checkouts (CI) and after
-# touching doc comments locally. CI's docs workflow runs on a fresh runner.
+# The tripwire below needs the full docbuild log, which only an actual docc
+# compile emits — a fully up-to-date incremental build re-emits nothing, so a
+# rerun after a gating failure would publish the same broken archive with a
+# clean log. Wipe the docbuild tree so every invocation performs a fresh
+# compile and the gate stays authoritative; the docbuild is fast enough that
+# the rebuild cost is negligible (CI's fresh runners rebuild anyway).
 DOCBUILD_LOG="$DERIVED_DATA/docbuild.log"
+rm -rf "$DERIVED_DATA"
 mkdir -p "$DERIVED_DATA"
 if [ "$BASE_PATH" = "/" ]; then
     xcodebuild docbuild \
@@ -65,9 +68,10 @@ cat "$DOCBUILD_LOG"
 # dead plain text on the published site, and a flood of such warnings hides
 # new link regressions. Fail the build when the docc phase emits any of the
 # documentation-rot warning classes, keeping the count pinned at zero.
-if grep -E "doesn't exist at '|is ambiguous at '|External name '.*' used to document parameter|Parameter '.*' is missing documentation" "$DOCBUILD_LOG" >/dev/null; then
+DOC_ROT_WARNING_RE="doesn't exist at '|is ambiguous at '|isn't a disambiguation for '|External name '.*' used to document parameter|Parameter '.*' is missing documentation"
+if grep -E "$DOC_ROT_WARNING_RE" "$DOCBUILD_LOG" >/dev/null; then
     echo "ERROR: DocC emitted documentation-rot warnings (unresolved/ambiguous symbol links or parameter-documentation mismatches). Fix the links listed above; see issue #623." >&2
-    grep -E "doesn't exist at '|is ambiguous at '|External name '.*' used to document parameter|Parameter '.*' is missing documentation" "$DOCBUILD_LOG" >&2
+    grep -E "$DOC_ROT_WARNING_RE" "$DOCBUILD_LOG" >&2
     exit 1
 fi
 
