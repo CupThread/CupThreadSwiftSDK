@@ -6,7 +6,7 @@ import Foundation
 /// or `currency` outside these bounds is a deterministic HTTP `400
 /// Validation failed` — and because the whole report is validated as one
 /// object server-side, every sibling write in the same `PUT` is silently
-/// dropped with it. ``FeedbackClient/updateUserAttributes`` enforces the
+/// dropped with it. ``FeedbackClient/updateUserAttributes(isPaying:plan:mrr:currency:userToken:signingSecret:)-(Bool?,_,_,_,_,_)`` enforces the
 /// bounds before any signing material is consulted or any bytes reach the
 /// network.
 public enum UserAttributeLimits: Sendable {

@@ -6,7 +6,7 @@ import Foundation
 ///
 /// The endpoint's `q` parameter is documented with `maxLength: 120`, and the
 /// search path is rate-limited per client IP (the budget
-/// ``SearchRequestThrottle`` spaces requests below) — so an over-long term is
+/// `SearchRequestThrottle` spaces requests below) — so an over-long term is
 /// a request the server can only reject, yet one that still spends an
 /// admission slot before failing. The SDK therefore truncates the term it
 /// actually sends to the documented bound, the same way `fetchFeatureRequests`

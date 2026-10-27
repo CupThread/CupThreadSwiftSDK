@@ -47,8 +47,8 @@ public extension FeedbackDraft {
 }
 
 /// A file uploaded through
-/// ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)`` or
-/// ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:)``
+/// ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:turnstileToken:)`` or
+/// ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:turnstileToken:)``
 /// and attached to a ``FeedbackDraft``.
 public struct FeedbackAttachment: Codable, Equatable, Sendable, Identifiable {
     /// Which storage backend holds the file.
@@ -170,8 +170,8 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
     /// are SDK-authored: draft entries with those names cannot replace the
     /// SDK's values on the wire, while every other custom key is preserved.
     public var metadata: [String: String]
-    /// References returned by the ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:)``
-    /// and ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:)`` variants.
+    /// References returned by the ``FeedbackClient/uploadAttachment(data:filename:mimeType:userToken:turnstileToken:)``
+    /// and ``FeedbackClient/uploadAttachment(fileURL:filename:mimeType:userToken:turnstileToken:)`` variants.
     /// Their `uploadId`s are sent with the submission — at most
     /// ``FeedbackSubmissionLimits/maxAttachmentCount`` of them (#613): the
     /// live schema caps the array at 8, and
@@ -232,7 +232,7 @@ public struct FeedbackDraft: Codable, Equatable, Sendable {
 
 /// The server's receipt for a submitted feedback draft.
 ///
-/// Returned by ``FeedbackClient/submit(_:userToken:)`` and also delivered to
+/// Returned by ``FeedbackClient/submit(_:userToken:turnstileToken:)`` and also delivered to
 /// ``FeedbackComposerView`` host apps through its `onSubmit` callback.
 ///
 /// Decoding is lenient: the documented response carries `id`, `title`,

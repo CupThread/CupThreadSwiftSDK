@@ -5,7 +5,7 @@ import SwiftUI
 /// Extracted vote-pill enablement (#34). Own requests stay disabled, and a
 /// resolved config with `allowAnonymousVote == false` disables every pill —
 /// except when the client can attach a bearer token right now (the resolved
-/// ``FeedbackClient/resolveAuthenticatedAccess()`` value): a signed-in user is
+/// `resolveAuthenticatedAccess()` value): a signed-in user is
 /// not bound by the *anonymous*-access switches, and the server stays
 /// authoritative for actual 401/403 rejections.
 enum FeatureVoteGate {

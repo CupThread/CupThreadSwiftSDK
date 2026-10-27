@@ -35,10 +35,10 @@ extension FeedbackClient {
     ///     human-verification gate (HTTP 403), the SDK requests a fresh token
     ///     from the provider and retries exactly once before throwing.
     /// - Returns: The session, including bearer token and pre-allocated slots.
-    /// - Throws: ``FeedbackClientError/uploaderIdentityRequired`` when no
-    ///   identity could be presented, ``FeedbackClientError/dailyStorageQuotaExceeded``
+    /// - Throws: ``FeedbackClientError/uploaderIdentityRequired(message:requestId:)`` when no
+    ///   identity could be presented, ``FeedbackClientError/dailyStorageQuotaExceeded(message:requestId:)``
     ///   when the workspace has exceeded its daily upload storage limit (HTTP 429
-    ///   `daily_storage_quota_exceeded`), ``FeedbackClientError/rateLimited`` on
+    ///   `daily_storage_quota_exceeded`), ``FeedbackClientError/rateLimited(message:requestId:)`` on
     ///   HTTP 429, ``FeedbackClientError/turnstileRequired(message:requestId:)``
     ///   when the server's Turnstile gate rejects the session creation and no
     ///   fresh token could be presented (HTTP 403 `turnstile_verification_failed`),
@@ -116,7 +116,7 @@ extension FeedbackClient {
     ///   - data: The raw file bytes.
     ///   - contentType: The file's MIME type; the server verifies it against
     ///     the bytes' magic content (`415` on mismatch).
-    ///   - session: The session the slot belongs to.
+    ///   - uploadSession: The session the slot belongs to.
     ///   - slot: The slot to fill; defaults to the session's first slot.
     ///   - filename: Name recorded on the returned attachment; defaults to
     ///     the slot's `clientFileId`.
@@ -130,11 +130,11 @@ extension FeedbackClient {
     ///   holds no matter which session the client runs in — including one
     ///   injected through ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``
     ///   that carries no redirect policy of its own (#561).
-    /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
-    ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
-    ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
-    ///   ``FeedbackClientError/uploadSessionExpired`` (HTTP 401 `session_expired` /
-    ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid``
+    /// - Throws: ``FeedbackClientError/payloadTooLarge(message:requestId:)`` (HTTP 413),
+    ///   ``FeedbackClientError/unsupportedMediaType(message:requestId:)`` (HTTP 415),
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` (HTTP 429),
+    ///   ``FeedbackClientError/uploadSessionExpired(message:requestId:)`` (HTTP 401 `session_expired` /
+    ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid(message:requestId:)``
     ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors),
     ///   ``FeedbackClientError/imageUploadFailed(message:requestId:)``
     ///   (HTTP 500 `image_upload_failed` — an unexpected server-side storage
@@ -194,7 +194,7 @@ extension FeedbackClient {
     ///   - fileURL: URL of the file to upload; its bytes are sent unmodified.
     ///   - contentType: The file's MIME type; the server verifies it against
     ///     the bytes' magic content (`415` on mismatch).
-    ///   - session: The session the slot belongs to.
+    ///   - uploadSession: The session the slot belongs to.
     ///   - slot: The slot to fill; defaults to the session's first slot.
     ///   - filename: Name recorded on the returned attachment; defaults to
     ///     the slot's `clientFileId`.
@@ -208,11 +208,11 @@ extension FeedbackClient {
     ///   holds no matter which session the client runs in — including one
     ///   injected through ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``
     ///   that carries no redirect policy of its own (#561).
-    /// - Throws: ``FeedbackClientError/payloadTooLarge`` (HTTP 413),
-    ///   ``FeedbackClientError/unsupportedMediaType`` (HTTP 415),
-    ///   ``FeedbackClientError/rateLimited`` (HTTP 429),
-    ///   ``FeedbackClientError/uploadSessionExpired`` (HTTP 401 `session_expired` /
-    ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid``
+    /// - Throws: ``FeedbackClientError/payloadTooLarge(message:requestId:)`` (HTTP 413),
+    ///   ``FeedbackClientError/unsupportedMediaType(message:requestId:)`` (HTTP 415),
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` (HTTP 429),
+    ///   ``FeedbackClientError/uploadSessionExpired(message:requestId:)`` (HTTP 401 `session_expired` /
+    ///   `session_invalid_or_expired`), ``FeedbackClientError/uploadSessionInvalid(message:requestId:)``
     ///   (HTTP 401 `session_invalid` / HTTP 409 lifecycle errors),
     ///   ``FeedbackClientError/imageUploadFailed(message:requestId:)``
     ///   (HTTP 500 `image_upload_failed` — an unexpected server-side storage
@@ -280,14 +280,14 @@ extension FeedbackClient {
     ///   consulted or any request is sent;
     ///   ``FeedbackClientError/invalidIdentityToken`` when `userToken` is
     ///   given but is not a UUID string (issue #617 — the same pre-Turnstile
-    ///   point); ``FeedbackClientError/unsupportedMediaType`` when
-    ///   the type is not accepted, ``FeedbackClientError/payloadTooLarge`` when
-    ///   it exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
+    ///   point); ``FeedbackClientError/unsupportedMediaType(message:requestId:)`` when
+    ///   the type is not accepted, ``FeedbackClientError/payloadTooLarge(message:requestId:)`` when
+    ///   it exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired(message:requestId:)``
     ///   when no identity could be presented,
-    ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
-    ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
+    ///   ``FeedbackClientError/uploadSessionExpired(message:requestId:)`` when the upload session
+    ///   expires, ``FeedbackClientError/uploadSessionInvalid(message:requestId:)`` for other session
     ///   lifecycle failures,
-    ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
+    ///   ``FeedbackClientError/dailyStorageQuotaExceeded(message:requestId:)`` when the workspace
     ///   has exceeded its daily upload limit,
     ///   ``FeedbackClientError/imageUploadFailed(message:requestId:)`` when the
     ///   server hits an unexpected storage failure (HTTP 500
@@ -351,14 +351,14 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/invalidIdentityToken`` when `userToken` is
     ///   given but is not a UUID string (issue #617 — checked before the
     ///   file is even stat'd);
-    ///   ``FeedbackClientError/unsupportedMediaType`` when the type
-    ///   is not accepted, ``FeedbackClientError/payloadTooLarge`` when it
-    ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired``
+    ///   ``FeedbackClientError/unsupportedMediaType(message:requestId:)`` when the type
+    ///   is not accepted, ``FeedbackClientError/payloadTooLarge(message:requestId:)`` when it
+    ///   exceeds the slot limit, ``FeedbackClientError/uploaderIdentityRequired(message:requestId:)``
     ///   when no identity could be presented,
-    ///   ``FeedbackClientError/uploadSessionExpired`` when the upload session
-    ///   expires, ``FeedbackClientError/uploadSessionInvalid`` for other session
+    ///   ``FeedbackClientError/uploadSessionExpired(message:requestId:)`` when the upload session
+    ///   expires, ``FeedbackClientError/uploadSessionInvalid(message:requestId:)`` for other session
     ///   lifecycle failures,
-    ///   ``FeedbackClientError/dailyStorageQuotaExceeded`` when the workspace
+    ///   ``FeedbackClientError/dailyStorageQuotaExceeded(message:requestId:)`` when the workspace
     ///   has exceeded its daily upload limit,
     ///   ``FeedbackClientError/imageUploadFailed(message:requestId:)`` when the
     ///   server hits an unexpected storage failure (HTTP 500

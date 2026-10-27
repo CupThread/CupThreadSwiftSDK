@@ -120,7 +120,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// sent without the required HMAC signature
     /// (HTTP 422 `payment_attributes_require_signature`). Configure
     /// ``FeedbackClientConfiguration/signingSecret`` — or pass the
-    /// `signingSecret` parameter — so ``FeedbackClient/updateUserAttributes``
+    /// `signingSecret` parameter — so ``FeedbackClient/updateUserAttributes(userToken:signingSecret:)``
     /// signs the report.
     case paymentAttributesRequireSignature(message: String?, requestId: String?)
     /// The app has no SDK signing secret configured in the CupThread console
@@ -269,7 +269,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// carries the **unsanitized raw response body** for diagnostics (an
     /// HTML/XML gateway error page, a stack trace, …) — read it through
     /// ``responseBody`` for logs and support tickets. It is never shown to
-    /// end users: ``LocalizedError/errorDescription`` renders localized,
+    /// end users: `LocalizedError.errorDescription` renders localized,
     /// status-based copy instead. `requestId` is the response's
     /// `X-Request-Id` correlation id for support requests.
     case unexpectedStatus(code: Int, message: String, requestId: String?)
@@ -278,7 +278,7 @@ public enum FeedbackClientError: LocalizedError, Equatable, Sendable {
     /// captured — an HTML/XML gateway error page, a stack trace, or a plain
     /// text error. Intended for logging and support tickets, never for
     /// display: every user-facing SDK surface renders
-    /// ``LocalizedError/errorDescription`` copy, which never embeds this text.
+    /// `LocalizedError.errorDescription` copy, which never embeds this text.
     public var responseBody: String? {
         switch self {
         case .unexpectedStatus(_, let message, _):

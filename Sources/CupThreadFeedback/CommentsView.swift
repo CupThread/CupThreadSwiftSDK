@@ -10,10 +10,10 @@ import SwiftUI
 /// author avatars. Users can post new comments and reply to existing ones.
 ///
 /// Posting is signed-in-only on the server: create the client with an
-/// authentication provider (``FeedbackClient/init(configuration:session:authenticationProvider:)``)
+/// authentication provider (``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)``)
 /// so signed-in users can contribute. Whether the interactive affordances
 /// render follows the *resolved* access verdict
-/// (``FeedbackClient/resolveAuthenticatedAccess()``), re-read on every load —
+/// (`resolveAuthenticatedAccess()`), re-read on every load —
 /// provider presence alone cannot tell a signed-out user of an
 /// unconditionally-installed provider apart (BUG-24). When no signed-in
 /// access can be resolved, the composer is replaced by a deliberate

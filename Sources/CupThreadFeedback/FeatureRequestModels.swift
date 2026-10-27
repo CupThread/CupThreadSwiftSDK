@@ -108,6 +108,8 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     ///   - isOwnRequest: Whether the requesting user submitted this request.
     ///   - createdAt: ISO-8601 creation timestamp.
     ///   - updatedAt: ISO-8601 last-update timestamp.
+    ///   - commentCount: Total number of visible comments on this request,
+    ///     when reported.
     public init(
         id: String,
         appId: String,
@@ -259,7 +261,7 @@ public struct FeatureRequestDraft: Equatable, Sendable {
 
 // MARK: - Server responses
 
-/// Response to ``FeedbackClient/submitFeatureRequest(_:userToken:)``.
+/// Response to ``FeedbackClient/submitFeatureRequest(_:userToken:turnstileToken:)``.
 public struct FeatureRequestSubmissionResult: Codable, Equatable, Sendable {
     /// Id of the newly created request.
     public let featureRequestId: String

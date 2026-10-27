@@ -89,7 +89,7 @@ public struct PublicAppConfig: Codable, Equatable, Sendable {
     /// Whether signed-out users may submit feedback.
     public let allowAnonymousFeedback: Bool
     /// Whether signed-out users may read the changelog. `false` makes
-    /// ``FeedbackClient/fetchChangelog()`` throw
+    /// ``FeedbackClient/fetchChangelog(maxPages:)`` throw
     /// ``FeedbackClientError/authenticationRequired``.
     public let allowAnonymousChangelog: Bool
     /// Theme, feature flags, and overlay copy configured in the console.
@@ -372,7 +372,7 @@ extension FeedbackClient {
     ///   roadmap access is disabled for the app (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` — deploy-skew
     ///   defense only (SaaS#1171 removed the disabled-app 403),
-    ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the shared per-client read
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   with status 404 for an unknown `appKey` or a disabled app — both
@@ -400,7 +400,7 @@ extension FeedbackClient {
     ///   roadmap access is disabled for the app (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` — deploy-skew
     ///   defense only (SaaS#1171 removed the disabled-app 403),
-    ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the shared per-client read
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   with status 404 for an unknown `appKey` or a disabled app — both

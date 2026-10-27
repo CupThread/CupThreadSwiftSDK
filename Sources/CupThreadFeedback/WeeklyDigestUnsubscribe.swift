@@ -40,7 +40,7 @@ extension FeedbackClient {
     ///   server),
     ///   ``FeedbackClientError/authenticationRequired`` (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` (HTTP 403),
-    ///   ``FeedbackClientError/rateLimited`` on HTTP 429, or
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` on HTTP 429, or
     ///   ``FeedbackClientError/invalidResponse``.
     public func unsubscribeFromWeeklyDigest(
         token: String

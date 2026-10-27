@@ -144,7 +144,7 @@ extension FeedbackClient {
     ///   identity is missing or rejected (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the app
     ///   disables self-service erasure (HTTP 403),
-    ///   ``FeedbackClientError/rateLimited`` on HTTP 429, or
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` on HTTP 429, or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   / ``FeedbackClientError/invalidResponse``.
     public func eraseMyData(userToken: String) async throws -> DataErasureResult {
@@ -193,7 +193,7 @@ extension FeedbackClient {
     /// ``UserTokenStore/reset()`` when the response reports `erased: true`;
     /// the next ``UserTokenStore/token`` read mints a fresh identity and the
     /// revoked one is never replayed. The locally remembered changelog
-    /// subscription email (see ``ChangelogSubscriptionStore``) is cleared at
+    /// subscription email (see `ChangelogSubscriptionStore`) is cleared at
     /// the same time so no PII survives a confirmed erasure on the device.
     /// When the result is `erased: false` (no profile matched the identity),
     /// both stores are left untouched.

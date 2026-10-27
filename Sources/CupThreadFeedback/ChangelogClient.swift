@@ -148,7 +148,7 @@ extension FeedbackClient {
     ///   changelog access is disabled (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
     ///   server's permission policy rejects the read (HTTP 403),
-    ///   ``FeedbackClientError/rateLimited``
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)``
     ///   when the shared per-client read budget is exhausted (HTTP 429 —
     ///   retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
@@ -211,7 +211,7 @@ extension FeedbackClient {
     ///   changelog access is disabled (HTTP 401),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` when the
     ///   server's permission policy rejects the read (HTTP 403),
-    ///   ``FeedbackClientError/rateLimited``
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)``
     ///   when the shared per-client read budget is exhausted (HTTP 429 —
     ///   retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
@@ -270,7 +270,7 @@ extension FeedbackClient {
     /// succeeds when `allowAnonymousChangelog = false`.
     /// - Parameters:
     ///   - email: The address to notify. Trimmed before sending. Must be
-    ///     plausibly shaped (``EmailShape/isPlausible(_:)``) — the same check
+    ///     plausibly shaped (`EmailShape.isPlausible(_:)`) — the same check
     ///     the subscribe sheet applies locally (#283); anything else is
     ///     rejected before dispatch instead of earning a guaranteed HTTP 400.
     ///   - userToken: Anonymous user token sent as `X-User-Token`, linking the
@@ -293,7 +293,7 @@ extension FeedbackClient {
     ///   email must be verified from a signed-in account (HTTP 403 `email_not_verified`),
     ///   ``FeedbackClientError/forbidden(message:requestId:)`` for any other
     ///   HTTP 403 policy rejection,
-    ///   ``FeedbackClientError/rateLimited`` on HTTP 429,
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` on HTTP 429,
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` or
     ///   ``FeedbackClientError/invalidResponse``.
     public func subscribeToChangelog(

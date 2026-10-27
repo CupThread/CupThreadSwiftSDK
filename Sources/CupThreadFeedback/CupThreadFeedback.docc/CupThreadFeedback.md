@@ -44,13 +44,13 @@ Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionO
 
 ## Comments & @replies
 
-Comment creation is signed-in-only on the CupThread API — create the client with an ``FeedbackClient/init(configuration:session:authenticationProvider:)`` provider so signed-in users can contribute.
+Comment creation is signed-in-only on the CupThread API — create the client with an ``FeedbackClient/init(configuration:session:turnstileTokenProvider:authenticationProvider:userAttributesSigner:)`` provider so signed-in users can contribute.
 
 - ``FeatureRequestComment``: A public comment on a feature request.
 - ``ListCommentsResult``: One cursor-paged batch of comments. ``ListCommentsResult/total`` is the visible thread size, not the page length.
 - ``CommentDraft``: A new comment before submission.
 - ``CommentsView``: Flat comment thread with @author replies and a deliberate signed-out state. The thread loads every page.
-- ``FeedbackClient/fetchComments(featureRequestId:)``, ``FeedbackClient/fetchComments(featureRequestId:limit:cursor:)``, ``FeedbackClient/postComment(featureRequestId:draft:userToken:)``
+- ``FeedbackClient/fetchComments(featureRequestId:maxPages:)``, ``FeedbackClient/fetchComments(featureRequestId:limit:cursor:)``, ``FeedbackClient/postComment(featureRequestId:draft:userToken:)``
 
 ## User profiles
 
@@ -73,7 +73,7 @@ Comment creation is signed-in-only on the CupThread API — create the client wi
 - ``FeedbackClient/presentLatestChangelog(onlyIfUnseen:)``: Programmatic overlay presentation.
 - ``FeedbackClient/prepareChangelogOverlay(onlyIfUnseen:)``: Fetch overlay data without presenting.
 - ``FeedbackClient/hasSeenChangelog(version:)``, ``FeedbackClient/markChangelogSeen(version:)``, ``FeedbackClient/markChangelogSeen(id:versionLabel:)``
-- ``FeedbackClient/fetchChangelog()``, ``FeedbackClient/fetchChangelog(limit:cursor:)``, ``FeedbackClient/subscribeToChangelog(email:userToken:turnstileToken:)``, ``FeedbackClient/unsubscribeFromChangelog(token:)``
+- ``FeedbackClient/fetchChangelog(maxPages:)``, ``FeedbackClient/fetchChangelog(limit:cursor:)``, ``FeedbackClient/subscribeToChangelog(email:userToken:turnstileToken:)``, ``FeedbackClient/unsubscribeFromChangelog(token:)``
 - ``FeedbackClient/unsubscribeFromWeeklyDigest(token:)``: Complete the RFC 8058 one-click unsubscribe from a weekly digest email.
 
 ## Appearance & feature flags
@@ -98,7 +98,7 @@ Comment creation is signed-in-only on the CupThread API — create the client wi
 Public image assets (such as app icons and avatars) are delivered from `GET /api/v1/files/{key}`. Requests can include an optional documented thumbnail width hint, returning a WebP thumbnail or original image with a 5-minute cache lifetime:
 
 - ``PublicImageThumbnailWidth``: Supported square thumbnail width hints (`16`, `32`, `36`, `56`, `64`, `72`, `80`, `112`, `128`, or `160`).
-- ``publicImageThumbnailURL(for:width:)``: Construct or update a thumbnail URL with an optional width hint query parameter while preserving path and query string as opaque URLs, and original-image fallback.
+- ``publicImageThumbnailURL(for:width:)-(_,PublicImageThumbnailWidth?)`` (or with a raw ``publicImageThumbnailURL(for:width:)-(_,Int?)``): Construct or update a thumbnail URL with an optional width hint query parameter while preserving path and query string as opaque URLs, and original-image fallback.
 
 ## Agentic coding
 

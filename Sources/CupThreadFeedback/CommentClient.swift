@@ -68,7 +68,7 @@ extension FeedbackClient {
     ///   server's permission policy rejects the read (HTTP 403),
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
     ///   comments are not available or disabled (HTTP 404),
-    ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the shared per-client read
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor),
@@ -158,7 +158,7 @@ extension FeedbackClient {
     ///   ``FeedbackClientError/commentsUnavailable(message:requestId:)`` when
     ///   the server answers HTTP 404 with the documented JSON error envelope
     ///   (comments are not available or disabled on this request),
-    ///   ``FeedbackClientError/rateLimited`` when the shared per-client read
+    ///   ``FeedbackClientError/rateLimited(message:requestId:)`` when the shared per-client read
     ///   budget is exhausted (HTTP 429 — retryable after a short back-off),
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
     ///   (including `400` for a malformed cursor, and a 404 that arrives
