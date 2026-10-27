@@ -41,6 +41,11 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     public let columnSlug: String?
     /// Display name of the board column, when assigned.
     public let columnName: String?
+    /// Hex color of the board column, when assigned (issue #628). The board
+    /// columns endpoint does not publish colors, so this per-request value is
+    /// the only column tint the API serves; treat it as presentation hinting
+    /// from the console theme, not a stable contract.
+    public let columnColor: String?
     /// Id of the tagged version, when any.
     public let versionId: String?
     /// Display label of the tagged version, when any.
@@ -93,6 +98,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
     ///   - columnId: Id of the board column, if assigned.
     ///   - columnSlug: Slug of the board column, if assigned.
     ///   - columnName: Display name of the board column, if assigned.
+    ///   - columnColor: Hex color of the board column, if assigned.
     ///   - versionId: Id of the tagged version, if any.
     ///   - versionLabel: Label of the tagged version, if any.
     ///   - releasedVersion: Version the request shipped in, if released.
@@ -119,6 +125,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         columnId: String? = nil,
         columnSlug: String? = nil,
         columnName: String? = nil,
+        columnColor: String? = nil,
         versionId: String? = nil,
         versionLabel: String? = nil,
         releasedVersion: String? = nil,
@@ -144,6 +151,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.columnId = columnId
         self.columnSlug = columnSlug
         self.columnName = columnName
+        self.columnColor = columnColor
         self.versionId = versionId
         self.versionLabel = versionLabel
         self.releasedVersion = releasedVersion
@@ -172,6 +180,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
             columnId: columnId,
             columnSlug: columnSlug,
             columnName: columnName,
+            columnColor: columnColor,
             versionId: versionId,
             versionLabel: versionLabel,
             releasedVersion: releasedVersion,
@@ -200,6 +209,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
         self.columnId = try container.decodeIfPresent(String.self, forKey: .columnId)
         self.columnSlug = try container.decodeIfPresent(String.self, forKey: .columnSlug)
         self.columnName = try container.decodeIfPresent(String.self, forKey: .columnName)
+        self.columnColor = try container.decodeIfPresent(String.self, forKey: .columnColor)
         self.versionId = try container.decodeIfPresent(String.self, forKey: .versionId)
         self.versionLabel = try container.decodeIfPresent(String.self, forKey: .versionLabel)
         self.releasedVersion = try container.decodeIfPresent(String.self, forKey: .releasedVersion)
@@ -220,7 +230,7 @@ public struct FeatureRequestItem: Codable, Identifiable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, appId, title, description, status
-        case columnId, columnSlug, columnName, versionId, versionLabel
+        case columnId, columnSlug, columnName, columnColor, versionId, versionLabel
         case releasedVersion, requesterName, requesterAvatarUrl, requesterClerkId
         case recentCommenters, hasMoreCommenters, approved, voteCount, importedVotes
         case hasVoted, isOwnRequest, createdAt, updatedAt
