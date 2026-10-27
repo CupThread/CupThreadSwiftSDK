@@ -70,6 +70,68 @@ struct FeedbackMetadataSanitizerSuite {
         #expect(sanitized["ssn"] == "[redacted]")
     }
 
+    @Test func isCredentialKeyCoversEveryCredentialKeyWordFragment() {
+        // One representative key per regex fragment in `credentialKeyWords`,
+        // so every declared entry is a covered redaction contract instead of
+        // documentation: editing a fragment here exercises it in a named test.
+        let fragments: [(fragment: String, key: String)] = [
+            ("pass(word|wd)?", "passwd"),
+            ("secret", "sharedSecret"),
+            ("token", "refreshToken"),
+            ("api[-_ ]?key", "apiKey"),
+            ("access[-_ ]?key", "accessKey"),
+            ("client[-_ ]?secret", "clientsecret"),
+            ("credential", "userCredential"),
+            ("auth(orization)?", "authorization"),
+            ("cookie", "cookieConsent"),
+            ("session", "sessionId"),
+            ("bearer", "proxyBearer"),
+            ("private[-_ ]?key", "privateKey"),
+            ("sign(ature)?", "requestSignature"),
+            ("jwt", "jwtClaims"),
+            ("otp", "otpCode"),
+            ("ssn", "employeeSsn"),
+            ("credit[-_ ]?card", "creditCard"),
+            ("card[-_ ]?number", "cardNumber")
+        ]
+
+        for (fragment, key) in fragments {
+            #expect(
+                FeedbackMetadataSanitizer.isCredentialKey(key),
+                "Fragment '\(fragment)' should redact representative key '\(key)'"
+            )
+            let sanitized = FeedbackMetadataSanitizer.sanitize([key: "leaked"])
+            #expect(
+                sanitized[key] == FeedbackMetadataSanitizer.redactedValue,
+                "sanitize should redact '\(key)' (fragment '\(fragment)')"
+            )
+        }
+
+        // Pin: every declared fragment must keep a representative above, so a
+        // keyword added to `credentialKeyWords` without coverage fails here
+        // instead of silently weakening redaction.
+        #expect(
+            Set(FeedbackMetadataSanitizer.credentialKeyWords) == Set(fragments.map(\.fragment)),
+            "credentialKeyWords and the representative-key table have diverged"
+        )
+    }
+
+    @Test func credentialFragmentsRequireWordBoundaries() {
+        // Substring overlaps with no whole-word boundary are not credentials.
+        let negatives = [
+            "passengerName", // "pass" without a trailing boundary
+            "tokenize",      // "token" without a trailing boundary
+            "sessionless",   // "session" without a trailing boundary
+            "credentialize"  // "credential" without a trailing boundary
+        ]
+        for key in negatives {
+            #expect(
+                !FeedbackMetadataSanitizer.isCredentialKey(key),
+                "Key '\(key)' must not be redacted"
+            )
+        }
+    }
+
     @Test func evictionWithThirtyHostKeysPreservesReservedKeys() {
         var metadata: [String: String] = [:]
         for index in 0..<30 {

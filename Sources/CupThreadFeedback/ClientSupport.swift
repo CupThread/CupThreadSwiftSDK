@@ -341,6 +341,9 @@ enum FeedbackMetadataSanitizer {
     static let reservedKeyNames: Set<String> = ["sdk", "sdkVersion", "platform", "submittedAt"]
 
     /// Sensitive keyword patterns mirroring the server's PRIV-01 word list.
+    /// Single source of truth for credential-looking key detection:
+    /// `sensitiveKeyRegex` builds its pattern from this list, so editing an
+    /// entry here changes redaction behavior (and its tests) in one place.
     static let credentialKeyWords: [String] = [
         "pass(word|wd)?", "secret", "token", "api[-_ ]?key", "access[-_ ]?key",
         "client[-_ ]?secret", "credential", "auth(orization)?", "cookie",
@@ -353,14 +356,7 @@ enum FeedbackMetadataSanitizer {
     }()
 
     private static let sensitiveKeyRegex: NSRegularExpression = {
-        let sensitiveWords = [
-            "pass(word|wd)?", "secret", "token", "api[-_ ]?key",
-            "access[-_ ]?key", "client[-_ ]?secret", "credential",
-            "auth(orization)?", "cookie", "session", "bearer",
-            "private[-_ ]?key", "sign(ature)?", "jwt", "otp",
-            "ssn", "credit[-_ ]?card", "card[-_ ]?number"
-        ].joined(separator: "|")
-        let pattern = "(^|[^a-z0-9])(\(sensitiveWords))([^a-z0-9]|$)"
+        let pattern = "(^|[^a-z0-9])(\(credentialKeyWords.joined(separator: "|")))([^a-z0-9]|$)"
         return (try? NSRegularExpression(pattern: pattern)) ?? NSRegularExpression()
     }()
 
