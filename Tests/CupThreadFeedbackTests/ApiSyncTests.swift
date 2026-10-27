@@ -837,3 +837,165 @@ struct AvatarURLPolicySyncTests {
         #expect(AvatarView(url: httpsProfile.avatarUrl).resolvedURL == URL(string: "https://cdn.example.com/p.png"))
     }
 }
+
+// MARK: - API sync schema corrections (issue #628)
+
+/// Pins the response-schema corrections from the SaaS #1474 spec sync: the
+/// `FeatureRequest` component's per-request `columnColor`, the six-key
+/// `CreateUploadSessionResponse` body with its legacy flat mirrors and
+/// `uploads` intake-descriptor array, and the three success statuses of
+/// `POST /api/v1/feedback` (200 forwarded, 201 stored, 202 queued).
+@Suite("ApiSyncSchemaCorrections", .serialized)
+struct ApiSyncSchemaCorrectionsTests {
+    static let apiHost = "apisync-schema.example.com"
+
+    /// The fully served `FeatureRequest` body: every always-served key from
+    /// the corrected spec, including the seven documented fields this sync
+    /// added (`columnName` and `columnColor` among them).
+    static func makeFullyServedItemJSON(id: String) -> [String: Any] {
+        [
+            "id": id,
+            "appId": "app-1",
+            "title": "Request \(id)",
+            "description": "Desc",
+            "status": "in_progress",
+            "columnId": "col-2",
+            "columnSlug": "in_progress",
+            "columnName": "In Progress",
+            "columnColor": "#F59E0B",
+            "versionId": "ver-9",
+            "versionLabel": "2.1.0",
+            "releasedVersion": "2.1.0",
+            "requesterName": "Lex",
+            "requesterAvatarUrl": "https://cdn.example.com/lex.jpg",
+            "requesterClerkId": "u_ab12cd34ef567890abcdef1234567890",
+            "recentCommenters": [
+                ["authorName": "Ada", "clerkUserId": "u_cd12cd34ef567890abcdef1234567890", "avatarUrl": NSNull()]
+            ],
+            "hasMoreCommenters": false,
+            "approved": true,
+            "voteCount": 12,
+            "importedVotes": 4,
+            "commentCount": 3,
+            "hasVoted": true,
+            "isOwnRequest": true,
+            "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-02T00:00:00Z"
+        ]
+    }
+
+    @Test func featureRequestDecodesColumnColorFromFullyServedBody() throws {
+        let request = try JSONDecoder().decode(
+            FeatureRequestItem.self,
+            from: encodeJSON(Self.makeFullyServedItemJSON(id: "fr-1"))
+        )
+
+        #expect(request.columnColor == "#F59E0B")
+        #expect(request.columnName == "In Progress")
+        #expect(request.releasedVersion == "2.1.0")
+        #expect(request.approved == true)
+        #expect(request.isOwnRequest == true)
+        #expect(request.commentCount == 3)
+        #expect(request.updatedAt == "2026-01-02T00:00:00Z")
+    }
+
+    @Test func featureRequestDefaultsColumnColorToNilWhenAbsent() throws {
+        // Columns without a console-configured color serve `columnColor: null`
+        // or omit it entirely; either decodes to `nil`.
+        var json = Self.makeFullyServedItemJSON(id: "fr-2")
+        json["columnColor"] = NSNull()
+        let nullColor = try JSONDecoder().decode(FeatureRequestItem.self, from: encodeJSON(json))
+        #expect(nullColor.columnColor == nil)
+
+        var omitted = Self.makeFullyServedItemJSON(id: "fr-3")
+        omitted.removeValue(forKey: "columnColor")
+        let absentColor = try JSONDecoder().decode(FeatureRequestItem.self, from: encodeJSON(omitted))
+        #expect(absentColor.columnColor == nil)
+    }
+
+    @Test func featureRequestColumnColorSurvivesVoteStateUpdate() throws {
+        let item = try JSONDecoder().decode(
+            FeatureRequestItem.self,
+            from: encodeJSON(Self.makeFullyServedItemJSON(id: "fr-4"))
+        )
+        let updated = item.withVoteState(voted: false, count: 11)
+        #expect(updated.columnColor == "#F59E0B")
+        #expect(updated.hasVoted == false)
+        #expect(updated.voteCount == 11)
+    }
+
+    @Test func uploadSessionResponseDecodesWithLegacyMirrorKeysPresent() throws {
+        // The session endpoint always serves six top-level keys; the SDK
+        // consumes the canonical `session`/`files` pair and must tolerate the
+        // legacy `sessionId`/`sessionToken`/`expiresAt` mirrors plus the
+        // `uploads` array with its intake-descriptor item shape (issue #628).
+        let body: [String: Any] = [
+            "session": [
+                "sessionId": "us_123",
+                "sessionToken": "ust_abc123",
+                "expiresAt": "2026-10-27T18:00:00Z",
+                "maxFileSizeBytes": 5_242_880,
+                "maxFiles": 8
+            ],
+            "files": [
+                [
+                    "clientFileId": "f-1",
+                    "uploadId": "upl_1",
+                    "uploadUrl": "/api/v1/uploads/upl_1",
+                    "maxSizeBytes": 5_242_880
+                ]
+            ],
+            "sessionId": "us_123",
+            "sessionToken": "ust_abc123",
+            "expiresAt": "2026-10-27T18:00:00Z",
+            "uploads": [
+                [
+                    "clientFileId": "f-1",
+                    "uploadId": "upl_1",
+                    "uploadUrl": "/api/v1/uploads/upl_1",
+                    "filename": "screenshot.png",
+                    "mimeType": "image/png",
+                    "maxBytes": 5_242_880
+                ]
+            ]
+        ]
+
+        let session = try JSONDecoder().decode(FeedbackUploadSession.self, from: encodeJSON(body))
+
+        #expect(session.session.sessionId == "us_123")
+        #expect(session.session.sessionToken == "ust_abc123")
+        #expect(session.session.expiresAt == "2026-10-27T18:00:00Z")
+        #expect(session.files.count == 1)
+        #expect(session.files[0].uploadId == "upl_1")
+        #expect(session.files[0].clientFileId == "f-1")
+        #expect(session.effectiveMaxSizeBytes() == 5_242_880)
+    }
+
+    /// The `201` (stored, no GitHub delivery) and `202` (stored, delivery
+    /// queued) success statuses carry the same receipt body as the forwarded
+    /// `200`, with the advisory `warning` always present on the stored paths.
+    @Test(arguments: [201, 202])
+    func submitAcceptsStoredAndQueuedSuccessStatuses(status: Int) async throws {
+        MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
+            (
+                makeHTTPResponse(status: status),
+                try encodeJSON([
+                    "submissionId": "sub-\(status)",
+                    "forwardedToGithub": false,
+                    "warning": "Stored in the CupThread inbox; delivery is pending.",
+                    "warningCode": "github_delivery_pending"
+                ])
+            )
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(Self.apiHost)")!)
+        let result = try await client.submit(
+            FeedbackDraft(title: "Title", description: "Description", platform: .ios)
+        )
+
+        #expect(result.submissionId == "sub-\(status)")
+        #expect(result.forwardedToGithub == false)
+        #expect(result.warning != nil)
+        #expect(result.warningCode == "github_delivery_pending")
+    }
+}
