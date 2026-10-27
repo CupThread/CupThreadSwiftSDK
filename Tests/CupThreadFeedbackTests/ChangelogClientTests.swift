@@ -161,14 +161,19 @@ struct ChangelogClientTests {
         #expect(result.subscribed == true)
     }
 
-    @Test func subscribeThrowsOnValidationError() async throws {
+    @Test func subscribeSurfacesAServerAnswered400AsUnexpectedStatus() async throws {
+        // A plausible address passes the local shape gate (#419) and rides
+        // the wire; a server-answered validation failure still surfaces as
+        // the genuine `.unexpectedStatus` through `validateResponse` —
+        // distinguishable from the typed local `.invalidInput` that the
+        // local gate throws for an implausible address (#620).
         MockURLProtocol.setHandler(forHost: Self.apiHost) { _ in
             (makeHTTPResponse(status: 400), try encodeJSON(["error": "Invalid email"]))
         }
 
         do {
             _ = try await Self.makeChangelogClient().subscribeToChangelog(
-                email: "not-an-email",
+                email: "user@example.com",
                 userToken: UUID().uuidString
             )
             Issue.record("Expected error to be thrown")
