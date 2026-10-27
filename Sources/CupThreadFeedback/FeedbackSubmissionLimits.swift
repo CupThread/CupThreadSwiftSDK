@@ -19,7 +19,9 @@ public enum FeedbackSubmissionLimits: Sendable {
     /// `uploadId`s actually forwarded: a ``FeedbackAttachment`` whose
     /// ``FeedbackAttachment/uploadId`` is `nil` (a legacy reference) never
     /// reaches the wire and does not count. The SDK's own composer stops
-    /// offering the picker well below this bound; the cap matters for hosts
+    /// offering the picker at exactly this bound, counted on the same figure
+    /// (`FeedbackSubmissionLimits/referencedUploadCount(in:)`, issue #633);
+    /// the cap matters for hosts
     /// that build their own attachment UI on the one-shot upload helpers,
     /// each of which creates its own session and so never sees the aggregate.
     public static let maxAttachmentCount = 8
