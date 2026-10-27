@@ -5,18 +5,21 @@ import Foundation
 /// The error envelope shared by every public endpoint:
 /// `{"error": "...", "code": "..."}` (`code` is optional and machine-readable).
 /// Endpoints that validate individual fields may additionally carry a
-/// `details` block with a flattened field-error map, e.g.
-/// `{"error": "Validation failed", "details": {"fieldErrors": {"plan": ["plan_reserved_sentinel"]}}}`.
+/// `details` block — the zod `flatten()` output, e.g.
+/// `{"error": "Validation failed", "details": {"formErrors": [], "fieldErrors": {"appKey": ["Required"]}}}`.
 struct APIErrorEnvelope: Decodable, Sendable {
     let error: String?
     let code: String?
     let details: FieldErrorDetails?
 }
 
-/// The optional `details` block of a failure envelope: a flattened
-/// field-error map keyed by field name, each value a list of issue messages
-/// (issue #403). Absent on most failure envelopes.
+/// The optional `details` block of a failure envelope (issue #629): the zod
+/// `flatten()` output the corrected spec documents on `ErrorResponse` —
+/// `formErrors` for object-level failures plus the flattened `fieldErrors`
+/// map (issue #403). Served only when `error` is `"Validation failed"`;
+/// either member may be omitted on the wire, so both stay optional.
 struct FieldErrorDetails: Decodable, Sendable {
+    let formErrors: [String]?
     let fieldErrors: [String: [String]]?
 }
 
