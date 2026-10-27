@@ -147,4 +147,36 @@ struct VoteShipNotifyEmailTests {
         #expect(result.voteCount == 1)
         #expect(result.warning?.isEmailNotVerified == true)
     }
+
+    @Test func toggleVoteSurfacesShipNotifyVerificationFailedWarning() async throws {
+        // Issue #626: an anonymous opt-in whose Turnstile verification the
+        // server found missing or rejected still records the vote but answers
+        // with the ship_notify_verification_failed warning — no consent row,
+        // no confirmation email.
+        MockURLProtocol.setHandler(forHost: Self.host) { _ in
+            (
+                makeHTTPResponse(status: 200),
+                try encodeJSON([
+                    "voted": true,
+                    "voteCount": 3,
+                    "warning": [
+                        "code": "ship_notify_verification_failed",
+                        "error": "Human verification failed, so the ship-notification opt-in "
+                            + "was not recorded. Complete the verification and try again."
+                    ]
+                ])
+            )
+        }
+        defer { MockURLProtocol.setHandler(forHost: Self.host, nil) }
+
+        let result = try await Self.makeAPIClient().toggleVote(
+            featureRequestId: "fr-1",
+            userToken: "3f2c9a1e-7b4d-4c8a-9e2f-1a2b3c4d5e6f",
+            shipNotifyEmail: "anon@example.com"
+        )
+        #expect(result.voted == true)
+        #expect(result.voteCount == 3)
+        #expect(result.warning?.isShipNotifyVerificationFailed == true)
+        #expect(result.warning?.isEmailNotVerified == false)
+    }
 }

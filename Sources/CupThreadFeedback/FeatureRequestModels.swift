@@ -273,16 +273,28 @@ public struct FeatureRequestSubmissionResult: Codable, Equatable, Sendable {
 /// response (`VoteResponse.warning` in the public API schema).
 ///
 /// A warning never means the vote failed — it is returned with HTTP 200 and
-/// the vote is recorded. The server currently emits `email_not_verified`
-/// (``VoteWarning/isEmailNotVerified``) on boards that require signed-in
-/// voting when the requested ship-notification email is not one of the
-/// signed-in session's verified addresses; in that case no notification
-/// consent is stored. Codes are plain strings so future server-side codes
+/// the vote is recorded. The server currently emits two codes:
+///
+/// - `email_not_verified` (``VoteWarning/isEmailNotVerified``) on boards
+///   that require signed-in voting when the requested ship-notification
+///   email is not one of the signed-in session's verified addresses.
+/// - `ship_notify_verification_failed`
+///   (``VoteWarning/isShipNotifyVerificationFailed``) when an anonymous
+///   vote carries a `shipNotifyEmail` but the request's human verification
+///   (Cloudflare Turnstile) was missing or rejected.
+///
+/// In both cases no ship-notification consent is stored and no confirmation
+/// email is sent. Codes are plain strings so future server-side codes
 /// decode unchanged and keep their message for diagnostics.
 public struct VoteWarning: Decodable, Equatable, Sendable {
     /// The code the server emits when a requested ship-notification email is
     /// not bound to the signed-in session.
     public static let emailNotVerifiedCode = "email_not_verified"
+    /// The code the server emits when an anonymous vote's requested
+    /// ship-notification opt-in fails its human-verification (Turnstile)
+    /// gate: the vote is recorded, but no consent row is stored and no
+    /// confirmation email is sent (issue #626).
+    public static let shipNotifyVerificationFailedCode = "ship_notify_verification_failed"
 
     /// Machine-readable warning code (e.g. `email_not_verified`). Branch on
     /// this rather than on ``message``.
@@ -297,6 +309,15 @@ public struct VoteWarning: Decodable, Equatable, Sendable {
     /// but the requested ship-notification email was rejected, so no
     /// notification consent was stored.
     public var isEmailNotVerified: Bool { code == Self.emailNotVerifiedCode }
+
+    /// Whether this is the `ship_notify_verification_failed` warning: the
+    /// vote was saved, but the requested ship-notification opt-in failed its
+    /// human-verification gate, so no notification consent was stored (issue
+    /// #626). This is "opt-in refused (verification)" — distinct from a
+    /// failed vote, which a warning never signals.
+    public var isShipNotifyVerificationFailed: Bool {
+        code == Self.shipNotifyVerificationFailedCode
+    }
 
     /// Creates a vote warning.
     /// - Parameters:
@@ -331,14 +352,17 @@ public struct VoteResult: Decodable, Equatable, Sendable {
     /// Non-fatal warning from the server, when present.
     ///
     /// The vote itself always succeeds when one is attached. The server emits
-    /// a warning on boards that require signed-in voting when a
-    /// `shipNotifyEmail` was sent that is not one of the signed-in session's
-    /// verified addresses. Built-in ``FeatureRequestsView`` flows never send
-    /// that field, so they never receive one; the field is decoded for
-    /// callers that opt in via
+    /// a warning when a `shipNotifyEmail` opt-in could not be recorded: on
+    /// boards that require signed-in voting, when the address is not one of
+    /// the signed-in session's verified addresses
+    /// (``VoteWarning/isEmailNotVerified``), or on an anonymous vote whose
+    /// human verification was missing or rejected
+    /// (``VoteWarning/isShipNotifyVerificationFailed``). Built-in
+    /// ``FeatureRequestsView`` flows never send that field, so they never
+    /// receive one; the field is decoded for callers that opt in via
     /// ``FeedbackClient/castVote(featureRequestId:userToken:shipNotifyEmail:turnstileToken:)``
     /// or that post votes through their own transport. Branch on
-    /// ``VoteWarning/code`` (see ``VoteWarning/isEmailNotVerified``).
+    /// ``VoteWarning/code`` (see the per-code predicates).
     public let warning: VoteWarning?
 
     /// Creates a vote result.

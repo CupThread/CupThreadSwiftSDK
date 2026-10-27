@@ -250,6 +250,34 @@ struct FeatureRequestPagingTests {
         )
     }
 
+    @Test func voteResultDecodesShipNotifyVerificationFailedWarning() throws {
+        // Issue #626: an anonymous vote carrying a shipNotifyEmail whose
+        // human verification was missing or rejected answers HTTP 200 with
+        // the vote recorded and a warning signaling that the opt-in was
+        // NOT recorded — "opt-in refused (verification)", not a failed vote.
+        let json = Data("""
+        {
+            "voted": true,
+            "voteCount": 3,
+            "warning": {
+                "code": "ship_notify_verification_failed",
+                "error": "Human verification failed; opt-in not recorded. Complete the verification and try again."
+            }
+        }
+        """.utf8)
+
+        let result = try JSONDecoder().decode(VoteResult.self, from: json)
+        #expect(result.voted == true)
+        #expect(result.voteCount == 3)
+        #expect(result.warning?.code == VoteWarning.shipNotifyVerificationFailedCode)
+        #expect(result.warning?.isShipNotifyVerificationFailed == true)
+        #expect(result.warning?.isEmailNotVerified == false)
+        #expect(
+            result.warning?.message
+                == "Human verification failed; opt-in not recorded. Complete the verification and try again."
+        )
+    }
+
     @Test func voteResultWithoutWarningDecodesAsNil() throws {
         // The warning is additive: anonymous boards and omitted
         // shipNotifyEmail never emit one, so those payloads must keep
@@ -278,6 +306,7 @@ struct FeatureRequestPagingTests {
         let result = try JSONDecoder().decode(VoteResult.self, from: json)
         #expect(result.warning?.code == "future_warning_code")
         #expect(result.warning?.isEmailNotVerified == false)
+        #expect(result.warning?.isShipNotifyVerificationFailed == false)
         #expect(result.warning?.message == "Something new")
     }
 
