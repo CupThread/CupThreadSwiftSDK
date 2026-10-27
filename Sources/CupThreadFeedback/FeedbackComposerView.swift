@@ -317,7 +317,7 @@ public struct FeedbackComposerView: View {
             #if canImport(PhotosUI) && !os(tvOS)
             if attachmentState.isUploading {
                 uploadingAttachmentRow
-            } else if draft.attachments.count < 5 {
+            } else if showsPhotoPicker {
                 PhotosPicker(
                     selection: photoSelectionBinding,
                     matching: .images,
@@ -347,6 +347,17 @@ public struct FeedbackComposerView: View {
     }
 
     #if canImport(PhotosUI) && !os(tvOS)
+    /// Whether the composer still offers another photo: the same comparison
+    /// ``FeedbackAttachmentStateMachine/canSubmit(draft:)`` makes, so the
+    /// picker stops exactly at the bound the wire cap counts
+    /// (`referencedUploadCount`, issue #633) instead of a bare literal.
+    /// A legacy reference without an `uploadId` costs no slot the submission
+    /// would never charge, and the form offers exactly the headroom the rest
+    /// of the pipeline documents.
+    private var showsPhotoPicker: Bool {
+        FeedbackSubmissionLimits.referencedUploadCount(in: draft) < FeedbackSubmissionLimits.maxAttachmentCount
+    }
+
     /// Drives the photo selection through the coordinator: a fresh pick
     /// starts its upload attempt, a picker-reported deselection only clears,
     /// and the coordinator clears the selection after every terminal upload
