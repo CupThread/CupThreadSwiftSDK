@@ -209,12 +209,15 @@ extension FeedbackClient {
     /// binding is the only one its opt-in challenge accepts on boards
     /// without anonymous-vote Turnstile.
     ///
-    /// On boards that require signed-in voting, the server accepts a
-    /// `shipNotifyEmail` only when it is one of the signed-in session's
-    /// verified addresses; a mismatched address still records the vote but
-    /// answers with a ``VoteResult/warning``
-    /// (``VoteWarning/isEmailNotVerified``) and stores no ship-notification
-    /// consent. The built-in ``FeatureRequestsView`` flow never sends the
+    /// When an opt-in cannot be recorded, the server still records the vote
+    /// and answers with a ``VoteResult/warning``: on boards that require
+    /// signed-in voting, a `shipNotifyEmail` that is not one of the
+    /// signed-in session's verified addresses answers
+    /// ``VoteWarning/isEmailNotVerified`` (issue #293), and an anonymous
+    /// opt-in whose human verification was missing or rejected answers
+    /// ``VoteWarning/isShipNotifyVerificationFailed`` (issue #626) — in
+    /// both cases no ship-notification consent is stored. The built-in
+    /// ``FeatureRequestsView`` flow never sends the
     /// field, so it never receives a warning; the warning is decoded for
     /// callers that opt in through this method or post votes through their
     /// own transport.
