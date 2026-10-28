@@ -212,7 +212,7 @@
 "cupthread.error.email_invalid" = "Please enter a valid email address.";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "Too many attachments: a submission can include up to 8 files. Remove some attachments and try again.";
-"cupthread.error.invalid_input" = "The provided details can't be accepted. Please check them and try again.";
+"cupthread.error.invalid_input" = "The provided input is invalid. Please check and try again.";
 /* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
 "cupthread.error.invalid_identity_token" = "The user token must be a UUID string. Update the app's identity configuration and try again.";
 /* Issue #257: duplicate attachment finalization — already submitted */
@@ -220,7 +220,7 @@
 
 /* Issue #266: typed error & attachment-validation copy — every errorDescription resolves through the catalog */
 "cupthread.error.invalid_response" = "The feedback server returned an invalid response.";
-"cupthread.error.unreadable_upload_response" = "The feedback server returned an unreadable upload response.";
+"cupthread.error.unreadable_upload_response" = "The server upload response was invalid. Please try again.";
 "cupthread.error.invalid_configuration" = "The app configuration is invalid. Check the app key and try again.";
 "cupthread.error.auth_required" = "This action is only available to signed-in users.";
 "cupthread.error.scan_rejected" = "The referenced attachment could not be uploaded due to content inspection rejection.";

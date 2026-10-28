@@ -33,7 +33,7 @@
 "cupthread.features.version_retry" = "重新加载版本列表";
 "cupthread.features.request_a_feature" = "提出新需求";
 "cupthread.features.request_a_feature_hint" = "打开需求建议提交面板";
-"cupthread.features.view_comments_hint" = "打开此功能请求的评论区和详情。";
+"cupthread.features.view_comments_hint" = "打开此需求的评论区和详情。";
 "cupthread.features.empty_title" = "暂无需求建议";
 "cupthread.features.empty_description" = "其他用户的建议与想法将显示在此处。";
 "cupthread.features.empty_with_query" = "未找到与“%@”相关的结果。";
@@ -98,9 +98,9 @@
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "投票太频繁了，请一分钟后再试。";
 "cupthread.features.vote_failed" = "投票没有成功，请检查网络后重试。";
-"cupthread.features.vote_request_unavailable" = "该功能请求已不存在。";
+"cupthread.features.vote_request_unavailable" = "该需求已不存在。";
 "cupthread.features.load_more" = "加载更多";
-"cupthread.features.load_more_hint" = "显示下一页功能请求。";
+"cupthread.features.load_more_hint" = "显示下一页需求。";
 
 /* Accidental-dismissal guard for compose surfaces (issue #46) */
 "cupthread.common.cancel" = "取消";
@@ -196,7 +196,7 @@
 "cupthread.permission.roadmap_title" = "无法打开路线图";
 "cupthread.permission.roadmap_description" = "CupThread 控制台已关闭匿名路线图访问。";
 "cupthread.permission.requests_title" = "无法提交需求";
-"cupthread.permission.requests_description" = "CupThread 控制台已关闭匿名功能请求。";
+"cupthread.permission.requests_description" = "CupThread 控制台已关闭匿名需求提交。";
 "cupthread.permission.changelog_title" = "无法查看更新日志";
 "cupthread.permission.changelog_description" = "CupThread 控制台已关闭匿名更新日志访问。";
 "cupthread.error.forbidden" = "此应用当前不允许该操作。";
@@ -212,7 +212,7 @@
 "cupthread.error.email_invalid" = "请输入有效的电子邮件地址。";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "附件过多：一次提交最多可包含 8 个文件。请移除部分附件后重试。";
-"cupthread.error.invalid_input" = "所提供的内容无法被接受，请检查后再试。";
+"cupthread.error.invalid_input" = "输入的内容无效，请检查后再试。";
 /* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
 "cupthread.error.invalid_identity_token" = "用户令牌必须是 UUID 字符串，请更新应用的身份配置后再试。";
 
@@ -221,7 +221,7 @@
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "反馈服务器返回了无效的响应。";
-"cupthread.error.unreadable_upload_response" = "反馈服务器返回了无法解读的上传响应。";
+"cupthread.error.unreadable_upload_response" = "服务器上传响应异常，请重试。";
 "cupthread.error.invalid_configuration" = "应用配置无效，请检查 App Key 后重试。";
 "cupthread.error.auth_required" = "此操作仅限已登录用户使用。";
 "cupthread.error.scan_rejected" = "引用的附件未通过内容安全检查，无法上传。";
@@ -232,7 +232,7 @@
 "cupthread.error.quota_exceeded" = "此应用已达本月提交上限，请稍后再试。";
 "cupthread.error.subscription_inactive" = "此应用当前无法提交内容，请稍后再试。";
 "cupthread.error.profile_not_found" = "该用户资料已不存在。";
-"cupthread.error.comments_unavailable" = "此功能请求暂不支持评论。";
+"cupthread.error.comments_unavailable" = "此需求暂不支持评论。";
 "cupthread.error.email_not_verified" = "请使用已登录账号的邮箱地址进行订阅。";
 "cupthread.attachment.oversized" = "附件（%1$@）超出了允许的最大大小 %2$@。";
 "cupthread.attachment.unprocessable" = "所选照片无法处理，无法上传。";
