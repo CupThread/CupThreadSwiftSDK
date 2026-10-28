@@ -70,7 +70,7 @@ Every framework slice in the XCFramework embeds a `PrivacyInfo.xcprivacy` manife
 
 ### Optional: AI Agent Skill
 
-If you use agentic coding assistants in your workflow, you can add the CupThread Swift skill via [`npx skills`](https://github.com/skills-directory/skills):
+If you use agentic coding assistants in your workflow, you can add the CupThread Swift skill via [`npx skills`](https://www.skills.sh):
 
 ```sh
 npx skills add CupThread/CupThreadAgenticCoding --skill cupthread-swift-sdk
