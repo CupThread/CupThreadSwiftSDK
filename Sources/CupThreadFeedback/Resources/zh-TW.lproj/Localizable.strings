@@ -33,7 +33,7 @@
 "cupthread.features.version_retry" = "重新載入版本列表";
 "cupthread.features.request_a_feature" = "提出新建議";
 "cupthread.features.request_a_feature_hint" = "開啟功能建議提交面板";
-"cupthread.features.view_comments_hint" = "開啟此功能請求的留言區與詳細內容。";
+"cupthread.features.view_comments_hint" = "開啟此需求的留言區與詳細內容。";
 "cupthread.features.empty_title" = "尚無功能建議";
 "cupthread.features.empty_description" = "其他使用者的建議與想法將顯示在此處。";
 "cupthread.features.empty_with_query" = "未找到與「%@」相關的結果。";
@@ -98,9 +98,9 @@
 /* September API sync: vote rate limiting + cursor paging */
 "cupthread.features.vote_rate_limited" = "投票太頻繁了，請一分鐘後再試。";
 "cupthread.features.vote_failed" = "投票沒有成功，請檢查網路後再試。";
-"cupthread.features.vote_request_unavailable" = "該功能請求已不存在。";
+"cupthread.features.vote_request_unavailable" = "該需求已不存在。";
 "cupthread.features.load_more" = "載入更多";
-"cupthread.features.load_more_hint" = "顯示下一頁功能請求。";
+"cupthread.features.load_more_hint" = "顯示下一頁需求。";
 
 /* Accidental-dismissal guard for compose surfaces (issue #46) */
 "cupthread.common.cancel" = "取消";
@@ -196,7 +196,7 @@
 "cupthread.permission.roadmap_title" = "無法開啟路線圖";
 "cupthread.permission.roadmap_description" = "CupThread 主控台已關閉匿名路線圖存取。";
 "cupthread.permission.requests_title" = "無法提交需求";
-"cupthread.permission.requests_description" = "CupThread 主控台已關閉匿名功能請求。";
+"cupthread.permission.requests_description" = "CupThread 主控台已關閉匿名需求提交。";
 "cupthread.permission.changelog_title" = "無法查看更新日誌";
 "cupthread.permission.changelog_description" = "CupThread 主控台已關閉匿名更新日誌存取。";
 "cupthread.error.forbidden" = "此應用目前不允許該操作。";
@@ -212,7 +212,7 @@
 "cupthread.error.email_invalid" = "請輸入有效的電子郵件地址。";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "附件過多：一次提交最多可包含 8 個檔案，請移除部分附件後再試一次。";
-"cupthread.error.invalid_input" = "您提供的內容無法被接受，請檢查後再試一次。";
+"cupthread.error.invalid_input" = "輸入的內容無效，請檢查後再試一次。";
 /* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
 "cupthread.error.invalid_identity_token" = "您使用的權杖必須是 UUID 字串，請更新應用程式的身分設定後再試一次。";
 
@@ -221,7 +221,7 @@
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "回饋伺服器傳回了無效的回應。";
-"cupthread.error.unreadable_upload_response" = "回饋伺服器傳回了無法解讀的上傳回應。";
+"cupthread.error.unreadable_upload_response" = "伺服器上傳回應異常，請重試。";
 "cupthread.error.invalid_configuration" = "應用程式設定無效，請檢查 App Key 後再試一次。";
 "cupthread.error.auth_required" = "此操作僅限已登入使用者使用。";
 "cupthread.error.scan_rejected" = "所引用的附件未通過內容安全檢查，無法上傳。";
@@ -232,7 +232,7 @@
 "cupthread.error.quota_exceeded" = "此應用程式已達本月提交上限，請稍後再試。";
 "cupthread.error.subscription_inactive" = "此應用程式目前無法提交內容，請稍後再試。";
 "cupthread.error.profile_not_found" = "該使用者的個人檔案已不存在。";
-"cupthread.error.comments_unavailable" = "此功能請求暫不支援留言。";
+"cupthread.error.comments_unavailable" = "此需求暫不支援留言。";
 "cupthread.error.email_not_verified" = "請使用您登入帳號的電子郵件地址訂閱。";
 "cupthread.attachment.oversized" = "附件（%1$@）超過了允許的大小上限 %2$@。";
 "cupthread.attachment.unprocessable" = "所選照片無法處理，無法上傳。";

@@ -212,7 +212,7 @@
 "cupthread.error.email_invalid" = "Vennligst oppgi en gyldig e-postadresse.";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "For mange vedlegg: en innsending kan inneholde opptil 8 filer. Fjern noen vedlegg og prøv igjen.";
-"cupthread.error.invalid_input" = "De oppgitte detaljene kan ikke godtas. Kontroller dem og prøv igjen.";
+"cupthread.error.invalid_input" = "De oppgitte opplysningene er ugyldige. Kontroller og prøv igjen.";
 /* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
 "cupthread.error.invalid_identity_token" = "Brukertokenet må være en UUID-streng. Oppdater appens identitetskonfigurasjon og prøv igjen.";
 
@@ -221,7 +221,7 @@
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Tilbakemeldingsserveren returnerte et ugyldig svar.";
-"cupthread.error.unreadable_upload_response" = "Tilbakemeldingsserveren returnerte et uleselig opplastingssvar.";
+"cupthread.error.unreadable_upload_response" = "Serverens opplastingssvar er ugyldig. Prøv igjen.";
 "cupthread.error.invalid_configuration" = "Appkonfigurasjonen er ugyldig. Kontroller appnøkkelen og prøv igjen.";
 "cupthread.error.auth_required" = "Denne handlingen er bare tilgjengelig for innloggede brukere.";
 "cupthread.error.scan_rejected" = "Vedlegget det vises til ble avvist ved innholdskontroll og kunne ikke lastes opp.";

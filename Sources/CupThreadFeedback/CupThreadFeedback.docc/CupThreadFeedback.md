@@ -2,7 +2,7 @@
 
 Native SwiftUI surfaces for feedback, feature requests, roadmaps, and changelogs — powered by [CupThread.com](https://cupthread.com).
 
-Add one client, drop in a view, and your Apple apps (iOS 17+, macOS 14+, visionOS 1+, tvOS 17+) get a production-ready feedback loop: structured feedback with attachments, votable feature requests, a kanban roadmap, and a "What's New" changelog — all themed and feature-gated from the CupThread developer console without shipping a new app version.
+A complete client and ready-made views provide a feedback loop for Apple apps (iOS 17+, macOS 14+, visionOS 1+, tvOS 17+): structured feedback with attachments, votable feature requests, a kanban roadmap, and a "What's New" changelog — themed and feature-gated from the CupThread developer console without shipping a new app version.
 
 ## Essentials
 

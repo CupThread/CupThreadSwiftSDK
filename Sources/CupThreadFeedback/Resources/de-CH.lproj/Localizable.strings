@@ -212,7 +212,7 @@
 "cupthread.error.email_invalid" = "Bitte geben Sie eine gültige E-Mail-Adresse ein.";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "Zu viele Anhänge: Eine Einsendung kann bis zu 8 Dateien enthalten. Bitte entfernen Sie einige Anhänge und versuchen Sie es erneut.";
-"cupthread.error.invalid_input" = "Diese Angaben können nicht akzeptiert werden. Bitte prüfen Sie sie und versuchen Sie es erneut.";
+"cupthread.error.invalid_input" = "Die Eingabe ist ungültig. Bitte prüfen und erneut versuchen.";
 /* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
 "cupthread.error.invalid_identity_token" = "Der Benutzer-Token muss eine UUID-Zeichenkette sein. Aktualisieren Sie die Identitätskonfiguration der App und versuchen Sie es erneut.";
 
@@ -221,7 +221,7 @@
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "Der Feedback-Server hat eine ungültige Antwort zurückgegeben.";
-"cupthread.error.unreadable_upload_response" = "Der Feedback-Server hat eine unlesbare Upload-Antwort zurückgegeben.";
+"cupthread.error.unreadable_upload_response" = "Die Upload-Antwort des Servers ist ungültig. Bitte erneut versuchen.";
 "cupthread.error.invalid_configuration" = "Die App-Konfiguration ist ungültig. Überprüfe den App-Key und versuche es erneut.";
 "cupthread.error.auth_required" = "Diese Aktion ist nur für angemeldete Benutzer verfügbar.";
 "cupthread.error.scan_rejected" = "Der referenzierte Anhang wurde bei der Inhaltsprüfung abgelehnt und konnte nicht hochgeladen werden.";

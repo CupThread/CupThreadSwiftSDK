@@ -35,7 +35,7 @@ struct MyApp: App {
 
 ``CupThreadTheme`` automatically fetches your remote ``SdkAppearance`` and applies the console-selected accent color (as the SwiftUI `tint`) and color-scheme preference to everything inside, and publishes the full configuration to the SwiftUI environment for SDK views to consult.
 
-The fetched configuration is resilient and frugal by design:
+The fetched configuration is resilient and efficient by design:
 
 - Every successful fetch is persisted per app key.
 - If a later fetch fails, the last successful configuration stays in force — theme, feature flags, and overlay copy never roll back to defaults mid-outage.

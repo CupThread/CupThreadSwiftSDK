@@ -212,7 +212,7 @@
 "cupthread.error.email_invalid" = "有効なメールアドレスを入力してください。";
 /* Issue #613: a submission may reference at most 8 attachment uploads — refused locally before a Turnstile token is spent */
 "cupthread.error.too_many_attachments" = "添付ファイルが多すぎます。1 回の送信に含められるファイルは最大 8 件です。添付ファイルをいくつか削除してから、もう一度お試しください。";
-"cupthread.error.invalid_input" = "入力内容を受け付けられません。内容を確認してもう一度お試しください。";
+"cupthread.error.invalid_input" = "入力内容が無効です。確認してもう一度お試しください。";
 /* Issue #617: the uuid-typed paths (proposals, votes, upload sessions) reject a non-UUID identity token locally */
 "cupthread.error.invalid_identity_token" = "ユーザートークンはUUID文字列である必要があります。アプリの識別子設定を更新してもう一度お試しください。";
 
@@ -221,7 +221,7 @@
 
 /* Issue #266: typed error & attachment-validation copy */
 "cupthread.error.invalid_response" = "フィードバックサーバーが無効な応答を返しました。";
-"cupthread.error.unreadable_upload_response" = "フィードバックサーバーが判読できないアップロード応答を返しました。";
+"cupthread.error.unreadable_upload_response" = "サーバーからのアップロード応答が不正です。もう一度お試しください。";
 "cupthread.error.invalid_configuration" = "アプリの設定が無効です。アプリキーを確認してもう一度お試しください。";
 "cupthread.error.auth_required" = "この操作はサインイン済みのユーザーのみ利用できます。";
 "cupthread.error.scan_rejected" = "参照された添付ファイルはコンテンツ検査で拒否されたため、アップロードできませんでした。";

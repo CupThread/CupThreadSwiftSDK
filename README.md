@@ -4,22 +4,6 @@ SwiftUI-based SDK for Apple platforms: **iOS 17+, macOS 14+, visionOS 1.0+, tvOS
 
 Part of the [CupThread.com](https://cupthread.com) platform.
 
-## 🤖 Recommended: Install via AI Agent (Agentic Coding)
-
-Instead of manually editing `Package.swift` and wiring views by hand, install the official **CupThread Swift AI Skill** into your workspace with [`npx skills`](https://github.com/skills-directory/skills) and let your AI assistant (Claude Code, Cursor, Copilot, Xcode, Windsurf, Codex, Antigravity) integrate and customize it for you:
-
-```sh
-npx skills add CupThread/CupThreadAgenticCoding --skill cupthread-swift-sdk
-```
-
-Once installed, simply copy and paste this prompt to your AI coding agent:
-
-```text
-Integrate the CupThread SwiftUI SDK (roadmap board, changelog overlay, and feedback composer) into this app. Scaffold a dedicated configuration helper with a placeholder for the App Key, and at the end, remind me with step-by-step instructions on how to set my App Key safely (e.g. via xcconfig or local config).
-```
-
----
-
 ## CupThread Ecosystem
 - 🌐 [CupThread.com](https://cupthread.com) — Feedback SaaS platform, developer console, and API.
 - 🍏 [CupThread/CupThreadSwiftSDK](https://github.com/CupThread/CupThreadSwiftSDK) — Apple platform SDK (SwiftUI / SPM / XCFramework).
@@ -44,7 +28,7 @@ Integrate the CupThread SwiftUI SDK (roadmap board, changelog overlay, and feedb
 
 ---
 
-## Manual Installation
+## Installation
 
 ### Swift Package Manager (Recommended)
 
@@ -83,6 +67,14 @@ targets: [
 Or download the zip directly from [Releases](https://github.com/CupThread/CupThreadSwiftSDK/releases), drag `CupThreadFeedback.xcframework` into your Xcode target's *Frameworks, Libraries, and Embedded Content* ("Do Not Embed" is correct — the framework links statically), and also add the bundled `CupThreadFeedback_CupThreadFeedback.bundle` to your target's *Copy Bundle Resources*. Static libraries cannot carry resources, so the localized-strings bundle ships next to the framework inside the zip; without it the first localized string lookup crashes. See the zip's `INSTALL.md`.
 
 Every framework slice in the XCFramework embeds a `PrivacyInfo.xcprivacy` manifest at its bundle root; Xcode 15+ aggregates it into your app during the build, so no manual privacy declarations are needed for the binary channel either.
+
+### Optional: AI Agent Skill
+
+If you use agentic coding assistants in your workflow, you can add the CupThread Swift skill via [`npx skills`](https://github.com/skills-directory/skills):
+
+```sh
+npx skills add CupThread/CupThreadAgenticCoding --skill cupthread-swift-sdk
+```
 
 ---
 
