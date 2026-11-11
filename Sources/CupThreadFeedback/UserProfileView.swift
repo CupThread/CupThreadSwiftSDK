@@ -100,6 +100,7 @@ public struct UserProfileView: View {
         }
         .task { await loadProfile() }
         .safeWebOpenURL()
+        .optionalImageProtection(client: client)
     }
 
     private func profileHeader(_ profile: UserProfile) -> some View {

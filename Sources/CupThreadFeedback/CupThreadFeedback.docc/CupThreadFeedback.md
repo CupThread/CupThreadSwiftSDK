@@ -100,6 +100,10 @@ Public image assets (such as app icons and avatars) are delivered from `GET /api
 - ``PublicImageThumbnailWidth``: Supported square thumbnail width hints (`16`, `32`, `36`, `56`, `64`, `72`, `80`, `112`, `128`, or `160`).
 - ``publicImageThumbnailURL(for:width:)-(_,PublicImageThumbnailWidth?)`` (or with a raw ``publicImageThumbnailURL(for:width:)-(_,Int?)``): Construct or update a thumbnail URL with an optional width hint query parameter while preserving path and query string as opaque URLs, and original-image fallback.
 
+SDK views consult ``FeedbackClient/fetchResourceProtection()`` before showing optional managed images. When the availability endpoint reports `optionalImagesDisabled`, they render a local placeholder and do not issue an image request. A temporary image outage answers HTTP 503 with `Cache-Control: no-store` and `Retry-After`; the loader treats it as retryable unavailability, keeps it out of the decoded-image cache, and honors the retry window.
+
+The resolved signal is shared per client so independently presented SDK surfaces cannot bypass an enabled gate on a warm configuration cache. Public ``CommentsView`` and ``UserProfileView`` also resolve it when they are presented without an SDK-managed parent.
+
 ## Agentic coding
 
 This SDK is engineered to be **Agentic Coding friendly** for LLMs and AI pair programmers with zero third-party dependencies, clean architecture, and comprehensive DocC documentation. Companion skills, CLI tools, and agent workflows are available at [CupThreadAgenticCoding](https://github.com/CupThread/CupThreadAgenticCoding).

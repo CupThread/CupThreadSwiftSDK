@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import SwiftUI
 
 // MARK: - Feature flags
@@ -267,6 +268,10 @@ private struct SdkAppConfigKey: EnvironmentKey {
     static let defaultValue: PublicAppConfig? = nil
 }
 
+private struct OptionalImagesDisabledKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
     var sdkAppearance: SdkAppearance? {
         get { self[SdkAppearanceKey.self] }
@@ -291,6 +296,16 @@ extension EnvironmentValues {
     var sdkAppConfig: PublicAppConfig? {
         get { self[SdkAppConfigKey.self] }
         set { self[SdkAppConfigKey.self] = newValue }
+    }
+
+    /// Whether optional managed images should stay local and unfetched.
+    ///
+    /// SDK views derive this from ``FeedbackClient/fetchResourceProtection()``.
+    /// The default is `false`, so an unconfigured or unknown state preserves
+    /// normal image loading and relies on the server's own response handling.
+    var optionalImagesDisabled: Bool {
+        get { self[OptionalImagesDisabledKey.self] }
+        set { self[OptionalImagesDisabledKey.self] = newValue }
     }
 }
 
@@ -402,6 +417,7 @@ private struct ThemedRoot<Content: View>: View {
             .environment(\.sdkConfigStatus, loader.status)
             .environment(\.sdkConfigLoader, loader)
             .environment(\.sdkAppConfig, loader.config)
+            .environment(\.optionalImagesDisabled, loader.optionalImagesDisabled)
             .safeWebOpenURL()
             .task { await loader.load() }
     }
@@ -445,6 +461,10 @@ struct SdkSurfaceModifier: ViewModifier {
             .preferredColorScheme(appearance.theme.preferredColorScheme)
             .environment(\.sdkAppearance, appearance)
             .environment(\.sdkAppConfig, injectedConfig ?? loader.config)
+            .environment(
+                \.optionalImagesDisabled,
+                injectedLoader?.optionalImagesDisabled ?? loader.optionalImagesDisabled
+            )
         case .waiting:
             SdkConfigWaitingView()
         case .unavailable:
@@ -452,6 +472,33 @@ struct SdkSurfaceModifier: ViewModifier {
                 await (injectedLoader ?? loader).load()
             }
         }
+    }
+}
+
+/// Resolves optional-image protection for public entry points that may be
+/// presented without an SDK-managed parent. Inside an SDK hierarchy, the
+/// already-resolved parent loader wins and the owned observer stays idle.
+struct OptionalImageProtectionModifier: ViewModifier {
+    let client: FeedbackClient
+
+    @Environment(\.sdkConfigLoader) private var injectedLoader
+    @StateObject private var loader: ResourceProtectionLoader
+
+    init(client: FeedbackClient) {
+        self.client = client
+        _loader = StateObject(wrappedValue: ResourceProtectionLoader(client: client))
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .environment(
+                \.optionalImagesDisabled,
+                injectedLoader?.optionalImagesDisabled ?? loader.optionalImagesDisabled
+            )
+            .task {
+                guard injectedLoader == nil else { return }
+                await loader.resolve()
+            }
     }
 }
 
@@ -480,6 +527,10 @@ struct FeatureDisabledView: View {
 extension View {
     func sdkSurface(client: FeedbackClient, feature: SdkFeature) -> some View {
         modifier(SdkSurfaceModifier(client: client, feature: feature))
+    }
+
+    func optionalImageProtection(client: FeedbackClient) -> some View {
+        modifier(OptionalImageProtectionModifier(client: client))
     }
 }
 

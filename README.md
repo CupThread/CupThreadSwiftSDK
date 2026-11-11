@@ -132,6 +132,7 @@ try await client.presentLatestChangelog(onlyIfUnseen: true)
 | `submit(_:userToken:)` | `POST /api/v1/feedback` (sends `X-User-Token`, `X-SDK-Version`; reports `metadata.sdk` & `metadata.sdkVersion`) |
 | `uploadAttachment(data:filename:mimeType:userToken:)` | `POST /api/v1/uploads/sessions` → `PUT /api/v1/uploads/{id}` (sends `X-User-Token`, `X-SDK-Version`) |
 | `fetchAppConfig()` | `GET /api/v1/public/config/{appKey}` |
+| `fetchResourceProtection()` | `GET /api/v1/public/resource-protection` (SDK views use this to suppress optional managed-image fetches) |
 | `prepareChangelogOverlay(onlyIfUnseen:)` | Fetches config + newest changelog entries (with seen state filter) |
 | `presentLatestChangelog(onlyIfUnseen:)` | Presents overlay sheet using console copy |
 | `hasSeenChangelog(version:)` | Checks `UserDefaults` for previously seen changelog version/ID |

@@ -325,17 +325,31 @@ struct AppConfigStoreTests {
 
     // MARK: - Loader integration
 
-    @Test func warmStoreResolvesLoaderSynchronouslyWithoutFetching() async throws {
+    @Test func warmStoreWithResolvedProtectionResolvesSynchronously() async throws {
         // Re-presentation contract: a loader created while the client's cache
-        // is fresh starts .ready at init, so the surface gate resolves on the
-        // first body evaluation and no new request is fired.
+        // is fresh and the client protection signal is resolved starts .ready
+        // at init, so the surface gate resolves on the first body evaluation
+        // and no new request is fired.
         let appKey = "app_warm_loader"
         let counter = makeCounter()
         try setConfigHandler(appKey: appKey, counter: counter, theme: "midnight")
         let store = makeStore(appKey: appKey)
         let client = makeStoreClient(appKey: appKey, store: store)
 
+        MockURLProtocol.setHandler(forHost: Self.host) { request in
+            let path = request.url?.path ?? ""
+            counter.record(path: path)
+            if path.contains("/resource-protection") {
+                return (
+                    makeHTTPResponse(),
+                    try encodeJSON(["optionalImagesDisabled": false])
+                )
+            }
+            return (makeHTTPResponse(), try configJSON(appKey: appKey, theme: "midnight"))
+        }
+
         _ = try await client.cachedAppConfig()
+        #expect(await client.resolveOptionalImagesDisabled() == false)
         #expect(counter.configRequests == 1)
 
         let rePresented = SdkConfigLoader(client: client, store: store)

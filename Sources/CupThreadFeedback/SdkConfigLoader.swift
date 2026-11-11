@@ -81,6 +81,17 @@ public final class SdkConfigLoader: ObservableObject {
     /// access control.
     @Published public private(set) var config: PublicAppConfig?
 
+    /// The last protection signal resolved for this client, or `false` before
+    /// a signal has been fetched successfully.
+    ///
+    /// A successful load resolves this value before the configuration becomes
+    /// ready, so gated views never race their first optional-image fetch. A
+    /// 404 clears the signal for deployments that predate the endpoint; other
+    /// protection-endpoint failures retain the last known value because the
+    /// signal is informational and must not turn a transient lookup failure
+    /// into an availability claim.
+    @Published public private(set) var optionalImagesDisabled = false
+
     private let client: FeedbackClient
     private let store: AppConfigStore
 
@@ -94,9 +105,13 @@ public final class SdkConfigLoader: ObservableObject {
     init(client: FeedbackClient, store: AppConfigStore) {
         self.client = client
         self.store = store
+        let cachedProtection = store.cachedOptionalImagesDisabled()
+        optionalImagesDisabled = cachedProtection ?? false
         // A synchronous TTL hit resolves the gate before the first body
-        // evaluation — no waiting placeholder on a warm cache.
-        if let cached = store.cachedConfig() {
+        // evaluation — no waiting placeholder on a warm cache. Protection must
+        // also already be resolved; a warm config alone cannot make a loader
+        // ready and enable optional images before its gate is known.
+        if let cached = store.cachedConfig(), cachedProtection != nil {
             config = cached
             status = .ready(cached.sdk)
         }
@@ -118,7 +133,13 @@ public final class SdkConfigLoader: ObservableObject {
     public func load() async {
         let client = self.client
         do {
+            let hasFreshConfig = store.cachedConfig() != nil
             let appConfig = try await store.config { try await client.fetchAppConfig() }
+            if !hasFreshConfig {
+                await resolveOptionalImageProtection(with: client, forceRefresh: true)
+            } else {
+                await resolveOptionalImageProtection(with: client)
+            }
             config = appConfig
             status = .ready(appConfig.sdk)
         } catch is CancellationError {
@@ -142,6 +163,7 @@ public final class SdkConfigLoader: ObservableObject {
         let client = self.client
         do {
             let appConfig = try await store.forceRefresh { try await client.fetchAppConfig() }
+            await resolveOptionalImageProtection(with: client, forceRefresh: true)
             config = appConfig
             status = .ready(appConfig.sdk)
         } catch is CancellationError {
@@ -151,5 +173,37 @@ public final class SdkConfigLoader: ObservableObject {
         } catch {
             status = .failed(appearance: store.lastGoodAppearance(), error: error)
         }
+    }
+
+    private func resolveOptionalImageProtection(
+        with client: FeedbackClient,
+        forceRefresh: Bool = false
+    ) async {
+        if let resolved = await client.resolveOptionalImagesDisabled(forceRefresh: forceRefresh) {
+            optionalImagesDisabled = resolved
+        }
+    }
+}
+
+// MARK: - Standalone protection observer
+
+/// Lightweight client-scoped observer for public views that can be presented
+/// without ``CupThreadTheme`` or another SDK surface.
+@MainActor
+final class ResourceProtectionLoader: ObservableObject {
+    /// While unresolved, `true` fails closed so a cold standalone view cannot
+    /// issue optional-image requests before the signal arrives. A transient
+    /// lookup failure falls back to normal loading once resolution completes.
+    @Published private(set) var optionalImagesDisabled: Bool
+
+    private let client: FeedbackClient
+
+    init(client: FeedbackClient) {
+        self.client = client
+        optionalImagesDisabled = client.configStore.cachedOptionalImagesDisabled() ?? true
+    }
+
+    func resolve() async {
+        optionalImagesDisabled = await client.resolveOptionalImagesDisabled() ?? false
     }
 }

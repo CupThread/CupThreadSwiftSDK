@@ -147,6 +147,8 @@ final class AppConfigStore: @unchecked Sendable {
     private let lock = NSLock()
     private var entry: Entry?
     private var inFlight: Task<PublicAppConfig, Error>?
+    private var optionalImagesDisabled: Bool?
+    private var protectionInFlight: Task<Bool, Error>?
 
     /// - Parameters:
     ///   - ttl: How long a fetched configuration is reused.
@@ -218,6 +220,47 @@ final class AppConfigStore: @unchecked Sendable {
         lastGood.cachedMaxAttachmentBytes()
     }
 
+    /// The resolved optional-image protection signal, or `nil` before a
+    /// successful lookup (a 404 from an older deployment resolves to `false`).
+    func cachedOptionalImagesDisabled() -> Bool? {
+        lock.lock()
+        defer { lock.unlock() }
+        return optionalImagesDisabled
+    }
+
+    /// Resolves the deployment-wide optional-image protection signal through
+    /// the client-shared cache and coalesced in-flight lookup.
+    ///
+    /// Unlike the app configuration, this lookup does not use the config TTL:
+    /// a successful value remains authoritative until ``forceRefresh`` is
+    /// requested by a configuration refresh. Transient failures do not create
+    /// an availability claim and are therefore not cached.
+    /// - Parameters:
+    ///   - forceRefresh: Bypass the resolved signal; configuration refreshes
+    ///     pass `true` so console-driven changes propagate.
+    ///   - fetch: The authoritative network read for `optionalImagesDisabled`.
+    /// - Returns: The resolved signal, or `nil` for a failed lookup.
+    func optionalImagesDisabled(
+        forceRefresh: Bool = false,
+        fetch: @escaping @Sendable () async throws -> Bool
+    ) async -> Bool? {
+        if !forceRefresh, let cached = cachedOptionalImagesDisabled() {
+            return cached
+        }
+
+        do {
+            return try await joinOrCreateProtectionFetch(fetch).value
+        } catch let error as FeedbackClientError {
+            if case .unexpectedStatus(let code, _, _) = error, code == 404 {
+                finishOptionalImagesDisabled(false)
+                return false
+            }
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
     // MARK: Lock-guarded sections (kept synchronous: `NSLock.unlock` is
     // unavailable from async contexts)
 
@@ -272,5 +315,38 @@ final class AppConfigStore: @unchecked Sendable {
         if case .success(let config) = result {
             entry = Entry(config: config, fetchedAt: now())
         }
+    }
+
+    private func joinOrCreateProtectionFetch(
+        _ fetch: @escaping @Sendable () async throws -> Bool
+    ) -> Task<Bool, Error> {
+        lock.lock()
+        defer { lock.unlock() }
+        if let protectionInFlight { return protectionInFlight }
+        let task = Task { [weak self] in
+            do {
+                let optionalImagesDisabled = try await fetch()
+                self?.finishOptionalImagesDisabled(optionalImagesDisabled)
+                return optionalImagesDisabled
+            } catch {
+                self?.finishProtectionFetch()
+                throw error
+            }
+        }
+        protectionInFlight = task
+        return task
+    }
+
+    private func finishOptionalImagesDisabled(_ optionalImagesDisabled: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.optionalImagesDisabled = optionalImagesDisabled
+        protectionInFlight = nil
+    }
+
+    private func finishProtectionFetch() {
+        lock.lock()
+        defer { lock.unlock() }
+        protectionInFlight = nil
     }
 }

@@ -174,6 +174,7 @@ public struct CommentsView: View {
         }
         .task { await loadComments() }
         .safeWebOpenURL()
+        .optionalImageProtection(client: client)
     }
 
     func commentRow(_ comment: FeatureRequestComment) -> some View {
