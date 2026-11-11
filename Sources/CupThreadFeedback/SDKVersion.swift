@@ -3,7 +3,7 @@ import Foundation
 
 extension FeedbackClient {
     /// The current semantic version of the CupThread Apple SDK.
-    public static let sdkVersion = "0.1.1"
+    public static let sdkVersion = "0.1.2"
 
     /// The SDK identifier reported in submission metadata and request headers.
     public static let sdkName = "cupthread-apple"
