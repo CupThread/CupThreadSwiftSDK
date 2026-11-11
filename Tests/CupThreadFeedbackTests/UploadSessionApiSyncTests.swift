@@ -102,6 +102,50 @@ struct UploadSessionApiSyncTests {
         }
     }
 
+    @Test func oversizedSvgDataConvenienceRejectsBeforeSessionCreation() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.setHandler(forHost: host) { request in
+            requests.value = (requests.value ?? []) + [request]
+            return (makeHTTPResponse(status: 200), Data())
+        }
+
+        let client = makeClient(baseURL: URL(string: "https://\(host)")!)
+        let oversizedSVG = Data(count: UploadSessionLimits.maxSvgInspectionBytes + 1)
+
+        await #expect(throws: FeedbackClientError.self) {
+            try await client.uploadAttachment(
+                data: oversizedSVG,
+                filename: "oversized.svg",
+                mimeType: "application/octet-stream"
+            )
+        }
+        #expect(requests.value == nil)
+    }
+
+    @Test func oversizedSvgFileConvenienceRejectsBeforeSessionCreation() async throws {
+        let requests = CaptureBox<[URLRequest]>()
+        MockURLProtocol.setHandler(forHost: host) { request in
+            requests.value = (requests.value ?? []) + [request]
+            return (makeHTTPResponse(status: 200), Data())
+        }
+
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: "cupthread-svg-ceiling-\(UUID().uuidString).svg")
+        let oversizedSVG = Data(count: UploadSessionLimits.maxSvgInspectionBytes + 1)
+        try oversizedSVG.write(to: fileURL, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let client = makeClient(baseURL: URL(string: "https://\(host)")!)
+        await #expect(throws: FeedbackClientError.self) {
+            try await client.uploadAttachment(
+                fileURL: fileURL,
+                filename: "oversized.svg",
+                mimeType: "application/octet-stream"
+            )
+        }
+        #expect(requests.value == nil)
+    }
+
     @Test func svgTooLargeResponseSurfacesUnsupportedMediaType() async throws {
         MockURLProtocol.setHandler(forHost: host) { request in
             if request.httpMethod == "POST" {

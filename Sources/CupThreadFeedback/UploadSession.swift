@@ -334,6 +334,7 @@ extension FeedbackClient {
         userToken: String? = nil,
         turnstileToken: String? = nil
     ) async throws -> FeedbackAttachment {
+        try validateSvgInspectionSize(size: data.count, contentType: mimeType, filename: filename)
         let uploadSession = try await createUploadSession(
             files: [FeedbackUploadFileSpec(
                 clientFileId: "file-1",
@@ -409,12 +410,14 @@ extension FeedbackClient {
         // non-UUID identity is reported before any filesystem access
         // (issue #617); the session-creation call below re-checks.
         let validatedToken = try validatedIdentityToken(userToken)
+        let fileSize = try fileSize(at: fileURL)
+        try validateSvgInspectionSize(size: fileSize, contentType: mimeType, filename: filename)
         let uploadSession = try await createUploadSession(
             files: [FeedbackUploadFileSpec(
                 clientFileId: "file-1",
                 filename: filename,
                 contentType: mimeType,
-                sizeBytes: try fileSize(at: fileURL)
+                sizeBytes: fileSize
             )],
             userToken: validatedToken,
             turnstileToken: turnstileToken
