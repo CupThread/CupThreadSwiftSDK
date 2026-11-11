@@ -5,6 +5,14 @@ import Foundation
 
 extension FeedbackClient {
 
+    /// Coordinates item PUTs across all clients for one upload session.
+    ///
+    /// The server admits at most one in-flight item per session and answers
+    /// every sibling with HTTP 409 `already_uploaded`. A static actor scopes
+    /// the wait to the session id, so callers may still submit different
+    /// sessions concurrently.
+    private static let uploadRequestGate = UploadSessionRequestGate()
+
     /// Creates an upload session, pre-allocating one slot per file.
     ///
     /// Anonymous callers must present an `X-User-Token` — the session is
@@ -141,6 +149,10 @@ extension FeedbackClient {
     ///   failure; retryable), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` /
     ///   ``FeedbackClientError/invalidResponse`` for other failures.
+    /// - Note: Upload item requests for one session are serialized by the SDK,
+    ///   matching the server's one-in-flight-item-per-session policy. Parallel
+    ///   callers wait for the active sibling PUT instead of triggering its
+    ///   HTTP 409 `already_uploaded` collision response.
     public func uploadAttachment(
         data: Data,
         contentType: String,
@@ -154,28 +166,38 @@ extension FeedbackClient {
         if let limit = uploadSession.effectiveMaxSizeBytes(for: slot), data.count > limit {
             throw FeedbackClientError.payloadTooLarge(message: nil)
         }
-
-        var request = try uploadRequest(
-            slot: slot,
-            sessionToken: uploadSession.session.sessionToken,
-            contentType: contentType
-        )
-        request.httpBody = data
-
-        // Per-task redirect delegate (#561): injected sessions carry no
-        // session-level `SameOriginRedirectLimiter`, and Foundation's default
-        // redirect policy would replay the PUT — bearer and attachment bytes
-        // included — to whatever host a 3xx `Location` names. On the default
-        // session this duplicates the session-level limiter identically.
-        let (responseData, response) = try await session.data(for: request, delegate: SameOriginRedirectLimiter())
-        try validateUploadResponse(response, data: responseData)
-        return finalizedAttachment(
-            from: responseData,
+        try validateSvgInspectionSize(
+            size: data.count,
             contentType: contentType,
-            slot: slot,
-            fallbackSize: data.count,
-            filename: filename
+            filename: filename ?? slot.clientFileId
         )
+
+        return try await Self.uploadRequestGate.run(for: uploadSession.session.sessionId) {
+            var request = try self.uploadRequest(
+                slot: slot,
+                sessionToken: uploadSession.session.sessionToken,
+                contentType: contentType
+            )
+            request.httpBody = data
+
+            // Per-task redirect delegate (#561): injected sessions carry no
+            // session-level `SameOriginRedirectLimiter`, and Foundation's default
+            // redirect policy would replay the PUT — bearer and attachment bytes
+            // included — to whatever host a 3xx `Location` names. On the default
+            // session this duplicates the session-level limiter identically.
+            let (responseData, response) = try await self.session.data(
+                for: request,
+                delegate: SameOriginRedirectLimiter()
+            )
+            try self.validateUploadResponse(response, data: responseData)
+            return self.finalizedAttachment(
+                from: responseData,
+                contentType: contentType,
+                slot: slot,
+                fallbackSize: data.count,
+                filename: filename
+            )
+        }
     }
 
     /// Uploads a file into a pre-allocated session slot by streaming it from
@@ -219,6 +241,10 @@ extension FeedbackClient {
     ///   failure; retryable), or
     ///   ``FeedbackClientError/unexpectedStatus(code:message:requestId:)`` /
     ///   ``FeedbackClientError/invalidResponse`` for other failures.
+    /// - Note: Upload item requests for one session are serialized by the SDK,
+    ///   matching the server's one-in-flight-item-per-session policy. Parallel
+    ///   callers wait for the active sibling PUT instead of triggering its
+    ///   HTTP 409 `already_uploaded` collision response.
     public func uploadAttachment(
         fileURL: URL,
         contentType: String,
@@ -233,25 +259,32 @@ extension FeedbackClient {
         if let limit = uploadSession.effectiveMaxSizeBytes(for: slot), fileSize > limit {
             throw FeedbackClientError.payloadTooLarge(message: nil)
         }
-
-        let request = try uploadRequest(
-            slot: slot,
-            sessionToken: uploadSession.session.sessionToken,
-            contentType: contentType
-        )
-        let (responseData, response) = try await session.upload(
-            for: request,
-            fromFile: fileURL,
-            delegate: SameOriginRedirectLimiter()
-        )
-        try validateUploadResponse(response, data: responseData)
-        return finalizedAttachment(
-            from: responseData,
+        try validateSvgInspectionSize(
+            size: fileSize,
             contentType: contentType,
-            slot: slot,
-            fallbackSize: fileSize,
-            filename: filename
+            filename: filename ?? fileURL.lastPathComponent
         )
+
+        return try await Self.uploadRequestGate.run(for: uploadSession.session.sessionId) {
+            let request = try self.uploadRequest(
+                slot: slot,
+                sessionToken: uploadSession.session.sessionToken,
+                contentType: contentType
+            )
+            let (responseData, response) = try await self.session.upload(
+                for: request,
+                fromFile: fileURL,
+                delegate: SameOriginRedirectLimiter()
+            )
+            try self.validateUploadResponse(response, data: responseData)
+            return self.finalizedAttachment(
+                from: responseData,
+                contentType: contentType,
+                slot: slot,
+                fallbackSize: fileSize,
+                filename: filename
+            )
+        }
     }
 
     /// Uploads one file end-to-end: creates a session bound to the end-user
@@ -423,6 +456,35 @@ extension FeedbackClient {
         guard files.allSatisfy({ $0.sizeBytes >= UploadSessionLimits.minFileSizeBytes }) else {
             throw FeedbackClientError.invalidInput(field: "files[].sizeBytes")
         }
+    }
+
+    /// Rejects a payload identified as SVG above the server's content-screening
+    /// decode ceiling before any upload bytes leave the client.
+    func validateSvgInspectionSize(
+        size: Int,
+        contentType: String,
+        filename: String?
+    ) throws {
+        guard isSvgInspectionCandidate(contentType: contentType, filename: filename),
+              size > UploadSessionLimits.maxSvgInspectionBytes else {
+            return
+        }
+        throw FeedbackClientError.unsupportedMediaType(
+            message: "SVG exceeds the content-inspection size limit of \(UploadSessionLimits.maxSvgInspectionBytes) bytes"
+        )
+    }
+
+    private func isSvgInspectionCandidate(contentType: String, filename: String?) -> Bool {
+        let mediaType = contentType
+            .split(separator: ";", maxSplits: 1, omittingEmptySubsequences: true)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if mediaType == "image/svg+xml" {
+            return true
+        }
+        guard let filename else { return false }
+        return URL(fileURLWithPath: filename).pathExtension.caseInsensitiveCompare("svg") == .orderedSame
     }
 
     /// Builds the `PUT /api/v1/uploads/{uploadId}` request for a slot.
@@ -624,4 +686,64 @@ extension FeedbackClient {
             return nil
         }
     }
+}
+
+private actor UploadSessionRequestGate {
+    private var activeSessions = Set<String>()
+    private var waiters: [String: [Waiter]] = [:]
+
+    func run<T: Sendable>(
+        for sessionID: String,
+        operation: @Sendable () async throws -> T
+    ) async throws -> T {
+        try Task.checkCancellation()
+        try await acquire(sessionID)
+        do {
+            try Task.checkCancellation()
+            let result = try await operation()
+            release(sessionID)
+            return result
+        } catch {
+            release(sessionID)
+            throw error
+        }
+    }
+
+    private func acquire(_ sessionID: String) async throws {
+        guard activeSessions.insert(sessionID).inserted else {
+            let waiterID = UUID()
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    waiters[sessionID, default: []].append(
+                        Waiter(id: waiterID, continuation: continuation)
+                    )
+                }
+            } onCancel: {
+                Task { await self.cancelWaiter(for: sessionID, waiterID: waiterID) }
+            }
+            return
+        }
+    }
+
+    private func cancelWaiter(for sessionID: String, waiterID: UUID) {
+        guard let waiterIndex = waiters[sessionID]?.firstIndex(where: { $0.id == waiterID }) else {
+            return
+        }
+        let waiter = waiters[sessionID]?.remove(at: waiterIndex)
+        waiter?.continuation.resume(throwing: CancellationError())
+    }
+
+    private func release(_ sessionID: String) {
+        if let waiter = waiters[sessionID]?.first {
+            waiters[sessionID]?.removeFirst()
+            waiter.continuation.resume()
+        } else {
+            activeSessions.remove(sessionID)
+        }
+    }
+}
+
+private struct Waiter: Sendable {
+    let id: UUID
+    let continuation: CheckedContinuation<Void, Error>
 }

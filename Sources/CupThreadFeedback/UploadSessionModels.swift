@@ -115,6 +115,12 @@ public enum UploadSessionLimits: Sendable {
     /// (``FeedbackUploadSession/effectiveMaxSizeBytes(for:)``), so this floor
     /// is the only size bound the client can decide before a session exists.
     public static let minFileSizeBytes = 1
+
+    /// The largest payload the upload item endpoint screens as SVG before
+    /// decoding it. A payload identified by an `.svg` filename or an
+    /// `image/svg+xml` content type above this byte count is rejected with
+    /// HTTP 415 `svg_too_large`, regardless of the slot's declared size.
+    public static let maxSvgInspectionBytes = 10_000_000
 }
 
 /// An upload session created via `POST /api/v1/uploads/sessions`.
