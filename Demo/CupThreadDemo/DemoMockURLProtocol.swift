@@ -87,6 +87,7 @@ final class DemoMockURLProtocol: URLProtocol, @unchecked Sendable {
         counterLock.unlock()
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private static func response(
         for path: String,
         query: String,
@@ -96,6 +97,9 @@ final class DemoMockURLProtocol: URLProtocol, @unchecked Sendable {
         if path.contains("/api/v1/public/config/") {
             recordConfigRequest()
             return MockResponse(200, DemoMockData.appConfigJSON)
+        }
+        if path.contains("/api/v1/public/resource-protection") {
+            return MockResponse(200, Data(#"{"optionalImagesDisabled":false}"#.utf8))
         }
         if path.contains("/api/v1/public/columns/") {
             return MockResponse(200, DemoMockData.columnsJSON)

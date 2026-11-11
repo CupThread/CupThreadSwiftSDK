@@ -23,6 +23,27 @@ typealias PlatformImage = UIImage
 typealias PlatformImage = NSImage
 #endif
 
+// MARK: - Temporary image unavailability
+
+/// A 503 from an optional managed-image endpoint. The image is temporarily
+/// unavailable—not missing—and `Retry-After` describes the negative-cache
+/// lifetime independently of the loader's generic failure interval.
+struct RemoteImageServiceUnavailable: Error, Equatable {
+    let retryAfter: TimeInterval?
+}
+
+/// Parses the documented numeric `Retry-After` value used by the image API.
+enum RetryAfterParser {
+    static func interval(from response: HTTPURLResponse) -> TimeInterval? {
+        guard let rawValue = response.value(forHTTPHeaderField: "Retry-After"),
+              let interval = Double(rawValue),
+              interval.isFinite,
+              interval >= 0
+        else { return nil }
+        return min(interval, 3_600)
+    }
+}
+
 // MARK: - Loader
 
 /// Shared loader for remote images (avatars, app icons).
@@ -65,7 +86,7 @@ final class RemoteImageLoader {
 
     /// A download failure worth replaying inside the negative-cache window.
     private struct FailedFetch {
-        let date: Date
+        let retryAt: Date
         let error: any Error
     }
 
@@ -160,8 +181,10 @@ final class RemoteImageLoader {
     /// `URLError(.badServerResponse)` without reaching the target, and a final
     /// response from another origin is rejected as `URLError(.badURL)`.
     ///
-/// A download that fails is remembered for `failureRetryInterval`; calls
-/// inside that window rethrow the recorded error without a network request.
+/// A download that fails is remembered for `failureRetryInterval`. A 503
+/// instead uses its non-negative `Retry-After` value (capped at one hour);
+/// calls inside that window rethrow the recorded error without a network
+/// request, and failed responses never enter the decoded-image cache.
 ///
 /// Memory is bounded end to end: the decoded bitmap's longest pixel edge is
 /// capped at `maxDecodedPixelEdge` via an ImageIO thumbnail decode (avatars
@@ -406,7 +429,7 @@ func image(for url: URL) async throws -> PlatformImage {
     /// retry window, pruning the entry once its window has lapsed.
     private func recentFailure(for url: URL) -> FailedFetch? {
         guard let failure = recentFailures[url] else { return nil }
-        if now().timeIntervalSince(failure.date) < failureRetryInterval {
+        if now() < failure.retryAt {
             return failure
         }
         recentFailures.removeValue(forKey: url)
@@ -417,9 +440,12 @@ func image(for url: URL) async throws -> PlatformImage {
     /// expired entries so the ledger stays bounded to one retry window.
     private func recordFailure(_ error: any Error, for url: URL) {
         let currentTime = now()
-        recentFailures[url] = FailedFetch(date: currentTime, error: error)
-        let cutoff = currentTime.addingTimeInterval(-failureRetryInterval)
-        recentFailures = recentFailures.filter { $0.value.date > cutoff }
+        let retryInterval = (error as? RemoteImageServiceUnavailable)?.retryAfter ?? failureRetryInterval
+        recentFailures[url] = FailedFetch(
+            retryAt: currentTime.addingTimeInterval(retryInterval),
+            error: error
+        )
+        recentFailures = recentFailures.filter { now() < $0.value.retryAt }
     }
 
     /// Finalizes a successful download from inside the detached background task,

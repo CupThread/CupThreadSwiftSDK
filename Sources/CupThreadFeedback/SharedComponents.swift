@@ -85,8 +85,24 @@ struct AvatarView: View {
     let url: String?
     var size: CGFloat = 20
     var thumbnailWidth: PublicImageThumbnailWidth?
+    var optionalImagesDisabledOverride: Bool?
+
+    @Environment(\.optionalImagesDisabled) private var optionalImagesDisabled
 
     var resolvedURL: URL? {
+        Self.resolvedURL(
+            from: url,
+            thumbnailWidth: thumbnailWidth,
+            optionalImagesDisabled: optionalImagesDisabledOverride ?? optionalImagesDisabled
+        )
+    }
+
+    static func resolvedURL(
+        from url: String?,
+        thumbnailWidth: PublicImageThumbnailWidth?,
+        optionalImagesDisabled: Bool
+    ) -> URL? {
+        guard !optionalImagesDisabled else { return nil }
         if let thumbnailWidth {
             return publicImageThumbnailURL(from: url, width: thumbnailWidth)
         }

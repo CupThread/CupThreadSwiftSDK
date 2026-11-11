@@ -1,4 +1,25 @@
+// swiftlint:disable file_length
 import Foundation
+
+// MARK: - Resource protection (GET /api/v1/public/resource-protection)
+
+/// The deployment-wide availability signal for optional managed images.
+///
+/// Returned by ``FeedbackClient/fetchResourceProtection()``. When
+/// ``ResourceProtectionStatus/optionalImagesDisabled`` is `true`, SDK views
+/// render their local placeholders without requesting optional avatars and
+/// app icons. The signal is informational: essential content behavior is
+/// unchanged, and a temporary image outage can still surface independently
+/// as HTTP 503.
+public struct ResourceProtectionStatus: Codable, Equatable, Sendable {
+    /// Whether optional managed images are temporarily disabled.
+    public let optionalImagesDisabled: Bool
+
+    /// Creates the resource-protection payload.
+    public init(optionalImagesDisabled: Bool) {
+        self.optionalImagesDisabled = optionalImagesDisabled
+    }
+}
 
 // MARK: - Public app config (GET /api/v1/public/config/{appKey})
 
@@ -361,6 +382,28 @@ extension FeedbackClient {
     ///   the window has expired and the refresh fails.
     public func cachedAppConfig() async throws -> PublicAppConfig {
         try await configStore.config { [self] in try await fetchAppConfig() }
+    }
+
+    /// Fetches the deployment-wide availability signal for optional managed
+    /// images.
+    ///
+    /// When `optionalImagesDisabled` is `true`, SDK views use their local
+    /// placeholders without fetching optional avatars and app icons. The
+    /// signal does not gate essential content and does not guarantee a
+    /// spending cap.
+    /// - Returns: The current resource-protection state.
+    /// - Throws: ``FeedbackClientError/unexpectedStatus(code:message:requestId:)``
+    ///   for a non-2xx response, including 404 before the API capability is
+    ///   deployed, or ``FeedbackClientError/invalidResponse`` for a malformed
+    ///   2xx payload.
+    public func fetchResourceProtection() async throws -> ResourceProtectionStatus {
+        try await get("/api/v1/public/resource-protection")
+    }
+
+    func resolveOptionalImagesDisabled(forceRefresh: Bool = false) async -> Bool? {
+        await configStore.optionalImagesDisabled(forceRefresh: forceRefresh) { [self] in
+            try await fetchResourceProtection().optionalImagesDisabled
+        }
     }
 
     /// Fetches the visible roadmap board columns, ordered by position.

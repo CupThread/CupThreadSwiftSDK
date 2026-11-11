@@ -127,7 +127,14 @@ final class BoundedBodyTransport: NSObject, URLSessionDataDelegate, @unchecked S
         }
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             completionHandler(.cancel)
-            finish(dataTask, with: .failure(URLError(.badServerResponse)))
+            let error: any Error = if http.statusCode == 503 {
+                RemoteImageServiceUnavailable(
+                    retryAfter: RetryAfterParser.interval(from: http)
+                )
+            } else {
+                URLError(.badServerResponse)
+            }
+            finish(dataTask, with: .failure(error))
             return
         }
         completionHandler(.allow)
