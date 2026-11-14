@@ -873,7 +873,13 @@ function verifyStaticBinary(framework, expectedArchs) {
 
 // The privacy manifest must sit at the framework bundle root so Xcode 15+
 // aggregates the SDK's required-reason API and collected-data declarations
-// into host apps. The spot-checked markers mirror PrivacyManifestTests.swift.
+// into host apps. Reasons are read from the parsed plist, not the XML text:
+// the manifest's comments mention them too.
+const REQUIRED_REASON_API_REASONS = {
+  NSPrivacyAccessedAPICategoryUserDefaults: ["CA92.1"],
+  NSPrivacyAccessedAPICategoryFileTimestamp: ["C617.1", "3B52.1"]
+};
+
 function verifyPrivacyManifest(framework, label) {
   const versioned = path.join(framework, "Versions", "A");
   const base = existsSync(versioned) ? versioned : framework;
@@ -881,16 +887,35 @@ function verifyPrivacyManifest(framework, label) {
   if (!existsSync(manifest)) {
     throw new Error(`${label} is missing ${PRIVACY_MANIFEST_NAME} at the framework root — host apps would be left to declare the SDK's required-reason API usage by hand`);
   }
-  const content = readFileSync(manifest, "utf8");
-  for (const marker of [
-    "NSPrivacyTracking",
-    "NSPrivacyAccessedAPICategoryUserDefaults",
-    "CA92.1",
-    "NSPrivacyCollectedDataTypeUserID",
-    "NSPrivacyCollectedDataTypeOtherUserContent"
-  ]) {
-    if (!content.includes(marker)) {
-      throw new Error(`${label} privacy manifest is missing the ${marker} declaration`);
+
+  let parsed;
+  try {
+    parsed = JSON.parse(run("plutil", ["-convert", "json", "-o", "-", manifest], { capture: true }));
+  } catch (error) {
+    throw new Error(`${label} ${PRIVACY_MANIFEST_NAME} did not parse as a property list: ${error.message}`);
+  }
+  if (parsed.NSPrivacyTracking !== false) {
+    throw new Error(`${label} privacy manifest must declare NSPrivacyTracking false`);
+  }
+
+  const apiTypes = parsed.NSPrivacyAccessedAPITypes ?? [];
+  for (const [category, reasons] of Object.entries(REQUIRED_REASON_API_REASONS)) {
+    const entry = apiTypes.find((apiType) => apiType.NSPrivacyAccessedAPIType === category);
+    if (!entry) {
+      throw new Error(`${label} privacy manifest is missing the ${category} declaration`);
+    }
+    const declaredReasons = new Set(entry.NSPrivacyAccessedAPITypeReasons ?? []);
+    for (const reason of reasons) {
+      if (!declaredReasons.has(reason)) {
+        throw new Error(`${label} privacy manifest is missing ${category} reason ${reason}`);
+      }
+    }
+  }
+
+  const dataTypes = new Set((parsed.NSPrivacyCollectedDataTypes ?? []).map((entry) => entry.NSPrivacyCollectedDataType));
+  for (const dataType of ["NSPrivacyCollectedDataTypeUserID", "NSPrivacyCollectedDataTypeOtherUserContent"]) {
+    if (!dataTypes.has(dataType)) {
+      throw new Error(`${label} privacy manifest is missing the ${dataType} declaration`);
     }
   }
 }
@@ -959,10 +984,10 @@ added to your app target.
 
 Each framework slice embeds a \`PrivacyInfo.xcprivacy\` manifest at its bundle
 root. Xcode 15+ automatically aggregates it into your app's privacy report —
-it declares the SDK's \`UserDefaults\` required-reason usage (CA92.1) and the
-data types the SDK transmits (anonymous user ID, optional name/email, user
-content). No manual action is needed; mirror the declarations in your own
-privacy labels if your app reports them.
+it declares the SDK's required-reason API usage (\`UserDefaults\` CA92.1, file
+timestamps C617.1/3B52.1) and the data types the SDK transmits (anonymous
+user ID, optional name/email, user content). No manual action is needed;
+mirror the declarations in your own privacy labels if your app reports them.
 
 ## License
 
@@ -1207,7 +1232,7 @@ async function main() {
       `CupThread Apple SDK v${version}`,
       "Static-library XCFramework: hosts link the SDK into their own binary (no embedded dylib, dead-code stripping applies).",
       "The zip carries the localized-strings bundle — add it to your app target's Copy Bundle Resources (see INSTALL.md).",
-      "Every framework slice ships a PrivacyInfo.xcprivacy manifest (UserDefaults CA92.1 + collected-data types), aggregated automatically by Xcode 15+.",
+      "Every framework slice ships a PrivacyInfo.xcprivacy manifest (UserDefaults CA92.1, file timestamps C617.1/3B52.1 + collected-data types), aggregated automatically by Xcode 15+.",
       "SwiftUI surfaces: roadmap board, What's New, feature requests, feedback composer.",
       "iOS 17+ · macOS 14+ (universal arm64 + x86_64) · visionOS 1.0+ · tvOS 17+.",
       `Binary target with checksum ${artifact.sha256}.`

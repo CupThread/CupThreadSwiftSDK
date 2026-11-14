@@ -49,29 +49,103 @@ struct PrivacyManifestTests {
         #expect(domains.isEmpty, "The SDK must not declare tracking domains")
     }
 
-    @Test func declaresUserDefaultsRequiredReasonCA92_1() throws {
+    /// The required-reason categories the audited call sites justify, pinned
+    /// exactly: adding a third category requires updating this expectation.
+    private static let auditedRequiredReasonAPIs: [String: [String]] = [
+        "NSPrivacyAccessedAPICategoryUserDefaults": ["CA92.1"],
+        "NSPrivacyAccessedAPICategoryFileTimestamp": ["C617.1", "3B52.1"]
+    ]
+
+    /// Tokens that appear at a required-reason API call site. Every match in
+    /// `Sources/CupThreadFeedback` must have its category declared.
+    private static let requiredReasonCallSites: [(token: String, category: String)] = [
+        ("UserDefaults", "NSPrivacyAccessedAPICategoryUserDefaults"),
+        ("attributesOfItem", "NSPrivacyAccessedAPICategoryFileTimestamp"),
+        ("contentModificationDate", "NSPrivacyAccessedAPICategoryFileTimestamp"),
+        ("getattrlist", "NSPrivacyAccessedAPICategoryFileTimestamp"),
+        ("getattrlist", "NSPrivacyAccessedAPICategoryDiskSpace"),
+        ("stat(", "NSPrivacyAccessedAPICategoryFileTimestamp"),
+        ("fstatat(", "NSPrivacyAccessedAPICategoryFileTimestamp"),
+        ("systemUptime", "NSPrivacyAccessedAPICategorySystemBootTime"),
+        ("mach_absolute_time", "NSPrivacyAccessedAPICategorySystemBootTime"),
+        ("volumeAvailableCapacity", "NSPrivacyAccessedAPICategoryDiskSpace"),
+        ("volumeTotalCapacity", "NSPrivacyAccessedAPICategoryDiskSpace"),
+        ("systemFreeSize", "NSPrivacyAccessedAPICategoryDiskSpace"),
+        ("systemSize", "NSPrivacyAccessedAPICategoryDiskSpace"),
+        ("statfs", "NSPrivacyAccessedAPICategoryDiskSpace"),
+        ("statvfs", "NSPrivacyAccessedAPICategoryDiskSpace"),
+        ("activeInputModes", "NSPrivacyAccessedAPICategoryActiveKeyboards")
+    ]
+
+    @Test func declaresExactlyTheAuditedRequiredReasonCategories() throws {
         let manifest = try loadManifest()
         let apiTypes = try #require(
             manifest["NSPrivacyAccessedAPITypes"] as? [[String: Any]],
             "NSPrivacyAccessedAPITypes must be an array of dictionaries"
         )
-        #expect(!apiTypes.isEmpty, "UserDefaults usage must be declared")
 
-        let defaults = apiTypes.filter {
-            ($0["NSPrivacyAccessedAPIType"] as? String) == "NSPrivacyAccessedAPICategoryUserDefaults"
+        var declared: [String: [String]] = [:]
+        for entry in apiTypes {
+            let category = try #require(
+                entry["NSPrivacyAccessedAPIType"] as? String,
+                "Every NSPrivacyAccessedAPITypes entry needs an NSPrivacyAccessedAPIType string"
+            )
+            let reasons = try #require(
+                entry["NSPrivacyAccessedAPITypeReasons"] as? [String],
+                "\(category) must carry reason codes"
+            )
+            #expect(declared[category] == nil, "\(category) is declared more than once")
+            declared[category] = reasons
         }
-        #expect(defaults.count == 1, "Expected exactly one UserDefaults declaration")
 
-        let reasons = try #require(
-            defaults.first?["NSPrivacyAccessedAPITypeReasons"] as? [String],
-            "UserDefaults declaration must carry reason codes"
+        #expect(
+            declared == Self.auditedRequiredReasonAPIs,
+            "Required-reason declarations drifted from the audited contract: found \(declared)"
         )
-        #expect(reasons == ["CA92.1"], "UserDefaults reason codes must be exactly [CA92.1], found \(reasons)")
+    }
 
-        let otherCategories = Set(
-            apiTypes.compactMap { $0["NSPrivacyAccessedAPIType"] as? String }
-        ).subtracting(["NSPrivacyAccessedAPICategoryUserDefaults"])
-        #expect(otherCategories.isEmpty, "Unexpected additional required-reason API categories: \(otherCategories)")
+    @Test func everyRequiredReasonCallIsDeclared() throws {
+        let manifest = try loadManifest()
+        let apiTypes = try #require(
+            manifest["NSPrivacyAccessedAPITypes"] as? [[String: Any]],
+            "NSPrivacyAccessedAPITypes must be an array of dictionaries"
+        )
+        let declared = Set(apiTypes.compactMap { $0["NSPrivacyAccessedAPIType"] as? String })
+
+        var undeclared: Set<String> = []
+        for file in try sourceFiles() {
+            let code = try String(contentsOf: file, encoding: .utf8)
+            for call in Self.requiredReasonCallSites
+            where code.contains(call.token) && !declared.contains(call.category) {
+                undeclared.insert("\(file.lastPathComponent): \(call.token) needs \(call.category)")
+            }
+        }
+
+        #expect(
+            undeclared.isEmpty,
+            "Required-reason API call sites are missing manifest declarations: \(undeclared.sorted())"
+        )
+    }
+
+    /// Every Swift source shipped by the library target, resolved from this
+    /// test file so it works from any checkout location.
+    private func sourceFiles() throws -> [URL] {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent() // PrivacyManifestTests.swift
+            .deletingLastPathComponent() // CupThreadFeedbackTests
+            .deletingLastPathComponent() // Tests
+            .appending(path: "Sources/CupThreadFeedback")
+        let enumerator = try #require(
+            FileManager.default.enumerator(at: sources, includingPropertiesForKeys: [.isRegularFileKey]),
+            "Could not enumerate \(sources.path)"
+        )
+
+        var files: [URL] = []
+        for case let file as URL in enumerator where file.pathExtension == "swift" {
+            files.append(file)
+        }
+        #expect(!files.isEmpty, "No Swift sources found under \(sources.path)")
+        return files
     }
 
     @Test func declaresAllCollectedDataTypes() throws {

@@ -8,18 +8,34 @@
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
-	<!-- Required-reason APIs. UserDefaults is the only category the SDK
-	     touches (changelog seen-state, last-good config cache, legacy
-	     migration). CA92.1: access user defaults to read or write information
-	     accessible only to the app itself. -->
+	<!-- Required-reason APIs. Two categories: UserDefaults (changelog
+	     seen-state, last-good config cache, legacy migration) and file
+	     timestamps (attachment byte sizes read through
+	     FileManager.attributesOfItem). -->
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>
+			<!-- CA92.1: access user defaults to read or write information
+			     accessible only to the app itself. -->
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<!-- C617.1: size of the SDK's own spooled attachment in
+			     temporaryDirectory (PhotoAttachmentSpooling).
+			     3B52.1: size of a file URL the host passes to
+			     uploadAttachment(fileURL:), such as a document-picker
+			     selection the user granted access to. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+				<string>3B52.1</string>
 			</array>
 		</dict>
 	</array>
