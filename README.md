@@ -47,7 +47,7 @@ Or add `https://github.com/CupThread/CupThreadSwiftSDK.git` via Xcode (*File > A
 
 Source-package consumers link the SDK **statically**: no `CupThreadFeedback` dylib is embedded in your app, the app linker dead-strips unused SDK code, and every extension target shares the single statically-linked copy.
 
-The SDK ships a [privacy manifest](https://developer.apple.com/documentation/bundleresources/privacy_manifest_files) (`PrivacyInfo.xcprivacy`) as a package resource. Xcode 15+ aggregates it into your app automatically — it declares the SDK's `UserDefaults` required-reason API usage (reason `CA92.1`), that the SDK performs no tracking, and the data types it transmits (anonymous user ID, optional name/email, user content, host-reported revenue attributes). You don't need to add anything by hand; mirror the declarations in your own privacy labels if your app reports them.
+The SDK ships a [privacy manifest](https://developer.apple.com/documentation/bundleresources/privacy_manifest_files) (`PrivacyInfo.xcprivacy`) as a package resource. Xcode 15+ aggregates it into your app automatically — it declares the SDK's required-reason API usage (`UserDefaults`, reason `CA92.1`; file timestamps, reasons `C617.1` and `3B52.1`), that the SDK performs no tracking, and the data types it transmits (anonymous user ID, optional name/email, user content, host-reported revenue attributes). You don't need to add anything by hand; mirror the declarations in your own privacy labels if your app reports them. Releases through 0.1.2 carry only the `UserDefaults` declaration; use a release built from this change, or track `main`, when your compliance scan expects the File-timestamp category.
 
 ### Prebuilt Binary Target (XCFramework)
 
@@ -66,7 +66,7 @@ targets: [
 
 Or download the zip directly from [Releases](https://github.com/CupThread/CupThreadSwiftSDK/releases), drag `CupThreadFeedback.xcframework` into your Xcode target's *Frameworks, Libraries, and Embedded Content* ("Do Not Embed" is correct — the framework links statically), and also add the bundled `CupThreadFeedback_CupThreadFeedback.bundle` to your target's *Copy Bundle Resources*. Static libraries cannot carry resources, so the localized-strings bundle ships next to the framework inside the zip; without it the first localized string lookup crashes. See the zip's `INSTALL.md`.
 
-Every framework slice in the XCFramework embeds a `PrivacyInfo.xcprivacy` manifest at its bundle root; Xcode 15+ aggregates it into your app during the build, so no manual privacy declarations are needed for the binary channel either.
+Every framework slice in the XCFramework embeds a `PrivacyInfo.xcprivacy` manifest at its bundle root; Xcode 15+ aggregates it into your app during the build, so no manual privacy declarations are needed for the binary channel either. Releases through 0.1.2 embed the manifest without the File-timestamp declaration — upgrade to a release built from this change (or rebuild the XCFramework from this commit) rather than adding the declaration to your app's manifest.
 
 ### Optional: AI Agent Skill
 
